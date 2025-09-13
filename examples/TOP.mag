@@ -1,0 +1,17 @@
+magic
+tech sky130A
+timestamp 1757805037
+<< nwell >>
+rect 117 130 286 250
+<< metal1 >>
+rect 120 210 175 225
+rect 132 20 170 35
+use INV  INV_0
+timestamp 1733796373
+transform 1 0 30 0 1 65
+box -30 -65 102 185
+use INV  INV_1
+timestamp 1733796373
+transform 1 0 200 0 1 65
+box -30 -65 102 185
+<< end >>

@@ -1,0 +1,26 @@
+magic
+tech sky130A
+timestamp 1733796373
+<< nwell >>
+rect -25 65 90 185
+<< nmos >>
+rect 20 -50 40 25
+<< pmos >>
+rect 20 90 40 165
+<< ndiff >>
+rect -10 -50 20 25
+rect 40 -50 70 25
+<< pdiff >>
+rect -5 90 20 165
+rect 40 90 70 165
+<< poly >>
+rect 20 165 40 180
+rect 20 25 40 90
+rect 20 -65 40 -50
+<< metal1 >>
+rect -25 145 90 160
+rect -30 -45 102 -30
+<< labels >>
+rlabel metal1 -30 -45 102 -30 1 VGND
+rlabel metal1 -25 145 90 160 1 VPWR
+<< end >>
