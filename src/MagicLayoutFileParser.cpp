@@ -33,7 +33,40 @@ string path 0.000 0.000 6.900 0.000
 << end >>
 #endif
 
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <sstream>
+
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/point.hpp>
+#include <boost/geometry/geometries/box.hpp>
+#include <boost/geometry/index/rtree.hpp>
+
+namespace bg = boost::geometry;
+namespace bgi = boost::geometry::index;
+
+// Define Boost.Geometry types for the spatial index.
+typedef bg::model::point<long, 2, bg::cs::cartesian> point_type;
+typedef bg::model::box<point_type> box_type;
+typedef std::pair<box_type, unsigned long> rtree_value;
 namespace MagicLayout {
 
+  class CellParseAction;
+
+  class CellParseAction {
+    //void InsertCell( bool parseMagicFile(const std::string& filename, bgi::rtree<rtree_value, bgi::rstar<16>>& rtree, std::vector<Shape>& shapes) {
+
+  };
+
+  void ParseGeometry();
+  
 }; // end of MagicLayout namespace
+
+void MagicLayout::ParseGeometry()
+{
+    bgi::rtree<rtree_value, bgi::rstar<16>> rtree;
+    rtree.insert( std::make_pair<box_type, long>( box_type(), 0 ) );
+}
 
