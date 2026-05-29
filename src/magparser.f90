@@ -74,12 +74,14 @@ module MagicVLSILayoutParser
 
   type :: Layer
      integer :: lid
-     type(Box),  pointer :: layer_boxes(:) => null()
+     integer                :: n_used   = 0   ! how many slots are filled
+     integer                :: n_alloc  = 0   ! current allocation size
+     type(Box), allocatable :: layer_boxes(:) 
   end type Layer
   integer :: MAX_N = 10
   type(hash_type) :: ht
   type(Layer), pointer :: layers(:) => null()
-  integer, allocatable :: geometry_count(:)
+  !integer, allocatable :: geometry_count(:)
   type(Box), allocatable :: extents(:)
   type(Box)              :: DESIGN_EXTENT
 contains
@@ -113,6 +115,15 @@ contains
     union_box%y2 = max(this%y2, other%y2)
   end function box_union
   
+  subroutine box_scale(this, ascale, bscale)
+    class(Box), intent(inout) :: this
+    integer, intent(in) :: ascale, bscale
+    this%x1 = (this%x1*ascale)/bscale
+    this%x2 = (this%x2*ascale)/bscale
+    this%y1 = (this%y1*ascale)/bscale
+    this%y2 = (this%y2*ascale)/bscale    
+  end subroutine box_scale
+  
   ! Type procedure for intersection of two boxes
   function box_intersection(this, other) result(intersection_box)
     class(Box), intent(in) :: this, other
@@ -139,7 +150,7 @@ contains
     ! Parses Magic VLSI layout files with component sections and rectangle definitions
     character(len=*), intent(in) :: fileName
     type(Box), pointer :: boxes(:)
-    integer, parameter :: MAX_BOXES  = 100
+    type(Box)          :: tempBox
     integer, intent(in) :: MAX_LAYERS 
     integer :: box_count = 0
     character(len=200) :: line
@@ -152,25 +163,20 @@ contains
     logical :: found_section
     integer :: layer_id
     logical :: ins,ok
-
+    integer :: ASCALE = 1
+    integer :: BSCALE = 1
+    integer, parameter :: INIT_ALLOC = 4
     ! Initialize the layer structure by allocating memory for box arrays
     ! This loop iterates through all possible layers in the hash table
     ! For each layer (from 1 to MAX_LAYERS), array of Box objects
-    ! The allocation size is fixed at MAX_BOXES per layer, creating a uniform memory layout
-    ! This approach provides efficient memory access patterns and predictable allocation behavior
-    ! Each layer's box array is stored as a contiguous block of memory for optimal cache performance
-    ! The MAX_BOXES parameter defines the maximum capacity for each layer's box storage
-    ! Memory is allocated once per layer, avoiding repeated allocations during runtime
-    ! This design assumes that each layer will not exceed MAX_BOXES boxes, which should be
-    ! carefully managed in the calling code to prevent buffer overflows
     ! The allocation occurs at initialization time, making subsequent box insertions
     ! into layers very fast as they simply require array indexing rather than memory allocation
-    
-    allocate(geometry_count(MAX_LAYERS))
     allocate(layers(MAX_LAYERS))
     allocate(extents(MAX_LAYERS))
-    do i=1,MAX_LAYERS
-       allocate(layers(i)%layer_boxes(MAX_BOXES))
+    do i = 1, MAX_LAYERS
+       allocate(layers(i)%layer_boxes(INIT_ALLOC))
+       layers(i)%n_used  = 0
+       layers(i)%n_alloc = INIT_ALLOC
     end do
     do i = 1, MAX_LAYERS
        call extents(i)%reset_to_infinity()
@@ -186,13 +192,19 @@ contains
 
        ! Skip empty lines and comments
        if (len_trim(line) == 0 .or. line(1:1) == '#') cycle
+       if (line(1:8) == 'magscale') then
+          read(line, *, iostat=i) dummy, ASCALE, BSCALE
+          write(*,*) 'MAGIC is using scaling parameters: ', ASCALE, ' ', BSCALE
+          cycle
+       end if
+       
        ! Check for section headers
        if (line(1:2) == '<<') then
           section_name = trim(line(4:len_trim(line)-2))
           section_name = trim(section_name)
           if( section_name == "labels" ) cycle
           if( section_name == "end" ) cycle          
-          write (*,'(3A10,I)') 'Layer = ', section_name, ' = id: ', layer_count
+          write (*,'(3A10,I5)') 'Layer = ', section_name, ' = id: ', layer_count
           call hash_put( ht, section_name, layer_count, ins )
           if( .not. ins ) write (*,*) 'Duplicate layer seen: ', section_name
           layer_count = layer_count + 1
@@ -206,18 +218,12 @@ contains
           ! Parse rectangle coordinates
           read(line, *, iostat=i) dummy, x1, y1, x2, y2
           call hash_get( ht, trim(section_name), layer_id, ok )
-          boxes => layers( layer_id )%layer_boxes
-          geometry_count(layer_id) = geometry_count(layer_id)+1
-          box_count = geometry_count(layer_id)
-          if (box_count > max_boxes) then
-             write(*,*) 'Error: Too many boxes in file'
-             stop
-          end if
-          boxes(box_count)%x1 = x1
-          boxes(box_count)%y1 = y1
-          boxes(box_count)%x2 = x2
-          boxes(box_count)%y2 = y2
-          if( ok ) write (*,*) 'Reading box into lid: ', layer_id
+          tempBox%x1 = x1
+          tempBox%y1 = y1
+          tempBox%x2 = x2
+          tempBox%y2 = y2
+          call box_scale( tempBox, ASCALE, BSCALE )
+          call addBoxToLayer( layer_id, tempBox )
        end if
 
        ! Parse label definitions
@@ -226,10 +232,10 @@ contains
           ! rlabel metal1 -25 145 90 160 1 VPWR
           read(line, *, iostat=i) dummy, dummy, x1, y1, x2, y2, dummy, dummy
           box_count = box_count + 1
-          boxes(box_count)%x1 = x1
-          boxes(box_count)%y1 = y1
-          boxes(box_count)%x2 = x2
-          boxes(box_count)%y2 = y2
+          !boxes(box_count)%x1 = x1
+          !boxes(box_count)%y1 = y1
+          !boxes(box_count)%x2 = x2
+          !boxes(box_count)%y2 = y2
        end if
 
     end do
@@ -240,14 +246,16 @@ contains
 
     ! Print parsed results
     write(*,*) 'Parsed ', hash_nitems(ht), ' layers.'
-    write(*,*) 'Geometry Count: ', geometry_count
-    write(*,*) 'Parsed ', sum(geometry_count), ' total boxes from ', fileName
+    print *, "=== number of boxes stored per layer ==="
+    do i = 1, size(layers)                ! modern: size(layers) = MAX_LAYERS
+       write(*,*) 'Layer: ', i, ' has ', layers(i)%n_used, ' rects.'
+    end do
     !do i = 1, box_count
     !   write(*,'(A,I,A,4I)') 'Box ', i, ': ', boxes(i)%x1, boxes(i)%y1, boxes(i)%x2, boxes(i)%y2
     !end do
     do i = 1, MAX_LAYERS
        boxes => layers(i)%layer_boxes
-       do j = 1, geometry_count(i)
+       do j = 1, layers(i)%n_used
           extents(i) = extents(i) + boxes(j)
        end do
        DESIGN_EXTENT = DESIGN_EXTENT + extents(i)
@@ -262,50 +270,37 @@ contains
     do i = 1, MAX_LAYERS
        if( extents(i)%is_valid() ) call extents(i)%print_box()
     end do
+    write(*,*) ''
+    do i = 1, size(layers)
+       deallocate( layers(i)%layer_boxes )
+    end do
   end subroutine parseMagicLayoutFile
+
+  subroutine ResizeLayer(layer_id, newSize)
+    integer, intent(in) :: layer_id
+    integer, intent(in)  :: newSize
+    type(Box), allocatable :: tmp(:)
+    type(Layer), pointer :: l
+    l => layers( layer_id )
+    allocate(tmp(newSize))
+    if (l%n_used > 0) tmp(1:l%n_used) = l%layer_boxes(1:l%n_used)   ! copy old data
+    call move_alloc(tmp, l%layer_boxes)   ! replace the old array
+    l%n_alloc = newSize
+  end subroutine ResizeLayer
+
+  subroutine addBoxToLayer( layer_id, tempBox )
+    integer, intent(in) :: layer_id
+    type(Box), intent(in) :: tempBox
+    type(Layer), pointer :: l
+    integer :: newSize
+    l => layers( layer_id )
+    if (l%n_used == l%n_alloc) then                ! buffer full → grow
+       newSize = max(1, l%n_alloc*2)                ! double the size
+       call ResizeLayer(layer_id, newSize)
+    end if
+    l%n_used = l%n_used + 1
+    l%layer_boxes(l%n_used) = tempBox
+    !write (*,*) 'Reading box into lid: ', layer_id, ' |x| = ', l%n_used
+  end subroutine addBoxToLayer
+  
 end module MagicVLSILayoutParser
-
-
-!===============================================================================
-! MAG_PARSER - Magic VLSI Layout File Parser
-!===============================================================================
-!
-! This program serves as a specialized parser for Magic VLSI layout files,
-! process ".mag" format files used in VLSI design.
-!
-! parser reads Magic layout files and extracts geometric information
-! about circuit components, including their coordinates, dimensions, and
-! hierarchical relationships within the layout.
-!
-! Key Features:
-!   - Parses Magic ".mag" files with standard Magic layout format
-!   - Supports hierarchical layout structures
-!   - Extracts geometric data for circuit components
-!   - Handles Magic-specific syntax and formatting conventions
-!   - Provides error handling for malformed input files
-!
-! File Format Support:
-!   - Input file: INV.mag (Magic layout file)
-!   - Output: Geometry data extraction and processing
-!
-! Usage:
-!   - Program expects a file named "INV.mag" in the current working directory
-!   - The file must be in valid Magic VLSI layout format
-!   - The second parameter (10 verbosity level or
-!     processing option for the parser
-!
-! Dependencies:
-!   - MagicVLSILayoutParser module (contains parseMagicLayoutFile subroutine)
-!
-! Author: Sandeep Koranne and Qwen3-Coder running on GB10 Blackwell DGX Spark
-! Date: October 2025
-! Version: 1.0
-!
-!===============================================================================
-
-program mag_parser
-  use MagicVLSILayoutParser
-  implicit none  
-  ! Modern Fort parser for INV.mag file format
-  call parseMagicLayoutFile("INV.mag",10)
-end program mag_parser
