@@ -1,0 +1,8 @@
+////////////////////////////////////////////////////////////////////////////////
+// File   : mmap_direct.cpp
+// Author : Sandeep Koranne (C) 2026. All rights reserved.
+// Purpose: Direct DMA access to single use compressed ZSTD file using mmap
+//        : for machine learning model generation we need to load large
+//        : datasets.
+////////////////////////////////////////////////////////////////////////////////
+
