@@ -1,3 +1,7 @@
+! File    : magparser.f90
+! Author  : Sandeep Koranne (C) All rights.reserved.
+! Purpose : Implementation of MAGIC VLSI format parser
+!
 ! Modern Fortran parser for INV.mag file format
 ! This program reads and parses Magic VLSI layout files containing geometric
 ! definitions and component information. The parser extracts rectangle 
@@ -54,99 +58,62 @@
 ! rlabel metal1 -25 145 90 160 1 VPWR
 ! << end >>
 
-module MagicVLSILayoutParser
-  use hash_mod
-  implicit none
+module DesignModule
+  use GeometryModule
+  implicit none  
   private
-  public:: Box, parseMagicLayoutFile
-
-  type :: Box
-     integer(kind=4) :: x1, y1, x2, y2
-   contains
-     procedure, pass :: reset_to_infinity
-     procedure, pass :: is_valid
-     procedure, pass :: print_box
-     procedure, pass :: box_union
-     procedure, pass :: box_intersection
-     generic :: operator(+) => box_union
-     generic :: operator(*) => box_intersection
-  end type Box
-
+  public :: Layer
   type :: Layer
      integer :: lid
-     integer                :: n_used   = 0   ! how many slots are filled
-     integer                :: n_alloc  = 0   ! current allocation size
+     integer(kind=8)        :: n_used   = 0   ! how many slots are filled
+     integer(kind=8)        :: n_alloc  = 0   ! current allocation size
      type(Box), allocatable :: layer_boxes(:) 
   end type Layer
+end module DesignModule
+
+module MagicVLSILayoutParser
+  use hash_mod
+  use GeometryModule
+  use DesignModule
+  use iso_c_binding 
+  implicit none
+  private
+  public:: parseMagicLayoutFile
+    interface
+        function gzopen(path, mode) bind(C, name="gzopen")
+            import :: c_ptr, c_char
+            type(c_ptr) :: gzopen
+            character(kind=c_char), intent(in) :: path(*)
+            character(kind=c_char), intent(in) :: mode(*)
+        end function gzopen
+
+        function gzgets(file, buf, len) bind(C, name="gzgets")
+            import :: c_ptr, c_char, c_int
+            type(c_ptr) :: gzgets
+            type(c_ptr), value :: file
+            character(kind=c_char), intent(out) :: buf(*)
+            integer(c_int), value :: len
+        end function gzgets
+
+        function gzclose(file) bind(C, name="gzclose")
+            import :: c_ptr, c_int
+            integer(c_int) :: gzclose
+            type(c_ptr), value :: file
+        end function gzclose
+    end interface
+  
   integer :: MAX_N = 10
   type(hash_type) :: ht
+  character(len=20), dimension(:), allocatable :: layerNames
   type(Layer), pointer :: layers(:) => null()
   !integer, allocatable :: geometry_count(:)
   type(Box), allocatable :: extents(:)
   type(Box)              :: DESIGN_EXTENT
+  integer, parameter :: M = 16                ! max entries per node
+  integer, parameter :: MAX_CHILD = M         ! internal nodes have ≤ M children  
 contains
-  ! Type procedure to reset box to [infinity,infinity,-infinity,-infinity]
-  subroutine reset_to_infinity(this)
-    class(Box), intent(inout) :: this
-    this%x1 = huge(this%x1)
-    this%y1 = huge(this%y1)
-    this%x2 = -huge(this%x1)
-    this%y2 = -huge(this%y1)
-  end subroutine reset_to_infinity
-  pure logical function is_valid(this)
-    class(Box), intent(in) :: this
-    !box is valid if x1 < x2 and y1 < y2
-    is_valid = (this%x1 < this%x2 .and. this%y1 < this%y2)
-  end function is_valid
   
-  subroutine print_box(this)
-    class(Box), intent(in) :: this    
-    print *, 'Box: [', this%x1, ',', this%y1, '] to [', this%x2, ',', this%y2, ']'
-  end subroutine print_box
-  ! Type procedure for union of two boxes
-  function box_union(this, other) result(union_box)
-    class(Box), intent(in) :: this, other
-    type(Box) :: union_box
-    
-    ! Find the bounding box that contains both boxes
-    union_box%x1 = min(this%x1, other%x1)
-    union_box%y1 = min(this%y1, other%y1)
-    union_box%x2 = max(this%x2, other%x2)
-    union_box%y2 = max(this%y2, other%y2)
-  end function box_union
-  
-  subroutine box_scale(this, ascale, bscale)
-    class(Box), intent(inout) :: this
-    integer, intent(in) :: ascale, bscale
-    this%x1 = (this%x1*ascale)/bscale
-    this%x2 = (this%x2*ascale)/bscale
-    this%y1 = (this%y1*ascale)/bscale
-    this%y2 = (this%y2*ascale)/bscale    
-  end subroutine box_scale
-  
-  ! Type procedure for intersection of two boxes
-  function box_intersection(this, other) result(intersection_box)
-    class(Box), intent(in) :: this, other
-    type(Box) :: intersection_box
-    
-    ! Find the intersection box
-    intersection_box%x1 = max(this%x1, other%x1)
-    intersection_box%y1 = max(this%y1, other%y1)
-    intersection_box%x2 = min(this%x2, other%x2)
-    intersection_box%y2 = min(this%y2, other%y2)
-    
-    ! Check if intersection is valid (non-empty)
-    if (intersection_box%x1 > intersection_box%x2 .or. &
-        intersection_box%y1 > intersection_box%y2) then
-       ! Invalid intersection - set to empty box
-       intersection_box%x1 = huge(this%x1)
-       intersection_box%y1 = huge(this%y1)
-       intersection_box%x2 = -huge(this%x1)
-       intersection_box%y2 = -huge(this%y1)
-    end if
-  end function box_intersection
-  
-  subroutine parseMagicLayoutFile(fileName,max_layers)
+  subroutine parseMagicLayoutFile(fileName,MAX_LAYERS)
     ! Parses Magic VLSI layout files with component sections and rectangle definitions
     character(len=*), intent(in) :: fileName
     type(Box), pointer :: boxes(:)
@@ -166,6 +133,12 @@ contains
     integer :: ASCALE = 1
     integer :: BSCALE = 1
     integer, parameter :: INIT_ALLOC = 4
+    ! to support compressed files
+    type(c_ptr) :: gz_file
+    character(kind=c_char, len=256) :: buffer
+    integer(c_int) :: status
+    type(c_ptr) :: res_ptr
+    real        :: t1, t2
     ! Initialize the layer structure by allocating memory for box arrays
     ! This loop iterates through all possible layers in the hash table
     ! For each layer (from 1 to MAX_LAYERS), array of Box objects
@@ -173,6 +146,7 @@ contains
     ! into layers very fast as they simply require array indexing rather than memory allocation
     allocate(layers(MAX_LAYERS))
     allocate(extents(MAX_LAYERS))
+    allocate(layerNames(MAX_LAYERS))
     do i = 1, MAX_LAYERS
        allocate(layers(i)%layer_boxes(INIT_ALLOC))
        layers(i)%n_used  = 0
@@ -184,81 +158,192 @@ contains
     call DESIGN_EXTENT%reset_to_infinity()
     call hash_create(ht,10)
     ! Open and parse the file
-    open(unit=10, file=fileName, status='old', action='read')
-
-    do
-       read(10, '(A)', end=100) line
-       line_number = line_number + 1
-
-       ! Skip empty lines and comments
-       if (len_trim(line) == 0 .or. line(1:1) == '#') cycle
-       if (line(1:8) == 'magscale') then
-          read(line, *, iostat=i) dummy, ASCALE, BSCALE
-          write(*,*) 'MAGIC is using scaling parameters: ', ASCALE, ' ', BSCALE
-          cycle
-       end if
+    i = len_trim(fileName)
+    if (i >= 3 .and. fileName(i-2:i) == ".gz") then
+       print *, "The file is a gzipped file!"
+       gz_file = gzopen(fileName // c_null_char, "r" // c_null_char)
        
-       ! Check for section headers
-       if (line(1:2) == '<<') then
-          section_name = trim(line(4:len_trim(line)-2))
-          section_name = trim(section_name)
-          if( section_name == "labels" ) cycle
-          if( section_name == "end" ) cycle          
-          write (*,'(3A10,I5)') 'Layer = ', section_name, ' = id: ', layer_count
-          call hash_put( ht, section_name, layer_count, ins )
-          if( .not. ins ) write (*,*) 'Duplicate layer seen: ', section_name
-          layer_count = layer_count + 1
-          found_section = .true.
-          cycle
+       if (.not. c_associated(gz_file)) then
+          print *, "Error: Could not open the gzipped file."
+          stop
        end if
+       do
+          block
+            integer :: null_pos
+            
+            ! 1. Locate the C null character position
+            line = repeat(c_null_char, len(line))
+            res_ptr = gzgets(gz_file, line, int(len(line), c_int))
+            ! If gzgets returns a null pointer, we hit EOF or an error
+            if (.not. c_associated(res_ptr)) exit
+            line_number = line_number + 1
+            null_pos = index(line, c_null_char)
+            if (null_pos > 1) then
+               ! 2. Check if the character right before '\0' is a newline (\n = ASCII 10)
+               !    Or a Windows carriage return (\r = ASCII 13)
+               do while (null_pos > 1)
+                  if (ichar(line(null_pos-1:null_pos-1)) == 10 .or. &
+                       ichar(line(null_pos-1:null_pos-1)) == 13) then
+                     null_pos = null_pos - 1
+                  else
+                     exit
+                  end if
+               end do
+               
+               ! 3. Clear everything from the data end to the end of the line variable
+               line(null_pos:) = ' '
+            else if (null_pos == 1) then
+               line = ' '
+            end if
+            if (len_trim(line) == 0 .or. line(1:1) == '#') cycle
+            if (line(1:8) == 'magscale') then
+               read(line, *, iostat=i) dummy, ASCALE, BSCALE
+               write(*,*) 'MAGIC is using scaling parameters: ', ASCALE, ' ', BSCALE
+               cycle
+            end if
 
-       ! Parse rectangle definitions
-       if (line(1:4) == 'rect' .and. found_section) then
-          !write (*,*) line
-          ! Parse rectangle coordinates
-          read(line, *, iostat=i) dummy, x1, y1, x2, y2
-          call hash_get( ht, trim(section_name), layer_id, ok )
-          tempBox%x1 = x1
-          tempBox%y1 = y1
-          tempBox%x2 = x2
-          tempBox%y2 = y2
-          call box_scale( tempBox, ASCALE, BSCALE )
-          call addBoxToLayer( layer_id, tempBox )
-       end if
+            ! Check for section headers
+            if (line(1:2) == '<<') then
+               section_name = trim(line(4:len_trim(line)-2))
+               section_name = trim(section_name)
+               if( section_name == "labels" ) cycle
+               if( section_name == "end" ) cycle          
+               write (*,'(3A10,I5)') 'Layer = ', section_name, ' = id: ', layer_count
+               call hash_put( ht, section_name, layer_count, ins )
+               if( .not. ins ) write (*,*) 'Duplicate layer seen: ', section_name
+               layerNames(layer_count) = section_name
+               layer_count = layer_count + 1
+               found_section = .true.
+               cycle
+            end if
 
-       ! Parse label definitions
-       if (line(1:5) == 'rlabel' .and. found_section) then
-          ! Parse label information
-          ! rlabel metal1 -25 145 90 160 1 VPWR
-          read(line, *, iostat=i) dummy, dummy, x1, y1, x2, y2, dummy, dummy
-          box_count = box_count + 1
-          !boxes(box_count)%x1 = x1
-          !boxes(box_count)%y1 = y1
-          !boxes(box_count)%x2 = x2
-          !boxes(box_count)%y2 = y2
-       end if
+            ! Parse rectangle definitions
+            if (line(1:4) == 'rect' .and. found_section) then
+               !write (*,*) line
+               ! Parse rectangle coordinates
+               read(line, *, iostat=i) dummy, x1, y1, x2, y2
+               call hash_get( ht, trim(section_name), layer_id, ok )
+               tempBox%x1 = x1
+               tempBox%y1 = y1
+               tempBox%x2 = x2
+               tempBox%y2 = y2
+               !call box_scale( tempBox, ASCALE, BSCALE )
+               call addBoxToLayer( layer_id, tempBox )
+            end if
 
-    end do
+            ! Parse label definitions
+            if (line(1:5) == 'rlabel' .and. found_section) then
+               ! Parse label information
+               ! rlabel metal1 -25 145 90 160 1 VPWR
+               read(line, *, iostat=i) dummy, dummy, x1, y1, x2, y2, dummy, dummy
+               box_count = box_count + 1
+               !boxes(box_count)%x1 = x1
+               !boxes(box_count)%y1 = y1
+               !boxes(box_count)%x2 = x2
+               !boxes(box_count)%y2 = y2
+            end if
+          end block
+       end do
+       ! 3. Close the file handle safely
+       status = gzclose(gz_file)
+    else
+       print *, "The file is NOT a gzipped file."
+       open(unit=10, file=fileName, status='old', action='read')
+       do
+          read(10, '(A)', end=100) line
+          line_number = line_number + 1
 
-100 continue ! this is end of file
-    close(10)
-    nullify(boxes)
+          ! Skip empty lines and comments
+          if (len_trim(line) == 0 .or. line(1:1) == '#') cycle
+          if (line(1:8) == 'magscale') then
+             read(line, *, iostat=i) dummy, ASCALE, BSCALE
+             write(*,*) 'MAGIC is using scaling parameters: ', ASCALE, ' ', BSCALE
+             cycle
+          end if
 
+          ! Check for section headers
+          if (line(1:2) == '<<') then
+             section_name = trim(line(4:len_trim(line)-2))
+             section_name = trim(section_name)
+             if( section_name == "labels" ) cycle
+             if( section_name == "end" ) cycle          
+             write (*,'(3A10,I5)') 'Layer = ', section_name, ' = id: ', layer_count
+             call hash_put( ht, section_name, layer_count, ins )
+             if( .not. ins ) write (*,*) 'Duplicate layer seen: ', section_name
+             layerNames(layer_count) = section_name
+             layer_count = layer_count + 1
+             found_section = .true.
+             cycle
+          end if
+
+          ! Parse rectangle definitions
+          if (line(1:4) == 'rect' .and. found_section) then
+             !write (*,*) line
+             ! Parse rectangle coordinates
+             read(line, *, iostat=i) dummy, x1, y1, x2, y2
+             call hash_get( ht, trim(section_name), layer_id, ok )
+             tempBox%x1 = x1
+             tempBox%y1 = y1
+             tempBox%x2 = x2
+             tempBox%y2 = y2
+             !call box_scale( tempBox, ASCALE, BSCALE )
+             call addBoxToLayer( layer_id, tempBox )
+          end if
+
+          ! Parse label definitions
+          if (line(1:5) == 'rlabel' .and. found_section) then
+             ! Parse label information
+             ! rlabel metal1 -25 145 90 160 1 VPWR
+             read(line, *, iostat=i) dummy, dummy, x1, y1, x2, y2, dummy, dummy
+             box_count = box_count + 1
+             !boxes(box_count)%x1 = x1
+             !boxes(box_count)%y1 = y1
+             !boxes(box_count)%x2 = x2
+             !boxes(box_count)%y2 = y2
+          end if
+
+       end do
+
+100    continue ! this is end of file
+       close(10)
+       nullify(boxes)
+    end if ! for .gz vs simple files
+    
     ! Print parsed results
     write(*,*) 'Parsed ', hash_nitems(ht), ' layers.'
-    print *, "=== number of boxes stored per layer ==="
-    do i = 1, size(layers)                ! modern: size(layers) = MAX_LAYERS
-       write(*,*) 'Layer: ', i, ' has ', layers(i)%n_used, ' rects.'
-    end do
-    !do i = 1, box_count
-    !   write(*,'(A,I,A,4I)') 'Box ', i, ': ', boxes(i)%x1, boxes(i)%y1, boxes(i)%x2, boxes(i)%y2
-    !end do
+    call cpu_time(t1)
     do i = 1, MAX_LAYERS
        boxes => layers(i)%layer_boxes
-       do j = 1, layers(i)%n_used
-          extents(i) = extents(i) + boxes(j)
-       end do
+       call quicksort_boxes( boxes, 1, layers(i)%n_used )
+       ok = CheckSortOrder( boxes, 1,  layers(i)%n_used )
+       if( .not. ok ) then
+          write(*,*) 'Sorting failed for layer: ', i, layerNames(i)
+       end if
+    end do
+    call cpu_time(t2)    
+    print '(A, F6.2, A)', 'Sorting completed in ', t2 - t1, ' seconds.'
+    print *, "=== number of boxes stored per layer ==="
+    do i = 1, size(layers)                ! modern: size(layers) = MAX_LAYERS
+       if( layers(i)%n_used == 0 ) then
+          cycle
+       end if
+       write(*,*) 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%n_used, ' rects.'
+       !boxes => layers(i)%layer_boxes
+       !do j = 1, layers(i)%n_used
+       !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
+       !end do
+    end do
+    do i = 1, MAX_LAYERS
+       boxes => layers(i)%layer_boxes
+       extents(i) = mbr_of_array( boxes, layers(i)%n_used )
        DESIGN_EXTENT = DESIGN_EXTENT + extents(i)
+       !do j = 1, layers(i)%n_used
+       !   extents(i) = extents(i) + boxes(j)
+       !end do
+       !write(*,'(A,4I)') 'Box: ',extents(i)%x1, extents(i)%y1, extents(i)%x2, extents(i)%y2
+       !extents(i) = mbr_of_array( boxes, layers(i)%n_used )
+       !write(*,'(A,4I)') 'Box: ', extents(i)%x1, extents(i)%y1, extents(i)%x2, extents(i)%y2       
+       !DESIGN_EXTENT = DESIGN_EXTENT + extents(i)
     end do
     if( .not. DESIGN_EXTENT%is_valid() ) then
        error stop 'Design EXTENT is not valid'
@@ -293,6 +378,9 @@ contains
     type(Box), intent(in) :: tempBox
     type(Layer), pointer :: l
     integer :: newSize
+    if( CheckBox( tempBox ) ) then
+       stop "ERROR: box in valid"
+    end if
     l => layers( layer_id )
     if (l%n_used == l%n_alloc) then                ! buffer full → grow
        newSize = max(1, l%n_alloc*2)                ! double the size
