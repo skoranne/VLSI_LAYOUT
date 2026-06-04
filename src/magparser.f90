@@ -60,21 +60,48 @@
 
 module DesignModule
   use GeometryModule
+  use RTreeBuilder
+  use iso_c_binding
   implicit none  
   private
-  public :: Layer
+  public :: Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
+       LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, &
+       NeedsSorting
+  type :: LayerTree
+     integer(kind=8) :: root_index
+     type(RTreeNode), allocatable :: tree_nodes(:)
+  end type LayerTree
+  enum, bind(C)                     ! bind(C) makes the values C‑compatible
+      enumerator :: LAYER_STATE_NONE  = int(Z'00', kind=c_int)
+      enumerator :: LAYER_STATE_HEAL  = int(Z'01', kind=c_int)   ! 0b0001
+      enumerator :: LAYER_STATE_SORT  = int(Z'02', kind=c_int)   ! 0b0010
+      enumerator :: LAYER_STATE_PNUM  = int(Z'04', kind=c_int)   ! 0b0100
+      enumerator :: LAYER_STATE_RTREE = int(Z'08', kind=c_int)   ! 0b1000
+  end enum
+  
   type :: Layer
      integer :: lid
      integer(kind=8)        :: n_used   = 0   ! how many slots are filled
      integer(kind=8)        :: n_alloc  = 0   ! current allocation size
-     type(Box), allocatable :: layer_boxes(:) 
+     type(Box), allocatable :: layer_boxes(:)
+     integer(kind=8)        :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
+     type(LayerTree)        :: tree
   end type Layer
+contains
+  pure function NeedsSorting(input_layer) result(retval)
+    type(Layer), intent(in) :: input_layer
+    logical :: retval
+    retval = iand(input_layer%layerState, LAYER_STATE_SORT ) == 0
+  end function NeedsSorting
+  
 end module DesignModule
 
 module MagicVLSILayoutParser
   use hash_mod
   use GeometryModule
   use DesignModule
+  use RTreeBuilder
+  use HDFDataModule  
   use iso_c_binding 
   implicit none
   private
@@ -117,6 +144,7 @@ contains
     ! Parses Magic VLSI layout files with component sections and rectangle definitions
     character(len=*), intent(in) :: fileName
     type(Box), pointer :: boxes(:)
+    type(Layer),pointer:: l
     type(Box)          :: tempBox
     integer, intent(in) :: MAX_LAYERS 
     integer :: box_count = 0
@@ -133,12 +161,20 @@ contains
     integer :: ASCALE = 1
     integer :: BSCALE = 1
     integer, parameter :: INIT_ALLOC = 4
+    integer, parameter :: K_LEAF_CAPACITY = 16 !> 32 is better than 64
     ! to support compressed files
     type(c_ptr) :: gz_file
     character(kind=c_char, len=256) :: buffer
     integer(c_int) :: status
     type(c_ptr) :: res_ptr
     real        :: t1, t2
+    !> fileName processing logic for HDF5
+    integer :: dot_pos
+    ! Deferred-length allocatable strings (Modern Fortran feature)
+    ! These automatically resize to fit the data assigned to them.
+    character(len=:), allocatable :: prefix
+    character(len=:), allocatable :: layerFileName
+    character(10)                 :: num_str
     ! Initialize the layer structure by allocating memory for box arrays
     ! This loop iterates through all possible layers in the hash table
     ! For each layer (from 1 to MAX_LAYERS), array of Box objects
@@ -160,7 +196,12 @@ contains
     ! Open and parse the file
     i = len_trim(fileName)
     if (i >= 3 .and. fileName(i-2:i) == ".gz") then
-       print *, "The file is a gzipped file!"
+       dot_pos = index( trim( fileName ), '.' )
+       if( dot_pos < 0 ) then
+          stop 'Use proper file name'
+       end if
+       prefix = fileName( 1 : dot_pos - 1 )
+       print *, "The file is a gzipped file!, w/prefix: ", prefix       
        gz_file = gzopen(fileName // c_null_char, "r" // c_null_char)
        
        if (.not. c_associated(gz_file)) then
@@ -230,7 +271,20 @@ contains
                !call box_scale( tempBox, ASCALE, BSCALE )
                call addBoxToLayer( layer_id, tempBox )
             end if
-
+            if (line(1:4) == 'HDF5' .and. found_section) then
+               !write (*,*) line
+               call hash_get( ht, trim(section_name), layer_id, ok )
+               ! Parse rectangle coordinates
+               section_name = trim(line(6:len_trim(line)))
+               call loadFromHDF( section_name, layers(layer_id)%layer_boxes )
+               layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
+               layers(layer_id)%layerState = ior( layers(layer_id)%layerState, LAYER_STATE_SORT )
+               write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from HDF5: ', section_name, ' ', layers(layer_id)%n_used
+               !boxes => layers(i)%layer_boxes
+               !do j = 1, layers(i)%n_used
+               !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
+               !end do
+            end if
             ! Parse label definitions
             if (line(1:5) == 'rlabel' .and. found_section) then
                ! Parse label information
@@ -247,8 +301,13 @@ contains
        ! 3. Close the file handle safely
        status = gzclose(gz_file)
     else
-       print *, "The file is NOT a gzipped file."
        open(unit=10, file=fileName, status='old', action='read')
+       dot_pos = index( trim( fileName ), '.', back = .true. )
+       if( dot_pos < 0 ) then
+          stop 'Use proper file name'
+       end if
+       prefix = fileName( 1 : dot_pos - 1 )
+       print *, "The file is NOT a gzipped file, w/prefix: ", prefix
        do
           read(10, '(A)', end=100) line
           line_number = line_number + 1
@@ -271,6 +330,9 @@ contains
              call hash_put( ht, section_name, layer_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate layer seen: ', section_name
              layerNames(layer_count) = section_name
+             if( layer_count > 1 ) then
+                call ResizeLayer( layer_count-1, layers(layer_count-1)%n_used ) !in-time compaction
+             end if
              layer_count = layer_count + 1
              found_section = .true.
              cycle
@@ -290,6 +352,21 @@ contains
              call addBoxToLayer( layer_id, tempBox )
           end if
 
+          if (line(1:4) == 'HDF5' .and. found_section) then
+             !write (*,*) line
+             call hash_get( ht, trim(section_name), layer_id, ok )
+             ! Parse rectangle coordinates
+             section_name = trim(line(6:len_trim(line)))
+             call loadFromHDF( section_name, layers(layer_id)%layer_boxes )
+             layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
+             layers(layer_id)%layerState = ior( layers(layer_id)%layerState, LAYER_STATE_SORT )
+             write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from HDF5: ', section_name, ' ', layers(layer_id)%n_used
+             !boxes => layers(i)%layer_boxes
+             !do j = 1, layers(i)%n_used
+             !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
+             !end do
+          end if
+          
           ! Parse label definitions
           if (line(1:5) == 'rlabel' .and. found_section) then
              ! Parse label information
@@ -313,22 +390,57 @@ contains
     write(*,*) 'Parsed ', hash_nitems(ht), ' layers.'
     call cpu_time(t1)
     do i = 1, MAX_LAYERS
-       boxes => layers(i)%layer_boxes
-       call quicksort_boxes( boxes, 1, layers(i)%n_used )
-       ok = CheckSortOrder( boxes, 1,  layers(i)%n_used )
+       !Contrary to logic this increases the peak RSS; if we want to do compaction
+       !we have to do it right after a layer is "completed"
+       if( layers(i)%n_used > 0 .and. layers(i)%n_used .ne. size( layers(i)%layer_boxes ) ) then
+          write(*,*) 'Performing compaction on layer: ', i, layerNames(i), ' ', layers(i)%n_used
+          call ResizeLayer( i, layers(i)%n_used ) ! performs compaction
+       end if
+    end do
+    do i = 1, MAX_LAYERS
+       allocate( layers(i)%tree%tree_nodes( CalculateTotalNodes( layers(i)%n_used, K_LEAF_CAPACITY ) ) )
+    end do
+    do concurrent (i = 1:MAX_LAYERS)
+    !do i=1,MAX_LAYERS
+       !for SDT6x6 it went from 16.8 to ~21
+       !boxes => layers(i)%layer_boxes
+       if( NeedsSorting( layers(i) ) ) then
+          call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
+       end if
+       call BuildRTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index)
+       !call str_pack( boxes, K_LEAF_CAPACITY )
+       !call quicksort_boxes( boxes, 1, layers(i)%n_used )
+       !ok = CheckSortOrder( boxes, 1,  layers(i)%n_used )
        if( .not. ok ) then
           write(*,*) 'Sorting failed for layer: ', i, layerNames(i)
        end if
     end do
+
     call cpu_time(t2)    
-    print '(A, F6.2, A)', 'Sorting completed in ', t2 - t1, ' seconds.'
+    print '(A, F12.2, A)', 'Sorting/OMT completed in ', t2 - t1, ' seconds.'
     print *, "=== number of boxes stored per layer ==="
+    if( .true. ) then
+    do i = 1, size(layers)
+       if( layers(i)%n_used == 0 ) then
+          cycle
+       end if
+       write(num_str,'(I0)') i
+       layerFileName = prefix // '_L' // trim(num_str) // '.h5'
+       call saveToHDF( layerFileName, layers(i)%layer_boxes )
+    end do
+    end if
     do i = 1, size(layers)                ! modern: size(layers) = MAX_LAYERS
        if( layers(i)%n_used == 0 ) then
           cycle
        end if
-       write(*,*) 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%n_used, ' rects.'
-       !boxes => layers(i)%layer_boxes
+       call cpu_time(t1)
+       !call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       call cpu_time(t2)
+       
+       write(*,'(A,I3,A,A8,A,I12,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%n_used, ' rects. |RTREE| = ', (t2-t1), ' secs.'
+       boxes => layers(i)%layer_boxes
+       !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       !awk 'NR>76262119 && NR<76401348' log_FPU.txt > m3_FPU_OMT64.txt
        !do j = 1, layers(i)%n_used
        !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
        !end do
@@ -355,6 +467,7 @@ contains
     do i = 1, MAX_LAYERS
        if( extents(i)%is_valid() ) call extents(i)%print_box()
     end do
+    write (*,*) '+-----------------------------------------------------------------+'    
     write(*,*) ''
     do i = 1, size(layers)
        deallocate( layers(i)%layer_boxes )
@@ -363,27 +476,25 @@ contains
 
   subroutine ResizeLayer(layer_id, newSize)
     integer, intent(in) :: layer_id
-    integer, intent(in)  :: newSize
+    integer(kind=8), intent(in)  :: newSize
     type(Box), allocatable :: tmp(:)
-    type(Layer), pointer :: l
-    l => layers( layer_id )
     allocate(tmp(newSize))
-    if (l%n_used > 0) tmp(1:l%n_used) = l%layer_boxes(1:l%n_used)   ! copy old data
-    call move_alloc(tmp, l%layer_boxes)   ! replace the old array
-    l%n_alloc = newSize
+    if (layers(layer_id)%n_used > 0) tmp(1:layers(layer_id)%n_used) = layers(layer_id)%layer_boxes(1:layers(layer_id)%n_used)   ! copy old data
+    call move_alloc(from=tmp, to=layers(layer_id)%layer_boxes)   ! replace the old array
+    layers(layer_id)%n_alloc = newSize
   end subroutine ResizeLayer
 
   subroutine addBoxToLayer( layer_id, tempBox )
     integer, intent(in) :: layer_id
     type(Box), intent(in) :: tempBox
     type(Layer), pointer :: l
-    integer :: newSize
+    integer(kind=8) :: newSize
     if( CheckBox( tempBox ) ) then
        stop "ERROR: box in valid"
     end if
     l => layers( layer_id )
     if (l%n_used == l%n_alloc) then                ! buffer full → grow
-       newSize = max(1, l%n_alloc*2)                ! double the size
+       newSize = max(1_8, l%n_alloc*2)                ! double the size
        call ResizeLayer(layer_id, newSize)
     end if
     l%n_used = l%n_used + 1

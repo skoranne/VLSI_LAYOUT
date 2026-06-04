@@ -8,6 +8,8 @@ level Verilog analysis.
 was written in 1995-1996, and modified for modern C++
 and boost::spatial_index which can be tried.
 
+grep  "<<" FPU_FLAT.mag | awk '{print $0; print "HDF5 FPU_DATA/FPU_FLAT_L" ++count ".h5"}'
+
 
  Reading filename: SDT6x6_FLAT.mag.gz
  The file is a gzipped file!
@@ -82,3 +84,17 @@ Sorting completed in 134.19 seconds.
  Box: [        2366 ,        5388 ] to [     1268682 ,     1281938 ]
  Box: [        1104 ,        5346 ] to [     1271508 ,     1281980 ]
  
+/ (Root)
+├── Layer_01/ (Group)
+│   ├── [Attributes] 
+│   │   ├── LayerName: "Metal_1" (String)
+│   │   └── BoundingBox: [0.0, 0.0, 5000.0, 5000.0] (Array of Reals/Doubles)
+│   └── Boxes (Dataset of Compound Datatypes)
+│
+├── Layer_02/ (Group)
+│   ├── [Attributes]
+│   │   ├── LayerName: "Via_1" 
+│   │   └── BoundingBox: [10.0, 10.0, 4990.0, 4990.0]
+│   └── Boxes (Dataset of Compound Datatypes)
+...
+└── Layer_30/ (Group)

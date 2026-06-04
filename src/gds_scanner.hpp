@@ -179,7 +179,7 @@ namespace VLSILayout
         const std::uint8_t* payload = p + 4;          // data bytes (if any)
         std::size_t dataBytes = recLen - 4;
 	bool isBox = false;
-	std::cout << __LINE__ << " " << (p-startPtr) << " " << std::hex << std::setw(2) << (int)recTyp << std::dec << " " << recLen << std::endl;
+	//std::cout << __LINE__ << " " << (p-startPtr) << " " << std::hex << std::setw(2) << (int)recTyp << std::dec << " " << recLen << std::endl;
         switch (recTyp)
 	  {
             /* --------------------------------------------------------------
@@ -242,7 +242,7 @@ namespace VLSILayout
 	      assert( curPoly );
 	      int width = read_be32(const_cast<const std::uint8_t*>( payload ) );
 	      curPoly->width = (width << 2);
-	      std::cout << "Assigning a WIDTH of " << width << " to PATH." << std::endl;
+	      //std::cout << "Assigning a WIDTH of " << width << " to PATH." << std::endl;
 	    }
 	    break;
 	  case BOX:       //
@@ -258,21 +258,21 @@ namespace VLSILayout
 	    assert( curPoly || curText );
 	    assert( ( curPoly == nullptr ) || ( curText == nullptr ) );
 	    if( curPoly ) {
-	      std::cout << "Assigning to POLY layer: " << (int)payload[0] << "\t" << (int)payload[1] << std::endl;
+	      //std::cout << "Assigning to POLY layer: " << (int)payload[0] << "\t" << (int)payload[1] << std::endl;
 	      curPoly->layer = static_cast<std::uint16_t>(payload[0] << 8 | payload[1]);
 	    } else {
-	      std::cout << "Assigning to TEXT layer: " << (int)payload[0] << "\t" << (int)payload[1] << std::endl;
+	      //std::cout << "Assigning to TEXT layer: " << (int)payload[0] << "\t" << (int)payload[1] << std::endl;
 	      curText->layer = static_cast<std::uint16_t>(payload[0] << 8 | payload[1]);
 	    }
 	    break;
 	  case DATATYPE:         // 0x0E – datatype number for the polygon
 	    assert( curPoly );
-	    std::cout << "Assigning to POLY datatype: " << (int)payload[0] << "\t" << (int)payload[1] << std::endl;
+	    //std::cout << "Assigning to POLY datatype: " << (int)payload[0] << "\t" << (int)payload[1] << std::endl;
 	    curPoly->datatype = static_cast<std::uint16_t>(payload[0] << 8 | payload[1]);
 	    break;
 	  case TEXTTYPE:         // 0x16 – datatype number for the polygon
 	    assert( curText );
-	    std::cout << "Assigning to TEXT texttype: " << (int)payload[0] << "\t" << (int)payload[1] << std::endl;
+	    //std::cout << "Assigning to TEXT texttype: " << (int)payload[0] << "\t" << (int)payload[1] << std::endl;
 	    curText->texttype = static_cast<std::uint16_t>(payload[0] << 8 | payload[1]);
 	    break;	    
 	  case XY:            // 0x10 – list of coordinate pairs
