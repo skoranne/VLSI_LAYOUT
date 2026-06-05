@@ -441,5 +441,10 @@ contains
     overlap = over_x * over_y
 
   end subroutine evaluate_split
+
+  !> Morton and other space filling curve sort
+  !> Given an array of type(Box), how can we create a Morton index (x|y)
+  !> then sort the array using that index and then use this sorted order
+  !> to create an RTree and evaluate performance.
 end module GeometryModule
 

@@ -1,0 +1,48 @@
+magic
+tech sky130A
+magscale 1 2
+timestamp 1780076111
+<< nwell >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L1.h5
+<< pwell >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L2.h5
+<< nmos >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L3.h5
+<< pmos >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L4.h5
+<< ndiff >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L5.h5
+<< pdiff >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L6.h5
+<< ndiffc >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L7.h5
+<< pdiffc >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L8.h5
+<< poly >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L9.h5
+<< polycont >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L10.h5
+<< locali >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L11.h5
+<< viali >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L12.h5
+<< metal1 >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L13.h5
+<< via1 >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L14.h5
+<< metal2 >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L15.h5
+<< via2 >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L16.h5
+<< metal3 >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L17.h5
+<< via3 >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L18.h5
+<< metal4 >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L19.h5
+<< via4 >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L20.h5
+<< metal5 >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT6x6_FLAT_L21.h5
+<< end >>
+

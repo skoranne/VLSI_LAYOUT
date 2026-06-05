@@ -401,7 +401,7 @@ contains
        allocate( layers(i)%tree%tree_nodes( CalculateTotalNodes( layers(i)%n_used, K_LEAF_CAPACITY ) ) )
     end do
     do concurrent (i = 1:MAX_LAYERS)
-    !do i=1,MAX_LAYERS
+    !do i=11,11
        !for SDT6x6 it went from 16.8 to ~21
        !boxes => layers(i)%layer_boxes
        if( NeedsSorting( layers(i) ) ) then
@@ -419,7 +419,7 @@ contains
     call cpu_time(t2)    
     print '(A, F12.2, A)', 'Sorting/OMT completed in ', t2 - t1, ' seconds.'
     print *, "=== number of boxes stored per layer ==="
-    if( .true. ) then
+    if( .false. ) then
     do i = 1, size(layers)
        if( layers(i)%n_used == 0 ) then
           cycle
@@ -430,11 +430,12 @@ contains
     end do
     end if
     do i = 1, size(layers)                ! modern: size(layers) = MAX_LAYERS
+    !do i = 11,11
        if( layers(i)%n_used == 0 ) then
           cycle
        end if
        call cpu_time(t1)
-       !call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        call cpu_time(t2)
        
        write(*,'(A,I3,A,A8,A,I12,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%n_used, ' rects. |RTREE| = ', (t2-t1), ' secs.'

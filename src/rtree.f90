@@ -49,13 +49,18 @@ contains
     ! 1. Calculate the total number of nodes needed for the flat array
     total_nodes = 0
     current_level_nodes = n_boxes
-
+    !> result = (n_boxes + capacity - 1) / capacity
+    !do while (current_level_nodes > 1)
+    !   current_level_nodes = ceiling(real(current_level_nodes) / real(capacity))
+    !   total_nodes = total_nodes + current_level_nodes
+    !end do
     do while (current_level_nodes > 1)
-       current_level_nodes = ceiling(real(current_level_nodes) / real(capacity))
+       ! Pure integer ceiling division: (A + B - 1) / B
+       current_level_nodes = (current_level_nodes + capacity - 1) / capacity
        total_nodes = total_nodes + current_level_nodes
     end do
   end function CalculateTotalNodes
-  
+  !> pure
   pure subroutine BuildRTree(sorted_boxes, capacity, tree_nodes, root_index)
     type(Box), intent(in) :: sorted_boxes(:)
     integer(kind=8), intent(in) :: capacity
@@ -72,17 +77,18 @@ contains
     ! 1. Calculate the total number of nodes needed for the flat array
     total_nodes = size( tree_nodes )
     current_level_nodes = n_boxes
-    !write (*,'(A,I8,A,I2,A,I8,A)') 'Flat RTree of ', n_boxes, ' of |C| = ', capacity, ' needs ', total_nodes, ' nodes.'
+
     !allocate(tree_nodes(total_nodes))
 
     ! 2. Build Level 1 (Parents of the external sorted boxes)
-    current_level_nodes = ceiling(real(n_boxes) / real(capacity))
+    !current_level_nodes = ceiling(real(n_boxes) / real(capacity))
+    current_level_nodes = (n_boxes + capacity - 1) / capacity
+    !write (*,'(A,I12,A,I2,A,I8,A,I12)') 'Flat RTree of ', n_boxes, ' of |C| = ', capacity, ' needs ', total_nodes, ' nodes. ', current_level_nodes    
     node_idx = 1
 
     do i = 1, current_level_nodes
        child_start = (i - 1) * capacity + 1
        child_end   = min(i * capacity, n_boxes)
-
        ! Initialize the aggregate MBR with the first child
        agg_mbr = sorted_boxes(child_start)
        tree_nodes(node_idx)%child_start = child_start
@@ -111,11 +117,13 @@ contains
     do while (prev_level_nodes > 1)
        current_level_start = node_idx
        current_level_nodes = ceiling(real(prev_level_nodes) / real(capacity))
-
+       
        do i = 1, current_level_nodes
           child_start = prev_level_start + (i - 1) * capacity
-          child_end   = min(prev_level_start + i * capacity - 1, prev_level_start + prev_level_nodes - 1)
-
+          child_end   = min(prev_level_start + i * capacity-1, prev_level_start + prev_level_nodes - 1)
+          !if( prev_level_start == 1 ) then
+          !   write (*,*) 'LEVEL1: CS ', child_start, ' CE ', child_end, ' MIN1 ', prev_level_start + i * capacity - 1, ' MIN2 ', prev_level_start + prev_level_nodes - 1
+          !end if
           ! Initialize aggregate MBR with the first child node
           agg_mbr = tree_nodes(child_start)%mbr
 
@@ -239,6 +247,7 @@ contains
           stop "INCREASE NUMBER SEARCH LEAVES"
        end if
        leafboxes( number_leaves ) = tree_nodes( index )%child_start
+       !write (*,*) 'NL = ', number_leaves, ' CS = ', tree_nodes( index )%child_start
     else
        do i = 1,tree_nodes(index)%num_children
           j = tree_nodes(index)%child_indices(i)
@@ -267,14 +276,18 @@ contains
     integer(kind=8) :: number_leaves
     logical         :: found
     num_boxes = size( sorted_boxes )
+    !write(*,*) 'DBG: ', num_boxes, ' ', size(tree_nodes)
     do i = 1, num_boxes
+    !do i = 310901856, 310901858
        number_leaves = 0
        leafboxes = 0
        found = .false.
        call SearchTree( tree_nodes, root_index, sorted_boxes(i), leafboxes, number_leaves )
+       !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
        if( number_leaves > 0 ) then
           !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
           outer: do j=1,number_leaves
+             !do k=leafboxes(j),min(leafboxes(j)+capacity-1, num_boxes)
              do k=leafboxes(j),leafboxes(j)+capacity-1
                 if( i == k ) then
                    !write(*,*) 'Index ',i, ' found at ', k                   

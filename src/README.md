@@ -9,7 +9,7 @@ was written in 1995-1996, and modified for modern C++
 and boost::spatial_index which can be tried.
 
 grep  "<<" FPU_FLAT.mag | awk '{print $0; print "HDF5 FPU_DATA/FPU_FLAT_L" ++count ".h5"}'
-
+Also we can use 'ratarmount' if we dont want to support .gz ourselves.
 
  Reading filename: SDT6x6_FLAT.mag.gz
  The file is a gzipped file!
@@ -83,7 +83,8 @@ Sorting completed in 134.19 seconds.
  Box: [         979 ,        2128 ] to [     1270069 ,     1282669 ]
  Box: [        2366 ,        5388 ] to [     1268682 ,     1281938 ]
  Box: [        1104 ,        5346 ] to [     1271508 ,     1281980 ]
- 
+
+TODO:
 / (Root)
 ├── Layer_01/ (Group)
 │   ├── [Attributes] 

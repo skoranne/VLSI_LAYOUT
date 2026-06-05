@@ -1,0 +1,11 @@
+magic
+tech sky130A
+magscale 1 2
+timestamp 1780624800
+<< foo >>
+<< bar >>
+<< poly >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_6x6_POLY_DIFF_DATA/SDT16_6x6_POLY_DIFF_L3.h5
+<< locali >>
+HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_6x6_POLY_DIFF_DATA/SDT16_6x6_POLY_DIFF_L4.h5
+<< end >>
