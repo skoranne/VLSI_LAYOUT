@@ -99,3 +99,79 @@ TODO:
 │   └── Boxes (Dataset of Compound Datatypes)
 ...
 └── Layer_30/ (Group)
+ Reading filename: MY_SEDFXTP1.mag
+ The file is NOT a gzipped file, w/prefix: MY_SEDFXTP1
+ MAGIC is using scaling parameters:            1             2
+  Layer = nwell         = id:     1
+ NUM BOXES in DATA FILE:                      3
+RL: 1    from HDF5: SEDFXTP1_DATA/S               3
+  Layer = pwell         = id:     2
+ NUM BOXES in DATA FILE:                      7
+RL: 2    from HDF5: SEDFXTP1_DATA/S               7
+  Layer = scnmos        = id:     3
+ NUM BOXES in DATA FILE:                     21
+RL: 3    from HDF5: SEDFXTP1_DATA/S               21
+  Layer = scpmoshvt     = id:     4
+ NUM BOXES in DATA FILE:                     21
+RL: 4    from HDF5: SEDFXTP1_DATA/S               21
+  Layer = ndiff         = id:     5
+ NUM BOXES in DATA FILE:                    108
+RL: 5    from HDF5: SEDFXTP1_DATA/S               108
+  Layer = pdiff         = id:     6
+ NUM BOXES in DATA FILE:                    144
+RL: 6    from HDF5: SEDFXTP1_DATA/S               144
+  Layer = ndiffc        = id:     7
+ NUM BOXES in DATA FILE:                     25
+RL: 7    from HDF5: SEDFXTP1_DATA/S               25
+  Layer = pdiffc        = id:     8
+ NUM BOXES in DATA FILE:                     38
+RL: 8    from HDF5: SEDFXTP1_DATA/S               38
+  Layer = poly          = id:     9
+ NUM BOXES in DATA FILE:                    197
+RL: 9    from HDF5: SEDFXTP1_DATA/S               197
+  Layer = polycont      = id:    10
+ NUM BOXES in DATA FILE:                     23
+RL: 10    from HDF5: SEDFXTP1_DATA/S               23
+  Layer = locali        = id:    11
+ NUM BOXES in DATA FILE:                    391
+RL: 11    from HDF5: SEDFXTP1_DATA/S               391
+  Layer = viali         = id:    12
+ NUM BOXES in DATA FILE:                     76
+RL: 12    from HDF5: SEDFXTP1_DATA/S               76
+  Layer = metal1        = id:    13
+ NUM BOXES in DATA FILE:                    127
+RL: 13    from HDF5: SEDFXTP1_DATA/S               127
+ Parsed           13  layers.
+Sorting/OMT completed in         0.60 seconds.
+ === number of boxes stored per layer ===
+Layer:   1 nwell    has            3 rects. |RTREE| =         0.00 secs.
+Layer:   2 pwell    has            7 rects. |RTREE| =         0.00 secs.
+Layer:   3 scnmos   has           21 rects. |RTREE| =         0.00 secs.
+Layer:   4 scpmoshv has           21 rects. |RTREE| =         0.00 secs.
+Layer:   5 ndiff    has          108 rects. |RTREE| =         0.00 secs.
+Layer:   6 pdiff    has          144 rects. |RTREE| =         0.00 secs.
+Layer:   7 ndiffc   has           25 rects. |RTREE| =         0.00 secs.
+Layer:   8 pdiffc   has           38 rects. |RTREE| =         0.00 secs.
+Layer:   9 poly     has          197 rects. |RTREE| =         0.00 secs.
+Layer:  10 polycont has           23 rects. |RTREE| =         0.00 secs.
+Layer:  11 locali   has          391 rects. |RTREE| =         0.02 secs.
+Layer:  12 viali    has           76 rects. |RTREE| =         0.00 secs.
+Layer:  13 metal1   has          127 rects. |RTREE| =         0.00 secs.
+ +-------------------------- Design Extent ------------------------+
+ Box: [         -38 ,         -48 ] to [        2706 ,         592 ]
+ +-----------------------------------------------------------------+
+ Box: [         -38 ,         261 ] to [        2706 ,         582 ]
+ Box: [           1 ,         -17 ] to [        2639 ,         229 ]
+ Box: [          79 ,          47 ] to [        2557 ,         203 ]
+ Box: [          79 ,         297 ] to [        2557 ,         497 ]
+ Box: [          27 ,          47 ] to [        2613 ,         203 ]
+ Box: [          27 ,         297 ] to [        2613 ,         497 ]
+ Box: [          35 ,          59 ] to [        2603 ,         180 ]
+ Box: [          35 ,         309 ] to [        2603 ,         485 ]
+ Box: [          23 ,          21 ] to [        2557 ,         523 ]
+ Box: [          33 ,          51 ] to [        2362 ,         365 ]
+ Box: [           0 ,         -17 ] to [        2668 ,         561 ]
+ Box: [          29 ,         -17 ] to [        2639 ,         561 ]
+ Box: [           0 ,         -48 ] to [        2668 ,         592 ]
+ +-----------------------------------------------------------------+
+ 
