@@ -187,7 +187,7 @@ contains
     character(10)                 :: num_str
     integer(kind=8) :: start_tick, end_tick, clock_rate
     real(kind=8)    :: elapsed_time
-
+    integer(kind=8) :: num_roots, num_rects
     ! 1. Get the number of ticks per second
     call system_clock(count_rate=clock_rate)
 
@@ -481,8 +481,12 @@ contains
        call cpu_time(t2)
        call system_clock(count=end_tick)
        elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
-       write(*,'(A,I3,A,A8,A,I12,A,I12,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%pnumtable%count_roots(), &
-            ' non-rects ', count(layers(i)%pnumtable%arr == 0), ' rects. |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
+       num_roots = layers(i)%pnumtable%count_roots()
+       !num_roots = 0
+       num_rects = count(layers(i)%pnumtable%arr == 0)
+       !num_rects = 0
+       write(*,'(A,I3,A,A8,A,I12,A,I12,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
+            ' non-rects ',num_rects , ' rects. |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
        boxes => layers(i)%layer_boxes
        !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        !awk 'NR>76262119 && NR<76401348' log_FPU.txt > m3_FPU_OMT64.txt

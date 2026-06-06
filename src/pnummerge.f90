@@ -93,23 +93,20 @@ contains
     integer :: nthreads, tid
 
 
-    !$omp parallel private(tid)
-    nthreads = omp_get_num_threads()
-    !$omp single
+    nthreads = omp_get_max_threads()
     allocate(buffers(nthreads))
-    !$omp end single
-    !$omp end parallel
-    
-    tid = omp_get_thread_num() + 1
-    call init_buffer(buffers(tid), initial_capacity=10000)
+    do i=1,nthreads
+       call init_buffer(buffers(i), initial_capacity=10000)
+    end do
     num_boxes = size( sorted_boxes )
     call uf%init( num_boxes )    
     !write(*,*) 'DBG: ', num_boxes, ' ', size(tree_nodes)
     !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
-    !$omp parallel do private(leafboxes, number_leaves, j, k)
+    !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid)
     over_all_boxes: do i=1,num_boxes
        number_leaves = 0
        leafboxes = 0
+       tid = omp_get_thread_num()+1
        call SearchTree( tree_nodes, root_index, sorted_boxes(i), leafboxes, number_leaves )
        !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
        if( number_leaves > 0 ) then
@@ -118,9 +115,9 @@ contains
              over_leaves: do k=leafboxes(j),min(leafboxes(j)+capacity-1, num_boxes)
                 !do k=leafboxes(j),leafboxes(j)+capacity-1
                 if( i < k .and. box_interact( sorted_boxes(i), sorted_boxes(k)) ) then
-                   !$komp critical (console_io)
+                   !$omp critical (console_io)
                    !write(*,*) 'Index ',i, ' ', sorted_boxes(i), ' interacts with ', k, ' ', sorted_boxes(k)
-                   !$komp end critical (console_io)
+                   !$omp end critical (console_io)
                    call push_edge(buffers(tid), i, k) ! Reallocates if capacity exceeded                   
                 end if
              end do over_leaves
