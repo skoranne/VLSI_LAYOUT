@@ -61,7 +61,9 @@
 module DesignModule
   use GeometryModule
   use RTreeBuilder
+  use DataStructuresModule
   use iso_c_binding
+  use iso_fortran_env, only : int32, int64
   implicit none  
   private
   public :: Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
@@ -86,6 +88,7 @@ module DesignModule
      type(Box), allocatable :: layer_boxes(:)
      integer(kind=8)        :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
      type(LayerTree)        :: tree
+     type(UnionFind(int64)) :: pnumtable
   end type Layer
 contains
   pure function NeedsSorting(input_layer) result(retval)
@@ -93,6 +96,11 @@ contains
     logical :: retval
     retval = iand(input_layer%layerState, LAYER_STATE_SORT ) == 0
   end function NeedsSorting
+  pure function NeedsPNum(input_layer) result(retval)
+    type(Layer), intent(in) :: input_layer
+    logical :: retval
+    retval = iand(input_layer%layerState, LAYER_STATE_PNUM ) == 0
+  end function NeedsPNum
   
 end module DesignModule
 
@@ -101,8 +109,10 @@ module MagicVLSILayoutParser
   use GeometryModule
   use DesignModule
   use RTreeBuilder
-  use HDFDataModule  
-  use iso_c_binding 
+  use HDFDataModule
+  use PNumMergeModule
+  use iso_c_binding
+  use iso_fortran_env, only : int32, int64
   implicit none
   private
   public:: parseMagicLayoutFile
@@ -175,6 +185,12 @@ contains
     character(len=:), allocatable :: prefix
     character(len=:), allocatable :: layerFileName
     character(10)                 :: num_str
+    integer(kind=8) :: start_tick, end_tick, clock_rate
+    real(kind=8)    :: elapsed_time
+
+    ! 1. Get the number of ticks per second
+    call system_clock(count_rate=clock_rate)
+
     ! Initialize the layer structure by allocating memory for box arrays
     ! This loop iterates through all possible layers in the hash table
     ! For each layer (from 1 to MAX_LAYERS), array of Box objects
@@ -279,7 +295,7 @@ contains
                call loadFromHDF( section_name, layers(layer_id)%layer_boxes )
                layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
                layers(layer_id)%layerState = ior( layers(layer_id)%layerState, LAYER_STATE_SORT )
-               write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from HDF5: ', section_name, ' ', layers(layer_id)%n_used
+               !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from HDF5: ', section_name, ' ', layers(layer_id)%n_used
                !boxes => layers(i)%layer_boxes
                !do j = 1, layers(i)%n_used
                !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
@@ -389,7 +405,8 @@ contains
     ! Print parsed results
     write(*,*) 'Parsed ', hash_nitems(ht), ' layers.'
     call cpu_time(t1)
-    do i = 1, MAX_LAYERS
+    call system_clock(count=start_tick)    
+    do i = 1, size(layers)
        !Contrary to logic this increases the peak RSS; if we want to do compaction
        !we have to do it right after a layer is "completed"
        if( layers(i)%n_used > 0 .and. layers(i)%n_used .ne. size( layers(i)%layer_boxes ) ) then
@@ -397,11 +414,10 @@ contains
           call ResizeLayer( i, layers(i)%n_used ) ! performs compaction
        end if
     end do
-    do i = 1, MAX_LAYERS
+    do i = 1, size(layers)
        allocate( layers(i)%tree%tree_nodes( CalculateTotalNodes( layers(i)%n_used, K_LEAF_CAPACITY ) ) )
-    end do
+    end do    
     do concurrent (i = 1:MAX_LAYERS)
-    !do i=11,11
        !for SDT6x6 it went from 16.8 to ~21
        !boxes => layers(i)%layer_boxes
        if( NeedsSorting( layers(i) ) ) then
@@ -415,9 +431,11 @@ contains
           write(*,*) 'Sorting failed for layer: ', i, layerNames(i)
        end if
     end do
-
-    call cpu_time(t2)    
-    print '(A, F12.2, A)', 'Sorting/OMT completed in ', t2 - t1, ' seconds.'
+    call cpu_time(t2)
+    call system_clock(count=end_tick)
+    elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
+    
+    print '(A, F12.2, A,F12.2,A)', 'Sorting/OMT completed in ', t2 - t1, ' CPU seconds.', elapsed_time, ' REAL seconds.'
     print *, "=== number of boxes stored per layer ==="
     if( .false. ) then
     do i = 1, size(layers)
@@ -429,23 +447,50 @@ contains
        call saveToHDF( layerFileName, layers(i)%layer_boxes )
     end do
     end if
-    do i = 1, size(layers)                ! modern: size(layers) = MAX_LAYERS
-    !do i = 11,11
+    write (*,*) '+-----------------------------------------------------------------+' 
+    tree_check_loop: do i = 1, size(layers)
        if( layers(i)%n_used == 0 ) then
           cycle
        end if
+       ! 2. Record the start tick
+       call system_clock(count=start_tick)           
        call cpu_time(t1)
        call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        call cpu_time(t2)
-       
-       write(*,'(A,I3,A,A8,A,I12,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%n_used, ' rects. |RTREE| = ', (t2-t1), ' secs.'
+       call system_clock(count=end_tick)
+       elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
+       write(*,'(A,I3,A,A8,A,I12,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%n_used, &
+            ' rects. |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
+       !boxes => layers(i)%layer_boxes
+       !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       !awk 'NR>76262119 && NR<76401348' log_FPU.txt > m3_FPU_OMT64.txt
+       !do j = 1, layers(i)%n_used
+       !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
+       !end do
+    end do tree_check_loop
+    write (*,*) '+-----------------------------------------------------------------+'
+    !> Polygon Number loop
+    pnum_loop: do i = 1, size(layers)
+       if( layers(i)%n_used == 0 ) then
+          cycle
+       end if
+       ! 2. Record the start tick
+       call system_clock(count=start_tick)           
+       call cpu_time(t1)
+       call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       call cpu_time(t2)
+       call system_clock(count=end_tick)
+       elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
+       write(*,'(A,I3,A,A8,A,I12,A,I12,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%pnumtable%count_roots(), &
+            ' non-rects ', count(layers(i)%pnumtable%arr == 0), ' rects. |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
        boxes => layers(i)%layer_boxes
        !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        !awk 'NR>76262119 && NR<76401348' log_FPU.txt > m3_FPU_OMT64.txt
        !do j = 1, layers(i)%n_used
        !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
        !end do
-    end do
+    end do pnum_loop
+    
     do i = 1, MAX_LAYERS
        boxes => layers(i)%layer_boxes
        extents(i) = mbr_of_array( boxes, layers(i)%n_used )

@@ -5,7 +5,8 @@
 module GeometryModule
   implicit none
   private
-  public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid
+  public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid, &
+       box_not_interact, box_interact
   ! Enum-like constants for the sorting axis
   integer, parameter :: AXIS_X = 1
   integer, parameter :: AXIS_Y = 2
@@ -52,6 +53,20 @@ contains
     is_eq = ( ( this%x1 == other%x1) .and. ( this%y1 == other%y1) .and. &
          ( this%x2 == other%x2) .and. ( this%y2 == other%y2) )
   end function box_equal
+  !> Topological functions
+  pure elemental function box_not_interact(this, other) result(retval)
+    class(Box), intent(in) :: this, other
+    logical :: retval
+    retval = ( ( this%x1 > other%x2) .or. ( this%y1 > other%y2) .or. &
+         ( this%x2 < other%x1) .or. ( this%y2 < other%y1) )
+  end function box_not_interact
+  pure elemental function box_interact(this, other) result(retval)
+    class(Box), intent(in) :: this, other
+    logical :: retval
+    retval = .not. box_not_interact(this, other)
+  end function box_interact
+  
+
   ! Type procedure for union of two boxes
   pure function box_union(this, other) result(union_box)
     class(Box), intent(in) :: this, other
@@ -76,7 +91,7 @@ contains
     end do
   end function mbr_of_array
 
-  subroutine box_scale(this, ascale, bscale)
+  pure subroutine box_scale(this, ascale, bscale)
     class(Box), intent(inout) :: this
     integer, intent(in) :: ascale, bscale
     this%x1 = (this%x1*ascale)/bscale
@@ -86,7 +101,7 @@ contains
   end subroutine box_scale
 
   ! Type procedure for intersection of two boxes
-  function box_intersection(this, other) result(intersection_box)
+  pure function box_intersection(this, other) result(intersection_box)
     class(Box), intent(in) :: this, other
     type(Box) :: intersection_box
 

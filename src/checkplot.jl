@@ -6,8 +6,27 @@
 using Plots
 using SpatialIndexing
 
-
-function plot_spatial_indexing_tree(filename::String;k::Int=16)
+function extract_levels!(node, level_dict)
+    # Branch nodes have a level; Leaf nodes do not (they are implicitly level 1)
+    lvl = hasproperty(node, :level) ? node.level : 1
+    
+    if !haskey(level_dict, lvl)
+        level_dict[lvl] = []
+    end
+    
+    # Store the MBR for this specific node
+    push!(level_dict[lvl], node.mbr)
+    
+    # Only recurse if it's a branch node (level > 1). 
+    # A Leaf's 'children' are the data items, not sub-nodes.
+    if lvl > 1 && hasproperty(node, :children)
+        for child in node.children
+            extract_levels!(child, level_dict)
+        end
+    end
+    return level_dict
+end    
+function LoadBoxes(filename::String)
     # 1. Read the boxes from your file
     boxes = BBox[]
     for line in eachline(filename)
@@ -22,55 +41,45 @@ function plot_spatial_indexing_tree(filename::String;k::Int=16)
             ))
         end
     end
+    boxes
+end
 
-    # 2. Initialize the SpatialIndexing RTree
-    # We specify Float64 for coordinates, 2 dimensions, Int for IDs, and Nothing for values
-    tree = RTree{Float64, 2}(Int, Nothing; leaf_capacity=k, branch_capacity=k)
-    
+function CreateTree(fileName;leaf_capacity=16,branch_capacity=16)
+    boxes = LoadBoxes(fileName)
+    tree = RTree{Float64, 2}(Int, Nothing; leaf_capacity, branch_capacity)    
     # 3. Insert all bounding boxes into the tree
     for box in boxes
         # SpatialIndexing.jl uses Rect((min_x, min_y), (max_x, max_y))
         rect = SpatialIndexing.Rect((box.xmin, box.ymin), (box.xmax, box.ymax))
         insert!(tree, rect, box.id, nothing)
     end
-# 4. Helper function to recursively traverse the tree and extract MBRs by level
-    function extract_levels!(node, level_dict)
-        # Branch nodes have a level; Leaf nodes do not (they are implicitly level 1)
-        lvl = hasproperty(node, :level) ? node.level : 1
-        
-        if !haskey(level_dict, lvl)
-            level_dict[lvl] = []
-        end
-        
-        # Store the MBR for this specific node
-        push!(level_dict[lvl], node.mbr)
-        
-        # Only recurse if it's a branch node (level > 1). 
-        # A Leaf's 'children' are the data items, not sub-nodes.
-        if lvl > 1 && hasproperty(node, :children)
-            for child in node.children
-                extract_levels!(child, level_dict)
-            end
-        end
-        return level_dict
-    end    
-    
-    # Extract levels starting from the root
+end
+function BulkCreateTree(fileName;leaf_capacity=16,branch_capacity=16)
+    boxes = LoadBoxes(fileName)
+    #    tree = SI.RTree{Int32, 2}(Int64)
+    tree = RTree{Float64, 2}(Int, Nothing; leaf_capacity, branch_capacity)
+    spatial_items = [
+        SI.SpatialElem(
+            SI.Rect((r.x1, r.y1), (r.x2, r.y2)), 
+            nothing,   # ID slot (corresponds to Nothing)
+            i          # Value slot (corresponds to Int64 row index)
+        )
+        for (i, r) in enumerate(boxes)
+            ]
+end
+
+function plot_spatial_indexing_tree(tree,how_many_levels=3)
     levels_map = extract_levels!(tree.root, Dict{Int, Vector{Any}}())
-    
-    # 5. Plot the tree levels
     p = plot(legend=:outertopright, aspect_ratio=:equal, title="SpatialIndexing.jl RTree Levels", yflip=true)
-    
-    # Sort levels descending so we plot the highest level (Root) first, then work down to the leaves
     sorted_levels = sort(collect(keys(levels_map)), rev=true)
-    
-    # Color palette to visually distinguish the hierarchy
     colors = [:red, :blue, :green, :purple, :orange]
-    
     for (i, lvl) in enumerate(sorted_levels)
+        if( lvl < how_many_levels )
+            continue
+        end
+        
         mbrs = levels_map[lvl]
         c = colors[mod1(i, length(colors))] # Cycle through colors safely
-        
         for (j, mbr) in enumerate(mbrs)
             # SpatialIndexing Rects store coordinates in `low` and `high` tuples
             min_x, min_y = mbr.low
@@ -94,7 +103,6 @@ function plot_spatial_indexing_tree(filename::String;k::Int=16)
     end
     
     display(p)
-    return tree
 end
 
 # Usage:

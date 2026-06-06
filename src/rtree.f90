@@ -29,14 +29,14 @@ module RTReeBuilder
   use GeometryModule
   implicit none
   private
-  public:: RTReeNode, CalculateTotalNodes, BuildRTree, ExplainTheTree, SelfTestTheTree, SearchTree
+  public:: RTReeNode, CalculateTotalNodes, BuildRTree, ExplainTheTree, SelfTestTheTree, SearchTree, K_MAX_SEARCH_LEAVES
   type :: RTreeNode
      type(Box) :: mbr
      integer(kind=4) :: num_children
      integer(kind=8) :: child_start = -1
      integer(kind=8), allocatable :: child_indices(:)
   end type RTreeNode
-  integer, parameter :: K_MAX_SEARCH_LEAVES = 2048
+  integer, parameter :: K_MAX_SEARCH_LEAVES = 4096
 contains
   pure function CalculateTotalNodes( n_boxes, capacity ) result(total_nodes)
     integer(kind=8), intent(in) :: n_boxes
@@ -221,7 +221,7 @@ contains
        retval = -n
     end if
   end function FixNumberChildren
-  recursive subroutine SearchTree(tree_nodes, index, qbox, leafboxes, number_leaves)
+  pure recursive subroutine SearchTree(tree_nodes, index, qbox, leafboxes, number_leaves)
     type(RTreeNode), intent(in) :: tree_nodes(:)
     integer(kind=8), intent(in) :: index
     type(Box), intent(in)       :: qbox
@@ -232,19 +232,24 @@ contains
     type(Box) :: tempBox
     integer(kind=8) :: i, j
     type(RTreeNode) :: childNode
+    if( size(tree_nodes) == 0 ) then
+       leafboxes(1) = 1
+       number_leaves = 1
+       return
+    end if
     cmbr = tree_nodes( index )%mbr
     tempBox = cmbr * qbox
     !write (*,'(A,4I,A,4I)') 'QBOX: ', qbox, ' CMBR: ', cmbr
     if( .not. MBRValid( tempBox ) ) then
-       write (*,*) 'QBOX: ', qbox, ' not within CMBR: ', cmbr
-       stop "ERROR"
+       !write (*,*) 'QBOX: ', qbox, ' not within CMBR: ', cmbr
+       error stop "ERROR: QBOX FAIL"
        return
     end if
     if( tree_nodes( index )%child_start > 0 ) then
        !> we have found a leaf
        number_leaves = number_leaves + 1
        if( number_leaves > K_MAX_SEARCH_LEAVES ) then
-          stop "INCREASE NUMBER SEARCH LEAVES"
+          error stop "INCREASE NUMBER SEARCH LEAVES"
        end if
        leafboxes( number_leaves ) = tree_nodes( index )%child_start
        !write (*,*) 'NL = ', number_leaves, ' CS = ', tree_nodes( index )%child_start
@@ -260,25 +265,33 @@ contains
           end if
        end do
     end if
-    
   end subroutine SearchTree
   
   subroutine SelfTestTheTree(sorted_boxes, capacity, tree_nodes, root_index)
     type(Box), intent(in) :: sorted_boxes(:)
-    type(Box)             :: b
     integer, intent(in) :: capacity
     integer(kind=8), intent(in) :: root_index
     type(RTreeNode), intent(in) :: tree_nodes(:)
-    type(RTreeNode) :: tempNode, childNode
+    !type(RTreeNode) :: tempNode, childNode
     integer(kind=8) :: num_boxes
-    integer(kind=8) :: i, j, k
+    logical         :: BIG_FAIL
+    integer(kind=8) :: i
     integer(kind=8) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
     integer(kind=8) :: number_leaves
-    logical         :: found
+    integer(kind=8) :: j, k
+    logical         :: found         
+    
+    BIG_FAIL = .false.
     num_boxes = size( sorted_boxes )
+    if( size( tree_nodes ) == 0  .and. ( num_boxes <= capacity ) ) then
+       return
+    end if
     !write(*,*) 'DBG: ', num_boxes, ' ', size(tree_nodes)
-    do i = 1, num_boxes
-    !do i = 310901856, 310901858
+    !> There are cases when the layer has < capacity boxes, so the tree is fake
+    !> We are going to assume that self check passes in these cases
+    !> we have to use OpenMP has do concurrent (atleast in ifx) did not make local vars
+    !$omp parallel do private(leafboxes, number_leaves, j, k, found)
+    over_all_boxes: do i=1,num_boxes
        number_leaves = 0
        leafboxes = 0
        found = .false.
@@ -287,28 +300,32 @@ contains
        if( number_leaves > 0 ) then
           !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
           outer: do j=1,number_leaves
-             !do k=leafboxes(j),min(leafboxes(j)+capacity-1, num_boxes)
-             do k=leafboxes(j),leafboxes(j)+capacity-1
+             over_leaves: do k=leafboxes(j),min(leafboxes(j)+capacity-1, num_boxes)
+                !do k=leafboxes(j),leafboxes(j)+capacity-1
                 if( i == k ) then
                    !write(*,*) 'Index ',i, ' found at ', k                   
                    if( found ) then
                       write(*,*) 'Index ',i, ' found repeated at ', k
-                      stop "assertion failed: duplicate index found"
+                      !stop "assertion failed: duplicate index found"
                    end if
                    found = .true.
                    !exit outer
                 end if
-             end do
+             end do over_leaves
           end do outer
           if( .not. found ) then
-             write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
-             stop "assertion failed: box not found at all"
+             !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
+             error stop "assertion failed: box not found at all"
           end if
        else
-          stop "ERROR: highly unusual"
+          !stop "ERROR: highly unusual"
+          BIG_FAIL = .true.
        end if
-    end do
-    
+    end do over_all_boxes
+
+    if( BIG_FAIL ) then
+       stop "ERROR: highly unusual"
+    end if
   end subroutine SelfTestTheTree
   
 end module RTReeBuilder

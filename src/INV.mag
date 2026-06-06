@@ -1,7 +1,6 @@
 magic
 tech sky130A
-magscale 1 1
-timestamp 1733796373
+timestamp 1780780657
 << nwell >>
 rect -25 65 90 185
 << nmos >>
@@ -20,6 +19,9 @@ rect 20 25 40 90
 rect 20 -65 40 -50
 << metal1 >>
 rect -25 145 90 160
+rect -25 102 90 117
+rect -29 -10 103 5
+rect -26 -30 -8 -10
 rect -30 -45 102 -30
 << labels >>
 rlabel metal1 -30 -45 102 -30 1 VGND

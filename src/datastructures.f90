@@ -5,6 +5,7 @@
 !         : ring-buffer, LRU, union-find, graph, tree
 
 module DataStructuresModule
+  use iso_fortran_env, only : int32, int64
   implicit none
   private
   public :: RingBuffer, UnionFind, LRU
@@ -49,16 +50,57 @@ module DataStructuresModule
   !==================================================================
   !  Derived type – the Union‑Find container
   !==================================================================
-  type :: UnionFind
-     integer, allocatable :: arr(:) ! parent array, 0 ⇒ element is a singleton
+  type :: UnionFind(int_kind)
+     integer, kind :: int_kind
+     integer(kind=int_kind), allocatable :: arr(:) ! parent array, 0 ⇒ element is a singleton
    contains
-     procedure, pass :: init   => uf_init
-     procedure, pass :: root   => uf_root   ! pure – no side‑effects
-     procedure, pass :: merge  => uf_merge
-     procedure, pass :: reduce => uf_reduce
-     procedure, pass :: insert => uf_insert ! for singletons, arr(i)=i
+     procedure, pass, private :: init_int32   => uf_init_int32
+     procedure, pass, private :: init_int64   => uf_init_int64
+     procedure, pass, private :: insert_int32 => uf_insert_int32 ! for singletons, arr(i)=i
+     procedure, pass, private :: insert_int64 => uf_insert_int64 ! for singletons, arr(i)=i          
+     procedure, pass, private :: root_int32   => uf_root_int32   ! pure – no side‑effects
+     procedure, pass, private :: root_int64   => uf_root_int64   ! pure – no side‑effects     
+     procedure, pass, private :: merge_int32  => uf_merge_int32
+     procedure, pass, private :: merge_int64  => uf_merge_int64     
+     procedure, pass, private :: reduce_int32 => uf_reduce_int32
+     procedure, pass, private :: reduce_int64 => uf_reduce_int64
+     procedure, pass, private :: fullreduce_int32 => uf_fullreduce_int32
+     procedure, pass, private :: fullreduce_int64 => uf_fullreduce_int64
+     procedure, pass, private :: count_roots_int32 => uf_count_roots_int32
+     procedure, pass, private :: count_roots_int64 => uf_count_roots_int64     
+     generic :: init => init_int32, init_int64
+     generic :: insert => insert_int32, insert_int64     
+     generic :: root => root_int32, root_int64
+     generic :: merge => merge_int32, merge_int64
+     generic :: reduce => reduce_int32, reduce_int64
+     generic :: fullreduce => fullreduce_int32, fullreduce_int64
+     generic :: count_roots => count_roots_int32, count_roots_int64
   end type UnionFind
-
+  interface uf_init
+     module procedure uf_init_int32
+     module procedure uf_init_int64
+  end interface uf_init
+  interface uf_insert
+     module procedure uf_insert_int32
+     module procedure uf_insert_int64
+  end interface uf_insert
+  interface uf_root
+     module procedure uf_root_int32
+     module procedure uf_root_int64
+  end interface uf_root
+  interface uf_merge
+     module procedure uf_merge_int32
+     module procedure uf_merge_int64
+  end interface uf_merge
+  interface uf_reduce
+     module procedure uf_reduce_int32
+     module procedure uf_reduce_int64
+  end interface uf_reduce
+  interface uf_count_roots
+     module procedure uf_count_roots_int32
+     module procedure uf_count_roots_int64
+  end interface uf_count_roots
+  
 contains
 
   !-------------------------------------------------------------------
@@ -160,28 +202,46 @@ contains
   !  MAX_N – maximum number of elements that can be stored.
   !  After initialisation arr(i) == 0 for all i its own set.
   !==================================================================
-  subroutine uf_init (self, max_n)
-    class(UnionFind), intent(inout) :: self
-    integer,          intent(in)    :: max_n
+  subroutine uf_init_int32 (self, max_n)
+    class(UnionFind(int32)), intent(inout) :: self
+    integer(kind=int32),     intent(in)    :: max_n
 
     if (allocated(self%arr)) deallocate(self%arr)
     allocate(self%arr(max_n))
     self%arr = 0           ! every element starts as a singleton root
-  end subroutine uf_init
-  subroutine uf_insert (self, i)
-    class(UnionFind), intent(inout) :: self
-    integer,          intent(in)    :: i
-    self%arr(i) = i        ! every non-singleton element points to self
-  end subroutine uf_insert
+  end subroutine uf_init_int32  
+  subroutine uf_init_int64 (self, max_n)
+    class(UnionFind(int64)), intent(inout) :: self
+    integer(kind=int64),     intent(in)    :: max_n
+    if (allocated(self%arr)) deallocate(self%arr)
+    allocate(self%arr(max_n))
+    self%arr = 0           ! every element starts as a singleton root
+  end subroutine uf_init_int64
+  
+  subroutine uf_insert_int32 (self, i)
+    class(UnionFind(int32)), intent(inout) :: self
+    integer(kind=int32), intent(in)    :: i
+    if( self%arr(i) == 0 ) then
+       self%arr(i) = i        ! every non-singleton element points to self
+    end if
+  end subroutine uf_insert_int32
+  subroutine uf_insert_int64 (self, i)
+    class(UnionFind(int64)), intent(inout) :: self
+    integer(kind=int64),     intent(in)    :: i
+    if( self%arr(i) == 0 ) then
+       self%arr(i) = i        ! every non-singleton element points to self
+    end if
+  end subroutine uf_insert_int64
+  
   !==================================================================
   !  PURE function – find the root of element I.
   !  No path compression is performed here (otherwise the routine would
   !  have side‑effects and could not be PURE).
   !==================================================================
-  pure function uf_root (self, i) result(r)
-    class(UnionFind), intent(in) :: self
-    integer,          intent(in) :: i
-    integer                      :: r, cur
+  pure function uf_root_int32 (self, i) result(r)
+    class(UnionFind(int32)), intent(in) :: self
+    integer(kind=int32),     intent(in) :: i
+    integer(kind=int32)                 :: r, cur
     if( self%arr(i) == 0 ) then
        r = i
        return
@@ -191,17 +251,31 @@ contains
        cur = self%arr(cur)
     end do
     r = cur
-  end function uf_root
+  end function uf_root_int32  
+  pure function uf_root_int64 (self, i) result(r)
+    class(UnionFind(int64)), intent(in) :: self
+    integer(kind=int64),     intent(in) :: i
+    integer(kind=int64)                 :: r, cur
+    if( self%arr(i) == 0 ) then
+       r = i
+       return
+    end if
+    cur = i
+    do while (self%arr(cur) /= cur)
+       cur = self%arr(cur)
+    end do
+    r = cur
+  end function uf_root_int64
 
   !==================================================================
   !  Merge the two sets that contain X and Y.
   !  The routine uses the pure function ROOT to locate the representatives
   !  and then makes one root the parent of the other.
   !==================================================================
-  subroutine uf_merge (self, x, y)
-    class(UnionFind), intent(inout) :: self
-    integer,          intent(in)    :: x, y
-    integer                         :: rx, ry
+  subroutine uf_merge_int32 (self, x, y)
+    class(UnionFind(int32)), intent(inout) :: self
+    integer(kind=int32),     intent(in)    :: x, y
+    integer(kind=int32)                    :: rx, ry
 
     rx = self%root(x)          ! find root of x (pure)
     ry = self%root(y)          ! find root of y (pure)
@@ -220,17 +294,40 @@ contains
        self%arr(rx) = ry
        call self%reduce(rx)       
     end if
-  end subroutine uf_merge
+  end subroutine uf_merge_int32
+  subroutine uf_merge_int64 (self, x, y)
+    class(UnionFind(int64)), intent(inout) :: self
+    integer(kind=int64),     intent(in)    :: x, y
+    integer(kind=int64)                    :: rx, ry
 
+    rx = self%root(x)          ! find root of x (pure)
+    ry = self%root(y)          ! find root of y (pure)
+    if( rx == 0 .or. ry == 0 ) then
+       stop "ERROR: singletons cannot be merged. Use insert(x) before"
+       return
+    end if
+    if (rx == ry) return       ! already in the same set
+
+    ! Simple union – make the root of X point to the root of Y.
+    ! (You could add union‑by‑rank here if you wish.)
+    if( rx < ry ) then
+       self%arr(ry) = rx
+       call self%reduce(ry)
+    else
+       self%arr(rx) = ry
+       call self%reduce(rx)       
+    end if
+  end subroutine uf_merge_int64
   !==================================================================
   !  Path‑compression routine.
   !  After a call to REDUCE(x) the entry arr(x) will contain the
   !  *final* root of the set that x belongs to, and all intermediate
-  !  nodes on the search path are also !==================================================================
-  subroutine uf_reduce (self, x)
-    class(UnionFind), intent(inout) :: self
-    integer,          intent(in)    :: x
-    integer                         :: r, cur, next
+  !  nodes on the search path are also
+  !==================================================================
+  subroutine uf_reduce_int32 (self, x)
+    class(UnionFind(int32)), intent(inout) :: self
+    integer(kind=int32),     intent(in)    :: x
+    integer(kind=int32)                    :: r, cur, next
     if( self%arr(x) == 0 ) then
        return !singletons cannot be further reduced. Could be an assertion here
     end if
@@ -248,7 +345,101 @@ contains
        self%arr(cur) = r             ! point directly to the root
        cur = next
     end do
-  end subroutine uf_reduce
+  end subroutine uf_reduce_int32
+  subroutine uf_reduce_int64 (self, x)
+    class(UnionFind(int64)), intent(inout) :: self
+    integer(kind=int64),     intent(in)    :: x
+    integer(kind=int64)                    :: r, cur, next
+    if( self%arr(x) == 0 ) then
+       return !singletons cannot be further reduced. Could be an assertion here
+    end if
+    cur = x
+    ! ---- first pass: find the root (same as ROOT) ------------------
+    do while (self%arr(cur) /= cur)
+       cur = self%arr(cur)
+    end do
+    r = cur
 
+    ! ---- second pass: compress the path ---------------------------
+    cur = x
+    do while (self%arr(cur) /= cur)
+       next        = self%arr(cur)   ! keep the next node before overwriting
+       self%arr(cur) = r             ! point directly to the root
+       cur = next
+    end do
+  end subroutine uf_reduce_int64
+  subroutine uf_fullreduce_int32 (self)
+    class(UnionFind(int32)), intent(inout) :: self
+    integer(kind=int32) :: i
+    do i=1,size(self%arr)
+       if( self%arr(i) /= 0 ) then
+          call self%reduce_int32( i )
+       end if
+    end do
+  end subroutine uf_fullreduce_int32
+  subroutine uf_fullreduce_int64 (self)
+    class(UnionFind(int64)), intent(inout) :: self
+    integer(kind=int64) :: i
+    do i=1,size(self%arr)
+       if( self%arr(i) /= 0 ) then
+          call self%reduce_int64( i )
+       end if
+    end do
+  end subroutine uf_fullreduce_int64
+  pure function uf_count_roots_int32 (self) result(retval)
+    class(UnionFind(int32)), intent(in) :: self
+    logical, allocatable :: seen(:)
+    integer(kind=int32) :: min_val, max_val, i
+    integer(kind=int32) :: retval
+    ! 1. Handle the edge case of an empty array
+    if (size(self%arr) == 0) then
+       retval = 0
+       return
+    end if
+    ! 2. Find the bounds of our data
+    min_val = minval(self%arr)
+    max_val = maxval(self%arr)
+    
+    ! 3. Allocate a boolean array mapped to our exact data range.
+    !    'source=.false.' initializes all elements to false.
+    allocate(seen(min_val:max_val), source=.false.)
+    
+    ! 4. Mark the index corresponding to the value as true
+    do i = 1, size(self%arr)
+       if( self%arr(i) > 0 ) then       
+          seen(self%arr(i)) = .true.
+       end if
+    end do
+    ! 5. The number of unique elements is just the count of true values!
+    retval = count(seen)    
+  end function uf_count_roots_int32
+  pure function uf_count_roots_int64 (self) result(retval)
+    class(UnionFind(int64)), intent(in) :: self
+    logical, allocatable :: seen(:)
+    integer(kind=int64) :: min_val, max_val, i
+    integer(kind=int64) :: retval    
+    ! 1. Handle the edge case of an empty array
+    if (size(self%arr) == 0) then
+       retval = 0
+       return
+    end if
+    ! 2. Find the bounds of our data
+    min_val = minval(self%arr)
+    max_val = maxval(self%arr)
+    
+    ! 3. Allocate a boolean array mapped to our exact data range.
+    !    'source=.false.' initializes all elements to false.
+    allocate(seen(min_val:max_val), source=.false.)
+    
+    ! 4. Mark the index corresponding to the value as true
+    do i = 1, size(self%arr)
+       if( self%arr(i) > 0 ) then
+          seen(self%arr(i)) = .true.
+       end if
+    end do
+    ! 5. The number of unique elements is just the count of true values!
+    retval = count(seen)    
+  end function uf_count_roots_int64
+  
 end module DataStructuresModule
 

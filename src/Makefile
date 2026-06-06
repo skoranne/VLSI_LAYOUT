@@ -16,6 +16,8 @@ datastructures.o:	datastructures.f90
 	$(FORTRAN) -c datastructures.f90
 geometry.o:	geometry.f90
 	$(FORTRAN) -c geometry.f90
+pnummerge.o:	pnummerge.f90
+	$(FORTRAN) -c pnummerge.f90
 hdfdata.o:	hdfdata.f90 geometry.f90
 	$(FORTRAN) -c hdfdata.f90
 rtree.o:	rtree.f90 geometry.f90
@@ -24,6 +26,6 @@ magparser.o:	magparser.f90 geometry.f90 rtree.f90
 	$(FORTRAN) -c magparser.f90
 mainmagparser.o:	mainmagparser.f90
 	$(FORTRAN) -c mainmagparser.f90
-MAGPARSER.exe:	hashtable.o geometry.o hdfdata.o datastructures.o rtree.o magparser.o mainmagparser.o
-	$(FORTRAN) mainmagparser.o magparser.o hashtable.o datastructures.o hdfdata.o geometry.o  rtree.o -o MAGPARSER.exe -L$(LIBS) -lz -lhdf5_fortran -lhdf5
+MAGPARSER.exe:	hashtable.o geometry.o hdfdata.o datastructures.o rtree.o pnummerge.o magparser.o mainmagparser.o
+	$(FORTRAN) mainmagparser.o magparser.o hashtable.o datastructures.o hdfdata.o geometry.o  rtree.o pnummerge.o -o MAGPARSER.exe -L$(LIBS) -lz -lhdf5_fortran -lhdf5
 
