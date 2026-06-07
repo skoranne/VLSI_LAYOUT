@@ -349,6 +349,11 @@ function fracture_to_rects(xs::Vector{Int}, ys::Vector{Int})
     return rects
 end
 
+#=
+For MW_FLAT.oas
+All HDF5 conversions completed successfully!
+7533.780301 seconds (74.04 G allocations: 3.446 TiB, 8.09% gc time, 0.02% compilation time)                                   
+=#
 function convert_to_hdf5(input_file::String)
     # Accumulate all rectangles in memory first to do a single fast HDF5 write.
     # Key: (layer, datatype), Value: Array of (x1, y1, x2, y2) tuples

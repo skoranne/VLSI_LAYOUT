@@ -356,3 +356,32 @@ Layer:  28 metal5   has          198 non-rects            0 rects. |RTREE| = CPU
  Box: [        1104 ,        5346 ] to [      358156 ,      358180 ]
  +-----------------------------------------------------------------+
  
+TODO:
+0) Calculate AREA of boxes using vertex token scanning
+0b)Assuming layer is overlap free, this should just be sum of box area
+1) Fix INTERACT on point touch box and create test with HOLES
+2) Single LAYER AND => during PNUM gives HEAL status
+4) PNUM sort
+4) AND optimization: compare bottom up RTREE to TOP Down
+   Is it possible that RTree( x AND y ) = f( RTree(x), RTree(y) )
+5) TOPOLOGICAL tables support
+6) Read in the HDF5 by Julia
+7) Control
+program my_control
+decl design input d1 = FPU.mag
+decl design input d2 = STD.mag
+decl design output o1 = FOO.mag
+decl design output o2 = FOO.gds
+decl int ctr = 2
+decl real dmin = 3.0
+decl layer diff = d1:65:20
+decl layer poly = d1:66:20
+var layer gate = ( diff * poly )
+var layer source_drain = ( diff - poly )
+decl group g1 = [ gate, source_drain ]
+exec run g1
+exec push g1 o1:gate
+exec push g1 o2:10:0
+end my_control
+
+8) Support Vertex token and scanline

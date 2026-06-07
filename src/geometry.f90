@@ -3,10 +3,11 @@
 ! Purpose : Implementation of MAGIC VLSI format parser
 
 module GeometryModule
+  use iso_fortran_env, only: int32, int64, real64
   implicit none
   private
   public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid, &
-       box_not_interact, box_interact
+       box_not_interact, box_interact, box_area, box_perimeter
   ! Enum-like constants for the sorting axis
   integer, parameter :: AXIS_X = 1
   integer, parameter :: AXIS_Y = 2
@@ -62,8 +63,19 @@ contains
   end function box_not_interact
   pure elemental function box_interact(this, other) result(retval)
     class(Box), intent(in) :: this, other
+    type(Box)              :: tempBox
     logical :: retval
-    retval = .not. box_not_interact(this, other)
+    if( box_not_interact(this, other) ) then
+       retval = .false.
+       return
+    else !> its possible that there is a corner to corner touch
+       tempBox = this * other
+       if( tempBox%x1 == tempBox%x2 .and. tempBox%y1 == tempBox%y2 ) then
+          retval = .false. ! point intersection
+       else
+          retval = MBRValid( tempBox )
+       end if
+    end if
   end function box_interact
   
 
@@ -129,7 +141,25 @@ contains
        write(*,'(A,4I)') 'Box ', b1%x1, b1%y1, b1%x2, b1%y2
     end if
   end function CheckBox
-
+  pure elemental function box_area(b) result(retval)
+    type(Box), intent(in) :: b
+    real(kind=real64)     :: retval
+    if( is_valid(b) ) then
+       retval = (b%x2 - b%x1) * (b%y2 - b%y1)
+    else
+       retval = 0.0
+    end if
+  end function box_area
+  pure elemental function box_perimeter(b) result(retval)
+    type(Box), intent(in) :: b
+    real(kind=real64)     :: retval
+    if( MBRValid(b) ) then !> because we can have interaction with line segment overlap
+       retval = 2*(b%x2 - b%x1) + 2*(b%y2 - b%y1)
+    else
+       retval = 0.0
+    end if
+  end function box_perimeter
+  
   pure elemental function box_less_than(b1, b2) result(res)
     type(Box), intent(in) :: b1, b2
     logical :: res

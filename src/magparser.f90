@@ -63,12 +63,12 @@ module DesignModule
   use RTreeBuilder
   use DataStructuresModule
   use iso_c_binding
-  use iso_fortran_env, only : int32, int64
+  use iso_fortran_env, only : int32, int64, real64
   implicit none  
   private
   public :: Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
        LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, &
-       NeedsSorting
+       NeedsSorting, NeedsPNum, NeedsHealing
   type :: LayerTree
      integer(kind=8) :: root_index
      type(RTreeNode), allocatable :: tree_nodes(:)
@@ -89,6 +89,7 @@ module DesignModule
      integer(kind=8)        :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
      type(LayerTree)        :: tree
      type(UnionFind(int64)) :: pnumtable
+     real(kind=real64)      :: area, perimeter
   end type Layer
 contains
   pure function NeedsSorting(input_layer) result(retval)
@@ -101,7 +102,11 @@ contains
     logical :: retval
     retval = iand(input_layer%layerState, LAYER_STATE_PNUM ) == 0
   end function NeedsPNum
-  
+  pure function NeedsHealing(input_layer) result(retval)
+    type(Layer), intent(in) :: input_layer
+    logical :: retval
+    retval = iand(input_layer%layerState, LAYER_STATE_HEAL ) == 0
+  end function NeedsHealing
 end module DesignModule
 
 module MagicVLSILayoutParser
@@ -188,6 +193,8 @@ contains
     integer(kind=8) :: start_tick, end_tick, clock_rate
     real(kind=8)    :: elapsed_time
     integer(kind=8) :: num_roots, num_rects
+    real(kind=real64),allocatable :: overlap_areas(:)
+    real(kind=real64),allocatable :: overlap_perimeter(:)    
     ! 1. Get the number of ticks per second
     call system_clock(count_rate=clock_rate)
 
@@ -199,6 +206,8 @@ contains
     allocate(layers(MAX_LAYERS))
     allocate(extents(MAX_LAYERS))
     allocate(layerNames(MAX_LAYERS))
+    allocate(overlap_areas(MAX_LAYERS))
+    allocate(overlap_perimeter(MAX_LAYERS))    
     do i = 1, MAX_LAYERS
        allocate(layers(i)%layer_boxes(INIT_ALLOC))
        layers(i)%n_used  = 0
@@ -224,7 +233,7 @@ contains
           print *, "Error: Could not open the gzipped file."
           stop
        end if
-       do
+       gz_file_processing_loop:do
           block
             integer :: null_pos
             
@@ -275,6 +284,9 @@ contains
             end if
 
             ! Parse rectangle definitions
+            if (line(1:4) == 'rect' ) then
+               exit gz_file_processing_loop
+            end if
             if (line(1:4) == 'rect' .and. found_section) then
                !write (*,*) line
                ! Parse rectangle coordinates
@@ -313,7 +325,7 @@ contains
                !boxes(box_count)%y2 = y2
             end if
           end block
-       end do
+       end do gz_file_processing_loop
        ! 3. Close the file handle safely
        status = gzclose(gz_file)
     else
@@ -324,7 +336,7 @@ contains
        end if
        prefix = fileName( 1 : dot_pos - 1 )
        print *, "The file is NOT a gzipped file, w/prefix: ", prefix
-       do
+       mag_file_processing_loop:do
           read(10, '(A)', end=100) line
           line_number = line_number + 1
 
@@ -337,6 +349,9 @@ contains
           end if
 
           ! Check for section headers
+          if (line(1:9) == '<< end >>') then
+             exit mag_file_processing_loop
+          end if
           if (line(1:2) == '<<') then
              section_name = trim(line(4:len_trim(line)-2))
              section_name = trim(section_name)
@@ -394,9 +409,7 @@ contains
              !boxes(box_count)%x2 = x2
              !boxes(box_count)%y2 = y2
           end if
-
-       end do
-
+       end do mag_file_processing_loop
 100    continue ! this is end of file
        close(10)
        nullify(boxes)
@@ -422,8 +435,10 @@ contains
        !boxes => layers(i)%layer_boxes
        if( NeedsSorting( layers(i) ) ) then
           call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
+          layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_SORT )
        end if
        call BuildRTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index)
+       layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_RTREE )
        !call str_pack( boxes, K_LEAF_CAPACITY )
        !call quicksort_boxes( boxes, 1, layers(i)%n_used )
        !ok = CheckSortOrder( boxes, 1,  layers(i)%n_used )
@@ -477,17 +492,26 @@ contains
        ! 2. Record the start tick
        call system_clock(count=start_tick)           
        call cpu_time(t1)
-       call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes,&
+       layers(i)%tree%root_index, overlap_areas(i), overlap_perimeter(i))
        call cpu_time(t2)
        call system_clock(count=end_tick)
        elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
        num_roots = layers(i)%pnumtable%count_roots()
-       !num_roots = 0
        num_rects = count(layers(i)%pnumtable%arr == 0)
-       !num_rects = 0
-       write(*,'(A,I3,A,A8,A,I12,A,I12,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
-            ' non-rects ',num_rects , ' rects. |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
-       boxes => layers(i)%layer_boxes
+       layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_PNUM )
+       !write(*,*) 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)
+       if( overlap_areas(i) > 0.0 ) then
+          !> this layer needs HEALING as we have detected overlap
+          layers(i)%layerState = ior( layers(i)%layerState, iand( layers(i)%layerState, NOT(LAYER_STATE_HEAL ) ) )
+       else
+          layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_HEAL )          
+       end if
+       
+       write(*,'(A,I3,A,A8,A,I12,A,I12,A,I2,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
+            ' non-rects ',num_rects , ' rects. STAT ',layers(i)%layerState, &
+            ' |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
+       !boxes => layers(i)%layer_boxes
        !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        !awk 'NR>76262119 && NR<76401348' log_FPU.txt > m3_FPU_OMT64.txt
        !do j = 1, layers(i)%n_used
@@ -495,12 +519,22 @@ contains
        !end do
     end do pnum_loop
     
-    do i = 1, MAX_LAYERS
+    do i = 1,size(layers)
        boxes => layers(i)%layer_boxes
        extents(i) = mbr_of_array( boxes, layers(i)%n_used )
        DESIGN_EXTENT = DESIGN_EXTENT + extents(i)
-       !do j = 1, layers(i)%n_used
-       !   extents(i) = extents(i) + boxes(j)
+       layers(i)%area = 0.0
+       if( .not. NeedsHealing( layers(i) ) ) then
+          do j = 1, layers(i)%n_used
+             layers(i)%area = layers(i)%area + box_area( boxes(j) )
+             layers(i)%perimeter = layers(i)%perimeter + box_perimeter( boxes(j) )
+             !   extents(i) = extents(i) + boxes(j)             
+          end do
+          layers(i)%perimeter = layers(i)%perimeter - overlap_perimeter(i)
+          !write(*,*) 'AREA = ', layers(i)%area
+       else
+          !write(*,*) 'AREA NOT COMPUTABLE = ', layers(i)%area
+       end if
        !end do
        !write(*,'(A,4I)') 'Box: ',extents(i)%x1, extents(i)%y1, extents(i)%x2, extents(i)%y2
        !extents(i) = mbr_of_array( boxes, layers(i)%n_used )
@@ -510,10 +544,20 @@ contains
     if( .not. DESIGN_EXTENT%is_valid() ) then
        error stop 'Design EXTENT is not valid'
     end if
+    write (*,*) '+-----------------------------------------------------------------+'    
+    write (*,*) '+                Layer Areas and Perimeters                       +'
+    write (*,*) '+-----------------------------------------------------------------+'
+    do i = 1, size(layers)
+       if( extents(i)%is_valid() ) then
+          write(*,'(A1,A12,F18.2,A1,F18.2)') ' ',layerNames(i), layers(i)%area, ' ', layers(i)%perimeter
+       end if
+    end do
+    write (*,*) '+-----------------------------------------------------------------+'    
+    write(*,*) ''
     
     write (*,*) '+-------------------------- Design Extent ------------------------+'
     call DESIGN_EXTENT%print_box()
-    write (*,*) '+-----------------------------------------------------------------+'
+    write (*,*) '+---------------------------Layers Extent ------------------------+'
     do i = 1, MAX_LAYERS
        if( extents(i)%is_valid() ) call extents(i)%print_box()
     end do

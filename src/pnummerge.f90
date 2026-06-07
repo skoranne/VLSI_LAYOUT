@@ -9,7 +9,7 @@
 !Is there any better idea for this ?
 
 module PNumMergeModule
-  use iso_fortran_env, only : int32, int64
+  use iso_fortran_env, only : int32, int64, real64
   use GeometryModule
   use RTreeBuilder
   use DataStructuresModule
@@ -78,31 +78,40 @@ contains
     end do
   end subroutine process_edges
 
-  subroutine PerformMerge(uf, sorted_boxes, capacity, tree_nodes, root_index)
+  subroutine PerformMerge(uf, sorted_boxes, capacity, tree_nodes, root_index, overlap_area, overlap_perimeter)
     type(UnionFind(int64)), intent(out) :: uf        
     type(Box), intent(in) :: sorted_boxes(:)
     integer, intent(in) :: capacity
     type(RTreeNode), intent(in) :: tree_nodes(:)
-    integer(kind=int64), intent(in) :: root_index    
+    integer(kind=int64), intent(in) :: root_index
+    real(kind=real64), intent(out)   :: overlap_area
+    real(kind=real64), intent(out)   :: overlap_perimeter    
     integer(kind=int64) :: num_boxes
     integer(kind=int64) :: i
     integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
     integer(kind=int64) :: number_leaves
     integer(kind=int64) :: j, k
     type(EdgeBuffer), allocatable :: buffers(:)
+    real(kind=real64),allocatable :: overlap_areas(:)
+    real(kind=real64),allocatable :: overlap_perimeters(:)    
+    type(Box) :: tempBox
     integer :: nthreads, tid
 
 
     nthreads = omp_get_max_threads()
     allocate(buffers(nthreads))
+    allocate(overlap_areas(nthreads))
+    allocate(overlap_perimeters(nthreads))    
     do i=1,nthreads
        call init_buffer(buffers(i), initial_capacity=10000)
+       overlap_areas(i) = 0.0
+       overlap_perimeters(i) = 0.0
     end do
     num_boxes = size( sorted_boxes )
     call uf%init( num_boxes )    
     !write(*,*) 'DBG: ', num_boxes, ' ', size(tree_nodes)
     !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
-    !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid)
+    !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid, tempBox)
     over_all_boxes: do i=1,num_boxes
        number_leaves = 0
        leafboxes = 0
@@ -115,10 +124,19 @@ contains
              over_leaves: do k=leafboxes(j),min(leafboxes(j)+capacity-1, num_boxes)
                 !do k=leafboxes(j),leafboxes(j)+capacity-1
                 if( i < k .and. box_interact( sorted_boxes(i), sorted_boxes(k)) ) then
+                   tempBox = sorted_boxes(i) * sorted_boxes(k)
                    !$omp critical (console_io)
-                   !write(*,*) 'Index ',i, ' ', sorted_boxes(i), ' interacts with ', k, ' ', sorted_boxes(k)
+                   !write(*,*) 'Index ',i, ' ', sorted_boxes(i), ' interacts with ', k, ' ', sorted_boxes(k), &
+                   !     ' * ', tempBox, box_area( tempBox ), box_perimeter( tempBox )
                    !$omp end critical (console_io)
-                   call push_edge(buffers(tid), i, k) ! Reallocates if capacity exceeded                   
+                   call push_edge(buffers(tid), i, k) ! Reallocates if capacity exceeded
+                   if( box_area( tempBox ) > 0.0 ) then
+                      overlap_areas(tid) = overlap_areas(tid) + box_area( tempBox )
+                   else
+                      !> good, we stay in overlap free regime, but now since the boxes
+                      !> are known to interact, we MUST have non-zero perimeter
+                      overlap_perimeters(tid) = overlap_perimeters(tid) + box_perimeter( tempBox )
+                   end if
                 end if
              end do over_leaves
           end do outer
@@ -127,7 +145,12 @@ contains
     ! The global Union-Find array is updated strictly sequentially
     do tid = 1, nthreads
        call process_edges( uf, buffers(tid) )
+       overlap_area = overlap_area + overlap_areas(tid)
+       overlap_perimeter = overlap_perimeter + overlap_perimeters(tid)       
     end do
+    if( overlap_area > 0.0 ) then
+       overlap_perimeter = 0.0
+    end if
     call uf%fullreduce()
   end subroutine PerformMerge
 

@@ -1,0 +1,30 @@
+magic
+tech sky130A
+timestamp 1780861048
+<< metal1 >>
+rect 64 64 128 128 < --- corner touch here
+rect 213 105 593 145
+rect 0 0 64 64 < --- this is a problem
+rect 213 33 283 105
+rect 514 33 593 105
+rect 213 -2 593 33
+<< end >>
+You can see the problem here, 6 rectangle but our system thinks
+There are 2 polygons, because 
++-----------------------------------------------------------------+
+Layer:   1 metal1   has            8 rects. |RTREE| = CPU         0.01 secs.        0.00 REAL secs
+ +-----------------------------------------------------------------+
+Layer:   1 metal1   has            2 non-rects            0 rects. |RTREE| = CPU         0.01 secs.        0.00 REAL secs
+After the fix to reject point-to-point touch as INTERACT we get
+Layer:   1 metal1   has            1 non-rects            2 rects. |RTREE| = CPU         0.00 secs.        0.00 REAL secs
+
+ +-------------------------- Design Extent ------------------------+
+ Box: [           0 ,          -2 ] to [         593 ,         145 ]
+ +-----------------------------------------------------------------+
+ The non-rect is a polygon with a hole, and we have to see how it can be handled.
+rect 64 64 128 128
+rect 213 105 593 145
+rect 0 0 64 64
+rect 213 33 283 105
+rect 514 33 593 105
+rect 213 -2 593 33
