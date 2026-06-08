@@ -1,0 +1,69 @@
+The Julia generated HDF5 is
+GROUP "/" {                                                                                                                   
+   DATASET "rectangles" {                                                                                                     
+      DATATYPE  H5T_STD_I64LE                                                                                                 
+      DATASPACE  SIMPLE { ( 4, 104 ) / ( 4, 104 ) }
+      DATA {                                                                                                                  
+      (0,0): 10205, 10205, 10520, 10525, 10735, 10040, 10040, 10105, 11210,                                                   
+      (0,9): 11695, 11210, 11695, 12265, 11095, 11095, 11580, 12910, 13395,                                                   
+      (0,18): 12910, 12910, 13395, 12180, 13395, 12180, 12910, 13395, 12910,                                                  
+      (0,27): 13395, 1755, 1615, 1755, 2115, 3055, 2115, 3055, 2115, 2125,                                                    
+
+And our old HDF5 format is
+GROUP "/" {                                                                                                                    
+   DATASET "boxes" {                                                                                                           
+      DATATYPE  H5T_COMPOUND {                                                                                                 
+         H5T_STD_I32LE "x1";
+         H5T_STD_I32LE "y1";
+         H5T_STD_I32LE "x2";
+         H5T_STD_I32LE "y2";
+      }          
+      DATASPACE  SIMPLE { ( 108 ) / ( 108 ) }
+      DATA {    
+      (0): {     
+            27,  
+            85, 
+            35,  
+            119  
+         },     
+      (1): {     
+            27,  
+            119,
+            79,  
+            131  
+         },     
+
+Done.
+julia> ConvertSTRMToHDF5("SEDFXTP1.gds.txt")
+Generated L81_D4.h5: 1 polygons, 5 vertices.
+Generated L93_D44.h5: 1 polygons, 9 vertices.
+Generated L122_D16.h5: 2 polygons, 10 vertices.
+Generated L78_D44.h5: 1 polygons, 5 vertices.
+Generated L236_D0.h5: 1 polygons, 5 vertices.
+Generated L67_D20.h5: 27 polygons, 299 vertices.
+Generated L68_D20.h5: 8 polygons, 96 vertices.
+Generated L67_D16.h5: 7 polygons, 35 vertices.
+Generated L68_D16.h5: 2 polygons, 10 vertices.
+Generated L67_D44.h5: 76 polygons, 380 vertices.
+Generated L64_D20.h5: 1 polygons, 9 vertices.
+Generated L94_D20.h5: 1 polygons, 31 vertices.
+Generated L64_D16.h5: 2 polygons, 10 vertices.
+Generated L95_D20.h5: 2 polygons, 72 vertices.
+Generated L66_D20.h5: 22 polygons, 278 vertices.
+Generated L65_D20.h5: 12 polygons, 84 vertices.
+Generated L66_D44.h5: 94 polygons, 470 vertices.
+
+This is not loading
+HDF5 "/scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW_FLAT_DATA/gL235_D4.h5" {
+GROUP "/" {
+   DATASET "rectangles" {
+      DATATYPE  H5T_STD_I64LE
+      DATASPACE  SIMPLE { ( 4, 224 ) / ( 4, 224 ) }
+      DATA {
+But this is loading correctly
+HDF5 "/scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW_FLAT_DATA/gL122_D16.h5" {
+GROUP "/" {
+   DATASET "rectangles" {
+      DATATYPE  H5T_STD_I64LE
+      DATASPACE  SIMPLE { ( 4, 26620832 ) / ( 4, 26620832 ) }
+      DATA {
