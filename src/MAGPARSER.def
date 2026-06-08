@@ -1,0 +1,48 @@
+Bootstrap: docker
+From: registry.access.redhat.com/ubi8/ubi:latest
+
+%help
+    This container builds and runs an OpenMP-enabled C application on RHEL ubi8.
+
+%files
+    # 1. Copy dependencies safely into a dedicated folder (NOT /lib64)
+    /lib64/libsz.so.2.0.1 /opt/libs/libsz.so.2
+    /lib64/libaec.so.0.0.8 /opt/libs/libaec.so.0
+    /scratch1/skoranne/INTELCOMPILERS/lib/libhdf5_fortran.so.310 /opt/libs/libhdf5_fortran.so.310
+    /scratch1/skoranne/INTELCOMPILERS/lib/libhdf5.so.310 /opt/libs/libhdf5.so.310
+    /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libimf.so /opt/libs/libimf.so
+    /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libiomp5.so /opt/libs/libiomp5.so
+    /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libifport.so.5 /opt/libs/libifport.so.5
+    /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libifcoremt.so.5 /opt/libs/libifcoremt.so.5
+    /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libsvml.so /opt/libs/libsvml.so
+    /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libintlc.so.5 /opt/libs/libintlc.so.5
+    /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libirng.so /opt/libs/libirng.so
+    
+    # 2. REMOVED libdl.so.2 completely (The base ubi8 image already has its own working version)
+
+    # 3. Copy your executable
+    /home/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe /opt/MAGPARSER.exe
+
+%post
+    # Clean container environment build setup
+    echo "Files copied successfully."
+
+%environment
+    export LC_ALL=C
+    
+    # 4. CRITICAL: Point to the folder inside the container, not host paths
+    export LD_LIBRARY_PATH="/opt/libs"
+    
+    # OpenMP performance & bug fixes
+    export OMP_NUM_THREADS=4
+    export KMP_AFFINITY=disabled
+    export KMP_DUPLICATE_LIB_OK=TRUE
+    export AUTO_NUM_THREADS=1
+
+%runscript
+    exec /opt/MAGPARSER.exe "$@"
+
+%labels
+    Author SandeepKoranne
+    Version 1.1
+    Description Magic VLSI Layout parser with HDF5 support
