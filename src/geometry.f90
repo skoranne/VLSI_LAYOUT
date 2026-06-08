@@ -6,14 +6,17 @@ module GeometryModule
   use iso_fortran_env, only: int32, int64, real64
   implicit none
   private
+  integer, parameter, public :: K = int32
+
   public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid, &
-       box_not_interact, box_interact, box_area, box_perimeter
+       box_not_interact, box_interact, box_area, box_perimeter, calculate_union_area, get_sort_permutation, &
+       calculate_polygon_union_area
   ! Enum-like constants for the sorting axis
   integer, parameter :: AXIS_X = 1
   integer, parameter :: AXIS_Y = 2
   !>   type, bind(C) :: Box
   type :: Box
-     integer(kind=4) :: x1, y1, x2, y2
+     integer(kind=K) :: x1, y1, x2, y2
    contains
      procedure, pass :: reset_to_infinity
      procedure, pass :: is_valid
@@ -25,6 +28,23 @@ module GeometryModule
      generic :: operator(*) => box_intersection
      generic :: operator(==) => box_equal
   end type Box
+  type :: AugmentedBox
+     type(Box) :: mbr
+     integer(kind=K) :: value
+  end type AugmentedBox
+
+  ! The generic interface routes the call to the correct specific subroutine
+  interface get_sort_permutation
+     module procedure get_box_permutation
+     !module procedure get_augmentbox_permutation
+  end interface get_sort_permutation
+  ! Auxiliary data structure for the sweep-line
+  type :: Event
+     integer(K) :: x
+     integer(K) :: y1, y2
+     integer(K) :: lap_change ! +1 for left edge, -1 for right edge
+  end type Event
+
 contains
   ! Type procedure to reset box to [infinity,infinity,-infinity,-infinity]
   pure subroutine reset_to_infinity(this)
@@ -77,7 +97,7 @@ contains
        end if
     end if
   end function box_interact
-  
+
 
   ! Type procedure for union of two boxes
   pure function box_union(this, other) result(union_box)
@@ -145,7 +165,7 @@ contains
     type(Box), intent(in) :: b
     real(kind=real64)     :: retval
     if( is_valid(b) ) then
-       retval = (b%x2 - b%x1) * (b%y2 - b%y1)
+       retval = real(b%x2 - b%x1) * real(b%y2 - b%y1)
     else
        retval = 0.0
     end if
@@ -154,12 +174,12 @@ contains
     type(Box), intent(in) :: b
     real(kind=real64)     :: retval
     if( MBRValid(b) ) then !> because we can have interaction with line segment overlap
-       retval = 2*(b%x2 - b%x1) + 2*(b%y2 - b%y1)
+       retval = 2*real(b%x2 - b%x1) + 2*real(b%y2 - b%y1)
     else
        retval = 0.0
     end if
   end function box_perimeter
-  
+
   pure elemental function box_less_than(b1, b2) result(res)
     type(Box), intent(in) :: b1, b2
     logical :: res
@@ -279,7 +299,7 @@ contains
 
     do i = left + 1, right
        key = arr(i)
-       
+
        ! Calculate the center of the key element being inserted
        if (axis == AXIS_X) then
           key_center = (key%x1 + key%x2) * 0.5
@@ -288,7 +308,7 @@ contains
        end if
 
        j = i - 1
-       
+
        ! Shift elements that are greater than the key to the right
        shift_loop: do while (j >= left)
           if (axis == AXIS_X) then
@@ -393,9 +413,9 @@ contains
     ! Allocate a single workspace array to avoid repeated memory allocations
     ! during the recursive splitting steps.
     allocate(workspace(size(arr)))
-    
+
     call omt_pack_recursive(arr, 1, size(arr), node_capacity, workspace)
-    
+
     deallocate(workspace)
   end subroutine omt_pack
 
@@ -415,7 +435,7 @@ contains
     ! To guarantee perfectly balanced trees, divide the required leaves in half
     num_leaves = ceiling(real(n) / real(node_capacity))
     left_leaves = num_leaves / 2
-    
+
     ! Calculate exact array index to split at
     split_idx = start_idx + left_leaves * node_capacity - 1
 
@@ -433,8 +453,8 @@ contains
     ! 3. Choose the best axis 
     ! (Minimize overlap first; use total area as a tie-breaker)
     if ((overlap_x < overlap_y) .or. (overlap_x == overlap_y .and. area_x < area_y)) then
-        ! X was better: restore the X-sorted array from the workspace
-        arr(start_idx:end_idx) = workspace(start_idx:end_idx)
+       ! X was better: restore the X-sorted array from the workspace
+       arr(start_idx:end_idx) = workspace(start_idx:end_idx)
     end if
     ! If Y was better, arr is already Y-sorted, so we do nothing.
 
@@ -460,25 +480,25 @@ contains
     l_xmin = arr(start_idx)%x1; l_xmax = arr(start_idx)%x2
     l_ymin = arr(start_idx)%y1; l_ymax = arr(start_idx)%y2
     do i = start_idx + 1, split_idx
-        l_xmin = min(l_xmin, arr(i)%x1)
-        l_xmax = max(l_xmax, arr(i)%x2)
-        l_ymin = min(l_ymin, arr(i)%y1)
-        l_ymax = max(l_ymax, arr(i)%y2)
+       l_xmin = min(l_xmin, arr(i)%x1)
+       l_xmax = max(l_xmax, arr(i)%x2)
+       l_ymin = min(l_ymin, arr(i)%y1)
+       l_ymax = max(l_ymax, arr(i)%y2)
     end do
 
     ! Initialize right MBR
     r_xmin = arr(split_idx + 1)%x1; r_xmax = arr(split_idx + 1)%x2
     r_ymin = arr(split_idx + 1)%y1; r_ymax = arr(split_idx + 1)%y2
     do i = split_idx + 2, end_idx
-        r_xmin = min(r_xmin, arr(i)%x1)
-        r_xmax = max(r_xmax, arr(i)%x2)
-        r_ymin = min(r_ymin, arr(i)%y1)
-        r_ymax = max(r_ymax, arr(i)%y2)
+       r_xmin = min(r_xmin, arr(i)%x1)
+       r_xmax = max(r_xmax, arr(i)%x2)
+       r_ymin = min(r_ymin, arr(i)%y1)
+       r_ymax = max(r_ymax, arr(i)%y2)
     end do
 
     ! Compute total area of both bounding boxes
     total_area = (l_xmax - l_xmin) * (l_ymax - l_ymin) + &
-                 (r_xmax - r_xmin) * (r_ymax - r_ymin)
+         (r_xmax - r_xmin) * (r_ymax - r_ymin)
 
     ! Compute physical overlap area
     over_x = max(0, min(l_xmax, r_xmax) - max(l_xmin, r_xmin))
@@ -487,6 +507,389 @@ contains
 
   end subroutine evaluate_split
 
+  !> winding number and lapcount analysis
+  pure function calculate_union_area(boxes) result(area)
+    type(Box), intent(in) :: boxes(:)
+    integer(kind=real64) :: area
+
+    integer :: n, num_events, num_y, i, j
+    type(Event), allocatable :: events(:)
+    integer(K), allocatable :: y_vals(:), unique_y(:)
+    integer, allocatable :: lap(:)
+    integer(kind=int64) :: current_x, dx, covered_y
+    integer :: j1, j2
+
+    n = size(boxes)
+    area = 0
+    if (n == 0) return
+
+    ! 1. Collect and compress Y coordinates
+    allocate(y_vals(2*n))
+    do i = 1, n
+       y_vals(2*i - 1) = min(boxes(i)%y1, boxes(i)%y2)
+       y_vals(2*i)     = max(boxes(i)%y1, boxes(i)%y2)
+    end do
+
+    call sort_int_array(y_vals)
+
+    ! Remove duplicates to create our y-axis segments
+    allocate(unique_y(2*n))
+    num_y = 1
+    unique_y(1) = y_vals(1)
+    do i = 2, 2*n
+       if (y_vals(i) /= unique_y(num_y)) then
+          num_y = num_y + 1
+          unique_y(num_y) = y_vals(i)
+       end if
+    end do
+
+    ! 2. Create Event Queue
+    allocate(events(2*n))
+    do i = 1, n
+       ! Left Edge Event
+       events(2*i - 1)%x          = min(boxes(i)%x1, boxes(i)%x2)
+       events(2*i - 1)%y1         = min(boxes(i)%y1, boxes(i)%y2)
+       events(2*i - 1)%y2         = max(boxes(i)%y1, boxes(i)%y2)
+       events(2*i - 1)%lap_change = 1
+
+       ! Right Edge Event
+       events(2*i)%x              = max(boxes(i)%x1, boxes(i)%x2)
+       events(2*i)%y1             = min(boxes(i)%y1, boxes(i)%y2)
+       events(2*i)%y2             = max(boxes(i)%y1, boxes(i)%y2)
+       events(2*i)%lap_change     = -1
+    end do
+
+    ! Sort events primarily by X coordinate
+    call sort_events(events)
+
+    ! 3. Sweep Line Algorithm
+    allocate(lap(num_y - 1))
+    lap = 0
+    area = 0
+    current_x = events(1)%x
+
+    do i = 1, 2*n
+       dx = int(events(i)%x,int64) - current_x
+
+       ! If we have moved horizontally, calculate area for the previous slice
+       if (dx > 0) then
+          covered_y = 0_int64
+          do j = 1, num_y - 1
+             if (lap(j) > 0) then
+                covered_y = covered_y + int(unique_y(j+1) - unique_y(j),int64)
+             end if
+          end do
+
+          area = area + (dx * covered_y)
+          current_x = int(events(i)%x,int64)
+       end if
+
+       ! Apply the current event to our Y-scanline lap counts
+       j1 = binary_search_y(unique_y, num_y, events(i)%y1)
+       j2 = binary_search_y(unique_y, num_y, events(i)%y2)
+
+       do j = j1, j2 - 1
+          lap(j) = lap(j) + events(i)%lap_change
+       end do
+    end do
+
+  end function calculate_union_area
+  pure function calculate_polygon_union_area(X, Y, poly_start, poly_end) result(area)
+    integer(kind=int32), intent(in) :: X(:), Y(:)
+    integer(kind=int32), intent(in) :: poly_start(:), poly_end(:)
+    integer(K) :: area
+
+    integer :: p, s, e, k, num_polygons, num_events, num_y, i, j
+    integer :: is_ccw, j1, j2
+    integer(kind=int64) :: signed_area, dy, current_x, dx, covered_y
+
+    ! Arrays sized safely to the maximum possible vertices
+    type(Event), allocatable :: events(:)
+    integer(kind=int32), allocatable :: y_vals(:), unique_y(:)
+    integer, allocatable :: lap(:)
+
+    num_polygons = size(poly_start)
+    area = 0
+    if (num_polygons == 0) return
+
+    allocate(events(size(X)))
+    allocate(y_vals(size(X)))
+
+    num_events = 0
+    num_y = 0
+
+    ! ==========================================
+    ! 1. Event Generation & Orientation Checking
+    ! ==========================================
+    do p = 1, num_polygons
+       s = poly_start(p)
+       e = poly_end(p)
+
+       ! A. Calculate Signed Area to determine CW/CCW
+       signed_area = 0
+       do k = s, e - 1
+          signed_area = signed_area + X(k) * Y(k+1) - X(k+1) * Y(k)
+       end do
+
+       if (signed_area > 0) then
+          is_ccw = 1
+       else if (signed_area < 0) then
+          is_ccw = -1
+       else
+          cycle ! Degenerate zero-area polygon, skip it
+       end if
+
+       ! B. Extract Vertical Edges
+       do k = s, e - 1
+          ! A vertical edge has same X, different Y
+          if (X(k) == X(k+1) .and. Y(k) /= Y(k+1)) then
+             num_events = num_events + 1
+             events(num_events)%x = X(k)
+             events(num_events)%y1 = min(Y(k), Y(k+1))
+             events(num_events)%y2 = max(Y(k), Y(k+1))
+
+             ! Collect Y coordinates for compression later
+             num_y = num_y + 1
+             y_vals(num_y) = min(Y(k), Y(k+1))
+             num_y = num_y + 1
+             y_vals(num_y) = max(Y(k), Y(k+1))
+
+             ! Assign Lap Count Parity based on direction and orientation
+             dy = Y(k+1) - Y(k)
+             if (dy > 0) then
+                ! Going UP
+                events(num_events)%lap_change = -1 * is_ccw
+             else
+                ! Going DOWN
+                events(num_events)%lap_change =  1 * is_ccw
+             end if
+          end if
+       end do
+    end do
+
+    if (num_events == 0) return
+
+    ! ==========================================
+    ! 2. Coordinate Compression (Y-Axis)
+    ! ==========================================
+    call sort_int_array(y_vals(1:num_y))
+
+    allocate(unique_y(num_y))
+    j = 1
+    unique_y(1) = y_vals(1)
+    do i = 2, num_y
+       if (y_vals(i) /= unique_y(j)) then
+          j = j + 1
+          unique_y(j) = y_vals(i)
+       end if
+    end do
+    num_y = j ! num_y is now the count of UNIQUE y coordinates
+
+    ! ==========================================
+    ! 3. Sweep Line Algorithm
+    ! ==========================================
+    call sort_events(events(1:num_events))
+
+    allocate(lap(num_y - 1))
+    lap = 0
+    area = 0
+    current_x = events(1)%x
+
+    do i = 1, num_events
+       dx = events(i)%x - current_x
+
+       if (dx > 0) then
+          covered_y = 0
+          do j = 1, num_y - 1
+             if (lap(j) > 0) then
+                covered_y = covered_y + (unique_y(j+1) - unique_y(j))
+             end if
+          end do
+
+          area = area + (dx * covered_y)
+          current_x = events(i)%x
+       end if
+
+       j1 = binary_search_y(unique_y, num_y, events(i)%y1)
+       j2 = binary_search_y(unique_y, num_y, events(i)%y2)
+
+       do j = j1, j2 - 1
+          lap(j) = lap(j) + events(i)%lap_change
+       end do
+    end do
+
+  end function calculate_polygon_union_area
+
+  ! --- Auxiliary Subroutines ---
+
+  ! Binary search for rapid index lookup of y-coordinates
+  pure function binary_search_y(arr, n, val) result(idx)
+    integer(K), intent(in) :: arr(:)
+    integer, intent(in) :: n
+    integer(K), intent(in) :: val
+    integer :: idx, low, high, mid
+
+    low = 1
+    high = n
+    idx = -1
+    do while (low <= high)
+       mid = (low + high) / 2
+       if (arr(mid) == val) then
+          idx = mid
+          return
+       else if (arr(mid) < val) then
+          low = mid + 1
+       else
+          high = mid - 1
+       end if
+    end do
+  end function binary_search_y
+
+  ! In-place Quicksort for 64-bit integers
+  pure recursive subroutine sort_int_array(arr)
+    integer(K), intent(inout) :: arr(:)
+    integer(K) :: pivot, temp
+    integer :: i, j, left, right
+
+    if (size(arr) <= 1) return
+    left = 1
+    right = size(arr)
+    pivot = arr((left + right) / 2)
+    i = left
+    j = right
+
+    do while (i <= j)
+       do while (arr(i) < pivot)
+          i = i + 1
+       end do
+       do while (arr(j) > pivot)
+          j = j - 1
+       end do
+       if (i <= j) then
+          temp = arr(i)
+          arr(i) = arr(j)
+          arr(j) = temp
+          i = i + 1
+          j = j - 1
+       end if
+    end do
+
+    if (left < j) call sort_int_array(arr(left:j))
+    if (i < right) call sort_int_array(arr(i:right))
+  end subroutine sort_int_array
+
+  ! In-place Quicksort for Events (sorting by X-coordinate)
+  pure recursive subroutine sort_events(arr)
+    type(Event), intent(inout) :: arr(:)
+    integer(K) :: pivot
+    type(Event) :: temp
+    integer :: i, j, left, right
+
+    if (size(arr) <= 1) return
+    left = 1
+    right = size(arr)
+    pivot = arr((left + right) / 2)%x
+    i = left
+    j = right
+
+    do while (i <= j)
+       do while (arr(i)%x < pivot)
+          i = i + 1
+       end do
+       do while (arr(j)%x > pivot)
+          j = j - 1
+       end do
+       if (i <= j) then
+          temp = arr(i)
+          arr(i) = arr(j)
+          arr(j) = temp
+          i = i + 1
+          j = j - 1
+       end if
+    end do
+
+    if (left < j) call sort_events(arr(left:j))
+    if (i < right) call sort_events(arr(i:right))
+  end subroutine sort_events
+
+
+  !Permutaion code using INDIRECT SORTING
+  !Instead of shuffling this AugmentBox data, can I generate an array of integers and then sort
+  !that into a permutation array ? Write a Fortran function which accepts the Box array (make
+  !it general so I can pass Box or AugmentBox) and as output in the subroutie it allocates and
+  !returns a permutation array of same size as Box array, but which contains the sort order.
+  ! =========================================================
+  ! 1. Implementation for type(Box)
+  ! =========================================================
+  subroutine get_box_permutation(arr, perm)
+    type(Box), intent(in) :: arr(:)
+    integer(int64), allocatable, intent(out) :: perm(:)
+    integer(int64) :: i, n
+
+    n = size(arr, kind=int64)
+    allocate(perm(n))
+
+    ! Initialize permutation array with 1, 2, 3... N
+    do i = 1, n
+       perm(i) = i
+    end do
+
+    ! Sort the indices
+    if (n > 1) then
+       call indirect_quicksort_box(arr, perm, 1_int64, n)
+    end if
+  end subroutine get_box_permutation
+
+  pure recursive subroutine indirect_quicksort_box(arr, perm, left, right)
+    type(Box), intent(in) :: arr(:)
+    integer(int64), intent(inout) :: perm(:)
+    integer(int64), intent(in) :: left, right
+
+    integer(int64) :: i, j, temp
+    type(Box) :: pivot_val
+
+    if (left < right) then
+       ! The pivot VALUE is looked up via the permutation array
+       pivot_val = arr(perm((left + right) / 2))
+       i = left
+       j = right
+
+       do while (i <= j)
+          ! Compare values using indices from perm
+          do while (box_less_than(arr(perm(i)), pivot_val))
+             i = i + 1
+          end do
+          do while (box_less_than(pivot_val, arr(perm(j))))
+             j = j - 1
+          end do
+
+          if (i <= j) then
+             ! Swap the INDICES, not the actual Box data
+             temp = perm(i)
+             perm(i) = perm(j)
+             perm(j) = temp
+             i = i + 1
+             j = j - 1
+          end if
+       end do
+
+       if (left < j)  call indirect_quicksort_box(arr, perm, left, j)
+       if (i < right) call indirect_quicksort_box(arr, perm, i, right)
+    end if
+  end subroutine indirect_quicksort_box
+
+  !> Polygon booleans
+  !Now that we have sorting for X,Y and we have   pure function
+  !calculate_polygon_union_area(X, Y, poly_start, poly_end) result(area)
+  !lets start adding polygon booleans for rectilinear polygons.
+  !So we will construct a new type which is
+  !type ShapeCollection
+  !integer(kind=K), allocatable: X(:),Y(:),poly_start(:),poly_end(:)
+  !and we want to write something like
+
+  !ksubroutine PolygonBooleanAND( A, B, C)
+  !where A B and C are of type ShapeCollection.
+  !Please generate modern Fortran code for this using the previously defined functions on sorting and event processing
   !> Morton and other space filling curve sort
   !> Given an array of type(Box), how can we create a Morton index (x|y)
   !> then sort the array using that index and then use this sorted order

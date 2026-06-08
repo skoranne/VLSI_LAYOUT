@@ -58,4 +58,6 @@ HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/FPU_FLAT_L26.h5
 HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/FPU_FLAT_L27.h5
 << metal5 >>
 HDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/FPU_FLAT_L28.h5
+<< poly2 >>
+JHDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/gL66_D20.h5
 << end >>

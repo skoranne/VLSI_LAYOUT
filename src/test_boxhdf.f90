@@ -16,7 +16,8 @@ program demo_box_hdf5
   use HDFDataModule
   use GeometryModule
   implicit none
-
+  integer(kind=int32), allocatable :: X(:), Y(:)
+  integer(kind=int32), allocatable :: polystart(:), polyend(:)
   type(Box), allocatable :: boxes(:), boxes_read(:)
   integer :: i, n
 
@@ -63,5 +64,21 @@ program demo_box_hdf5
   else
      print *, 'Verification failed – mismatch!'
   end if
+
+  call LoadPolygonOffsetsHDF5("a.h5",X, Y, polystart, polyend)
+  !> what does 12 polygon 84 vertices mean
+  if( size(X) /= size(Y) ) then
+     error stop "|X| != |Y|"
+  end if
+  if( size(polystart) /= size(polyend) ) then
+     error stop "|PolyStart| != |PolyEnd|"
+  end if
+  
+  do i=1,size(polystart)
+     write(*,*) 'Polygon = ', i, ' has ', polyend(i) - polystart(i), ' vertices'
+     write(*,*) X(polystart(i):polyend(i)-1)
+     write(*,*) Y(polystart(i):polyend(i)-1)     
+  end do
+
 end program demo_box_hdf5
 

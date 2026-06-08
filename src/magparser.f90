@@ -299,7 +299,7 @@ contains
                !call box_scale( tempBox, ASCALE, BSCALE )
                call addBoxToLayer( layer_id, tempBox )
             end if
-            if (line(1:4) == 'HDF5' .and. found_section) then
+            if (line(1:5) == 'HDF5' .and. found_section) then
                !write (*,*) line
                call hash_get( ht, trim(section_name), layer_id, ok )
                ! Parse rectangle coordinates
@@ -313,6 +313,19 @@ contains
                !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
                !end do
             end if
+            if (line(1:4) == 'JHDF5' .and. found_section) then
+               !write (*,*) line
+               call hash_get( ht, trim(section_name), layer_id, ok )
+               ! Parse rectangle coordinates
+               section_name = trim(line(7:len_trim(line)))
+               call LoadJuliaHDF5( section_name, layers(layer_id)%layer_boxes, 5 ) ! scaling_factor set to 5
+               layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
+               !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from JHDF5: ', section_name, ' ', layers(layer_id)%n_used
+               !boxes => layers(i)%layer_boxes
+               !do j = 1, layers(i)%n_used
+               !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
+               !end do
+            end if            
             ! Parse label definitions
             if (line(1:5) == 'rlabel' .and. found_section) then
                ! Parse label information
@@ -391,7 +404,20 @@ contains
              call loadFromHDF( section_name, layers(layer_id)%layer_boxes )
              layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
              layers(layer_id)%layerState = ior( layers(layer_id)%layerState, LAYER_STATE_SORT )
-             write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from HDF5: ', section_name, ' ', layers(layer_id)%n_used
+             !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from HDF5: ', section_name, ' ', layers(layer_id)%n_used
+             !boxes => layers(i)%layer_boxes
+             !do j = 1, layers(i)%n_used
+             !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
+             !end do
+          end if
+          if (line(1:5) == 'JHDF5' .and. found_section) then
+             !write (*,*) line
+             call hash_get( ht, trim(section_name), layer_id, ok )
+             ! Parse rectangle coordinates
+             section_name = trim(line(7:len_trim(line)))
+             call LoadJuliaHDF5( section_name, layers(layer_id)%layer_boxes, 5 ) ! scaling_factor set to 5
+             layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
+             !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from JHDF5: ', section_name, ' ', layers(layer_id)%n_used
              !boxes => layers(i)%layer_boxes
              !do j = 1, layers(i)%n_used
              !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
@@ -484,7 +510,7 @@ contains
        !end do
     end do tree_check_loop
     write (*,*) '+-----------------------------------------------------------------+'
-    !> Polygon Number loop
+    !> Polygon Number loop, this loop is parallelized inside over each polygon/box
     pnum_loop: do i = 1, size(layers)
        if( layers(i)%n_used == 0 ) then
           cycle
@@ -503,7 +529,7 @@ contains
        !write(*,*) 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)
        if( overlap_areas(i) > 0.0 ) then
           !> this layer needs HEALING as we have detected overlap
-          layers(i)%layerState = ior( layers(i)%layerState, iand( layers(i)%layerState, NOT(LAYER_STATE_HEAL ) ) )
+          layers(i)%layerState = iand( layers(i)%layerState, NOT(LAYER_STATE_HEAL ) )
        else
           layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_HEAL )          
        end if
@@ -518,18 +544,24 @@ contains
        !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
        !end do
     end do pnum_loop
-    
-    do i = 1,size(layers)
-       boxes => layers(i)%layer_boxes
-       extents(i) = mbr_of_array( boxes, layers(i)%n_used )
+    do concurrent (i = 1:MAX_LAYERS)    
+    !do i = 1,size(layers)
+       if( layers(i)%n_used == 0 ) then
+          cycle
+       end if
+       extents(i) = mbr_of_array( layers(i)%layer_boxes, layers(i)%n_used )
        DESIGN_EXTENT = DESIGN_EXTENT + extents(i)
        layers(i)%area = 0.0
        if( .not. NeedsHealing( layers(i) ) ) then
           do j = 1, layers(i)%n_used
-             layers(i)%area = layers(i)%area + box_area( boxes(j) )
-             layers(i)%perimeter = layers(i)%perimeter + box_perimeter( boxes(j) )
-             !   extents(i) = extents(i) + boxes(j)             
+             layers(i)%area = layers(i)%area + box_area( layers(i)%layer_boxes(j) )
+             layers(i)%perimeter = layers(i)%perimeter + box_perimeter( layers(i)%layer_boxes(j) )
           end do
+          if( layers(i)%area /= calculate_union_area( layers(i)%layer_boxes ) ) then
+             write(*,*) 'Layer ',i, 'Layer State ', layers(i)%layerState
+             write(*,*) 'Union Area by SCANLINE: ', calculate_union_area( layers(i)%layer_boxes ), ' OVLP: ', layers(i)%area
+             error stop
+          end if
           layers(i)%perimeter = layers(i)%perimeter - overlap_perimeter(i)
           !write(*,*) 'AREA = ', layers(i)%area
        else

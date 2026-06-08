@@ -474,3 +474,133 @@ end
 # Example usage:
 # df = parse_rectangles_h5("gL67_D20.h5")
 # first(df, 5)
+using HDF5
+
+function export_polygons_offset_to_hdf5(filename::String)
+    raw_strings = [
+        "boundary 66 20 {10205 105} {10205 1035} {10525 1035} {10525 705} {10355 705} {10355 105} {10205 105}",
+        "boundary 66 20 {10520 1605} {10520 1875} {10525 1875} {10525 2615} {10675 2615} {10675 1875} {10850 1875} {10850 1605} {10520 1605}",
+        "boundary 66 20 {10735 105} {10735 1245} {10040 1245} {10040 1575} {10105 1575} {10105 2615} {10255 2615} {10255 1575} {10310 1575} {10310 1395} {10885 1395} {10885 105} {10735 105}",
+        "boundary 66 20 {11210 105} {11210 1035} {11095 1035} {11095 2615} {11245 2615} {11245 1220} {11580 1220} {11580 2615} {11730 2615} {11730 1220} {12535 1220} {12535 890} {12265 890} {12265 1035} {11845 1035} {11845 105} {11695 105} {11695 1035} {11360 1035} {11360 105} {11210 105}"
+    ]
+
+    X = Int32[]
+    Y = Int32[]
+    starts = Int32[]
+    ends = Int32[]
+
+    current_idx = 1
+    for line in raw_strings
+        matches = eachmatch(r"\{(\d+)\s+(\d+)\}", line)
+        start_idx = current_idx
+        
+        for m in matches
+            push!(X, parse(Int32, m.captures[1]))
+            push!(Y, parse(Int32, m.captures[2]))
+            current_idx += 1
+        end
+        
+        # Record the 1-based Fortran-compatible offset bounds
+        push!(starts, Int32(start_idx))
+        push!(ends, Int32(current_idx - 1))
+    end
+
+    # Create two 2D matrices
+    vertices_data = Matrix(hcat(X, Y)')        # Dim: 2 x N_vertices
+    offsets_data  = Matrix(hcat(starts, ends)')  # Dim: 2 x N_polygons
+
+    h5open(filename, "w") do file
+        file["vertices"] = vertices_data
+        file["offsets"]  = offsets_data
+    end
+    
+    println("Wrote $(length(X)) vertices and $(length(starts)) polygon offsets to $filename")
+end
+
+#export_polygons_offset_to_hdf5("offset_polygons.h5")
+function ConvertSTRMToHDF5(input_filename::String)
+    # Dictionary to group arrays by (Layer, Datatype)
+    # Key: (Int, Int) -> Value: Dict holding X, Y, starts, and ends arrays
+    datasets = Dict{Tuple{Int, Int}, Dict{Symbol, Vector{Int32}}}()
+
+    # Read the file line by line
+    for line in eachline(input_filename)
+        line = strip(line)
+        isempty(line) && continue
+
+        # --- Parse BOX elements ---
+        if startswith(line, "box")
+            # Regex extracts Layer, Datatype, and the two {x y} pairs
+            m = match(r"box\s+(\d+)\s+(\d+)\s+\{(-?\d+)\s+(-?\d+)\}\s+\{(-?\d+)\s+(-?\d+)\}", line)
+            if m !== nothing
+                layer = parse(Int, m.captures[1])
+                dtype = parse(Int, m.captures[2])
+                x1, y1, x2, y2 = parse.(Int32, m.captures[3:6])
+
+                # Initialize dictionary for this layer/datatype if it doesn't exist
+                key = (layer, dtype)
+                if !haskey(datasets, key)
+                    datasets[key] = Dict(:X => Int32[], :Y => Int32[], :starts => Int32[], :ends => Int32[])
+                end
+                ds = datasets[key]
+
+                start_idx = length(ds[:X]) + 1
+
+                # Expand the 2 coordinate pairs into a 5-point closed polygon (CCW)
+                push!(ds[:X], x1, x2, x2, x1, x1)
+                push!(ds[:Y], y1, y1, y2, y2, y1)
+
+                # Record 1-based Fortran offset
+                push!(ds[:starts], Int32(start_idx))
+                push!(ds[:ends], Int32(length(ds[:X])))
+            end
+
+        # --- Parse BOUNDARY elements ---
+        elseif startswith(line, "boundary")
+            # Regex extracts Layer, Datatype, and the remainder of the line
+            m = match(r"boundary\s+(\d+)\s+(\d+)\s+(.+)", line)
+            if m !== nothing
+                layer = parse(Int, m.captures[1])
+                dtype = parse(Int, m.captures[2])
+                
+                key = (layer, dtype)
+                if !haskey(datasets, key)
+                    datasets[key] = Dict(:X => Int32[], :Y => Int32[], :starts => Int32[], :ends => Int32[])
+                end
+                ds = datasets[key]
+
+                start_idx = length(ds[:X]) + 1
+
+                # Extract all coordinate pairs from the remainder string
+                for cm in eachmatch(r"\{(-?\d+)\s+(-?\d+)\}", m.captures[3])
+                    push!(ds[:X], parse(Int32, cm.captures[1]))
+                    push!(ds[:Y], parse(Int32, cm.captures[2]))
+                end
+
+                # Record 1-based Fortran offset
+                push!(ds[:starts], Int32(start_idx))
+                push!(ds[:ends], Int32(length(ds[:X])))
+            end
+        end
+    end
+
+    # --- Write to HDF5 Files ---
+    for ((layer, dtype), ds) in datasets
+        filename = "L$(layer)_D$(dtype).h5"
+        
+        # Materialize standard-stride contiguous arrays using Matrix()
+        # This prevents the "Cannot read/write arrays with a different stride" error
+        vertices_data = Matrix(hcat(ds[:X], ds[:Y])')
+        offsets_data  = Matrix(hcat(ds[:starts], ds[:ends])')
+        
+        h5open(filename, "w") do file
+            file["vertices"] = vertices_data
+            file["offsets"]  = offsets_data
+        end
+        
+        println("Generated $filename: $(length(ds[:starts])) polygons, $(length(ds[:X])) vertices.")
+    end
+end
+
+# To execute the script, just point it at your layout file:
+# process_layout_to_hdf5("magic_layout.txt")
