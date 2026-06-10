@@ -10,6 +10,9 @@ and boost::spatial_index which can be tried.
 
 grep  "<<" FPU_FLAT.mag | awk '{print $0; print "HDF5 FPU_DATA/FPU_FLAT_L" ++count ".h5"}'
 Also we can use 'ratarmount' if we dont want to support .gz ourselves.
+
+![FPU with Paraview on HDF5](FPU.png)
+
 ```
  Reading filename: SDT6x6_FLAT.mag.gz
  The file is a gzipped file!
