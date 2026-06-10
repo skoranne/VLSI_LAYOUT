@@ -50,6 +50,8 @@
 !=====================================================================
 program mag_parser
   use MagicVLSILayoutParser               ! <-- your parser module
+  use DesignModule
+  use ControlModule
   implicit none
 
   !-----------------------------------------------------------------
@@ -62,7 +64,7 @@ program mag_parser
   character(len=256)            :: arg_string    ! temporary buffer for the 2nd argument
   character(len=*), parameter   :: default_file = "INV.mag"
   integer,          parameter   :: default_max  = 10
-
+  type(Design)                  :: load_design
   !-----------------------------------------------------------------
   !  Get the number of arguments supplied on the command line
   !-----------------------------------------------------------------
@@ -105,7 +107,8 @@ program mag_parser
   !-----------------------------------------------------------------
   !  Call the actual parser (the routine you already have)
   !-----------------------------------------------------------------
-  call parseMagicLayoutFile(trim(filename), maxLayers)
+  !call parseMagicLayoutFile(load_design, trim(filename), maxLayers)
+  call ParseControlFile( trim(filename), maxLayers )
 
   !-----------------------------------------------------------------
   !  Normal program termination

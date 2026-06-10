@@ -1,0 +1,42 @@
+magic
+tech sky130A
+magscale 1 2
+timestamp 1780076111
+<< nwell >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/mkFPU_FLAT_L64_D20.bin
+<< pwell >>
+<< scnmos >>
+<< scpmoshvt >>
+<< diff >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/mkFPU_FLAT_L65_D20.bin 
+<< pdiff >>
+<< ndiffc >>
+<< pdiffc >>
+<< psubdiff >>
+<< nsubdiff >>
+<< psubdiffcont >>
+<< nsubdiffcont >>
+<< poly >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/mkFPU_FLAT_L66_D20.bin
+<< polycont >>
+<< rmp >>
+<< ndiode >>
+<< ndiodec >>
+<< locali >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/mkFPU_FLAT_L67_D20.bin
+<< viali >>
+<< metal1 >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/mkFPU_FLAT_L68_D20.bin
+<< via1 >>
+<< metal2 >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/mkFPU_FLAT_L69_D20.bin
+<< via2 >>
+<< metal3 >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/mkFPU_FLAT_L70_D20.bin
+<< via3 >>
+<< metal4 >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/mkFPU_FLAT_L71_D20.bin
+<< via4 >>
+<< metal5 >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_DATA/mkFPU_FLAT_L72_D20.bin
+<< end >>

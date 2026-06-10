@@ -12,7 +12,8 @@ module HDFDataModule
   use hdf5
   implicit none
   private
-  public :: h5check, saveToHDF, loadFromHDF, LoadJuliaHDF5, LoadPolygonOffsetsHDF5
+  public :: h5check, saveToHDF, loadFromHDF, LoadJuliaHDF5, LoadPolygonOffsetsHDF5, &
+       LoadKLBin
 contains
   !=================================================================
   !  Helper: abort the program if an HDF5 call returned a non‑zero error.
@@ -220,6 +221,9 @@ contains
           boxes(i)%y1 = raw_data(2, i) / scaling_factor
           boxes(i)%x2 = raw_data(3, i) / scaling_factor
           boxes(i)%y2 = raw_data(4, i) / scaling_factor
+          if( .not. boxes(i)%is_valid() ) then
+             error stop "INVALID BOX 1"
+          end if
        end do
     else if (dims(2) == 4) then
        num_boxes = dims(1)
@@ -229,6 +233,9 @@ contains
           boxes(i)%y1 = raw_data(i, 2) / scaling_factor
           boxes(i)%x2 = raw_data(i, 3) / scaling_factor
           boxes(i)%y2 = raw_data(i, 4) / scaling_factor
+          if( .not. boxes(i)%is_valid() ) then
+             error stop "INVALID BOX 2"
+          end if
        end do
     else
        stop "ERROR: Neither HDF5 dimension equals 4. Cannot map coordinates."
@@ -247,6 +254,94 @@ contains
     deallocate(maxdims)
 
   end subroutine LoadJuliaHDF5
+  subroutine NewLoadJuliaHDF5(filename, boxes, scaling_factor)
+    character(len=*), intent(in)  :: filename
+    type(Box), allocatable, intent(out) :: boxes(:)
+    integer, intent(in)           :: scaling_factor
+    integer(HID_T) :: file_id, dset_id, space_id
+    integer(HSIZE_T), allocatable :: dims(:), maxdims(:)
+    integer :: rank, num_boxes, i, alloc_err
+    integer :: ierr
+
+    ! 1. Match type exactly with H5T_STD_I64LE on disk
+    integer(int64), allocatable, target :: raw_data(:,:)
+    type(c_ptr) :: ptr
+
+    call h5open_f(ierr)
+    call h5check(ierr, 'h5open_f')
+
+    call h5fopen_f(filename, H5F_ACC_RDONLY_F, file_id, ierr)
+    call h5check(ierr, 'h5fopen_f')
+    call h5dopen_f(file_id, "rectangles", dset_id, ierr)
+    call h5check(ierr, 'h5dopen_f')
+
+    call h5dget_space_f(dset_id, space_id, ierr)
+    call h5check(ierr, 'h5dget_space_f')
+    call h5sget_simple_extent_ndims_f(space_id, rank, ierr)
+    call h5check(ierr, 'h5sget_simple_extent_ndims_f')
+
+    allocate(dims(rank), maxdims(rank))
+    call h5sget_simple_extent_dims_f(space_id, dims, maxdims, ierr)
+    call h5check(ierr, 'h5sget_simple_extent_dims_f')
+
+    ! Allocate 64-bit matching array layout exactly as described by HDF5
+    allocate(raw_data(dims(1), dims(2)), stat=alloc_err)
+    if (alloc_err /= 0) stop "ERROR: allocating raw HDF5 read buffer"
+
+    ptr = c_loc(raw_data(1, 1))
+
+    ! 2. CLEANUP: Use native 64-bit integer descriptor directly. 
+    ! No manual type copying or size modifications required.
+    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, ptr, ierr)
+    call h5check(ierr, 'h5dread_f')
+
+    ! 3. Map 2D raw data into 1D array of Box types
+    ! Since h5dump says (4, 224), dims(1) is exactly 4.
+    if (dims(1) == 4) then
+       num_boxes = dims(2)
+       allocate(boxes(num_boxes))
+       do i = 1, num_boxes
+          ! Downcast safely during calculation assignment
+          boxes(i)%x1 = int(raw_data(1, i) / scaling_factor, kind=4)
+          boxes(i)%y1 = int(raw_data(2, i) / scaling_factor, kind=4)
+          boxes(i)%x2 = int(raw_data(3, i) / scaling_factor, kind=4)
+          boxes(i)%y2 = int(raw_data(4, i) / scaling_factor, kind=4)
+          if( .not. boxes(i)%is_valid() ) then
+             write(*,*) "CRITICAL: Invalid box found at index: ", i
+             write(*,*) "Coords: ", raw_data(1,i), raw_data(2,i), raw_data(3,i), raw_data(4,i)
+             error stop "INVALID BOX 1"
+          end if
+       end do
+    else if (dims(2) == 4) then
+       num_boxes = dims(1)
+       allocate(boxes(num_boxes))
+       do i = 1, num_boxes
+          boxes(i)%x1 = int(raw_data(i, 1) / scaling_factor, kind=4)
+          boxes(i)%y1 = int(raw_data(i, 2) / scaling_factor, kind=4)
+          boxes(i)%x2 = int(raw_data(i, 3) / scaling_factor, kind=4)
+          boxes(i)%y2 = int(raw_data(i, 4) / scaling_factor, kind=4)
+          if( .not. boxes(i)%is_valid() ) then
+             write(*,*) "CRITICAL: Invalid box found at index: ", i
+             write(*,*) "Coords: ", raw_data(1,i), raw_data(2,i), raw_data(3,i), raw_data(4,i)             
+             error stop "INVALID BOX 2"
+          end if
+       end do
+    else
+       stop "ERROR: Neither HDF5 dimension equals 4. Cannot map coordinates."
+    end if
+
+    write(*,*) 'NUM BOXES LOADED FROM JULIA: ', num_boxes
+
+    ! Clean up
+    call h5sclose_f(space_id, ierr)
+    call h5dclose_f(dset_id, ierr)
+    call h5fclose_f(file_id, ierr)
+
+    deallocate(raw_data)
+    deallocate(dims)
+    deallocate(maxdims)
+
+  end subroutine NewLoadJuliaHDF5
 
   !Write another Julia function to directly store this collection of polygon boundaries into HDF5
   !boundary 66 20 {10205 105} {10205 1035} {10525 1035} {10525 705} {10355 705} {10355 105} {10205 105}
@@ -363,5 +458,66 @@ contains
     write(*,*) 'Loaded Vertices: ', num_vertices
 
   end subroutine LoadPolygonOffsetsHDF5
+  subroutine LoadKLBin(fileName,boxes)
+    character(len=*), intent(in)  :: filename
+    type(Box), allocatable,intent(out) :: boxes(:)
+    integer(kind=int64) :: file_bytes, total_boxes, i, dot_pos
+    integer, parameter  :: BOX_SIZE_BYTES = 16 ! 4 coordinates * 4 bytes
+    integer :: file_unit, io_status, i
+    ! 1. Query the filesystem for the total file size in bytes
+    i = len_trim(fileName)
+    if (i >= 3 .and. fileName(i-2:i) == ".gz") then
+       dot_pos = index( trim( fileName ), '.' )
+       if( dot_pos < 0 ) then
+          stop 'Use proper file name'
+       end if
+       prefix = fileName( 1 : dot_pos - 1 )
+       print *, "The file is a gzipped file!, w/prefix: ", prefix       
+       gz_file = gzopen(fileName // c_null_char, "r" // c_null_char)
+    end if
+    inquire(file=trim(filename), size=file_bytes)
+    if (file_bytes <= 0) then
+       print *, "Error: File is empty or does not exist."
+       stop
+    end if
+    ! 2. Calculate the exact number of box structs in the array
+    total_boxes = file_bytes / BOX_SIZE_BYTES
+    write(*,'(A,I12,A)') 'INFO: Total file size =    ', file_bytes, ' bytes'
+    write(*,'(A,I12,A)') 'INFO: Allocating array for ', total_boxes, ' boxes.'
+    ! 3. Allocate the dynamic storage
+    allocate(boxes(total_boxes))
+    ! 4. Open the file in raw binary stream mode
+    open(newunit=file_unit, &
+         file=trim(filename), &
+         access='stream', &         ! Eliminates complex record headers
+         form='unformatted', &      ! Tells Fortran it is binary, not text
+         status='old', &
+         action='read', &
+         iostat=io_status)
+    if (io_status /= 0) then
+       print *, "Error: Could not open the binary file."
+       stop
+    end if
+    ! 5. Read the entire file cleanly into your allocated array in one shot
+    read(file_unit, iostat=io_status) boxes
+    if (io_status == 0) then
+       write(*,'(A,I12,A)') 'INFO: Read successful for ', total_boxes, ' boxes.'       
+       ! Example: print the first box if it exists
+       !if (total_boxes > 0) then
+       !   print '(A,4I12)', "First Box: ", boxes(1)%x1, &
+       !        boxes(1)%y1, &
+       !        boxes(1)%x2, &
+       !        boxes(1)%y2
+       !end if
+       do i=1,total_boxes
+          if( .not. boxes(i)%is_valid() ) error stop "INVALID BOX detected on input"
+       end do
+    else
+       print *, "Error occurred while reading the data array."
+    end if
+
+    close(file_unit)
+
+  end subroutine LoadKLBin
 
 end module HDFDataModule

@@ -107,9 +107,11 @@ contains
        overlap_areas(i) = 0.0
        overlap_perimeters(i) = 0.0
     end do
+    overlap_area = 0.0
+    overlap_perimeter = 0.0
     num_boxes = size( sorted_boxes )
     call uf%init( num_boxes )    
-    !write(*,*) 'DBG: ', num_boxes, ' ', size(tree_nodes)
+    !write(*,*) 'DBG: ', num_boxes, ' ', size(tree_nodes), ' ', uf%arr
     !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
     !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid, tempBox)
     over_all_boxes: do i=1,num_boxes
@@ -135,6 +137,11 @@ contains
                    else
                       !> good, we stay in overlap free regime, but now since the boxes
                       !> are known to interact, we MUST have non-zero perimeter
+                      if( tempBox%x1 == tempBox%x2 .or. tempBox%y1 == tempBox%y2 ) then
+                         !> ok
+                      else
+                         error stop "OVERLAP DETECTED"
+                      end if
                       overlap_perimeters(tid) = overlap_perimeters(tid) + box_perimeter( tempBox )
                    end if
                 end if
@@ -153,7 +160,7 @@ contains
     end if
     call uf%fullreduce()
   end subroutine PerformMerge
-
+  
 end module PNumMergeModule
 
 

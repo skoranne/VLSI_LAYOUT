@@ -67,7 +67,9 @@ module DataStructuresModule
      procedure, pass, private :: fullreduce_int32 => uf_fullreduce_int32
      procedure, pass, private :: fullreduce_int64 => uf_fullreduce_int64
      procedure, pass, private :: count_roots_int32 => uf_count_roots_int32
-     procedure, pass, private :: count_roots_int64 => uf_count_roots_int64     
+     procedure, pass, private :: count_roots_int64 => uf_count_roots_int64
+     procedure, pass, private :: uf_expand_roots_int32, uf_expand_roots_int64
+     procedure, pass, private :: uf_contract_roots_int32, uf_contract_roots_int64     
      generic :: init => init_int32, init_int64
      generic :: insert => insert_int32, insert_int64     
      generic :: root => root_int32, root_int64
@@ -75,6 +77,8 @@ module DataStructuresModule
      generic :: reduce => reduce_int32, reduce_int64
      generic :: fullreduce => fullreduce_int32, fullreduce_int64
      generic :: count_roots => count_roots_int32, count_roots_int64
+     generic :: expand_roots => uf_expand_roots_int32, uf_expand_roots_int64 !> singleton rectangle information is forgotten
+     generic :: contract_roots => uf_contract_roots_int32, uf_contract_roots_int64 !> singleton rectangle information is computed
   end type UnionFind
   interface uf_init
      module procedure uf_init_int32
@@ -370,19 +374,55 @@ contains
   end subroutine uf_reduce_int64
   subroutine uf_fullreduce_int32 (self)
     class(UnionFind(int32)), intent(inout) :: self
-    integer(kind=int32) :: i
+    integer(kind=int32) :: n, i, root, current_label
+    integer(kind=int32), allocatable   :: root_map(:)
+    n = size(self%arr)
+    allocate(root_map(n), source=0_int32)
     do i=1,size(self%arr)
        if( self%arr(i) /= 0 ) then
           call self%reduce_int32( i )
        end if
     end do
+    !> after this atleast we know if arr(i) == i then i is a root
+    current_label = 1
+    ! Pass 1: Identify true roots and assign them sequential IDs
+    do i = 1, n
+       if (self%arr(i) == i) then
+          root_map(i) = current_label
+          current_label = current_label + 1
+       end if
+    end do
+    do i = 1,n
+       if( self%arr(i) > 0 ) then
+          self%arr(i) = root_map( self%arr(i) )
+       end if
+    end do
   end subroutine uf_fullreduce_int32
+  !> Full reduce also includes a relabel phase, where roots are sequentially
+  !> assigned from 1..n, where n=num_roots.
   subroutine uf_fullreduce_int64 (self)
     class(UnionFind(int64)), intent(inout) :: self
-    integer(kind=int64) :: i
+    integer(kind=int64) :: n, i, root, current_label
+    integer(kind=int64), allocatable   :: root_map(:)
+    n = size(self%arr)
+    allocate(root_map(n), source=0_int64)
     do i=1,size(self%arr)
        if( self%arr(i) /= 0 ) then
           call self%reduce_int64( i )
+       end if
+    end do
+    !> after this atleast we know if arr(i) == i then i is a root
+    current_label = 1
+    ! Pass 1: Identify true roots and assign them sequential IDs
+    do i = 1, n
+       if (self%arr(i) == i) then
+          root_map(i) = current_label
+          current_label = current_label + 1
+       end if
+    end do
+    do i = 1,n
+       if( self%arr(i) > 0 ) then
+          self%arr(i) = root_map( self%arr(i) )
        end if
     end do
   end subroutine uf_fullreduce_int64
@@ -440,6 +480,59 @@ contains
     ! 5. The number of unique elements is just the count of true values!
     retval = count(seen)    
   end function uf_count_roots_int64
+  pure subroutine uf_contract_roots_int32(self)
+    class(UnionFind(int32)), intent(inout) :: self
+    logical, allocatable :: seen(:)
+    integer(kind=int64) :: min_val, max_val, i
+    integer(kind=int64) :: retval    
+  end subroutine uf_contract_roots_int32
+  
+  pure subroutine uf_contract_roots_int64(self)
+    class(UnionFind(int64)), intent(inout) :: self
+    logical, allocatable :: seen(:)
+    integer(kind=int64) :: min_val, max_val, i
+    integer(kind=int64) :: retval    
+  end subroutine uf_contract_roots_int64
+  subroutine uf_expand_roots_int32(self)
+    class(UnionFind(int32)), intent(inout) :: self
+    integer(kind=int64) :: num_roots, i
+    num_roots = self%count_roots()
+    write(*,*) 'Incoming |Root| = ', num_roots, ' |S| = ', size(self%arr)
+    do i=1,size(self%arr)
+       if( self%arr(i) == 0 ) then
+          self%arr(i) = num_roots + 1
+          num_roots = num_roots + 1
+       end if
+    end do
+    if( num_roots /= self%count_roots() ) then
+       write(*,*) 'Outgoing |Root| = ', num_roots, ' while UF%count_roots = ', self%count_roots()
+       error stop "INCONSISTENT EXPANSION of roots detected."
+    end if    
+  end subroutine uf_expand_roots_int32
+  
+  subroutine uf_expand_roots_int64(self)
+    class(UnionFind(int64)), intent(inout) :: self
+    integer(kind=int64) :: num_roots, i, min_val, max_val
+    num_roots = self%count_roots()
+    min_val = minval(self%arr)
+    max_val = maxval(self%arr)    
+    !write(*,*) 'Incoming |Root| = ', num_roots, ' |S| = ', size(self%arr), ' minval = ', min_val, ' maxval = ', max_val
+    do i=1,size(self%arr)
+       if( self%arr(i) == 0 ) then
+          self%arr(i) = num_roots + 1
+          num_roots = num_roots + 1
+       end if
+    end do
+    min_val = minval(self%arr)
+    max_val = maxval(self%arr)    
+    !write(*,*) 'Out |Root| = ', num_roots, ' |S| = ', size(self%arr), ' minval = ', min_val, ' maxval = ', max_val    
+    if( num_roots /= self%count_roots() ) then
+       write(*,*) 'Outgoing |Root| = ', num_roots, ' while UF%count_roots = ', self%count_roots()
+       error stop "INCONSISTENT EXPANSION of roots detected."
+    end if
+  end subroutine uf_expand_roots_int64
   
 end module DataStructuresModule
+
+
 

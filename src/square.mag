@@ -3,17 +3,19 @@ tech sky130A
 timestamp 1780872228
 << metal1 >>
 rect 7 4 11 5
-rect 1 1 2 2
-rect 3 1 5 3
+rect 1 1 3 3
+rect 6 6 11 9
 rect 7 2 8 4
 rect 10 2 11 4
 rect 7 1 11 2
-rect 0 0 1 1
+rect 0 0 2 2
 << end >>
  +-----------------------------------------------------------------+
 Layer:   1 metal1   has            7 rects. |RTREE| = CPU         0.51 secs.        0.02 REAL secs
  +-----------------------------------------------------------------+
 Layer:   1 metal1   has            1 non-rects            3 rects. STAT 15 |RTREE| = CPU         0.01 secs.        0.00 REAL secs
+We modified the RECT from (0,0) (1,1) to (0,0) (2,2) and create overlap, this is NOT legal MAGIC
+Layer:   1 metal1   has            2 non-rects            1 rects. STAT 14 |RTREE| = CPU         0.02 secs.        0.00 REAL secs
  +-----------------------------------------------------------------+
  +                Layer Areas and Perimeters                       +
  +-----------------------------------------------------------------+

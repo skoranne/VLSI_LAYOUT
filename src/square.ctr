@@ -1,0 +1,5 @@
+# Control file for MAGPARSER
+program square
+decl design d1 = square.mag
+decl design d2 = MY_SED.mag
+end 

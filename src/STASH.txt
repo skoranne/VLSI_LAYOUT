@@ -1,0 +1,86 @@
+! **Prerequisite**: Ensure your array has the TARGET attribute so C_LOC works
+    ! type(box_type), allocatable, target :: boxes(:)
+    ! type(box_type), allocatable :: temp_boxes(:)
+    ! integer(c_int) :: bytes_read
+    ! integer :: capacity
+
+    if (i >= 3 .and. fileName(i-2:i) == ".gz") then
+        ! --- 1. GZIPPED FILE HANDLING ---
+        dot_pos = index( trim( fileName ), '.' )
+        if( dot_pos < 0 ) stop 'Use proper file name'
+        
+        prefix = fileName( 1 : dot_pos - 1 )
+        print *, "INFO: Gzipped file detected. Prefix: ", prefix       
+        gz_file = gzopen(fileName // c_null_char, "r" // c_null_char)
+        
+        ! Allocate initial capacity (e.g., 1000 boxes)
+        capacity = 1000
+        allocate(boxes(capacity))
+        total_boxes = 0
+        
+        print *, "INFO: Dynamically reading gzip stream..."
+        
+        ! Read dynamically until EOF
+        read_loop: do
+            ! Resize array if we hit capacity
+            if (total_boxes == capacity) then
+                allocate(temp_boxes(capacity * 2))
+                temp_boxes(1:capacity) = boxes
+                call move_alloc(from=temp_boxes, to=boxes)
+                capacity = capacity * 2
+            end if
+            
+            ! Pass the C address of the NEXT available slot in the array
+            bytes_read = gzread(gz_file, c_loc(boxes(total_boxes + 1)), BOX_SIZE_BYTES)
+            
+            if (bytes_read == 0) exit read_loop ! End of decompressed stream
+            if (bytes_read < 0) stop "Error: gzread failed during decompression."
+            
+            total_boxes = total_boxes + 1
+        end do read_loop
+        
+        ! Trim the array to the exact number of read structs
+        if (total_boxes > 0) then
+            allocate(temp_boxes(total_boxes))
+            temp_boxes(1:total_boxes) = boxes(1:total_boxes)
+            call move_alloc(from=temp_boxes, to=boxes)
+        else
+            deallocate(boxes)
+        end if
+        
+        ! Close the gz stream (assuming iret is declared integer(c_int))
+        iret = gzclose(gz_file)
+        print *, "INFO: Read ", total_boxes, " boxes from compressed file."
+        
+    else
+        ! --- 2. STANDARD UNFORMATTED STREAM HANDLING ---
+        inquire(file=trim(filename), size=file_bytes)
+        
+        if (file_bytes <= 0) then
+            print *, "Error: File is empty or does not exist."
+            stop
+        end if
+        
+        ! Calculate exact number of boxes (Safe here, file is uncompressed)
+        total_boxes = file_bytes / BOX_SIZE_BYTES
+        print *, "INFO: Total file size = ", file_bytes, " bytes"
+        print *, "INFO: Allocating array for ", total_boxes, " boxes."
+        
+        allocate(boxes(total_boxes))
+        
+        open(newunit=file_unit, &
+             file=trim(filename), &
+             access='stream', &         
+             form='unformatted', &      
+             status='old', &
+             action='read', &
+             iostat=io_status)
+             
+        if (io_status /= 0) stop "Error: Could not open the binary file."
+        
+        read(file_unit, iostat=io_status) boxes
+        close(file_unit)
+        print *, "INFO: Read ", total_boxes, " boxes from uncompressed file."
+        
+    end if
+    

@@ -266,7 +266,9 @@ contains
        end do
     end if
   end subroutine SearchTree
-  
+  !+----------------------------------------------------------------------------------+                                                  
+  !Layer: 1 gL67_D20 has 457108784 rects. |RTREE| = CPU 8137.33 secs. 187.95 REAL secs                            
+  !+----------------------------------------------------------------------------------+        
   subroutine SelfTestTheTree(sorted_boxes, capacity, tree_nodes, root_index)
     type(Box), intent(in) :: sorted_boxes(:)
     integer, intent(in) :: capacity

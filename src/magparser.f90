@@ -57,60 +57,9 @@
 ! rlabel metal1 -30 -45 102 -30 1 VGND
 ! rlabel metal1 -25 145 90 160 1 VPWR
 ! << end >>
-
-module DesignModule
-  use GeometryModule
-  use RTreeBuilder
-  use DataStructuresModule
-  use iso_c_binding
-  use iso_fortran_env, only : int32, int64, real64
-  implicit none  
-  private
-  public :: Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
-       LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, &
-       NeedsSorting, NeedsPNum, NeedsHealing
-  type :: LayerTree
-     integer(kind=8) :: root_index
-     type(RTreeNode), allocatable :: tree_nodes(:)
-  end type LayerTree
-  enum, bind(C)                     ! bind(C) makes the values C‑compatible
-      enumerator :: LAYER_STATE_NONE  = int(Z'00', kind=c_int)
-      enumerator :: LAYER_STATE_HEAL  = int(Z'01', kind=c_int)   ! 0b0001
-      enumerator :: LAYER_STATE_SORT  = int(Z'02', kind=c_int)   ! 0b0010
-      enumerator :: LAYER_STATE_PNUM  = int(Z'04', kind=c_int)   ! 0b0100
-      enumerator :: LAYER_STATE_RTREE = int(Z'08', kind=c_int)   ! 0b1000
-  end enum
-  
-  type :: Layer
-     integer :: lid
-     integer(kind=8)        :: n_used   = 0   ! how many slots are filled
-     integer(kind=8)        :: n_alloc  = 0   ! current allocation size
-     type(Box), allocatable :: layer_boxes(:)
-     integer(kind=8)        :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
-     type(LayerTree)        :: tree
-     type(UnionFind(int64)) :: pnumtable
-     real(kind=real64)      :: area, perimeter
-  end type Layer
-contains
-  pure function NeedsSorting(input_layer) result(retval)
-    type(Layer), intent(in) :: input_layer
-    logical :: retval
-    retval = iand(input_layer%layerState, LAYER_STATE_SORT ) == 0
-  end function NeedsSorting
-  pure function NeedsPNum(input_layer) result(retval)
-    type(Layer), intent(in) :: input_layer
-    logical :: retval
-    retval = iand(input_layer%layerState, LAYER_STATE_PNUM ) == 0
-  end function NeedsPNum
-  pure function NeedsHealing(input_layer) result(retval)
-    type(Layer), intent(in) :: input_layer
-    logical :: retval
-    retval = iand(input_layer%layerState, LAYER_STATE_HEAL ) == 0
-  end function NeedsHealing
-end module DesignModule
-
 module MagicVLSILayoutParser
   use hash_mod
+  use DesignModule
   use GeometryModule
   use DesignModule
   use RTreeBuilder
@@ -145,23 +94,25 @@ module MagicVLSILayoutParser
     end interface
   
   integer :: MAX_N = 10
-  type(hash_type) :: ht
-  character(len=20), dimension(:), allocatable :: layerNames
-  type(Layer), pointer :: layers(:) => null()
+  !type(hash_type) :: ht
+  !character(len=20), dimension(:), allocatable :: layerNames
+  !type(Layer), pointer :: layers(:) => null()
   !integer, allocatable :: geometry_count(:)
-  type(Box), allocatable :: extents(:)
-  type(Box)              :: DESIGN_EXTENT
   integer, parameter :: M = 16                ! max entries per node
   integer, parameter :: MAX_CHILD = M         ! internal nodes have ≤ M children  
 contains
   
-  subroutine parseMagicLayoutFile(fileName,MAX_LAYERS)
+  subroutine parseMagicLayoutFile(load_design,fileName,MAX_LAYERS)
     ! Parses Magic VLSI layout files with component sections and rectangle definitions
+    type(Design), intent(out), target :: load_design
     character(len=*), intent(in) :: fileName
+    integer, intent(in) :: MAX_LAYERS
+    type(hash_type), pointer :: ht
+    character(len=1024), dimension(:), pointer :: layerNames(:)
+    type(Layer), pointer :: layers(:)
     type(Box), pointer :: boxes(:)
     type(Layer),pointer:: l
     type(Box)          :: tempBox
-    integer, intent(in) :: MAX_LAYERS 
     integer :: box_count = 0
     character(len=200) :: line
     character(len=200) :: section_name
@@ -194,7 +145,10 @@ contains
     real(kind=8)    :: elapsed_time
     integer(kind=8) :: num_roots, num_rects
     real(kind=real64),allocatable :: overlap_areas(:)
-    real(kind=real64),allocatable :: overlap_perimeter(:)    
+    real(kind=real64),allocatable :: overlap_perimeter(:)
+    real(kind=real64)             :: area_by_union
+    type(Box), allocatable :: extents(:)
+    type(Box)              :: DESIGN_EXTENT
     ! 1. Get the number of ticks per second
     call system_clock(count_rate=clock_rate)
 
@@ -203,11 +157,16 @@ contains
     ! For each layer (from 1 to MAX_LAYERS), array of Box objects
     ! The allocation occurs at initialization time, making subsequent box insertions
     ! into layers very fast as they simply require array indexing rather than memory allocation
-    allocate(layers(MAX_LAYERS))
+    write (*,*) '+-----------------------------------------------------------------+'    
+    allocate(load_design%layers(MAX_LAYERS))
     allocate(extents(MAX_LAYERS))
-    allocate(layerNames(MAX_LAYERS))
+    allocate(load_design%layerNames(MAX_LAYERS))
     allocate(overlap_areas(MAX_LAYERS))
-    allocate(overlap_perimeter(MAX_LAYERS))    
+    allocate(overlap_perimeter(MAX_LAYERS))
+    ht => load_design%ht
+    layerNames => load_design%layerNames
+    layers => load_design%layers
+    
     do i = 1, MAX_LAYERS
        allocate(layers(i)%layer_boxes(INIT_ALLOC))
        layers(i)%n_used  = 0
@@ -218,6 +177,8 @@ contains
     end do
     call DESIGN_EXTENT%reset_to_infinity()
     call hash_create(ht,10)
+    !write(*,*) '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
+    !write(*,*)
     ! Open and parse the file
     i = len_trim(fileName)
     if (i >= 3 .and. fileName(i-2:i) == ".gz") then
@@ -297,7 +258,7 @@ contains
                tempBox%x2 = x2
                tempBox%y2 = y2
                !call box_scale( tempBox, ASCALE, BSCALE )
-               call addBoxToLayer( layer_id, tempBox )
+               call addBoxToLayer( layers, layer_id, tempBox )
             end if
             if (line(1:5) == 'HDF5' .and. found_section) then
                !write (*,*) line
@@ -325,7 +286,20 @@ contains
                !do j = 1, layers(i)%n_used
                !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
                !end do
-            end if            
+            end if
+            if (line(1:4) == 'KLBIN' .and. found_section) then
+               !write (*,*) line
+               call hash_get( ht, trim(section_name), layer_id, ok )
+               ! Parse rectangle coordinates
+               section_name = trim(line(7:len_trim(line)))
+               call LoadKLBin( section_name, layers(layer_id)%layer_boxes )
+               layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
+               !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from KLBIN: ', section_name, ' ', layers(layer_id)%n_used
+               !boxes => layers(i)%layer_boxes
+               !do j = 1, layers(i)%n_used
+               !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
+               !end do
+            end if                        
             ! Parse label definitions
             if (line(1:5) == 'rlabel' .and. found_section) then
                ! Parse label information
@@ -375,7 +349,7 @@ contains
              if( .not. ins ) write (*,*) 'Duplicate layer seen: ', section_name
              layerNames(layer_count) = section_name
              if( layer_count > 1 ) then
-                call ResizeLayer( layer_count-1, layers(layer_count-1)%n_used ) !in-time compaction
+                call ResizeLayer( layers, layer_count-1, layers(layer_count-1)%n_used ) !in-time compaction
              end if
              layer_count = layer_count + 1
              found_section = .true.
@@ -393,7 +367,7 @@ contains
              tempBox%x2 = x2
              tempBox%y2 = y2
              !call box_scale( tempBox, ASCALE, BSCALE )
-             call addBoxToLayer( layer_id, tempBox )
+             call addBoxToLayer( layers, layer_id, tempBox )
           end if
 
           if (line(1:4) == 'HDF5' .and. found_section) then
@@ -418,6 +392,19 @@ contains
              call LoadJuliaHDF5( section_name, layers(layer_id)%layer_boxes, 5 ) ! scaling_factor set to 5
              layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
              !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from JHDF5: ', section_name, ' ', layers(layer_id)%n_used
+             !boxes => layers(i)%layer_boxes
+             !do j = 1, layers(i)%n_used
+             !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
+             !end do
+          end if
+          if (line(1:5) == 'KLBIN' .and. found_section) then
+             !write (*,*) line
+             call hash_get( ht, trim(section_name), layer_id, ok )
+             ! Parse rectangle coordinates
+             section_name = trim(line(7:len_trim(line)))
+             call LoadKLBin( section_name, layers(layer_id)%layer_boxes )
+             layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
+             !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from KLBIN: ', section_name, ' ', layers(layer_id)%n_used
              !boxes => layers(i)%layer_boxes
              !do j = 1, layers(i)%n_used
              !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
@@ -449,14 +436,15 @@ contains
        !Contrary to logic this increases the peak RSS; if we want to do compaction
        !we have to do it right after a layer is "completed"
        if( layers(i)%n_used > 0 .and. layers(i)%n_used .ne. size( layers(i)%layer_boxes ) ) then
-          write(*,*) 'Performing compaction on layer: ', i, layerNames(i), ' ', layers(i)%n_used
-          call ResizeLayer( i, layers(i)%n_used ) ! performs compaction
+          write(*,'(A,I3,A8,A,I12)') 'Performing compaction on layer: ', i, layerNames(i), ' ', layers(i)%n_used
+          call ResizeLayer( layers, i, layers(i)%n_used ) ! performs compaction
        end if
     end do
     do i = 1, size(layers)
        allocate( layers(i)%tree%tree_nodes( CalculateTotalNodes( layers(i)%n_used, K_LEAF_CAPACITY ) ) )
     end do    
-    do concurrent (i = 1:MAX_LAYERS)
+    !do concurrent (i = 1:MAX_LAYERS)
+    do i = 1,size(layers)
        !for SDT6x6 it went from 16.8 to ~21
        !boxes => layers(i)%layer_boxes
        if( NeedsSorting( layers(i) ) ) then
@@ -496,13 +484,18 @@ contains
        ! 2. Record the start tick
        call system_clock(count=start_tick)           
        call cpu_time(t1)
-       call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       !write(*,*) 'RT = ', size(layers(i)%tree%tree_nodes), ' ', layers(i)%tree%root_index
+       !do j=1,size(layers(i)%tree%tree_nodes)
+       !   write(*,*) j,' ',layers(i)%tree%tree_nodes(j)%mbr
+       !end do
+       !>>> UNCOMMENT <<<
+       !call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        call cpu_time(t2)
        call system_clock(count=end_tick)
        elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
-       write(*,'(A,I3,A,A8,A,I12,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%n_used, &
+       write(*,'(A,I3,A8,A8,A,I12,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%n_used, &
             ' rects. |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
-       !boxes => layers(i)%layer_boxes
+       boxes => layers(i)%layer_boxes
        !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        !awk 'NR>76262119 && NR<76401348' log_FPU.txt > m3_FPU_OMT64.txt
        !do j = 1, layers(i)%n_used
@@ -518,6 +511,7 @@ contains
        ! 2. Record the start tick
        call system_clock(count=start_tick)           
        call cpu_time(t1)
+
        call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes,&
        layers(i)%tree%root_index, overlap_areas(i), overlap_perimeter(i))
        call cpu_time(t2)
@@ -527,15 +521,34 @@ contains
        num_rects = count(layers(i)%pnumtable%arr == 0)
        layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_PNUM )
        !write(*,*) 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)
+       !
+
        if( overlap_areas(i) > 0.0 ) then
           !> this layer needs HEALING as we have detected overlap
-          layers(i)%layerState = iand( layers(i)%layerState, NOT(LAYER_STATE_HEAL ) )
+          write(*,*) 'PerformUnion as overlap detected.'
+          !call PerformUnion( layers(i) )
+
+          call PerformPolygonUnion( layers(i) )
+          call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes,&
+               layers(i)%tree%root_index, overlap_areas(i), overlap_perimeter(i))
+          num_roots = layers(i)%pnumtable%count_roots()
+          num_rects = count(layers(i)%pnumtable%arr == 0)
+          if( overlap_areas(i) > 0.0 ) then
+             write(*,'(A,I3,A8,A8,A,I12,A,I12,A,I2,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
+                  ' non-rects ',num_rects , ' rects. STAT ',layers(i)%layerState, &
+                  ' |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
+             write(*,*) 'OVLP AREA = ', overlap_areas(i)
+             layers(i)%layerState = iand( layers(i)%layerState, NOT(LAYER_STATE_HEAL ) )
+             error stop 'UNION failed.'
+          else
+             layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_HEAL )          
+          end if
        else
           layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_HEAL )          
        end if
        
-       write(*,'(A,I3,A,A8,A,I12,A,I12,A,I2,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
-            ' non-rects ',num_rects , ' rects. STAT ',layers(i)%layerState, &
+       write(*,'(A,I3,A,A8,4(A,I12),A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
+            ' non-rects ',num_rects , ' rects ', layers(i)%n_used, ' boxes STAT ',layers(i)%layerState, &
             ' |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
        !boxes => layers(i)%layer_boxes
        !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
@@ -544,8 +557,8 @@ contains
        !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
        !end do
     end do pnum_loop
-    do concurrent (i = 1:MAX_LAYERS)    
-    !do i = 1,size(layers)
+    !do concurrent (i = 1:MAX_LAYERS)    
+    do i = 1,size(layers)
        if( layers(i)%n_used == 0 ) then
           cycle
        end if
@@ -557,14 +570,17 @@ contains
              layers(i)%area = layers(i)%area + box_area( layers(i)%layer_boxes(j) )
              layers(i)%perimeter = layers(i)%perimeter + box_perimeter( layers(i)%layer_boxes(j) )
           end do
-          if( layers(i)%area /= calculate_union_area( layers(i)%layer_boxes ) ) then
+          area_by_union = calculate_union_area_by_polygon( layers(i) )
+          if( layers(i)%area /= area_by_union ) then
              write(*,*) 'Layer ',i, 'Layer State ', layers(i)%layerState
-             write(*,*) 'Union Area by SCANLINE: ', calculate_union_area( layers(i)%layer_boxes ), ' OVLP: ', layers(i)%area
+             write(*,*) 'Union Area by SCANLINE: ', area_by_union, ' OVLP: ', layers(i)%area
              error stop
           end if
           layers(i)%perimeter = layers(i)%perimeter - overlap_perimeter(i)
+          if( layers(i)%perimeter < 0.0 ) error stop "INCONSISTENT PERIMETER detected."
           !write(*,*) 'AREA = ', layers(i)%area
        else
+          layers(i)%area = calculate_union_area_by_polygon( layers(i) )
           !write(*,*) 'AREA NOT COMPUTABLE = ', layers(i)%area
        end if
        !end do
@@ -600,7 +616,8 @@ contains
     end do
   end subroutine parseMagicLayoutFile
 
-  subroutine ResizeLayer(layer_id, newSize)
+  subroutine ResizeLayer(layers,layer_id, newSize)
+    type(Layer), intent(inout) :: layers(:)
     integer, intent(in) :: layer_id
     integer(kind=8), intent(in)  :: newSize
     type(Box), allocatable :: tmp(:)
@@ -610,7 +627,8 @@ contains
     layers(layer_id)%n_alloc = newSize
   end subroutine ResizeLayer
 
-  subroutine addBoxToLayer( layer_id, tempBox )
+  subroutine addBoxToLayer( layers, layer_id, tempBox )
+    type(Layer), intent(inout), target :: layers(:)    
     integer, intent(in) :: layer_id
     type(Box), intent(in) :: tempBox
     type(Layer), pointer :: l
@@ -621,7 +639,7 @@ contains
     l => layers( layer_id )
     if (l%n_used == l%n_alloc) then                ! buffer full → grow
        newSize = max(1_8, l%n_alloc*2)                ! double the size
-       call ResizeLayer(layer_id, newSize)
+       call ResizeLayer(layers, layer_id, newSize)
     end if
     l%n_used = l%n_used + 1
     l%layer_boxes(l%n_used) = tempBox

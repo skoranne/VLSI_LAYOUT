@@ -53,6 +53,10 @@ Generated L66_D20.h5: 22 polygons, 278 vertices.
 Generated L65_D20.h5: 12 polygons, 84 vertices.
 Generated L66_D44.h5: 94 polygons, 470 vertices.
 
+Next we did HDF5 + CELLS, for MW
+8765.091329 seconds (47.04 G allocations: 2.448 TiB, 6.60% gc time)
+
+
 This is not loading
 HDF5 "/scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW_FLAT_DATA/gL235_D4.h5" {
 GROUP "/" {
@@ -67,3 +71,59 @@ GROUP "/" {
       DATATYPE  H5T_STD_I64LE
       DATASPACE  SIMPLE { ( 4, 26620832 ) / ( 4, 26620832 ) }
       DATA {
+
+Starting from
+box 68 16 {145 2635} {315 2805}
+boundary 66 20 {10205 105} {10205 1035} {10525 1035} {10525 705} {10355 705} {10355 105} {10205 105}
+boundary 66 20 {10520 1605} {10520 1875} {10525 1875} {10525 2615} {10675 2615} {10675 1875} {10850 1875} {10850 1605} {10520 1605}
+boundary 66 20 {10735 105} {10735 1245} {10040 1245} {10040 1575} {10105 1575} {10105 2615} {10255 2615} {10255 1575} {10310 1575} {10310
+
+HDF5 "b.h5" {
+GROUP "/" {
+   DATASET "Cells" {
+      DATATYPE  H5T_STD_I32LE
+      DATASPACE  SIMPLE { ( 584, 4 ) / ( 584, 4 ) }
+      DATA {
+      (0,0): 0, 1, 2, 3,
+      (1,0): 4, 5, 6, 7,
+      (2,0): 8, 9, 10, 11,
+      (3,0): 12, 13, 14, 15,
+      }
+   }
+   DATASET "Points" {
+      DATATYPE  H5T_IEEE_F32LE
+      DATASPACE  SIMPLE { ( 2336, 3 ) / ( 2336, 3 ) }
+      DATA {
+      (0,0): 0, 0, 0,
+      (1,0): 14260, 0, 0,
+      (2,0): 14260, 2720, 0,
+      (3,0): 0, 2720, 0,
+      (4,0): 145, -85, 0,
+      }
+   }
+   DATASET "boxes" {
+      DATATYPE  H5T_COMPOUND {
+         H5T_STD_I32LE "x1";
+         H5T_STD_I32LE "y1";
+         H5T_STD_I32LE "x2";
+         H5T_STD_I32LE "y2";
+      }
+      DATASPACE  SIMPLE { ( 584 ) / ( 584 ) }
+      DATA {
+      (0): {
+            0,
+            0,
+            14260,
+            2720
+         },
+      (1): {
+            145,
+            -85,
+            315,
+            85
+         },
+   }
+}
+}
+
+Attempt to reduce peak memory

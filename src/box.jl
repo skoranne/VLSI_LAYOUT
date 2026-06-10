@@ -6,6 +6,7 @@
 using HDF5
 using DataFrames
 using SpatialIndexing
+using CodecZstd
 const SI = SpatialIndexing
 # Open your specific HDF5 file
 function LoadHDF5IntoDF(fileName,datasetname)
@@ -604,3 +605,675 @@ end
 
 # To execute the script, just point it at your layout file:
 # process_layout_to_hdf5("magic_layout.txt")
+using Plots
+
+function plot_contours(filename::String)
+    # Store all parsed polygons as vectors of (X, Y) vectors
+    all_x = Vector{Vector{Float64}}()
+    all_y = Vector{Vector{Float64}}()
+    
+    current_x = Float64[]
+    current_y = Float64[]
+    flat_nums = Float64[]
+
+    # 1. Parse the file
+    for line in eachline(filename)
+        line = strip(line)
+        
+        # Skip the header or empty lines
+        if isempty(line) || startswith(line, "Extracted")
+            continue
+        end
+
+        if startswith(line, "Polygon")
+            # If we were already building a polygon, save it before starting the new one
+            if !isempty(flat_nums)
+                push!(all_x, flat_nums[1:2:end])
+                push!(all_y, flat_nums[2:2:end])
+                empty!(flat_nums)
+            end
+            
+            # The polygon line contains numbers after the colon
+            parts = split(line, ":")
+            if length(parts) > 1
+                nums = parse.(Float64, split(parts[2]))
+                append!(flat_nums, nums)
+            end
+        else
+            # This is a continuation line of pure numbers
+            nums = parse.(Float64, split(line))
+            append!(flat_nums, nums)
+        end
+    end
+
+    # Don't forget to save the very last polygon in the file
+    if !isempty(flat_nums)
+        push!(all_x, flat_nums[1:2:end])
+        push!(all_y, flat_nums[2:2:end])
+    end
+
+    # 2. Plot the polygons
+    println("Successfully parsed $(length(all_x)) contours. Plotting...")
+    
+    # Initialize the plot canvas with equal aspect ratio to prevent stretching
+    p = plot(legend=false, aspect_ratio=:equal, title="VLSI Contours", 
+             xlabel="X", ylabel="Y", grid=true)
+
+    for i in 1:length(all_x)
+        xs = all_x[i]
+        ys = all_y[i]
+        
+        # Ensure the polygon cycle is closed visually by repeating the first point
+        if xs[1] != xs[end] || ys[1] != ys[end]
+            push!(xs, xs[1])
+            push!(ys, ys[1])
+        end
+
+        # Plot using :shape to fill the polygons. 
+        # Alternatively, use seriestype=:path for outlines only.
+        plot!(p, xs, ys, seriestype=:shape, fillalpha=0.4, linecolor=:black, linewidth=1.5)
+    end
+
+    display(p)
+    return p
+end
+
+# Usage:
+# plot_contours("my_contours.txt")
+using Plots
+
+# Define a structure to hold a complex shape
+struct ComplexShape
+    outer::Vector{Tuple{Float64, Float64}}
+    holes::Vector{Vector{Tuple{Float64, Float64}}}
+end
+
+function plot_complex_contours(filename::String)
+    shapes = ComplexShape[]
+    
+    flat_nums = Float64[]
+    current_poly_type = 0 # 1 = outer boundary, >1 = hole
+    
+    # Helper function to convert flat array into (X, Y) tuples
+    function flush_pts!()
+        pts = Tuple{Float64, Float64}[]
+        for i in 1:2:(length(flat_nums)-1)
+            push!(pts, (flat_nums[i], flat_nums[i+1]))
+        end
+        # Ensure the cycle is visually closed
+        if !isempty(pts) && pts[1] != pts[end]
+            push!(pts, pts[1])
+        end
+        empty!(flat_nums)
+        return pts
+    end
+
+    # Helper function to save the current gathered points into our structs
+    function save_current!()
+        pts = flush_pts!()
+        if isempty(pts) return end
+        
+        if current_poly_type == 1
+            # Start a brand new shape with an outer boundary
+            push!(shapes, ComplexShape(pts, Vector{Vector{Tuple{Float64, Float64}}}()))
+        elseif current_poly_type > 1
+            # Add this as a hole to the most recently created shape
+            if !isempty(shapes)
+                push!(shapes[end].holes, pts)
+            end
+        end
+    end
+
+    # 1. Parse the file
+    for line in eachline(filename)
+        line = strip(line)
+        if isempty(line) || startswith(line, "Extracted")
+            continue
+        end
+        
+        if startswith(line, "Polygon")
+            save_current!() # Save whatever we were previously building
+            
+            parts = split(line, ":")
+            header = split(parts[1])
+            current_poly_type = parse(Int, header[2]) # "1", "2", etc.
+            
+            if length(parts) > 1
+                append!(flat_nums, parse.(Float64, split(parts[2])))
+            end
+        else
+            append!(flat_nums, parse.(Float64, split(line)))
+        end
+    end
+    save_current!() # Don't forget the very last polygon!
+
+    # 2. Plotting
+    println("Successfully parsed $(length(shapes)) complex shapes. Plotting...")
+    
+    p = plot(legend=false, aspect_ratio=:equal, title="VLSI Layout with Holes", 
+             xlabel="X", ylabel="Y", grid=true)
+             
+    # Pass 1: Draw all solid outer boundaries (Blue)
+    for shape in shapes
+        xs = [pt[1] for pt in shape.outer]
+        ys = [pt[2] for pt in shape.outer]
+        plot!(p, xs, ys, seriestype=:shape, fillcolor=:steelblue, fillalpha=0.7, linecolor=:black)
+    end
+    
+    # Pass 2: Draw all holes over them (White out)
+    for shape in shapes
+        for hole in shape.holes
+            hx = [pt[1] for pt in hole]
+            hy = [pt[2] for pt in hole]
+            # Use background color (white) with 100% opacity to punch the hole
+            plot!(p, hx, hy, seriestype=:shape, fillcolor=:white, fillalpha=1.0, linecolor=:black)
+        end
+    end
+
+    display(p)
+    return p
+end
+
+# Usage:
+# plot_complex_contours("layout.txt")
+
+using HDF5
+
+
+# (Assuming fracture_to_rects is defined elsewhere in your code)
+# function fracture_to_rects(xs::Vector{Int}, ys::Vector{Int}) ...
+
+function simple_convert_layout_to_hdf5(input_txt::String, h5_filename::String, xmf_filename::String)
+    boxes = BoxData[]
+
+    println("Parsing layout file...")
+    for line in eachline(input_txt)
+        line = strip(line)
+        
+        if startswith(line, "box")
+            # Regex to extract the two coordinate pairs
+            #m = match(r"box\s+\d+\s+\d+\s+\{([^}]+)\}\s+\{([^}]+)\}", line)
+            m = match(r"box\s+.*?\{([^}]+)\}\s*\{([^}]+)\}", line)
+            if m !== nothing
+                pt1 = parse.(Int32, split(m[1]))
+                pt2 = parse.(Int32, split(m[2]))
+                
+                # Ensure x1, y1 is the lower-left and x2, y2 is upper-right
+                x1, x2 = min(pt1[1], pt2[1]), max(pt1[1], pt2[1])
+                y1, y2 = min(pt1[2], pt2[2]), max(pt1[2], pt2[2])
+                
+                push!(boxes, BoxData(x1, y1, x2, y2))
+            end
+            
+        elseif startswith(line, "boundary")
+            # Extract all coordinate pairs inside {}
+            xs = Int[]
+            ys = Int[]
+            for m in eachmatch(r"\{([^}]+)\}", line)
+                coords = parse.(Int, split(m[1]))
+                push!(xs, coords[1])
+                push!(ys, coords[2])
+            end
+            
+            # Pass to your existing fracturing function
+            if length(xs) > 0
+                fractured_rects = fracture_to_rects(xs, ys)
+                for r in fractured_rects
+                    # Assuming fracture_to_rects returns tuples or structs of (x1, y1, x2, y2)
+                    push!(boxes, BoxData(Int32(r[1]), Int32(r[2]), Int32(r[3]), Int32(r[4])))
+                end
+            end
+        end
+    end
+
+    num_boxes = length(boxes)
+    println("Successfully parsed $num_boxes rectangles.")
+    # --- FAIL-SAFE ---
+    if num_boxes == 0
+        println("ERROR: No boxes were found. Aborting HDF5 generation to prevent empty files.")
+        return
+    end
+    # 2. Generate ParaView Mesh Data
+    # ParaView needs 3D points (Z=0) and Quadrilateral connectivity
+    points = zeros(Float32, 3, num_boxes * 4) # 3 coords (X,Y,Z), 4 points per box
+    cells = zeros(Int32, 4, num_boxes)        # 4 point indices per quadrilateral
+
+    for i in 1:num_boxes
+        b = boxes[i]
+        base_idx = (i - 1) * 4
+        
+        # Point 0: Bottom-Left
+        points[1, base_idx + 1] = b.x1; points[2, base_idx + 1] = b.y1; points[3, base_idx + 1] = 0.0
+        # Point 1: Bottom-Right
+        points[1, base_idx + 2] = b.x2; points[2, base_idx + 2] = b.y1; points[3, base_idx + 2] = 0.0
+        # Point 2: Top-Right
+        points[1, base_idx + 3] = b.x2; points[2, base_idx + 3] = b.y2; points[3, base_idx + 3] = 0.0
+        # Point 3: Top-Left
+        points[1, base_idx + 4] = b.x1; points[2, base_idx + 4] = b.y2; points[3, base_idx + 4] = 0.0
+        
+        # 0-based indexing for XDMF
+        cells[1, i] = base_idx
+        cells[2, i] = base_idx + 1
+        cells[3, i] = base_idx + 2
+        cells[4, i] = base_idx + 3
+    end
+
+    # 3. Write the HDF5 File
+    println("Writing HDF5 to $h5_filename...")
+    h5open(h5_filename, "w") do file
+        # Write your exact requested compound dataset
+        # HDF5.jl automatically maps Julia arrays of structs to H5T_COMPOUND
+        write(file, "boxes", boxes)
+        
+        # Write the ParaView required datasets
+        write(file, "Points", points)
+        write(file, "Cells", cells)
+    end
+
+    # 4. Write the XDMF File
+    println("Writing XDMF to $xmf_filename...")
+    # Get just the filename without the path for the XML reference
+    h5_basename = basename(h5_filename)
+    
+    open(xmf_filename, "w") do io
+        write(io, """
+        <?xml version="1.0" ?>
+        <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
+        <Xdmf Version="2.0">
+          <Domain>
+            <Grid Name="VLSI_Layout" GridType="Uniform">
+              <Topology TopologyType="Quadrilateral" NumberOfElements="$num_boxes">
+                <DataItem Dimensions="$num_boxes 4" NumberType="Int" Format="HDF">
+                  $h5_basename:/Cells
+                </DataItem>
+              </Topology>
+              <Geometry GeometryType="XYZ">
+                <DataItem Dimensions="$(num_boxes * 4) 3" NumberType="Float" Format="HDF">
+                  $h5_basename:/Points
+                </DataItem>
+              </Geometry>
+            </Grid>
+          </Domain>
+        </Xdmf>
+        """)
+    end
+
+    println("Done! You can now load $xmf_filename in ParaView.")
+end
+
+# Usage:
+# convert_layout_to_hdf5("layout.txt", "SEDFXTP1_L11.h5", "SEDFXTP1_L11.xmf")
+
+
+# 1. Upgraded schema to store layer and datatype
+struct BoxData
+    x1::Int32
+    y1::Int32
+    x2::Int32
+    y2::Int32
+    layer::Int32
+    datatype::Int32
+end
+
+function convert_layout_to_hdf5(input_txt::String, h5_filename::String, xmf_filename::String)
+    boxes = BoxData[]
+
+    println("Parsing layout file for multi-layer data...")
+    for line in eachline(input_txt)
+        line = strip(line)
+        
+        if startswith(line, "box")
+            # Upgraded Regex: Captures layer (1), datatype (2), pt1 (3), pt2 (4)
+            m = match(r"box\s+(\d+)\s+(\d+)\s+.*?\{([^}]+)\}\s*\{([^}]+)\}", line)
+            
+            if m !== nothing
+                layer    = parse(Int32, m[1])
+                datatype = parse(Int32, m[2])
+                pt1      = parse.(Int32, split(strip(m[3])))
+                pt2      = parse.(Int32, split(strip(m[4])))
+                
+                x1, x2 = min(pt1[1], pt2[1]), max(pt1[1], pt2[1])
+                y1, y2 = min(pt1[2], pt2[2]), max(pt1[2], pt2[2])
+                
+                push!(boxes, BoxData(x1, y1, x2, y2, layer, datatype))
+            end
+            
+        elseif startswith(line, "boundary")
+            # Upgraded Regex: Captures layer (1), datatype (2), and the rest of the string (3)
+            m = match(r"boundary\s+(\d+)\s+(\d+)\s+(.*)", line)
+            
+            if m !== nothing
+                layer      = parse(Int32, m[1])
+                datatype   = parse(Int32, m[2])
+                coords_str = m[3]
+
+                xs = Int[]
+                ys = Int[]
+                for c in eachmatch(r"\{([^}]+)\}", coords_str)
+                    coords = parse.(Int, split(strip(c[1])))
+                    push!(xs, coords[1])
+                    push!(ys, coords[2])
+                end
+                
+                if length(xs) > 0
+                    fractured_rects = fracture_to_rects(xs, ys)
+                    for r in fractured_rects
+                        push!(boxes, BoxData(Int32(r[1]), Int32(r[2]), Int32(r[3]), Int32(r[4]), layer, datatype))
+                    end
+                end
+            end
+        end
+    end
+
+    num_boxes = length(boxes)
+    println("Successfully parsed $num_boxes rectangles across multiple layers.")
+
+    if num_boxes == 0
+        println("ERROR: No boxes found. Aborting.")
+        return
+    end
+
+    # 2. Generate ParaView Mesh & Attribute Data
+    points = zeros(Float32, 3, num_boxes * 4) 
+    cells  = zeros(Int32, 4, num_boxes)       
+    
+    # NEW: Isolate the layer data so ParaView can read it directly as a Cell Attribute
+    layer_array = zeros(Int32, num_boxes)
+
+    for i in 1:num_boxes
+        b = boxes[i]
+        base_idx = (i - 1) * 4
+        
+        points[1, base_idx + 1] = b.x1; points[2, base_idx + 1] = b.y1; points[3, base_idx + 1] = 0.0
+        points[1, base_idx + 2] = b.x2; points[2, base_idx + 2] = b.y1; points[3, base_idx + 2] = 0.0
+        points[1, base_idx + 3] = b.x2; points[2, base_idx + 3] = b.y2; points[3, base_idx + 3] = 0.0
+        points[1, base_idx + 4] = b.x1; points[2, base_idx + 4] = b.y2; points[3, base_idx + 4] = 0.0
+        
+        cells[1, i] = base_idx
+        cells[2, i] = base_idx + 1
+        cells[3, i] = base_idx + 2
+        cells[4, i] = base_idx + 3
+        
+        # Populate the attribute array
+        layer_array[i] = b.layer
+    end
+
+    # 3. Write the HDF5 File
+    println("Writing HDF5 to $h5_filename...")
+    h5open(h5_filename, "w") do file
+        write(file, "boxes", boxes) # Your programmatic schema
+        write(file, "Points", points)
+        write(file, "Cells", cells)
+        write(file, "Layers", layer_array) # NEW: ParaView attribute dataset
+    end
+
+    # 4. Write the XDMF File
+    println("Writing XDMF to $xmf_filename...")
+    h5_basename = basename(h5_filename)
+    
+    open(xmf_filename, "w") do io
+        write(io, """
+        <?xml version="1.0" ?>
+        <!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
+        <Xdmf Version="2.0">
+          <Domain>
+            <Grid Name="VLSI_Layout" GridType="Uniform">
+              <Topology TopologyType="Quadrilateral" NumberOfElements="$num_boxes">
+                <DataItem Dimensions="$num_boxes 4" NumberType="Int" Format="HDF">
+                  $h5_basename:/Cells
+                </DataItem>
+              </Topology>
+              <Geometry GeometryType="XYZ">
+                <DataItem Dimensions="$(num_boxes * 4) 3" NumberType="Float" Format="HDF">
+                  $h5_basename:/Points
+                </DataItem>
+              </Geometry>
+              <Attribute Name="Layer" AttributeType="Scalar" Center="Cell">
+                <DataItem Dimensions="$num_boxes" NumberType="Int" Format="HDF">
+                  $h5_basename:/Layers
+                </DataItem>
+              </Attribute>
+            </Grid>
+          </Domain>
+        </Xdmf>
+        """)
+    end
+end
+
+#=
+For mkFPU_FLAT, these are the ONLY layers
+64 20 1 100
+65 20 2 200
+66 20 3 300
+67 20 4 400
+68 20 5 500
+69 20 6 600
+70 20 7 700
+71 20 8 800
+72 20 9 900
+235 4 10 50
+=#
+# The keys are Tuples: (Val1, Val2)
+# The values are NamedTuples for readable access: (file_num=X, z_val=Y)
+
+
+# 1. Define the global mapping dictionary
+const MAPPING_DICT_FPU = Dict(
+    (64, 20)  => (file_num = 1,  z_val = 100.0f0),
+    (65, 20)  => (file_num = 2,  z_val = 200.0f0),
+    (66, 20)  => (file_num = 3,  z_val = 300.0f0),
+    (67, 20)  => (file_num = 4,  z_val = 400.0f0),
+    (68, 20)  => (file_num = 5,  z_val = 500.0f0),
+    (69, 20)  => (file_num = 6,  z_val = 600.0f0),
+    (70, 20)  => (file_num = 7,  z_val = 700.0f0),
+    (71, 20)  => (file_num = 8,  z_val = 800.0f0),
+    (72, 20)  => (file_num = 9,  z_val = 900.0f0),
+    (235, 4)  => (file_num = 10, z_val = 50.0f0)
+)
+
+#cat /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW_FLAT_DATA/UNIQ_LD.txt |awk '{printf "("$2","$3│········
+#") => " "(file_num = " NR ", z_val = " NR*100  "),\n"}'
+const MAPPING_DICT = Dict(
+(64,20) => (file_num = 1, z_val = 100),
+(65,20) => (file_num = 2, z_val = 200),
+(66,20) => (file_num = 3, z_val = 300),
+(67,20) => (file_num = 4, z_val = 400),
+(68,20) => (file_num = 5, z_val = 500),
+(93,44) => (file_num = 6, z_val = 600),
+(94,20) => (file_num = 7, z_val = 700),
+(95,20) => (file_num = 8, z_val = 800),
+(122,16) => (file_num = 9, z_val = 900),
+(235,4) => (file_num = 10, z_val = 1000),
+(236,0) => (file_num = 11, z_val = 1100),
+(64,16) => (file_num = 12, z_val = 1200),
+(64,20) => (file_num = 13, z_val = 1300),
+(65,20) => (file_num = 14, z_val = 1400),
+(65,44) => (file_num = 15, z_val = 1500),
+(66,15) => (file_num = 16, z_val = 1600),
+(66,20) => (file_num = 17, z_val = 1700),
+(66,44) => (file_num = 18, z_val = 1800),
+(67,16) => (file_num = 19, z_val = 1900),
+(67,20) => (file_num = 20, z_val = 2000),
+(67,44) => (file_num = 21, z_val = 2100),
+(68,16) => (file_num = 22, z_val = 2200),
+(68,20) => (file_num = 23, z_val = 2300),
+(68,44) => (file_num = 24, z_val = 2400),
+(69,16) => (file_num = 25, z_val = 2500),
+(69,20) => (file_num = 26, z_val = 2600),
+(69,44) => (file_num = 27, z_val = 2700),
+(70,16) => (file_num = 28, z_val = 2800),
+(70,20) => (file_num = 29, z_val = 2900),
+(70,44) => (file_num = 30, z_val = 3000),
+(71,16) => (file_num = 31, z_val = 3100),
+(71,20) => (file_num = 32, z_val = 3200),
+(71,44) => (file_num = 33, z_val = 3300),
+(72,16) => (file_num = 34, z_val = 3400),
+(72,20) => (file_num = 35, z_val = 3500),
+(78,44) => (file_num = 36, z_val = 3600),
+(81,14) => (file_num = 37, z_val = 3700),
+(81,23) => (file_num = 38, z_val = 3800),
+(81,4) => (file_num = 39, z_val = 3900),
+(93,44) => (file_num = 40, z_val = 4000),
+(94,20) => (file_num = 41, z_val = 4100),
+(95,20) => (file_num = 42, z_val = 4200)
+)
+
+using TranscodingStreams
+function convert_layout_to_hdf5(input_file::String, base_h5_filename::String)
+    # Group the parsed boxes by their target file number
+    # Key: file_num, Value: Vector of BoxData
+    layer_groups = Dict{Int, Vector{BoxData}}()
+
+    println("Parsing layout file for multi-layer data...")
+    open(input_file) do file
+        decompressor_stream = ZstdDecompressorStream(file)
+        
+    for line in eachline(decompressor_stream)
+        line = strip(line)
+        
+        if startswith(line, "box")
+            m = match(r"box\s+(\d+)\s+(\d+)\s+.*?\{([^}]+)\}\s*\{([^}]+)\}", line)
+            
+            if m !== nothing
+                layer    = parse(Int32, m[1])
+                datatype = parse(Int32, m[2])
+                pt1      = parse.(Int32, split(strip(m[3])))
+                pt2      = parse.(Int32, split(strip(m[4])))
+                
+                x1, x2 = min(pt1[1], pt2[1]), max(pt1[1], pt2[1])
+                y1, y2 = min(pt1[2], pt2[2]), max(pt1[2], pt2[2])
+                
+                key = (Int(layer), Int(datatype))
+                if haskey(MAPPING_DICT, key)
+                    file_num = MAPPING_DICT[key].file_num
+                    box = BoxData(x1, y1, x2, y2, layer, datatype)
+                    push!(get!(() -> BoxData[], layer_groups, file_num), box)
+                else
+                    println("⚠️ Skipping box: No dictionary entry for key combo $key")
+                end
+            end
+            
+        elseif startswith(line, "boundary")
+            #m = match(r"boundary\s+(\d+)\s+(\d+)\s+(.*)", line)
+            m = match(r"box\s+.*?\{([^}]+)\}\s*\{([^}]+)\}", line)
+
+            if m !== nothing
+                layer      = parse(Int32, m[1])
+                datatype   = parse(Int32, m[2])
+                coords_str = m[3]
+
+                xs = Int[]
+                ys = Int[]
+                for c in eachmatch(r"\{([^}]+)\}", coords_str)
+                    coords = parse.(Int, split(strip(c[1])))
+                    push!(xs, coords[1])
+                    push!(ys, coords[2])
+                end
+                
+                if length(xs) > 0
+                    key = (Int(layer), Int(datatype))
+                    if haskey(MAPPING_DICT, key)
+                        file_num = MAPPING_DICT[key].file_num
+                        fractured_rects = fracture_to_rects(xs, ys)
+                        
+                        box_list = get!(() -> BoxData[], layer_groups, file_num)
+                        for r in fractured_rects
+                            push!(box_list, BoxData(Int32(r[1]), Int32(r[2]), Int32(r[3]), Int32(r[4]), layer, datatype))
+                        end
+                    else
+                        println("⚠️ Skipping boundary: No dictionary entry for key combo $key")
+                    end
+                end
+            end
+        end
+    end
+    end
+    
+    if isempty(layer_groups)
+        println("ERROR: No valid boxes mapped to dictionary keys. Aborting.")
+        return
+    end
+
+    # 2. Process and save each layer's specific file group
+    for (file_num, boxes) in layer_groups
+        num_boxes = length(boxes)
+        
+        # Get the global Z coordinate for this specific file layer group
+        # We can find this by querying the first item since they all share a file map key
+        sample_key = (Int(boxes[1].layer), Int(boxes[1].datatype))
+        z_val = MAPPING_DICT[sample_key].z_val
+
+        # Create output filenames: e.g., "SEDFXTP1_DATA_L3.h5"
+        base_name, ext = splitext(base_h5_filename)
+        #h5_filename   = "$(base_name)_L$(file_num)$(ext)"
+        h5_filename   = "$(base_name)_L$(boxes[1].layer)_D$(boxes[1].datatype)$(ext)"
+        #xmf_filename  = "$(base_name)_L$(file_num).xmf"
+        xmf_filename  = "$(base_name)_L$(boxes[1].layer)_D$(boxes[1].datatype).xmf"
+
+        println("Processing Layer File: $h5_filename with $num_boxes boxes at Z = $z_val")
+
+        # Generate ParaView Mesh Grid Data
+        points = zeros(Float32, 3, num_boxes * 4) 
+        cells  = zeros(Int32, 4, num_boxes)       
+        layer_array = zeros(Int32, num_boxes)
+
+        for i in 1:num_boxes
+            b = boxes[i]
+            base_idx = (i - 1) * 4
+            
+            # Map coordinates and assign the true Z value dynamically
+            points[1, base_idx + 1] = b.x1; points[2, base_idx + 1] = b.y1; points[3, base_idx + 1] = z_val
+            points[1, base_idx + 2] = b.x2; points[2, base_idx + 2] = b.y1; points[3, base_idx + 2] = z_val
+            points[1, base_idx + 3] = b.x2; points[2, base_idx + 3] = b.y2; points[3, base_idx + 3] = z_val
+            points[1, base_idx + 4] = b.x1; points[2, base_idx + 4] = b.y2; points[3, base_idx + 4] = z_val
+            
+            cells[1, i] = base_idx
+            cells[2, i] = base_idx + 1
+            cells[3, i] = base_idx + 2
+            cells[4, i] = base_idx + 3
+            
+            layer_array[i] = b.layer
+        end
+
+        # Write the specialized layer HDF5 File
+        h5open(h5_filename, "w") do file
+            write(file, "boxes", boxes) 
+            write(file, "Points", points)
+            write(file, "Cells", cells)
+            write(file, "Layers", layer_array) 
+        end
+        
+        # Proactively generate a matching XDMF file companion for ParaView
+        write_xdmf_companion(xmf_filename, basename(h5_filename), num_boxes)
+    end
+end
+
+# Helper function to auto-generate the XDMF files for ParaView
+function write_xdmf_companion(xmf_path::String, h5_basename::String, num_boxes::Int)
+    open(xmf_path, "w") do io
+        write(io, """<?xml version="1.0" ?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
+<Xdmf Version="2.0">
+  <Domain>
+    <Grid Name="LayerGrid" GridType="Uniform">
+      <Topology TopologyType="Polygon" NumberOfElements="$num_boxes">
+        <DataItem Dimensions="$num_boxes 4" NumberType="Int" Format="HDF">
+          $h5_basename:/Cells
+        </DataItem>
+      </Topology>
+      <Geometry GeometryType="XYZ">
+        <DataItem Dimensions="$(num_boxes * 4) 3" NumberType="Float" Format="HDF">
+          $h5_basename:/Points
+        </DataItem>
+      </Geometry>
+      <Attribute Name="LayerID" AttributeType="Scalar" Center="Cell">
+        <DataItem Dimensions="$num_boxes" NumberType="Int" Format="HDF">
+          $h5_basename:/Layers
+        </DataItem>
+      </Attribute>
+    </Grid>
+  </Domain>
+</Xdmf>
+""")
+    end
+end

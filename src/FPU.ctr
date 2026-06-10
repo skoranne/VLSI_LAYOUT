@@ -1,0 +1,4 @@
+# Control file for MAGPARSER
+program square
+decl design d1 = MY_FPU_KLBIN.mag
+end 

@@ -10,7 +10,7 @@ module GeometryModule
 
   public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid, &
        box_not_interact, box_interact, box_area, box_perimeter, calculate_union_area, get_sort_permutation, &
-       calculate_polygon_union_area, PolygonBooleanAND
+       calculate_polygon_union_area, PolygonBooleanAND, heal_boxes, sort_int_array
   ! Enum-like constants for the sorting axis
   integer, parameter :: AXIS_X = 1
   integer, parameter :: AXIS_Y = 2
@@ -258,7 +258,7 @@ contains
     end if
   end subroutine quicksort_boxes
 
-  pure subroutine str_pack(arr, node_capacity)
+  subroutine str_pack(arr, node_capacity)
     type(Box), intent(inout), dimension(:) :: arr
     integer, intent(in) :: node_capacity
 
@@ -294,7 +294,7 @@ contains
     end do
 
   end subroutine str_pack
-  pure subroutine insertion_sort_boxes(arr, left, right, axis)
+  subroutine insertion_sort_boxes(arr, left, right, axis)
     type(Box), intent(inout), dimension(:) :: arr
     integer, intent(in) :: left, right, axis
 
@@ -334,7 +334,7 @@ contains
     end do
 
   end subroutine insertion_sort_boxes
-  pure recursive subroutine quicksort_boxes_STR(arr, left, right, axis)
+  recursive subroutine quicksort_boxes_STR(arr, left, right, axis)
     type(Box), intent(inout), dimension(:) :: arr
     integer, intent(in) :: left, right, axis
     integer, parameter :: K_SMALL_THRESHOLD = 64 !> 16 was worse than 32
@@ -408,7 +408,7 @@ contains
   end subroutine quicksort_boxes_STR
 
   ! Wrapper subroutine to match your original interface
-  pure subroutine omt_pack(arr, node_capacity)
+  subroutine omt_pack(arr, node_capacity)
     type(Box), intent(inout), dimension(:) :: arr
     integer, intent(in) :: node_capacity
     type(Box), allocatable, dimension(:) :: workspace
@@ -418,18 +418,27 @@ contains
     ! Allocate a single workspace array to avoid repeated memory allocations
     ! during the recursive splitting steps.
     allocate(workspace(size(arr)))
-
+    !$omp parallel default(none) shared(arr,workspace) firstprivate(node_capacity)
+    !$omp single nowait
     call omt_pack_recursive(arr, 1, size(arr), node_capacity, workspace)
+    !$omp end single
+    !$omp end parallel
 
     deallocate(workspace)
   end subroutine omt_pack
 
 
   ! Recursive Top-Down Partitioning
-  pure recursive subroutine omt_pack_recursive(arr, start_idx, end_idx, node_capacity, workspace)
+  recursive subroutine omt_pack_recursive(arr, start_idx, end_idx, node_capacity, workspace)
     type(Box), intent(inout), dimension(:) :: arr
     integer, intent(in) :: start_idx, end_idx, node_capacity
     type(Box), intent(inout), dimension(:) :: workspace
+    integer, parameter :: MIN_TASK_SIZE = 32768
+    !On MW
+    !Default do concurrent on outer loop took
+    !Sorting/OMT completed in     10248.56 CPU seconds.     2256.00 REAL seconds.
+    !OpenMP with 32768
+    !Sorting/OMT completed in     39305.40 CPU seconds.     1304.20 REAL seconds.                                                  
 
     integer :: n, num_leaves, left_leaves, split_idx
     real :: overlap_x, area_x, overlap_y, area_y
@@ -464,14 +473,26 @@ contains
     ! If Y was better, arr is already Y-sorted, so we do nothing.
 
     ! 4. Recursively process the left and right partitions
-    call omt_pack_recursive(arr, start_idx, split_idx, node_capacity, workspace)
-    call omt_pack_recursive(arr, split_idx + 1, end_idx, node_capacity, workspace)
-
+    if ( split_idx - start_idx + 1 >= MIN_TASK_SIZE ) then
+       !$omp task shared(arr,workspace) firstprivate(start_idx, split_idx,node_capacity) default(none)
+       call omt_pack_recursive(arr, start_idx, split_idx, node_capacity, workspace)
+       !$omp end task
+    else
+       call omt_pack_recursive(arr, start_idx, split_idx, node_capacity, workspace)
+    end if
+    if ( end_idx - split_idx >= MIN_TASK_SIZE ) then
+       !$omp task shared(arr,workspace) firstprivate(split_idx, end_idx, node_capacity) default(none) &
+       !$omp& if ( end_idx - split_idx >= MIN_TASK_SIZE )
+       call omt_pack_recursive(arr, split_idx + 1, end_idx, node_capacity, workspace)
+       !$omp end task
+    else
+       call omt_pack_recursive(arr, split_idx + 1, end_idx, node_capacity, workspace)
+    end if
   end subroutine omt_pack_recursive
 
 
   ! Helper Subroutine: Computes the cost (Overlap and Area) of a proposed split
-  pure subroutine evaluate_split(arr, start_idx, split_idx, end_idx, overlap, total_area)
+  subroutine evaluate_split(arr, start_idx, split_idx, end_idx, overlap, total_area)
     type(Box), intent(in), dimension(:) :: arr
     integer, intent(in) :: start_idx, split_idx, end_idx
     real, intent(out) :: overlap, total_area
@@ -599,6 +620,306 @@ contains
     end do
 
   end function calculate_union_area
+  !> box_count is the output count, since memory is recycled using move_alloc
+  pure subroutine old_heal_boxes(input_box_count, boxes, output_box_count)
+    integer(kind=int64), intent(in) :: input_box_count    
+    type(Box), allocatable, intent(inout) :: boxes(:)
+    integer(kind=int64), intent(out) :: output_box_count
+    type(Box), allocatable :: healed_boxes(:)
+
+    integer :: n, num_y, i, j
+    type(Event), allocatable :: events(:)
+    integer(K), allocatable :: y_vals(:), unique_y(:) ! Assuming 'K' is defined in module
+    integer, allocatable :: lap(:)
+    integer(kind=int64) :: current_x, next_x
+    integer :: j1, j2
+
+    ! --- Variables for Output Collection ---
+    type(Box), allocatable :: temp_boxes(:), resized_boxes(:)
+    integer :: max_boxes
+    logical :: in_segment
+    integer(kind=int64) :: y_start, y_end
+
+    n = input_box_count
+    if (n == 0) then
+       allocate(healed_boxes(0))
+       return
+    end if
+
+    ! 1. Collect and compress Y coordinates
+    allocate(y_vals(2*n))
+    do i = 1, n
+       y_vals(2*i - 1) = min(boxes(i)%y1, boxes(i)%y2)
+       y_vals(2*i)     = max(boxes(i)%y1, boxes(i)%y2)
+    end do
+
+    call sort_int_array(y_vals)
+
+    ! Remove duplicates to create our y-axis segments
+    allocate(unique_y(2*n))
+    num_y = 1
+    unique_y(1) = y_vals(1)
+    do i = 2, 2*n
+       if (y_vals(i) /= unique_y(num_y)) then
+          num_y = num_y + 1
+          unique_y(num_y) = y_vals(i)
+       end if
+    end do
+
+    ! 2. Create Event Queue
+    allocate(events(2*n))
+    do i = 1, n
+       events(2*i - 1)%x          = min(boxes(i)%x1, boxes(i)%x2)
+       events(2*i - 1)%y1         = min(boxes(i)%y1, boxes(i)%y2)
+       events(2*i - 1)%y2         = max(boxes(i)%y1, boxes(i)%y2)
+       events(2*i - 1)%lap_change = 1
+
+       events(2*i)%x              = max(boxes(i)%x1, boxes(i)%x2)
+       events(2*i)%y1             = min(boxes(i)%y1, boxes(i)%y2)
+       events(2*i)%y2             = max(boxes(i)%y1, boxes(i)%y2)
+       events(2*i)%lap_change     = -1
+    end do
+
+    call sort_events(events)
+
+    ! 3. Sweep Line Algorithm
+    allocate(lap(num_y - 1))
+    lap = 0
+
+    ! Initial allocation for output array (dynamically grows if needed)
+    max_boxes = max(100, 4 * n)
+    allocate(temp_boxes(max_boxes))
+    output_box_count = 0
+
+    current_x = int(events(1)%x, int64)
+
+    do i = 1, 2*n
+       next_x = int(events(i)%x, int64)
+
+       ! If the sweep line has moved right, process the active overlapping regions
+       if (next_x > current_x) then
+          in_segment = .false.
+
+          do j = 1, num_y - 1
+             if (lap(j) > 0 .and. .not. in_segment) then
+                ! Start of a newly merged contiguous segment
+                in_segment = .true.
+                y_start = unique_y(j)
+             else if (lap(j) == 0 .and. in_segment) then
+                ! End of the contiguous segment -> Generate a Box
+                in_segment = .false.
+                y_end = unique_y(j)
+
+                output_box_count = output_box_count + 1
+                ! Reallocate if we hit capacity
+                if (output_box_count > max_boxes) then
+                   allocate(resized_boxes(max_boxes * 2))
+                   resized_boxes(1:max_boxes) = temp_boxes
+                   call move_alloc(resized_boxes, temp_boxes)
+                   max_boxes = max_boxes * 2
+                end if
+
+                temp_boxes(output_box_count)%x1 = current_x
+                temp_boxes(output_box_count)%x2 = next_x
+                temp_boxes(output_box_count)%y1 = y_start
+                temp_boxes(output_box_count)%y2 = y_end
+             end if
+          end do
+
+          ! Catch the edge case where the union touches the absolute top boundary
+          if (in_segment) then
+             y_end = unique_y(num_y)
+             output_box_count = output_box_count + 1
+             if (output_box_count > max_boxes) then
+                allocate(resized_boxes(max_boxes * 2))
+                resized_boxes(1:max_boxes) = temp_boxes
+                call move_alloc(resized_boxes, temp_boxes)
+                max_boxes = max_boxes * 2
+             end if
+             temp_boxes(output_box_count)%x1 = current_x
+             temp_boxes(output_box_count)%x2 = next_x
+             temp_boxes(output_box_count)%y1 = y_start
+             temp_boxes(output_box_count)%y2 = y_end
+          end if
+
+          current_x = next_x
+       end if
+
+       ! Update scanline laps with current event
+       j1 = binary_search_y(unique_y, num_y, events(i)%y1)
+       j2 = binary_search_y(unique_y, num_y, events(i)%y2)
+
+       do j = j1, j2 - 1
+          lap(j) = lap(j) + events(i)%lap_change
+       end do
+    end do
+
+    ! 4. Finalize the correctly sized output collection
+    if( output_box_count == 0 ) error stop "PLEASE ANALYZE"
+    if( output_box_count > 0 .and. output_box_count < size(boxes) ) then
+       boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+    else
+       allocate(healed_boxes(output_box_count))
+       if (output_box_count > 0) then
+          healed_boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+       end if
+       call move_alloc(from=healed_boxes, to=boxes)
+    end if
+  end subroutine old_heal_boxes
+  pure subroutine heal_boxes(input_box_count, boxes, output_box_count)
+    integer(kind=int64), intent(in) :: input_box_count  
+    type(Box), allocatable, intent(inout) :: boxes(:)
+    integer(kind=int64), intent(out) :: output_box_count
+
+    ! Internal variables
+    integer :: n, num_y, i, j
+    type(Event), allocatable :: events(:)
+    integer(K), allocatable :: y_vals(:) 
+    integer, allocatable :: lap(:)
+    integer(kind=int64) :: current_x, next_x
+    integer :: j1, j2
+
+    ! Output collection
+    type(Box), allocatable :: temp_boxes(:), resized_boxes(:), healed_boxes(:)
+    integer :: max_boxes
+    logical :: in_segment
+    integer(kind=int64) :: y_start, y_end
+
+    n = input_box_count
+
+    ! --- FIX 1: Properly handle n == 0 ---
+    if (n == 0) then
+       output_box_count = 0
+       allocate(healed_boxes(0))
+       call move_alloc(from=healed_boxes, to=boxes)
+       return
+    end if
+
+    ! 1. Collect, sort, and compress Y coordinates IN-PLACE
+    allocate(y_vals(2*n))
+    do i = 1, n
+       y_vals(2*i - 1) = min(boxes(i)%y1, boxes(i)%y2)
+       y_vals(2*i)     = max(boxes(i)%y1, boxes(i)%y2)
+    end do
+
+    call sort_int_array(y_vals)
+
+    ! --- FIX 2: In-place unique check (eliminates unique_y entirely) ---
+    num_y = 1
+    do i = 2, 2*n
+       if (y_vals(i) /= y_vals(num_y)) then
+          num_y = num_y + 1
+          y_vals(num_y) = y_vals(i)
+       end if
+    end do
+    ! Now y_vals(1:num_y) acts as our unique y-axis boundaries.
+
+    ! 2. Create Event Queue
+    allocate(events(2*n))
+    do i = 1, n
+       events(2*i - 1)%x          = min(boxes(i)%x1, boxes(i)%x2)
+       events(2*i - 1)%y1         = min(boxes(i)%y1, boxes(i)%y2)
+       events(2*i - 1)%y2         = max(boxes(i)%y1, boxes(i)%y2)
+       events(2*i - 1)%lap_change = 1
+
+       events(2*i)%x              = max(boxes(i)%x1, boxes(i)%x2)
+       events(2*i)%y1             = min(boxes(i)%y1, boxes(i)%y2)
+       events(2*i)%y2             = max(boxes(i)%y1, boxes(i)%y2)
+       events(2*i)%lap_change     = -1
+    end do
+
+    call sort_events(events)
+
+    ! 3. Sweep Line Algorithm
+    allocate(lap(num_y - 1))
+    lap = 0
+
+    ! --- FIX 3: Start with a sensible allocation, not 4*n ---
+    max_boxes = max(100, n) 
+    allocate(temp_boxes(max_boxes))
+    output_box_count = 0
+
+    current_x = int(events(1)%x, int64)
+
+    do i = 1, 2*n
+       next_x = int(events(i)%x, int64)
+
+       if (next_x > current_x) then
+          in_segment = .false.
+
+          do j = 1, num_y - 1
+             if (lap(j) > 0 .and. .not. in_segment) then
+                in_segment = .true.
+                y_start = y_vals(j)
+             else if (lap(j) == 0 .and. in_segment) then
+                in_segment = .false.
+                y_end = y_vals(j)
+
+                output_box_count = output_box_count + 1
+
+                ! --- FIX 4: 1.5x scaling to reduce reallocation memory spikes ---
+                if (output_box_count > max_boxes) then
+                   max_boxes = max_boxes + (max_boxes / 2) + 1 
+                   allocate(resized_boxes(max_boxes))
+                   resized_boxes(1:output_box_count-1) = temp_boxes
+                   call move_alloc(resized_boxes, temp_boxes)
+                end if
+
+                temp_boxes(output_box_count)%x1 = current_x
+                temp_boxes(output_box_count)%x2 = next_x
+                temp_boxes(output_box_count)%y1 = y_start
+                temp_boxes(output_box_count)%y2 = y_end
+             end if
+          end do
+
+          ! Catch edge case
+          if (in_segment) then
+             y_end = y_vals(num_y)
+             output_box_count = output_box_count + 1
+
+             if (output_box_count > max_boxes) then
+                max_boxes = max_boxes + (max_boxes / 2) + 1
+                allocate(resized_boxes(max_boxes))
+                resized_boxes(1:output_box_count-1) = temp_boxes
+                call move_alloc(resized_boxes, temp_boxes)
+             end if
+
+             temp_boxes(output_box_count)%x1 = current_x
+             temp_boxes(output_box_count)%x2 = next_x
+             temp_boxes(output_box_count)%y1 = y_start
+             temp_boxes(output_box_count)%y2 = y_end
+          end if
+
+          current_x = next_x
+       end if
+
+       ! Update scanline laps with current event using our compressed y_vals
+       j1 = binary_search_y(y_vals, num_y, events(i)%y1)
+       j2 = binary_search_y(y_vals, num_y, events(i)%y2)
+
+       do j = j1, j2 - 1
+          lap(j) = lap(j) + events(i)%lap_change
+       end do
+    end do
+
+    ! --- FIX 5: Explicitly free internals right before finalizing ---
+    deallocate(events)
+    deallocate(y_vals)
+    deallocate(lap)
+
+    ! 4. Finalize the correctly sized output collection
+    if( output_box_count == 0 ) error stop "PLEASE ANALYZE"
+    if( output_box_count > 0 .and. output_box_count < size(boxes) ) then
+       boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+    else
+       allocate(healed_boxes(output_box_count))
+       if (output_box_count > 0) then
+          healed_boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+       end if
+       call move_alloc(from=healed_boxes, to=boxes)
+    end if
+  end subroutine heal_boxes
+
   pure function calculate_polygon_union_area(X, Y, poly_start, poly_end) result(area)
     integer(kind=int32), intent(in) :: X(:), Y(:)
     integer(kind=int32), intent(in) :: poly_start(:), poly_end(:)
