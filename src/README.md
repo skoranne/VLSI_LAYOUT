@@ -10,7 +10,7 @@ and boost::spatial_index which can be tried.
 
 grep  "<<" FPU_FLAT.mag | awk '{print $0; print "HDF5 FPU_DATA/FPU_FLAT_L" ++count ".h5"}'
 Also we can use 'ratarmount' if we dont want to support .gz ourselves.
-
+```
  Reading filename: SDT6x6_FLAT.mag.gz
  The file is a gzipped file!
  MAGIC is using scaling parameters:            1             2
@@ -83,7 +83,8 @@ Sorting completed in 134.19 seconds.
  Box: [         979 ,        2128 ] to [     1270069 ,     1282669 ]
  Box: [        2366 ,        5388 ] to [     1268682 ,     1281938 ]
  Box: [        1104 ,        5346 ] to [     1271508 ,     1281980 ]
-
+```
+```
 TODO:
 / (Root)
 ├── Layer_01/ (Group)
@@ -99,6 +100,9 @@ TODO:
 │   └── Boxes (Dataset of Compound Datatypes)
 ...
 └── Layer_30/ (Group)
+```
+
+```
  Reading filename: MY_SEDFXTP1.mag
  The file is NOT a gzipped file, w/prefix: MY_SEDFXTP1
  MAGIC is using scaling parameters:            1             2
@@ -174,7 +178,9 @@ Layer:  13 metal1   has          127 rects. |RTREE| =         0.00 secs.
  Box: [          29 ,         -17 ] to [        2639 ,         561 ]
  Box: [           0 ,         -48 ] to [        2668 ,         592 ]
  +-----------------------------------------------------------------+
- 
+```
+
+```
  Reading filename: MY_FPU_FLAT.mag
  The file is NOT a gzipped file, w/prefix: MY_FPU_FLAT
  MAGIC is using scaling parameters:            1             2
@@ -355,7 +361,9 @@ Layer:  28 metal5   has          198 non-rects            0 rects. |RTREE| = CPU
  Box: [        3838 ,        5388 ] to [      349258 ,      358138 ]
  Box: [        1104 ,        5346 ] to [      358156 ,      358180 ]
  +-----------------------------------------------------------------+
- 
+```
+
+```
 TODO:
 0) Calculate AREA of boxes using vertex token scanning
 0b)Assuming layer is overlap free, this should just be sum of box area
@@ -385,6 +393,7 @@ exec push g1 o2:10:0
 end my_control
 
 8) Support Vertex token and scanline
+```
 
 MW large design
 Existing do concurrent: Sorting/OMT completed in     10248.56 CPU seconds.     2256.00 REAL seconds.
