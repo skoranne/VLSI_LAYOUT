@@ -463,18 +463,8 @@ contains
     type(Box), allocatable,intent(out) :: boxes(:)
     integer(kind=int64) :: file_bytes, total_boxes, i, dot_pos
     integer, parameter  :: BOX_SIZE_BYTES = 16 ! 4 coordinates * 4 bytes
-    integer :: file_unit, io_status, i
+    integer :: file_unit, io_status
     ! 1. Query the filesystem for the total file size in bytes
-    i = len_trim(fileName)
-    if (i >= 3 .and. fileName(i-2:i) == ".gz") then
-       dot_pos = index( trim( fileName ), '.' )
-       if( dot_pos < 0 ) then
-          stop 'Use proper file name'
-       end if
-       prefix = fileName( 1 : dot_pos - 1 )
-       print *, "The file is a gzipped file!, w/prefix: ", prefix       
-       gz_file = gzopen(fileName // c_null_char, "r" // c_null_char)
-    end if
     inquire(file=trim(filename), size=file_bytes)
     if (file_bytes <= 0) then
        print *, "Error: File is empty or does not exist."
@@ -501,7 +491,7 @@ contains
     ! 5. Read the entire file cleanly into your allocated array in one shot
     read(file_unit, iostat=io_status) boxes
     if (io_status == 0) then
-       write(*,'(A,I12,A)') 'INFO: Read successful for ', total_boxes, ' boxes.'       
+       write(*,'(A,I12,A)') 'INFO: Read successful for  ', total_boxes, ' boxes.'       
        ! Example: print the first box if it exists
        !if (total_boxes > 0) then
        !   print '(A,4I12)', "First Box: ", boxes(1)%x1, &
