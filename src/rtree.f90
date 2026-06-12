@@ -36,7 +36,7 @@ module RTReeBuilder
      integer(kind=8) :: child_start = -1
      integer(kind=8), allocatable :: child_indices(:)
   end type RTreeNode
-  integer, parameter :: K_MAX_SEARCH_LEAVES = 4096
+  integer, parameter :: K_MAX_SEARCH_LEAVES = 16*4096
 contains
   pure function CalculateTotalNodes( n_boxes, capacity ) result(total_nodes)
     integer(kind=8), intent(in) :: n_boxes

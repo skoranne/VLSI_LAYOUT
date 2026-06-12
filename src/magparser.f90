@@ -65,6 +65,7 @@ module MagicVLSILayoutParser
   use RTreeBuilder
   use HDFDataModule
   use PNumMergeModule
+  use SystemInformationModule
   use iso_c_binding
   use iso_fortran_env, only : int32, int64
   implicit none
@@ -157,6 +158,7 @@ contains
     ! For each layer (from 1 to MAX_LAYERS), array of Box objects
     ! The allocation occurs at initialization time, making subsequent box insertions
     ! into layers very fast as they simply require array indexing rather than memory allocation
+    call StartMarkTime("ReadDB")    
     write (*,*) '+-----------------------------------------------------------------+'    
     allocate(load_design%layers(MAX_LAYERS))
     allocate(extents(MAX_LAYERS))
@@ -429,7 +431,9 @@ contains
     end if ! for .gz vs simple files
     
     ! Print parsed results
-    write(*,*) 'Parsed ', hash_nitems(ht), ' layers.'
+    write(*,*) 'Parsed ', hash_nitems(ht), ' layer(s).'
+    call StopMarkTime("ReadDB")
+    call StartMarkTime("SortBuildRTree")    
     call cpu_time(t1)
     call system_clock(count=start_tick)    
     do i = 1, size(layers)
@@ -442,7 +446,8 @@ contains
     end do
     do i = 1, size(layers)
        allocate( layers(i)%tree%tree_nodes( CalculateTotalNodes( layers(i)%n_used, K_LEAF_CAPACITY ) ) )
-    end do    
+    end do
+
     !do concurrent (i = 1:MAX_LAYERS)
     do i = 1,size(layers)
        !for SDT6x6 it went from 16.8 to ~21
@@ -462,10 +467,10 @@ contains
     end do
     call cpu_time(t2)
     call system_clock(count=end_tick)
-    elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
-    
-    print '(A, F12.2, A,F12.2,A)', 'Sorting/OMT completed in ', t2 - t1, ' CPU seconds.', elapsed_time, ' REAL seconds.'
-    print *, "=== number of boxes stored per layer ==="
+    elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)    
+    !print '(A, F12.2, A,F12.2,A)', 'Sorting/OMT completed in ', t2 - t1, ' CPU seconds.', elapsed_time, ' REAL seconds.'
+    call StopMarkTime("SortBuildRTree")
+    !print *, "=== number of boxes stored per layer ==="
     if( .false. ) then
     do i = 1, size(layers)
        if( layers(i)%n_used == 0 ) then
@@ -476,7 +481,11 @@ contains
        call saveToHDF( layerFileName, layers(i)%layer_boxes )
     end do
     end if
-    write (*,*) '+-----------------------------------------------------------------+' 
+    write (*,*) '+--------------------------------------------------+'
+    call StartMarkTime("TreeCheckLoop")
+    write (*,*) '+--------------------------------------------------+'        
+    write(*,'(A8,A12,A30)') 'Layer','Total','RTree CPU and REAL time'
+    write (*,*) '+--------------------------------------------------+'        
     tree_check_loop: do i = 1, size(layers)
        if( layers(i)%n_used == 0 ) then
           cycle
@@ -489,12 +498,12 @@ contains
        !   write(*,*) j,' ',layers(i)%tree%tree_nodes(j)%mbr
        !end do
        !>>> UNCOMMENT <<<
-       !call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        call cpu_time(t2)
        call system_clock(count=end_tick)
        elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
-       write(*,'(A,I3,A8,A8,A,I12,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', layers(i)%n_used, &
-            ' rects. |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
+       write(*,'(A8,I12,F12.2,F12.2)') layerNames(i), layers(i)%n_used, &
+            (t2-t1), elapsed_time
        boxes => layers(i)%layer_boxes
        !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        !awk 'NR>76262119 && NR<76401348' log_FPU.txt > m3_FPU_OMT64.txt
@@ -502,7 +511,12 @@ contains
        !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
        !end do
     end do tree_check_loop
-    write (*,*) '+-----------------------------------------------------------------+'
+    write (*,*) '+--------------------------------------------------+'            
+    call StopMarkTime("TreeCheckLoop")
+    call StartMarkTime("PNumLoop")
+    write (*,*) '+-----------------------------------------------------------------------------+'        
+    write(*,'(A8,3(A12),A5,A30)') 'Layer','Polygons','Rects','Total','ST','RTree CPU and REAL time'
+    write (*,*) '+-----------------------------------------------------------------------------+'    
     !> Polygon Number loop, this loop is parallelized inside over each polygon/box
     pnum_loop: do i = 1, size(layers)
        if( layers(i)%n_used == 0 ) then
@@ -511,7 +525,6 @@ contains
        ! 2. Record the start tick
        call system_clock(count=start_tick)           
        call cpu_time(t1)
-
        call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes,&
        layers(i)%tree%root_index, overlap_areas(i), overlap_perimeter(i))
        call cpu_time(t2)
@@ -520,14 +533,11 @@ contains
        num_roots = layers(i)%pnumtable%count_roots()
        num_rects = count(layers(i)%pnumtable%arr == 0)
        layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_PNUM )
-       !write(*,*) 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)
-       !
-
        if( overlap_areas(i) > 0.0 ) then
           !> this layer needs HEALING as we have detected overlap
-          write(*,*) 'PerformUnion as overlap detected.'
+          !write(*,*) 'PerformUnion as overlap detected.'
+          !write(*,'(A,A12,A,F20.2)') 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)          
           !call PerformUnion( layers(i) )
-
           call PerformPolygonUnion( layers(i) )
           call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes,&
                layers(i)%tree%root_index, overlap_areas(i), overlap_perimeter(i))
@@ -546,10 +556,10 @@ contains
        else
           layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_HEAL )          
        end if
-       
-       write(*,'(A,I3,A,A8,4(A,I12),A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
-            ' non-rects ',num_rects , ' rects ', layers(i)%n_used, ' boxes STAT ',layers(i)%layerState, &
-            ' |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
+       !write(*,'(A,A8,3(I12),A,I2,A,F12.2,A,F12.2,A)')
+       write(*,'(A8,3(I12),I5,F12.2,F12.2)') layerNames(i), &
+            num_roots, num_rects , layers(i)%n_used, layers(i)%layerState, &
+            (t2-t1), elapsed_time
        !boxes => layers(i)%layer_boxes
        !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        !awk 'NR>76262119 && NR<76401348' log_FPU.txt > m3_FPU_OMT64.txt
@@ -557,8 +567,11 @@ contains
        !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
        !end do
     end do pnum_loop
-    !do concurrent (i = 1:MAX_LAYERS)    
-    do i = 1,size(layers)
+    write (*,*) '+-----------------------------------------------------------------------------+'    
+    call StopMarkTime("PNumLoop")
+    call StartMarkTime("ExtentLoop")    
+    do concurrent (i = 1:MAX_LAYERS)    
+    !do i = 1,size(layers)
        if( layers(i)%n_used == 0 ) then
           cycle
        end if
@@ -592,12 +605,13 @@ contains
     if( .not. DESIGN_EXTENT%is_valid() ) then
        error stop 'Design EXTENT is not valid'
     end if
+    call StopMarkTime("ExtentLoop")
     write (*,*) '+-----------------------------------------------------------------+'    
     write (*,*) '+                Layer Areas and Perimeters                       +'
     write (*,*) '+-----------------------------------------------------------------+'
     do i = 1, size(layers)
        if( extents(i)%is_valid() ) then
-          write(*,'(A1,A12,F18.2,A1,F18.2)') ' ',layerNames(i), layers(i)%area, ' ', layers(i)%perimeter
+          write(*,'(A1,A12,F18.8,A1,F18.8)') ' ',layerNames(i), layers(i)%area*1e-6, ' ', layers(i)%perimeter*1e-6
        end if
     end do
     write (*,*) '+-----------------------------------------------------------------+'    

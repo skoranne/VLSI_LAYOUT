@@ -1,0 +1,4 @@
+# Control file for MAGPARSER
+program square
+decl design d1 = MY_SDT6x6.mag
+end 

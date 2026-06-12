@@ -1,8 +1,7 @@
 # Control file for MAGPARSER
 program square
 systeminfo
-decl design d1 = square.mag
-decl output o1 = foo.mag
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_FPU_DATA/SMALL_FPU.mag
 decl output o2 = bar.mag
 info
 # decl design d2 = MY_SED.mag

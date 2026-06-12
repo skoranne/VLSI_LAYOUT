@@ -1,9 +1,7 @@
 # Control file for MAGPARSER
 program square
 systeminfo
-decl design d1 = square.mag
-decl output o1 = foo.mag
-decl output o2 = bar.mag
+decl design d1 = square_klbin.mag
 info
 # decl design d2 = MY_SED.mag
 end 

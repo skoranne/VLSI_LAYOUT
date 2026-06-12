@@ -2,8 +2,11 @@ magic
 tech sky130A
 magscale 1 2
 timestamp 1660669191
-<< gL67_D20 >>
-KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW_FLAT_DATA/MW_FLAT_L67_D20.bin
+<< gL67_D20_merged >>
+KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW_FLAT_DATA/MW_FLAT_L67_D20_merged.bin
 << end >>
+<< gL67_D20_merged >>
+KLBIN 
+
 JHDF5 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW_FLAT_DATA/gL67_D20.h5
 

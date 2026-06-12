@@ -13,6 +13,23 @@ Also we can use 'ratarmount' if we dont want to support .gz ourselves.
 
 ![FPU with Paraview on HDF5](FPU.png)
 
+The key property here is to use 'Static RTree methods'; this can be explained using this
+example:
+
++-------------------------+
+|xxxxxxx                  |
++-------------------------+
+
+We want to GROW the xxxx shape in a step of 2 and in each step AND with the original.
+After some iterations the shape looks like
++-------------------------+
+|xxxxxxxxxxxxxxxxx        |
++-------------------------+
+To get this in a Static RTree, we realize that the original layer's RTree does not
+need to be modified. And we can use OpenMP on the RTree buckets; if during the course
+of the AND new fragmentation occurs we just add a new dummy leaf bucket and continue.
+
+
 ```
  Reading filename: SDT6x6_FLAT.mag.gz
  The file is a gzipped file!

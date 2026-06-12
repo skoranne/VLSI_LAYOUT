@@ -52,6 +52,7 @@ program mag_parser
   use MagicVLSILayoutParser               ! <-- your parser module
   use DesignModule
   use ControlModule
+  use version_mod, only: commit_hash
   implicit none
 
   !-----------------------------------------------------------------
@@ -65,6 +66,11 @@ program mag_parser
   character(len=*), parameter   :: default_file = "INV.mag"
   integer,          parameter   :: default_max  = 10
   type(Design)                  :: load_design
+
+  write(*,*) 'MAGPARSER.exe by Sandeep Koranne (C) All rights reserved.'
+  write(*,*) 'Released under MIT License. See the README and LICENSE '
+  write(*,*) 'https://github.com/skoranne/VLSI_LAYOUT/'
+  write(*,*) 'Release: ', commit_hash
   !-----------------------------------------------------------------
   !  Get the number of arguments supplied on the command line
   !-----------------------------------------------------------------

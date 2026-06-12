@@ -127,3 +127,63 @@ GROUP "/" {
 }
 
 Attempt to reduce peak memory
+
+In Modern Fortran, we can do this
+type :: UnionFind(int_kind)
+    integer, kind :: int_kind
+    integer(kind=int_kind), allocatable :: arr(:)
+contains
+    ! Just one binding needed! No generics required.
+    procedure, pass, private :: count_roots => uf_count_roots 
+end type UnionFind
+
+contains
+
+! The single generic implementation
+pure function uf_count_roots(self) result(retval)
+    class(UnionFind(int_kind)), intent(in) :: self
+    integer(kind=int_kind) :: retval
+    ! ... logic here ...
+end function uf_count_roots
+
+/opt/nvidia/hpc_sdk/Linux_aarch64/25.9/compilers/share/llvm/bin/llc: error: /opt/nvidia/hpc_sdk/Linux_aarch64/25.9/compilers/share/llvm/bin/llc: /tmp/nvfortranqA4hgWT2PMOO-.ll:277:21: error: use of undefined value '%cap'
+        store i32  %0, ptr %cap, align 4, !dbg !144
+
+
+1) Root annotation does work since if in the RTree there is equality of R, then
+   its idempotent which root it belongs to. It has to be strict equality.
+
+2) Tiling does work: if MBR of R is very very large, it is better to segment
+   R into R(i=1:n) and repeat in do concurrent
+
+3) Compressed events do work: in the absolute case when you have to relegate
+  to scanline, or events, use compressed form to save memory.
+```
+For tiled MW this is a known problem
+Layer = gL67_D20      = id:     1
+INFO: Total file size =      4989015488 bytes
+INFO: Allocating array for    311813468 boxes.
+INFO: Read successful for     311813468 boxes.
+ Parsed            1  layers.
+Sorting/OMT completed in      6551.43 CPU seconds.      220.80 REAL seconds.                                                  
+ === number of boxes stored per layer ===
+ +-----------------------------------------------------------------+                                                          
+Layer:   1        gL67_D20 has    311813468 rects. |RTREE| = CPU      8211.44 secs.      296.88 REAL secs
+ +-----------------------------------------------------------------+
+Layer:   1 gL67_D20 has     47737156 non-rects     68134360 rects    311813468 boxes STAT           15 |RTREE| = CPU      9094.93 secs.      328.92 REAL secs
+ +-----------------------------------------------------------------+
+ +                Layer Areas and Perimeters                       +
+ +-----------------------------------------------------------------+
+ gL67_D20     58133777333120.00    374890515544.00
+ +-----------------------------------------------------------------+
+ 
+ +-------------------------- Design Extent ------------------------+
+ Box: [        5116 ,       10684 ] to [    13414100 ,    14008800 ]
+ +---------------------------Layers Extent ------------------------+
+ Box: [        5116 ,       10684 ] to [    13414100 ,    14008800 ]
+ +-----------------------------------------------------------------+
+ 
+Line number:    4 end                                                                             
+ --- End of file
+END 23868.55 CPU seconds.  857.38 REAL seconds. FULL TIME:   857.38
+```

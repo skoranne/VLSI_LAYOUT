@@ -309,7 +309,7 @@ contains
     call get_equal_key_segments( input_layer%pnumtable%arr, permutation, segments )
     !write(*,*) 'Segments = ', segments
     !> Usually the first segment comprises of the rectangles which we dont need to care about
-    final_capacity = num_rects + 10*(input_layer%n_used-num_rects)
+    final_capacity = num_rects + 4*(input_layer%n_used-num_rects)
     !>>> Trying to debug the large memory <<<
     allocate( final_boxes( final_capacity ) )
     final_count = 0
@@ -344,7 +344,7 @@ contains
        end if
        
        if( box_count > size( current_polygon_boxes ) ) then
-          write(*,'(4(A,I0),A)') 'Processing polygon number: ', polygon_number, ' with ', box_count, ' rects, |cpb| = ', size( current_polygon_boxes ), ' |FC| = ', final_capacity, ' '
+          !write(*,'(4(A,I0),A)') 'Processing polygon number: ', polygon_number, ' with ', box_count, ' rects, |cpb| = ', size( current_polygon_boxes ), ' |FC| = ', final_capacity, ' '
           deallocate( current_polygon_boxes )
           allocate( current_polygon_boxes( 2*box_count ) )
        end if

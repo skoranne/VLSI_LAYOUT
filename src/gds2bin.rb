@@ -33,6 +33,17 @@ layout.read(input_file)
 # we dont need to count the number of boxes as we can
 # use the size of the file / by 32-bytes and get number of boxes
 top = layout.top_cell
+bbox_um = top.dbbox
+puts "INFO: Database Unit (DBU): #{layout.dbu} µm"
+puts "--- Top Cell Extent ---"
+puts "Bottom-Left  : (#{bbox_um.left}, #{bbox_um.bottom}) µm"
+puts "Top-Right    : (#{bbox_um.right}, #{bbox_um.top}) µm"
+puts "Total Width  : #{bbox_um.width} µm"
+puts "Total Height : #{bbox_um.height} µm"
+puts "-----------------------"
+
+# this flattens
+#top.flatten(-1, true)
 puts "INFO: Reading cell: #{top.name}"
 layout.layer_indices.each do |li|
   layerInfo = layout.get_info( li )
@@ -42,25 +53,13 @@ layout.layer_indices.each do |li|
   puts "INFO: Writing into BIN: #{binFileName}"
   f = File.open(binFileName, "wb" )
   shapeIterator = top.begin_shapes_rec(li)
+  
   next if shapeIterator.at_end?
   region = RBA::Region::new(shapeIterator)
-  
-  # 3. If the region has shapes, decompose them and stream them out
-  # if !region.is_empty?
-  #   puts "INFO: Converting & Writing into BIN: #{binFileName}"
-  #   f = File.open(binFileName, "wb")
-  #       # KLayout internal engine: Fractures the region into a flat array of pure boxes
-  #   # Polygon::TD_simple forces the engine to resolve shapes as rectangles
-  #   box_shapes = region.decompose_trapezoids(Polygon::TD_simple)
-  #   # Iterate through the generated Box objects inside the Shapes container
-  #   box_shapes.each do |shape|
-  #     if shape.is_box?
-  #       b = shape.box
-  #       f.write([b.left, b.bottom, b.right, b.top].pack("q<q<q<q<"))
-  #     end
-  #   end
-  #   f.close
-  # end
+  region.merge #This is one option
+  area_um2 = region.area * (layout.dbu ** 2)
+  perimeter_um = region.perimeter * layout.dbu
+  puts "INFO: Layer #{layer_number}/#{layer_datatype} -> True Area: #{area_um2.round(4)} µm², True Perimeter: #{perimeter_um.round(4)} µm"
   
   while !shapeIterator.at_end?
     shape = shapeIterator.shape
@@ -84,24 +83,11 @@ layout.layer_indices.each do |li|
         # Extract the exact geometric bounding limits of each slice
         b = poly.bbox
         f.write([b.left, b.bottom, b.right, b.top].pack("l<l<l<l<"))
-      end
-      
+      end      
     else
       # Safely skip Texts and other non-area geometries (like Edges)
       # puts "INFO: Ignoring non-geometric shape in LAYOUT"
     end
-    # else
-    #   #puts "INFO: Ignoring NON_BOXES in LAYOUT: #{input_file}"
-    #   single_shape_region = RBA::Region::new
-    #   geom_polygon = shape.polygon.transformed(shapeIterator.trans)
-    #   single_shape_region.insert(geom_polygon)
-    #   fragments = single_shape_region.decompose_trapezoids(Polygon::TD_simple)
-    #   fragments.each do |poly|
-    #     # Extract the exact geometric bounding limits of each slice
-    #     b = poly.bbox
-    #     f.write([b.left, b.bottom, b.right, b.top].pack("l<l<l<l<"))
-    #   end
-    # end
     shapeIterator.next
   end
   f.close
