@@ -58,6 +58,7 @@
 ! rlabel metal1 -25 145 90 160 1 VPWR
 ! << end >>
 module MagicVLSILayoutParser
+  use CommonModule
   use hash_mod
   use DesignModule
   use GeometryModule
@@ -66,6 +67,7 @@ module MagicVLSILayoutParser
   use HDFDataModule
   use PNumMergeModule
   use SystemInformationModule
+  use MortonSortModule
   use iso_c_binding
   use iso_fortran_env, only : int32, int64
   implicit none
@@ -128,7 +130,6 @@ contains
     integer :: ASCALE = 1
     integer :: BSCALE = 1
     integer, parameter :: INIT_ALLOC = 4
-    integer, parameter :: K_LEAF_CAPACITY = 16 !> 32 is better than 64
     ! to support compressed files
     type(c_ptr) :: gz_file
     character(kind=c_char, len=256) :: buffer
@@ -453,7 +454,8 @@ contains
        !for SDT6x6 it went from 16.8 to ~21
        !boxes => layers(i)%layer_boxes
        if( NeedsSorting( layers(i) ) ) then
-          call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
+          !call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
+          call MortonSort( layers(i)%layer_boxes )
           layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_SORT )
        end if
        call BuildRTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index)

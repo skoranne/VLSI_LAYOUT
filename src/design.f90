@@ -2,6 +2,7 @@
 ! Author : Sandeep Koranne (C) 2026. All rights reserved.
 ! Purpose: Keep all layer information together
 module DesignModule
+  use CommonModule
   use hash_mod  
   use GeometryModule
   use RTreeBuilder
@@ -11,7 +12,6 @@ module DesignModule
   use iso_fortran_env, only : int32, int64, real64
   implicit none  
   private
-  !integer, parameter :: K_LEAF_CAPACITY = 16 !> 32 is better than  
   public :: Design, Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
        LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, &
        NeedsSorting, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
@@ -69,7 +69,6 @@ contains
   end function NeedsHealing
   subroutine PerformUnion( input_layer )
     type(Layer), intent(inout) :: input_layer
-    integer, parameter :: K_LEAF_CAPACITY = 16 !> 32 is better than
     integer(kind=int64) :: i,n, updated_box_count
     type(Box) :: tempBox
     if( input_layer%n_used == 0 ) return
@@ -279,7 +278,6 @@ contains
   !> On MW:  Heal changed:   51953736        1568839856
   subroutine PerformPolygonUnion( input_layer )
     type(Layer), intent(inout) :: input_layer
-    integer, parameter :: K_LEAF_CAPACITY = 16 !> 32 is better than
     integer, parameter :: K_POLYGON_INIT_BOX_COUNT = 64
     integer(kind=int64) :: i,j,n, num_roots, num_rects, polygon_number, box_count
     integer(kind=int64) :: updated_box_count, final_count, final_capacity

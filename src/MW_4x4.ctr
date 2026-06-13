@@ -1,0 +1,8 @@
+# Control file for MAGPARSER
+program square
+systeminfo
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
+decl output o2 = bar.mag
+info
+# decl design d2 = MY_SED.mag
+end 

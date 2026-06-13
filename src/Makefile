@@ -15,9 +15,10 @@ LDLIBS = -lz -lhdf5_fortran -lhdf5
 
 # --- Library Definition ---
 LIBRARY = libmagparser.a
-LIB_OBJS = systeminfo.o hashtable.o geometry.o design.o \
+LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
            controlparser.o hdfdata.o datastructures.o \
-           rtree.o pnummerge.o magparser.o contour.o version_mod.o
+           rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
+	   polygon_fracture.o boxmerge.o
 
 # Create a list of all object files that will be compiled
 ALL_OBJS = $(LIB_OBJS) mainmagparser.o test_contour.o
@@ -37,10 +38,15 @@ version_mod.f90: ../.git/HEAD ../.git/index
 	@echo "  character(len=*), parameter :: commit_hash = '$(GIT_HASH)'" >> $@
 	@echo "end module version_mod" >> $@
 
-unit_test: test_contour.exe
+unit_test: test_contour.exe test_morton.exe test_polygonfracture.exe test_boxmerge.exe \
+	   test_skiplist.exe
 
 clean:
 	rm -f *.o *.mod *.a *.exe
+
+# Generating specific versions
+#merge_utils.o: merge_utils.F90 SkipList_template.inc
+#    $(FC) $(FFLAGS) -DPAYLOAD_TYPE="type(ScanBox)" -DPROC_PREFIX="scanbox_" -c merge_utils.F90 -o merge_utils.o
 
 # --- Pattern Rules ---
 # This single rule replaces all the individual ".f90 -> .o" targets.
@@ -61,6 +67,14 @@ MAGPARSER.exe: mainmagparser.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_morton.exe: test_morton.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_polygonfracture.exe: test_polygonfracture.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_boxmerge.exe: test_boxmerge.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_skiplist.exe: test_skiplist.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # --- Fortran Module Dependencies ---

@@ -13,7 +13,7 @@ module HDFDataModule
   implicit none
   private
   public :: h5check, saveToHDF, loadFromHDF, LoadJuliaHDF5, LoadPolygonOffsetsHDF5, &
-       LoadKLBin
+       LoadKLBin, WriteKLBin
 contains
   !=================================================================
   !  Helper: abort the program if an HDF5 call returned a non‑zero error.
@@ -510,10 +510,16 @@ contains
   subroutine WriteKLBin(fileName, boxes)
     character(len=*), intent(in) :: filename
     type(Box), intent(in)        :: boxes(:)
-    integer(kind=int64)          :: total_boxes
+    integer(kind=int64)          :: i, total_boxes
     integer                      :: file_unit, io_status
     ! 1. Determine the total number of boxes to write
     total_boxes = size(boxes, kind=int64)
+    do i=1,total_boxes
+       if( .not. boxes(i)%is_valid() ) then
+          write(*,*) 'Box: ', i, ' ', boxes(i), ' WRONG.'
+          error stop "INVALID BOX"
+       end if
+    end do
     write(*,'(A,I12,A)') 'INFO: Writing array of     ', total_boxes, ' boxes.'
     ! 2. Open the file in raw binary stream mode
     open(newunit=file_unit, &

@@ -5,6 +5,7 @@
 
 program testContour
   use iso_fortran_env, only: int32, int64, real64
+  use CommonModule
   use GeometryModule
   use HDFDataModule
   use RTreeBuilder
@@ -13,7 +14,6 @@ program testContour
   use DesignModule
   use ContourExtractionModule
   implicit none
-  integer(kind=int64), parameter :: K_LEAF_CAPACITY = 16
   type(Layer),target :: input_layer
   type(Box), pointer :: boxes(:)
   type(Box) :: tempBox

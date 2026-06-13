@@ -187,3 +187,11 @@ Line number:    4 end
  --- End of file
 END 23868.55 CPU seconds.  857.38 REAL seconds. FULL TIME:   857.38
 ```
+ Num:                4791792  area =    2168368540481.00                                                                      
+ MBR:         5510       10785     1790790     1795295  BOX_AREA:                                                              
+   3185849925632.00                                                                                                            
+ Expected AREA of complement =    1017481385151.00                                                                             
+ Executing Scanline Fracturing with Skip List...                                                                               
+ In PF (Fractured Count):      6311489     
+ Expected AREA of complement =    1017481385151.00 while 1017481477575.00        
+Layer 1/0 Area: 1017481.4775749999 um^2

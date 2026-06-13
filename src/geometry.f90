@@ -4,19 +4,20 @@
 
 module GeometryModule
   use iso_fortran_env, only: int32, int64, real64
+  use CommonModule
   implicit none
   private
-  integer, parameter, public :: K = int32
+  !integer, parameter, public :: K = int32
 
   public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid, &
        box_not_interact, box_interact, box_area, box_perimeter, calculate_union_area, get_sort_permutation, &
-       calculate_polygon_union_area, PolygonBooleanAND, heal_boxes, sort_int_array
+       calculate_polygon_union_area, PolygonBooleanAND, heal_boxes, sort_int_array, box_grow
   ! Enum-like constants for the sorting axis
   integer, parameter :: AXIS_X = 1
   integer, parameter :: AXIS_Y = 2
   !>   type, bind(C) :: Box
   type :: Box
-     integer(kind=K) :: x1, y1, x2, y2
+     integer(kind=K_COORDINATE_KIND) :: x1, y1, x2, y2
    contains
      procedure, pass :: reset_to_infinity
      procedure, pass :: is_valid
@@ -30,7 +31,7 @@ module GeometryModule
   end type Box
   type :: AugmentedBox
      type(Box) :: mbr
-     integer(kind=K) :: value
+     integer(kind=K_COORDINATE_KIND) :: value
   end type AugmentedBox
 
   ! The generic interface routes the call to the correct specific subroutine
@@ -44,9 +45,9 @@ module GeometryModule
   end type ShapeCollection
   ! Auxiliary data structure for the sweep-line
   type :: Event
-     integer(K) :: x
-     integer(K) :: y1, y2
-     integer(K) :: lap_change ! +1 for left edge, -1 for right edge
+     integer(kind=K_COORDINATE_KIND) :: x
+     integer(kind=K_COORDINATE_KIND) :: y1, y2
+     integer(kind=K_COORDINATE_KIND) :: lap_change ! +1 for left edge, -1 for right edge
      integer :: owner ! 1 for Shape A, 2 for Shape B     
   end type Event
 
@@ -136,6 +137,16 @@ contains
     this%y1 = (this%y1*ascale)/bscale
     this%y2 = (this%y2*ascale)/bscale    
   end subroutine box_scale
+  pure subroutine box_grow(this, xgrow, ygrow)
+    class(Box), intent(inout) :: this
+    integer, intent(in) :: xgrow, ygrow
+    if( .not. this%is_valid() ) error stop "INBOX NOT VALID"
+    this%x1 = (this%x1-xgrow)
+    this%x2 = (this%x2+xgrow)
+    this%y1 = (this%y1-ygrow)
+    this%y2 = (this%y2+ygrow)
+    if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID"
+  end subroutine box_grow
 
   ! Type procedure for intersection of two boxes
   pure function box_intersection(this, other) result(intersection_box)
@@ -170,7 +181,7 @@ contains
     type(Box), intent(in) :: b
     real(kind=real64)     :: retval
     if( is_valid(b) ) then
-       retval = real(b%x2 - b%x1) * real(b%y2 - b%y1)
+       retval = real(b%x2 - b%x1,real64) * real(b%y2 - b%y1,real64)
     else
        retval = 0.0
     end if
@@ -540,7 +551,7 @@ contains
 
     integer :: n, num_events, num_y, i, j
     type(Event), allocatable :: events(:)
-    integer(K), allocatable :: y_vals(:), unique_y(:)
+    integer(kind=K_COORDINATE_KIND), allocatable :: y_vals(:), unique_y(:)
     integer, allocatable :: lap(:)
     integer(kind=int64) :: current_x, dx, covered_y
     integer :: j1, j2
@@ -629,7 +640,7 @@ contains
 
     integer :: n, num_y, i, j
     type(Event), allocatable :: events(:)
-    integer(K), allocatable :: y_vals(:), unique_y(:) ! Assuming 'K' is defined in module
+    integer(kind=K_COORDINATE_KIND), allocatable :: y_vals(:), unique_y(:) ! Assuming 'K' is defined in module
     integer, allocatable :: lap(:)
     integer(kind=int64) :: current_x, next_x
     integer :: j1, j2
@@ -774,7 +785,7 @@ contains
     ! Internal variables
     integer :: n, num_y, i, j
     type(Event), allocatable :: events(:)
-    integer(K), allocatable :: y_vals(:) 
+    integer(kind=K_COORDINATE_KIND), allocatable :: y_vals(:) 
     integer, allocatable :: lap(:)
     integer(kind=int64) :: current_x, next_x
     integer :: j1, j2
@@ -923,11 +934,12 @@ contains
   pure function calculate_polygon_union_area(X, Y, poly_start, poly_end) result(area)
     integer(kind=int32), intent(in) :: X(:), Y(:)
     integer(kind=int32), intent(in) :: poly_start(:), poly_end(:)
-    integer(K) :: area
+    integer(kind=int64) :: area
 
     integer :: p, s, e, k, num_polygons, num_events, num_y, i, j
     integer :: is_ccw, j1, j2
-    integer(kind=int64) :: signed_area, dy, current_x, dx, covered_y
+    integer(kind=int64) :: signed_area
+    integer(kind=K_COORDINATE_KIND) :: dy, current_x, dx, covered_y
 
     ! Arrays sized safely to the maximum possible vertices
     type(Event), allocatable :: events(:)
@@ -1050,9 +1062,9 @@ contains
 
   ! Binary search for rapid index lookup of y-coordinates
   pure function binary_search_y(arr, n, val) result(idx)
-    integer(K), intent(in) :: arr(:)
+    integer(K_COORDINATE_KIND), intent(in) :: arr(:)
     integer, intent(in) :: n
-    integer(K), intent(in) :: val
+    integer(K_COORDINATE_KIND), intent(in) :: val
     integer :: idx, low, high, mid
 
     low = 1
@@ -1073,8 +1085,8 @@ contains
 
   ! In-place Quicksort for 64-bit integers
   pure recursive subroutine sort_int_array(arr)
-    integer(K), intent(inout) :: arr(:)
-    integer(K) :: pivot, temp
+    integer(K_COORDINATE_KIND), intent(inout) :: arr(:)
+    integer(K_COORDINATE_KIND) :: pivot, temp
     integer :: i, j, left, right
 
     if (size(arr) <= 1) return
@@ -1107,7 +1119,7 @@ contains
   ! In-place Quicksort for Events (sorting by X-coordinate)
   pure recursive subroutine sort_events(arr)
     type(Event), intent(inout) :: arr(:)
-    integer(K) :: pivot
+    integer(K_COORDINATE_KIND) :: pivot
     type(Event) :: temp
     integer :: i, j, left, right
 
@@ -1210,20 +1222,20 @@ contains
   !lets start adding polygon booleans for rectilinear polygons.
   !So we will construct a new type which is
   !type ShapeCollection
-  !integer(kind=K), allocatable: X(:),Y(:),poly_start(:),poly_end(:)
+  !integer(kind=K_COORDINATE_KIND), allocatable: X(:),Y(:),poly_start(:),poly_end(:)
   !and we want to write something like
   subroutine PolygonBooleanAND(A, B, C)
     type(ShapeCollection), intent(in)  :: A, B
     type(ShapeCollection), intent(out) :: C
-    !integer, parameter :: K = int64
+    !integer, parameter :: K_COORDINATE_KIND = int64
     type(Event), allocatable :: events(:)
-    integer(kind=K), allocatable  :: y_vals(:), unique_y(:)
+    integer(kind=K_COORDINATE_KIND), allocatable  :: y_vals(:), unique_y(:)
     integer, allocatable     :: lap_A(:), lap_B(:)
     logical, allocatable     :: is_inside(:)
-    integer(kind=K), allocatable  :: start_x(:)
+    integer(kind=K_COORDINATE_KIND), allocatable  :: start_x(:)
 
     integer :: num_events, num_y, i, j, j1, j2
-    integer(kind=K) :: current_x
+    integer(kind=K_COORDINATE_KIND) :: current_x
     logical :: new_inside
 
     ! Dynamic output buffers (oversized for safety, trimmed at the end)
@@ -1362,11 +1374,12 @@ contains
     type(ShapeCollection), intent(in) :: shape
     integer, intent(in) :: owner_id
     type(Event), intent(inout) :: events(:)
-    integer(kind=K), intent(inout) :: y_vals(:)
+    integer(kind=K_COORDINATE_KIND), intent(inout) :: y_vals(:)
     integer, intent(inout) :: num_events, num_y
 
     integer :: p, s, e, kloop, is_ccw
-    integer(kind=K) :: signed_area, dy
+    integer(kind=K_COORDINATE_KIND) :: dy
+    integer(kind=int64)             :: signed_area
 
     if (.not. allocated(shape%poly_start)) return
 
@@ -1394,9 +1407,9 @@ contains
           if (shape%X(kloop) == shape%X(kloop+1) .and. shape%Y(kloop) /= shape%Y(kloop+1)) then
              num_events = num_events + 1
              events(num_events)%owner = owner_id
-             events(num_events)%x = int(shape%X(kloop), K)
-             events(num_events)%y1 = min(int(shape%Y(kloop), K), int(shape%Y(kloop+1), K))
-             events(num_events)%y2 = max(int(shape%Y(kloop), K), int(shape%Y(kloop+1), K))
+             events(num_events)%x = int(shape%X(kloop), K_COORDINATE_KIND)
+             events(num_events)%y1 = min(int(shape%Y(kloop), K_COORDINATE_KIND), int(shape%Y(kloop+1), K_COORDINATE_KIND))
+             events(num_events)%y2 = max(int(shape%Y(kloop), K_COORDINATE_KIND), int(shape%Y(kloop+1), K_COORDINATE_KIND))
 
              num_y = num_y + 1
              y_vals(num_y) = events(num_events)%y1
