@@ -1,13 +1,14 @@
 ! File   : polygon_fracture.f90
 ! Author : Sandeep Koranne
-! Purpose: See the notes in skiplist.f90.notes
-!
-module polygon_fracture_mod
+! Purpose: High-Performance Scanline Fracture using Doubly-Linked LIFO Arena SkipList.
+!          Features O(1) deletions and O(log N) UP/DOWN neighbor resolutions.
+
+module PolygonFractureModule
   use CommonModule
   use GeometryModule
-  use DesignModule
+  !use DesignModule
   use HDFDataModule
-  use ContourExtractionModule
+  !use ContourExtractionModule
 
   use, intrinsic :: iso_fortran_env, only: int32, int64, real64
   implicit none
@@ -15,305 +16,268 @@ module polygon_fracture_mod
   integer, parameter :: K_POLYGON_INIT_BOX_COUNT = 64
 
   ! --- Constants & Kinds ---
-  integer, parameter :: MAX_SKIP_LEVEL = 32
+  integer, parameter      :: MAX_SKIP_LEVEL = 32
   real(real64), parameter :: SKIP_PROBABILITY = 0.5_real64
 
   ! --- Public Exports ---
   public :: XYTracker, SkipList, SkipListNode, NodePtr
-  public :: init_skiplist, insert_edge, remove_edge, find_bounding_edges, destroy_skiplist
-  public :: sort_trackers, scanline_fracture, generate_trackers
+  public :: init_skiplist, update_active_edges, find_bounding_edges, destroy_skiplist
+  public :: sort_trackers, scanline_fracture, generate_trackers, heal_boxes
   public :: K_COORDINATE_KIND
+
   type :: ActiveRegion
-     integer(kind=K_COORDINATE_KIND) :: y1, y2, x_start
+      integer(kind=K_COORDINATE_KIND) :: y1, y2, x_start
   end type ActiveRegion
-  ! --- Types ---
+
   type :: XYTracker
-     integer(kind=K_COORDINATE_KIND) :: X, Y
-     integer(kind=int64) :: polygonNumber 
-     ! the winding number of the vertex is the sign of polygonNumber
+      integer(kind=K_COORDINATE_KIND) :: X, Y
+      integer(kind=int64) :: polygonNumber 
+      ! the winding number of the vertex is the sign of polygonNumber
   end type XYTracker
 
-  ! Fortran requires a wrapper type to have arrays of pointers
+  ! ============================================================================
+  ! HIGHEST-EFFORT SKIPLIST SCHEMA (Doubly-Linked, Arena-Allocated)
+  ! ============================================================================
   type :: NodePtr
-     type(SkipListNode), pointer :: ptr => null()
+      type(SkipListNode), pointer :: ptr => null()
   end type NodePtr
 
   type :: SkipListNode
-     integer(kind=K_COORDINATE_KIND) :: y_val
-     integer(kind=int64) :: lap_change
-     type(NodePtr), allocatable :: forward(:)
+      ! Payload
+      integer(kind=K_COORDINATE_KIND) :: y_val
+      integer(kind=int64)             :: lap_change
+      
+      ! Bi-directional Routing and LIFO Memory Chain
+      type(NodePtr) :: Forward(MAX_SKIP_LEVEL)
+      type(NodePtr) :: Backward(MAX_SKIP_LEVEL) 
+      type(NodePtr) :: NextFree
   end type SkipListNode
 
   type :: SkipList
-     integer :: current_level
-     type(SkipListNode), pointer :: header => null()
+      integer :: current_level
+      type(SkipListNode), pointer :: header => null()
+      
+      ! Memory Pool Optimization
+      type(SkipListNode), pointer :: Arena(:) => null()
+      type(NodePtr)               :: FreeHead
   end type SkipList
 
 contains
 
-  ! ==========================================
-  ! Skip List Core Functions
-  ! ==========================================
-
-  subroutine init_skiplist(list)
+  ! ============================================================================
+  ! MEMORY POOL & SKIPLIST LIFECYCLE
+  ! ============================================================================
+  
+  subroutine init_skiplist(list, capacity)
     type(SkipList), intent(inout) :: list
-    integer :: i
+    integer(int64), intent(in)    :: capacity
+    integer(int64) :: i
+    integer :: j
 
     list%current_level = 1
-    allocate(list%header)
-    ! Use a minimum sentinel value
+    ! Allocate contiguous arena block
+    allocate(list%Arena(capacity + 1))
+
+    ! Chain the LIFO free list
+    do i = 1, capacity
+        list%Arena(i)%NextFree%ptr => list%Arena(i+1)
+        do j = 1, MAX_SKIP_LEVEL
+            list%Arena(i)%Forward(j)%ptr  => null()
+            list%Arena(i)%Backward(j)%ptr => null()
+        end do
+    end do
+    
+    list%Arena(capacity + 1)%NextFree%ptr => null()
+    do j = 1, MAX_SKIP_LEVEL
+        list%Arena(capacity + 1)%Forward(j)%ptr  => null()
+        list%Arena(capacity + 1)%Backward(j)%ptr => null()
+    end do
+
+    list%FreeHead%ptr => list%Arena(1)
+
+    ! Consume the first node as the Sentinel Header
+    list%header => SL_GET_FREE(list)
     list%header%y_val = -huge(1_int64)
     list%header%lap_change = 0
-    allocate(list%header%forward(MAX_SKIP_LEVEL))
-
-    do i = 1, MAX_SKIP_LEVEL
-       list%header%forward(i)%ptr => null()
-    end do
   end subroutine init_skiplist
 
   subroutine destroy_skiplist(list)
     type(SkipList), intent(inout) :: list
-    type(SkipListNode), pointer :: current, next_node
-
-    current => list%header
-    do while (associated(current))
-       next_node => current%forward(1)%ptr
-       deallocate(current%forward)
-       deallocate(current)
-       current => next_node
-    end do
+    if (associated(list%Arena)) deallocate(list%Arena)
     nullify(list%header)
+    nullify(list%FreeHead%ptr)
   end subroutine destroy_skiplist
+
+  function SL_GET_FREE(list) result(node)
+    type(SkipList), intent(inout) :: list
+    type(SkipListNode), pointer :: node
+    if (.not. associated(list%FreeHead%ptr)) then
+        error stop "CRITICAL: Polygon Fracture SkipList Arena Exhausted!"
+    end if
+    node => list%FreeHead%ptr
+    list%FreeHead%ptr => node%NextFree%ptr
+    node%NextFree%ptr => null()
+  end function SL_GET_FREE
+
+  subroutine SL_RELEASE(list, node)
+    type(SkipList), intent(inout) :: list
+    type(SkipListNode), pointer :: node
+    integer :: i
+    ! Wipe pointers to prevent ghost links
+    do i = 1, MAX_SKIP_LEVEL
+        node%Forward(i)%ptr  => null()
+        node%Backward(i)%ptr => null()
+    end do
+    node%NextFree%ptr => list%FreeHead%ptr
+    list%FreeHead%ptr => node
+  end subroutine SL_RELEASE
 
   function random_level() result(lvl)
     integer :: lvl
     real(real64) :: r
-
     lvl = 1
     call random_number(r)
     do while (r < SKIP_PROBABILITY .and. lvl < MAX_SKIP_LEVEL)
-       lvl = lvl + 1
-       call random_number(r)
+        lvl = lvl + 1
+        call random_number(r)
     end do
   end function random_level
-  !> Accumulates lap counts for coincident Y boundaries. 
-  !> Auto-deletes the node if the lap count reaches zero.
+
+
+  ! ============================================================================
+  ! O(log N) UP/DOWN SWEEP-LINE ENGINE
+  ! ============================================================================
+
+  !> Smart Update: Accumulates winding numbers. If a boundary perfectly resolves (lap == 0),
+  !> it leverages the Backward pointers to un-splice the node in O(1) without a re-scan.
   subroutine update_active_edges(list, y_val, lap_delta)
     type(SkipList), intent(inout) :: list
     integer(kind=K_COORDINATE_KIND), intent(in) :: y_val
     integer(kind=int64), intent(in) :: lap_delta
 
     type(NodePtr) :: update(MAX_SKIP_LEVEL)
-    type(SkipListNode), pointer :: current, target, new_node
+    type(SkipListNode), pointer :: current, target, new_node, prev_node, next_node
     integer :: i, lvl
 
     current => list%header
 
-    ! 1. Find positions to update
+    ! 1. O(log N) Search for the target Y coordinate
     do i = list%current_level, 1, -1
-       do while (associated(current%forward(i)%ptr))
-          if (current%forward(i)%ptr%y_val < y_val) then
-             current => current%forward(i)%ptr
-          else
-             exit
-          end if
-       end do
-       update(i)%ptr => current
+        do while (associated(current%Forward(i)%ptr))
+            if (current%Forward(i)%ptr%y_val < y_val) then
+                current => current%Forward(i)%ptr
+            else
+                exit
+            end if
+        end do
+        update(i)%ptr => current
     end do
 
-    target => current%forward(1)%ptr
+    target => current%Forward(1)%ptr
 
-    ! 2. Check if the Y-coordinate already exists in the Skip List
+    ! 2. Coordinate MATCH: Accumulate or Delete
     if (associated(target)) then
-       if (target%y_val == y_val) then
-          ! It exists: accumulate the winding sign
-          target%lap_change = target%lap_change + lap_delta
+        if (target%y_val == y_val) then
+            target%lap_change = target%lap_change + lap_delta
 
-          ! If the boundary is fully resolved, remove the node entirely
-          if (target%lap_change == 0) then
-             do i = 1, list%current_level
-                if (.not. associated(update(i)%ptr%forward(i)%ptr)) exit
-                if (.not. associated(update(i)%ptr%forward(i)%ptr, target)) exit
-                update(i)%ptr%forward(i)%ptr => target%forward(i)%ptr
-             end do
+            ! If boundary resolves, O(1) Un-splice using doubly-linked pointers
+            if (target%lap_change == 0) then
+                do i = 1, list%current_level
+                    ! If this node is not active at this level, stop splicing
+                    if (.not. associated(target%Backward(i)%ptr)) exit
 
-             deallocate(target%forward)
-             deallocate(target)
+                    prev_node => target%Backward(i)%ptr
+                    next_node => target%Forward(i)%ptr
 
-             ! Reduce max level if top levels are now empty
-             do while (list%current_level > 1 .and. &
-                  .not. associated(list%header%forward(list%current_level)%ptr))
-                list%current_level = list%current_level - 1
-             end do
-          end if
+                    ! Bypass the target node
+                    if (associated(prev_node)) prev_node%Forward(i)%ptr => next_node
+                    if (associated(next_node)) next_node%Backward(i)%ptr => prev_node
+                end do
+                
+                ! Release back to Arena
+                call SL_RELEASE(list, target)
 
-          return ! We are done
-       end if
+                ! Safely lower the list's max level if the top lanes are now empty
+                do while (list%current_level > 1 .and. &
+                     .not. associated(list%header%Forward(list%current_level)%ptr))
+                    list%current_level = list%current_level - 1
+                end do
+            end if
+            return 
+        end if
     end if
 
-    ! 3. The Y-coordinate does not exist; insert a new node
+    ! 3. Coordinate NOT FOUND: Insert New Boundary (O(log N) search + O(1) splice)
     if (lap_delta == 0) return 
 
     lvl = random_level()
-
     if (lvl > list%current_level) then
-       do i = list%current_level + 1, lvl
-          update(i)%ptr => list%header
-       end do
-       list%current_level = lvl
+        do i = list%current_level + 1, lvl
+            update(i)%ptr => list%header
+        end do
+        list%current_level = lvl
     end if
 
-    allocate(new_node)
+    new_node => SL_GET_FREE(list)
     new_node%y_val = y_val
     new_node%lap_change = lap_delta
-    allocate(new_node%forward(lvl))
 
+    ! Doubly-Linked Splice
     do i = 1, lvl
-       new_node%forward(i)%ptr => update(i)%ptr%forward(i)%ptr
-       update(i)%ptr%forward(i)%ptr => new_node
+        ! Forward links
+        new_node%Forward(i)%ptr => update(i)%ptr%Forward(i)%ptr
+        update(i)%ptr%Forward(i)%ptr => new_node
+        
+        ! Backward links
+        if (associated(new_node%Forward(i)%ptr)) then
+            new_node%Forward(i)%ptr%Backward(i)%ptr => new_node
+        end if
+        new_node%Backward(i)%ptr => update(i)%ptr
     end do
   end subroutine update_active_edges
 
-  subroutine insert_edge(list, y_val, edge_id)
-    type(SkipList), intent(inout) :: list
-    integer(kind=K_COORDINATE_KIND), intent(in) :: y_val
-    integer(kind=int64), intent(in) :: edge_id
 
-    type(NodePtr) :: update(MAX_SKIP_LEVEL)
-    type(SkipListNode), pointer :: current, new_node
-    integer :: i, lvl
-
-    current => list%header
-
-    ! Find positions to update
-    do i = list%current_level, 1, -1
-       do while (associated(current%forward(i)%ptr))
-          if (current%forward(i)%ptr%y_val < y_val) then
-             current => current%forward(i)%ptr
-          else
-             exit
-          end if
-       end do
-       update(i)%ptr => current
-    end do
-
-    ! Generate random level for new node
-    lvl = random_level()
-
-    if (lvl > list%current_level) then
-       do i = list%current_level + 1, lvl
-          update(i)%ptr => list%header
-       end do
-       list%current_level = lvl
-    end if
-
-    ! Create and splice in the new node
-    allocate(new_node)
-    new_node%y_val = y_val
-    !>> this is to be changed <<
-    !new_node%edge_id = edge_id
-    allocate(new_node%forward(lvl))
-
-    do i = 1, lvl
-       new_node%forward(i)%ptr => update(i)%ptr%forward(i)%ptr
-       update(i)%ptr%forward(i)%ptr => new_node
-    end do
-  end subroutine insert_edge
-
-  subroutine remove_edge(list, y_val)
-    type(SkipList), intent(inout) :: list
-    integer(kind=K_COORDINATE_KIND), intent(in) :: y_val
-
-    type(NodePtr) :: update(MAX_SKIP_LEVEL)
-    type(SkipListNode), pointer :: current, target
-    integer :: i
-
-    current => list%header
-
-    do i = list%current_level, 1, -1
-       do while (associated(current%forward(i)%ptr))
-          if (current%forward(i)%ptr%y_val < y_val) then
-             current => current%forward(i)%ptr
-          else
-             exit
-          end if
-       end do
-       update(i)%ptr => current
-    end do
-
-    target => current%forward(1)%ptr
-
-    if (associated(target)) then
-       if (target%y_val == y_val) then
-          do i = 1, list%current_level
-             if (.not. associated(update(i)%ptr%forward(i)%ptr)) exit
-             if (.not. associated(update(i)%ptr%forward(i)%ptr, target)) exit
-             update(i)%ptr%forward(i)%ptr => target%forward(i)%ptr
-          end do
-
-          deallocate(target%forward)
-          deallocate(target)
-
-          ! Reduce level if top levels are now empty
-          do while (list%current_level > 1 .and. &
-               .not. associated(list%header%forward(list%current_level)%ptr))
-             list%current_level = list%current_level - 1
-          end do
-       end if
-    end if
-  end subroutine remove_edge
-
-  ! Finds the nearest edge directly above (ceiling) and below (floor) the target Y
+  !> Look UP and DOWN Optimization: 
+  !> Finds the target, then instantly grabs Forward(1) for CEILING and Backward(1) for FLOOR.
   subroutine find_bounding_edges(list, target_y, floor_y, ceil_y, found_floor, found_ceil)
     type(SkipList), intent(in) :: list
     integer(kind=K_COORDINATE_KIND), intent(in) :: target_y
     integer(kind=K_COORDINATE_KIND), intent(out) :: floor_y, ceil_y
     logical, intent(out) :: found_floor, found_ceil
-
+    integer :: i
     type(SkipListNode), pointer :: current
 
     found_floor = .false.
     found_ceil = .false.
     current => list%header
 
-    ! Find the floor (greatest value < target_y)
-    call traverse_to_floor(list, target_y, current)
+    ! 1. O(log N) Traversal to exactly target_y
+    do i = list%current_level, 1, -1
+        do while (associated(current%Forward(i)%ptr))
+            if (current%Forward(i)%ptr%y_val <= target_y) then
+                current => current%Forward(i)%ptr
+            else
+                exit
+            end if
+        end do
+    end do
 
-    if (associated(current) .and. current%y_val /= -huge(1_int64)) then
-       floor_y = current%y_val
-       found_floor = .true.
+    ! 2. Look DOWN (Floor) using Backward pointer
+    if (associated(current%Backward(1)%ptr)) then
+        if (current%Backward(1)%ptr%y_val /= -huge(1_int64)) then
+            floor_y = current%Backward(1)%ptr%y_val
+            found_floor = .true.
+        end if
     end if
 
-    ! The ceiling is naturally the immediate next node at level 1
-    if (associated(current%forward(1)%ptr)) then
-       ceil_y = current%forward(1)%ptr%y_val
-       found_ceil = .true.
+    ! 3. Look UP (Ceiling) using Forward pointer
+    if (associated(current%Forward(1)%ptr)) then
+        ceil_y = current%Forward(1)%ptr%y_val
+        found_ceil = .true.
     end if
   end subroutine find_bounding_edges
 
-  subroutine traverse_to_floor(list, target_y, current)
-    type(SkipList), intent(in) :: list
-    integer(kind=K_COORDINATE_KIND), intent(in) :: target_y
-    type(SkipListNode), pointer, intent(inout) :: current
-    integer :: i
-
-    do i = list%current_level, 1, -1
-       do while (associated(current%forward(i)%ptr))
-          if (current%forward(i)%ptr%y_val <= target_y) then
-             current => current%forward(i)%ptr
-          else
-             exit
-          end if
-       end do
-    end do
-  end subroutine traverse_to_floor
-
-
-  ! ==========================================
-  ! Utility & Algorithm Execution
-  ! ==========================================
-
-  ! Quicksort implementation (using X, then Y for stable geometric sorting)
+  ! ... (Keep existing sort_trackers, quicksort, is_less_than unaltered) ...
   pure recursive subroutine sort_trackers(arr)
     type(XYTracker), intent(inout) :: arr(:)
     integer :: n
@@ -362,7 +326,173 @@ contains
        less = a%X < b%X
     end if
   end function is_less_than
+
+
+  ! ============================================================================
+  ! SCANLINE ENGINE
+  ! ============================================================================
 subroutine scanline_fracture(trackers, fractured_boxes)
+    type(XYTracker), intent(inout) :: trackers(:)
+    type(Box), allocatable, intent(out) :: fractured_boxes(:)
+
+    type(SkipList) :: active_edges
+    type(SkipListNode), pointer :: current_node
+
+    integer :: i, n
+    integer(kind=K_COORDINATE_KIND) :: current_x, y_start, y_end
+    integer(kind=int64) :: winding_sign, current_lap, max_sweep_capacity
+
+    ! O(1) Pointer Swap Optimization variables
+    type(ActiveRegion), target, allocatable :: region_bank_A(:), region_bank_B(:), temp_regions(:)
+    type(ActiveRegion), pointer :: prev_regions(:), curr_regions(:), swap_ptr(:)
+    integer :: n_prev, n_curr, p, c
+
+    type(Box), allocatable :: temp_boxes(:), resized_boxes(:)
+    integer(kind=int64) :: output_count, max_boxes
+
+    n = size(trackers)
+    if (n == 0) then
+       allocate(fractured_boxes(0))
+       return
+    end if
+
+    call sort_trackers(trackers)
+    
+    ! Initialize Arena with capacity N
+    ! call init_skiplist(active_edges, int(n, int64))
+    call init_skiplist(active_edges, min(int(n, int64), 5000000_int64))
+    ! 1. Pre-allocate Massive Output Block
+    ! A typical polygon fractures into roughly 1 to 2 times the number of vertices.
+    ! Pre-allocating massively avoids mid-sweep geometric reallocations.
+    max_boxes = max(100000_int64, int(n, int64) * 2_int64)
+    allocate(temp_boxes(max_boxes))
+    output_count = 0
+
+    ! 2. Absolute Maximum Capacity Region Banks
+    ! There can NEVER be more vertical active regions than N/2. 
+    ! Allocating strictly to the mathematical limit removes all bounds-checking overhead.
+    max_sweep_capacity = min(int(n, int64)/2_int64, 2000000_int64)
+    !allocate(region_bank_A(n/2 + 1), region_bank_B(n/2 + 1))
+    allocate(region_bank_A(max_sweep_capacity), region_bank_B(max_sweep_capacity))
+    prev_regions => region_bank_A
+    curr_regions => region_bank_B
+    n_prev = 0
+
+    do i = 1, n
+       winding_sign = sign(1_int64, trackers(i)%polygonNumber)
+       call update_active_edges(active_edges, trackers(i)%Y, winding_sign)
+
+       if (i == n .or. trackers(i)%X < trackers(i+1)%X) then
+          current_x = trackers(i)%X
+          n_curr = 0
+
+          current_node => active_edges%header%Forward(1)%ptr
+          current_lap = 0
+
+          ! 3. Uninterrupted Hardware-Prefetch-Friendly Traversal
+          do while (associated(current_node))
+             if (current_lap <= 0 .and. current_lap + current_node%lap_change > 0) then
+                y_start = current_node%y_val
+             else if (current_lap > 0 .and. current_lap + current_node%lap_change <= 0) then
+                y_end = current_node%y_val
+                
+                n_curr = n_curr + 1
+                ! --- NEW: DYNAMIC REGION BANK EXPANSION ---
+                if (n_curr > size(region_bank_B)) then
+                   max_sweep_capacity = size(region_bank_B) * 2_int64
+                   
+                   ! Expand Bank B (Current)
+                   allocate(temp_regions(max_sweep_capacity))
+                   temp_regions(1:n_curr-1) = curr_regions(1:n_curr-1)
+                   call move_alloc(from=temp_regions, to=region_bank_B)
+                   curr_regions => region_bank_B
+                   
+                   ! Expand Bank A (Previous) so they remain symmetric for O(1) swap
+                   allocate(temp_regions(max_sweep_capacity))
+                   if (n_prev > 0) temp_regions(1:n_prev) = prev_regions(1:n_prev)
+                   call move_alloc(from=temp_regions, to=region_bank_A)
+                   prev_regions => region_bank_A
+                end if
+                ! ------------------------------------------
+                
+                curr_regions(n_curr)%y1 = y_start
+                curr_regions(n_curr)%y2 = y_end
+                curr_regions(n_curr)%x_start = current_x 
+             end if
+
+             current_lap = current_lap + current_node%lap_change
+             current_node => current_node%Forward(1)%ptr
+          end do
+
+          p = 1
+          c = 1
+          do while (p <= n_prev .and. c <= n_curr)
+             if (prev_regions(p)%y1 == curr_regions(c)%y1 .and. prev_regions(p)%y2 == curr_regions(c)%y2) then
+                curr_regions(c)%x_start = prev_regions(p)%x_start
+                p = p + 1
+                c = c + 1
+             else if (prev_regions(p)%y1 < curr_regions(c)%y1) then
+                if (current_x > prev_regions(p)%x_start) then
+                   call emit_region(prev_regions(p), current_x)
+                end if
+                p = p + 1
+             else if (prev_regions(p)%y1 > curr_regions(c)%y1) then
+                c = c + 1
+             else 
+                if (current_x > prev_regions(p)%x_start) then
+                   call emit_region(prev_regions(p), current_x)
+                end if
+                p = p + 1
+             end if
+          end do
+
+          do while (p <= n_prev)
+             if (current_x > prev_regions(p)%x_start) then
+                call emit_region(prev_regions(p), current_x)
+             end if
+             p = p + 1
+          end do
+
+          ! 4. O(1) State Transfer (The 584-Second Bottleneck Fix)
+          if (n_curr > 0) then
+             swap_ptr => prev_regions
+             prev_regions => curr_regions
+             curr_regions => swap_ptr
+          end if
+          n_prev = n_curr
+       end if
+    end do
+
+    call destroy_skiplist(active_edges)
+    write(*,*) 'In PF (Fractured Count): ', output_count
+    
+    allocate(fractured_boxes(output_count))
+    if (output_count > 0) then
+       fractured_boxes(1:output_count) = temp_boxes(1:output_count)
+    end if
+
+  contains
+
+    subroutine emit_region(region, x_end)
+       type(ActiveRegion), intent(in) :: region
+       integer(kind=K_COORDINATE_KIND), intent(in) :: x_end
+       
+       output_count = output_count + 1
+       
+       if (output_count > max_boxes) then
+          max_boxes = max_boxes * 2_int64
+          allocate(resized_boxes(max_boxes))
+          resized_boxes(1:output_count-1) = temp_boxes(1:output_count-1)
+          call move_alloc(from=resized_boxes, to=temp_boxes)
+       end if
+
+       temp_boxes(output_count)%x1 = region%x_start
+       temp_boxes(output_count)%x2 = x_end
+       temp_boxes(output_count)%y1 = region%y1
+       temp_boxes(output_count)%y2 = region%y2
+    end subroutine emit_region
+  end subroutine scanline_fracture
+  subroutine old_scanline_fracture(trackers, fractured_boxes)
     type(XYTracker), intent(inout) :: trackers(:)
     type(Box), allocatable, intent(out) :: fractured_boxes(:)
 
@@ -373,11 +503,9 @@ subroutine scanline_fracture(trackers, fractured_boxes)
     integer(kind=K_COORDINATE_KIND) :: current_x, y_start, y_end
     integer(kind=int64) :: winding_sign, current_lap
 
-    ! Region History Variables
     type(ActiveRegion), allocatable :: prev_regions(:), curr_regions(:), temp_regions(:)
     integer :: n_prev, n_curr, max_regions, p, c
 
-    ! Output collection variables
     type(Box), allocatable :: temp_boxes(:), resized_boxes(:)
     integer :: output_count, max_boxes
 
@@ -387,11 +515,11 @@ subroutine scanline_fracture(trackers, fractured_boxes)
        return
     end if
 
-    ! 1. Sort vertices left-to-right (X), then bottom-to-top (Y)
     call sort_trackers(trackers)
-    call init_skiplist(active_edges)
+    
+    ! Initialize Arena with capacity N (Guarantees zero heap requests during sweep)
+    call init_skiplist(active_edges, int(n, int64))
 
-    ! Initialize memory arrays
     max_boxes = max(100, n)
     allocate(temp_boxes(max_boxes))
     output_count = 0
@@ -400,20 +528,15 @@ subroutine scanline_fracture(trackers, fractured_boxes)
     allocate(prev_regions(max_regions), curr_regions(max_regions))
     n_prev = 0
 
-    ! 2. Sweep Line Execution
     do i = 1, n
        winding_sign = sign(1_int64, trackers(i)%polygonNumber)
-
-       ! Update Skip List with the current edge
        call update_active_edges(active_edges, trackers(i)%Y, winding_sign)
 
-       ! 3. Check if we have processed all events at the current X coordinate.
        if (i == n .or. trackers(i)%X < trackers(i+1)%X) then
           current_x = trackers(i)%X
           n_curr = 0
 
-          ! --- Extract Current Active Y-Intervals ---
-          current_node => active_edges%header%forward(1)%ptr
+          current_node => active_edges%header%Forward(1)%ptr
           current_lap = 0
 
           do while (associated(current_node))
@@ -424,7 +547,6 @@ subroutine scanline_fracture(trackers, fractured_boxes)
                 
                 n_curr = n_curr + 1
                 
-                ! Expand region arrays safely if we exceed capacity
                 if (n_curr > max_regions) then
                    max_regions = max_regions * 2
                    allocate(temp_regions(max_regions))
@@ -438,33 +560,28 @@ subroutine scanline_fracture(trackers, fractured_boxes)
 
                 curr_regions(n_curr)%y1 = y_start
                 curr_regions(n_curr)%y2 = y_end
-                curr_regions(n_curr)%x_start = current_x ! Default origin is current X
+                curr_regions(n_curr)%x_start = current_x 
              end if
 
              current_lap = current_lap + current_node%lap_change
-             current_node => current_node%forward(1)%ptr
+             current_node => current_node%Forward(1)%ptr
           end do
 
-          ! --- Fast Two-Pointer Merge & Emit Phase ---
           p = 1
           c = 1
           do while (p <= n_prev .and. c <= n_curr)
              if (prev_regions(p)%y1 == curr_regions(c)%y1 .and. prev_regions(p)%y2 == curr_regions(c)%y2) then
-                ! Exact Match: Region continues uninterrupted. Inherit the historical x_start.
                 curr_regions(c)%x_start = prev_regions(p)%x_start
                 p = p + 1
                 c = c + 1
              else if (prev_regions(p)%y1 < curr_regions(c)%y1) then
-                ! The previous region ended (interrupted by an edge). Emit it.
                 if (current_x > prev_regions(p)%x_start) then
                    call emit_region(prev_regions(p), current_x)
                 end if
                 p = p + 1
              else if (prev_regions(p)%y1 > curr_regions(c)%y1) then
-                ! The current region is completely new. It already has x_start = current_x.
                 c = c + 1
              else 
-                ! y1 matches but y2 differs (a split or merge happened at the upper boundary). Emit it.
                 if (current_x > prev_regions(p)%x_start) then
                    call emit_region(prev_regions(p), current_x)
                 end if
@@ -472,7 +589,6 @@ subroutine scanline_fracture(trackers, fractured_boxes)
              end if
           end do
 
-          ! Emit any remaining previous regions that didn't match
           do while (p <= n_prev)
              if (current_x > prev_regions(p)%x_start) then
                 call emit_region(prev_regions(p), current_x)
@@ -480,13 +596,11 @@ subroutine scanline_fracture(trackers, fractured_boxes)
              p = p + 1
           end do
 
-          ! Save the current state as the previous state for the next X iteration
           if (n_curr > 0) prev_regions(1:n_curr) = curr_regions(1:n_curr)
           n_prev = n_curr
        end if
     end do
 
-    ! 4. Cleanup and Finalize
     call destroy_skiplist(active_edges)
     write(*,*) 'In PF (Fractured Count): ', output_count
     
@@ -497,7 +611,6 @@ subroutine scanline_fracture(trackers, fractured_boxes)
 
   contains
 
-    ! Helper routine to cleanly handle dynamic reallocation and assignments
     subroutine emit_region(region, x_end)
        type(ActiveRegion), intent(in) :: region
        integer(kind=K_COORDINATE_KIND), intent(in) :: x_end
@@ -516,106 +629,8 @@ subroutine scanline_fracture(trackers, fractured_boxes)
        temp_boxes(output_count)%y1 = region%y1
        temp_boxes(output_count)%y2 = region%y2
     end subroutine emit_region
-
-  end subroutine scanline_fracture
-  subroutine old_scanline_fracture(trackers, fractured_boxes)
-    type(XYTracker), intent(inout) :: trackers(:)
-    type(Box), allocatable, intent(out) :: fractured_boxes(:)
-
-    type(SkipList) :: active_edges
-    type(SkipListNode), pointer :: current_node
-
-    integer :: i, n
-    integer(kind=K_COORDINATE_KIND) :: current_x, next_x, y_start, y_end
-    integer(kind=int64) :: winding_sign, current_lap
-
-    ! Output collection variables
-    type(Box), allocatable :: temp_boxes(:), resized_boxes(:)
-    integer :: output_count, max_boxes
-
-    n = size(trackers)
-    if (n == 0) then
-       allocate(fractured_boxes(0))
-       return
-    end if
-
-    ! 1. Sort vertices left-to-right (X), then bottom-to-top (Y)
-    call sort_trackers(trackers)
-    call init_skiplist(active_edges)
-
-    ! Initialize dynamic output array
-    max_boxes = max(100, n)
-    allocate(temp_boxes(max_boxes))
-    output_count = 0
-
-    ! 2. Sweep Line Execution
-    do i = 1, n
-       winding_sign = sign(1_int64, trackers(i)%polygonNumber)
-
-       ! Add or subtract the winding sign to the Y coordinate in the Skip List.
-       ! (Assume this helper accumulates lap_change, and deletes the node if it hits 0)
-       call update_active_edges(active_edges, trackers(i)%Y, winding_sign)
-
-       ! 3. Check if we have processed all events at the current X coordinate.
-       ! If the next event is further to the right, we have a continuous "slab" to emit.
-       if (i < n) then
-          if (trackers(i)%X < trackers(i+1)%X) then
-             current_x = trackers(i)%X
-             next_x    = trackers(i+1)%X
-
-             ! Traverse Level 1 of the Skip List (Sorted Active Y Boundaries)
-             current_node => active_edges%header%forward(1)%ptr
-             current_lap = 0
-             y_start = 0
-             do while (associated(current_node))
-                ! State Transition: Empty Space -> Inside a Polygon
-                ! (Detects a boundary when density crosses from <= 0 to > 0)
-                if (current_lap <= 0 .and. current_lap + current_node%lap_change > 0) then
-                   y_start = current_node%y_val
-
-                   ! State Transition: Inside a Polygon -> Empty Space
-                   ! (Detects a boundary when density drops from > 0 to <= 0)
-                else if (current_lap > 0 .and. current_lap + current_node%lap_change <= 0) then
-                   y_end = current_node%y_val
-
-                   ! --- EMIT THE FRACTURED BOX ---
-                   output_count = output_count + 1
-
-                   ! Handle dynamic memory resizing
-                   if (output_count > max_boxes) then
-                      max_boxes = max_boxes + (max_boxes / 2) + 1
-                      allocate(resized_boxes(max_boxes))
-                      resized_boxes(1:output_count-1) = temp_boxes(1:output_count-1)
-                      call move_alloc(from=resized_boxes, to=temp_boxes)
-                   end if
-
-                   temp_boxes(output_count)%x1 = current_x
-                   temp_boxes(output_count)%x2 = next_x
-                   temp_boxes(output_count)%y1 = y_start
-                   temp_boxes(output_count)%y2 = y_end
-                end if
-
-                ! Accumulate the lap count and move to the next vertical boundary
-                current_lap = current_lap + current_node%lap_change
-                current_node => current_node%forward(1)%ptr
-             end do
-          end if
-       end if
-    end do
-
-    ! 4. Cleanup and Finalize
-    call destroy_skiplist(active_edges)
-    write(*,*) 'In PF: ', output_count
-    ! Lock in the exact size for the final output array
-    allocate(fractured_boxes(output_count))
-    if (output_count > 0) then
-       fractured_boxes(1:output_count) = temp_boxes(1:output_count)
-    end if
-
   end subroutine old_scanline_fracture
 
-  !> Generates an array of XYTrackers from an array of Boxes.
-  !> Automatically normalizes coordinates and flags winding numbers.
   pure subroutine generate_trackers(boxes, bbox, trackers)
     type(Box), intent(in) :: boxes(:)
     type(Box), intent(in) :: bbox
@@ -629,33 +644,370 @@ subroutine scanline_fracture(trackers, fractured_boxes)
     max_x = bbox%x2
     min_y = bbox%y1
     max_y = bbox%y2
-    ! Each box has 4 corners, so we need exactly 4x the trackers
+    
     allocate(trackers(4 * (n+1)))
     trackers(1) = XYTracker(X = min_x, Y = min_y, polygonNumber =  1)
-    trackers(2) = XYTracker(X = min_x, Y = max_y, polygonNumber =  -1)
-    trackers(3) = XYTracker(X = max_x, Y = min_y, polygonNumber =  -1)
-    trackers(4) = XYTracker(X = max_x, Y = max_y, polygonNumber =  1)    
+    trackers(2) = XYTracker(X = min_x, Y = max_y, polygonNumber = -1)
+    trackers(3) = XYTracker(X = max_x, Y = min_y, polygonNumber = -1)
+    trackers(4) = XYTracker(X = max_x, Y = max_y, polygonNumber =  1)   
+    
     do i = 1, n
        idx = i * 4
-
-       ! 1. Normalize box coordinates to guarantee proper left-to-right sweeping
        min_x = min(boxes(i)%x1, boxes(i)%x2)
        max_x = max(boxes(i)%x1, boxes(i)%x2)
        min_y = min(boxes(i)%y1, boxes(i)%y2)
        max_y = max(boxes(i)%y1, boxes(i)%y2)
 
-       ! 2. Left Vertices (Sweep line encounters these first -> Insert phase)
-       ! Positive ID signifies insertion of the Y boundaries
-       trackers(idx + 1) = XYTracker(X = min_x, Y = min_y, polygonNumber =  -i)
+       trackers(idx + 1) = XYTracker(X = min_x, Y = min_y, polygonNumber = -i)
        trackers(idx + 2) = XYTracker(X = min_x, Y = max_y, polygonNumber =  i)
-
-       ! 3. Right Vertices (Sweep line encounters these last -> Remove phase)
-       ! Negative ID signifies removal of the Y boundaries
-       trackers(idx + 3) = XYTracker(X = max_x, Y = min_y, polygonNumber = i)
+       trackers(idx + 3) = XYTracker(X = max_x, Y = min_y, polygonNumber =  i)
        trackers(idx + 4) = XYTracker(X = max_x, Y = max_y, polygonNumber = -i)
     end do
   end subroutine generate_trackers
+  subroutine heal_boxes4(input_box_count, boxes, output_box_count)
+    integer(kind=int64), intent(in) :: input_box_count  
+    type(Box), allocatable, intent(inout) :: boxes(:)
+    integer(kind=int64), intent(out) :: output_box_count
 
-end module polygon_fracture_mod
+    type(SkipList) :: active_edges
+    type(SkipListNode), pointer :: current_node
 
+    type(XYTracker), allocatable :: events(:)
+    integer :: i, n
+    integer(kind=K_COORDINATE_KIND) :: current_x, y_start, y_end, min_y, max_y, min_x, max_x
+    integer(kind=int64) :: current_lap
 
+    ! O(1) Pointer Swap variables
+    type(ActiveRegion), target, allocatable :: region_bank_A(:), region_bank_B(:), temp_regions(:)
+    type(ActiveRegion), pointer :: prev_regions(:), curr_regions(:), swap_ptr(:)
+    integer :: n_prev, n_curr, p, c
+
+    ! Output collection
+    type(Box), allocatable :: temp_boxes(:), resized_boxes(:)
+    integer(kind=int64) :: max_boxes, max_sweep_capacity
+
+    n = int(input_box_count, int32)
+    if (n == 0) then
+       output_box_count = 0
+       return
+    end if
+
+    ! 1. Generate O(1) Point Boundaries (The Derivative Trick)
+    allocate(events(4 * n))
+    do i = 1, n
+       min_x = min(boxes(i)%x1, boxes(i)%x2)
+       max_x = max(boxes(i)%x1, boxes(i)%x2)
+       min_y = min(boxes(i)%y1, boxes(i)%y2)
+       max_y = max(boxes(i)%y1, boxes(i)%y2)
+
+       ! Left Edge (Insert Box) -> Adds +1 to the interval [min_y, max_y)
+       events(4*i - 3) = XYTracker(X = min_x, Y = min_y, polygonNumber =  1) 
+       events(4*i - 2) = XYTracker(X = min_x, Y = max_y, polygonNumber = -1) 
+       
+       ! Right Edge (Remove Box) -> Subtracts 1 from the interval [min_y, max_y)
+       events(4*i - 1) = XYTracker(X = max_x, Y = min_y, polygonNumber = -1) 
+       events(4*i)     = XYTracker(X = max_x, Y = max_y, polygonNumber =  1) 
+    end do
+
+    ! 2. Sort and Initialize
+    call sort_trackers(events)
+    call init_skiplist(active_edges, min(int(4*n, int64), 5000000_int64))
+
+    max_boxes = max(100000_int64, int(n, int64))
+    allocate(temp_boxes(max_boxes))
+    output_box_count = 0
+
+    max_sweep_capacity = min(int(n, int64)/2_int64 + 1, 2000000_int64)
+    allocate(region_bank_A(max_sweep_capacity), region_bank_B(max_sweep_capacity))
+    prev_regions => region_bank_A
+    curr_regions => region_bank_B
+    n_prev = 0
+
+    ! 3. Sweep Line Algorithm
+    do i = 1, 4*n
+       ! Insert boundary point in O(log N)
+       call update_active_edges(active_edges, events(i)%Y, sign(1_int64, events(i)%polygonNumber))
+
+       if (i == 4*n .or. events(i)%X < events(i+1)%X) then
+          current_x = events(i)%X
+          n_curr = 0
+
+          current_node => active_edges%header%Forward(1)%ptr
+          current_lap = 0
+
+          ! Walk ONLY the active edges (O(M) instead of O(Total Y Universe))
+          do while (associated(current_node))
+             ! Integrate lap counts
+             if (current_lap <= 0 .and. current_lap + current_node%lap_change > 0) then
+                y_start = current_node%y_val
+             else if (current_lap > 0 .and. current_lap + current_node%lap_change <= 0) then
+                y_end = current_node%y_val
+                n_curr = n_curr + 1
+                
+                ! Dynamic Bank Expansion (Safe Fallback)
+                if (n_curr > size(region_bank_B)) then
+                   max_sweep_capacity = size(region_bank_B) * 2_int64
+                   allocate(temp_regions(max_sweep_capacity))
+                   temp_regions(1:n_curr-1) = curr_regions(1:n_curr-1)
+                   call move_alloc(from=temp_regions, to=region_bank_B)
+                   curr_regions => region_bank_B
+                   
+                   allocate(temp_regions(max_sweep_capacity))
+                   if (n_prev > 0) temp_regions(1:n_prev) = prev_regions(1:n_prev)
+                   call move_alloc(from=temp_regions, to=region_bank_A)
+                   prev_regions => region_bank_A
+                end if
+
+                curr_regions(n_curr)%y1 = y_start
+                curr_regions(n_curr)%y2 = y_end
+                curr_regions(n_curr)%x_start = current_x 
+             end if
+             
+             current_lap = current_lap + current_node%lap_change
+             current_node => current_node%Forward(1)%ptr
+          end do
+
+          ! Fast Two-Pointer Merge (Heals adjacent segments horizontally)
+          p = 1
+          c = 1
+          do while (p <= n_prev .and. c <= n_curr)
+             if (prev_regions(p)%y1 == curr_regions(c)%y1 .and. prev_regions(p)%y2 == curr_regions(c)%y2) then
+                curr_regions(c)%x_start = prev_regions(p)%x_start
+                p = p + 1
+                c = c + 1
+             else if (prev_regions(p)%y1 < curr_regions(c)%y1) then
+                if (current_x > prev_regions(p)%x_start) call emit_region(prev_regions(p), current_x)
+                p = p + 1
+             else if (prev_regions(p)%y1 > curr_regions(c)%y1) then
+                c = c + 1
+             else 
+                if (current_x > prev_regions(p)%x_start) call emit_region(prev_regions(p), current_x)
+                p = p + 1
+             end if
+          end do
+
+          do while (p <= n_prev)
+             if (current_x > prev_regions(p)%x_start) call emit_region(prev_regions(p), current_x)
+             p = p + 1
+          end do
+
+          ! O(1) Swap
+          if (n_curr > 0) then
+             swap_ptr => prev_regions
+             prev_regions => curr_regions
+             curr_regions => swap_ptr
+          end if
+          n_prev = n_curr
+       end if
+    end do
+
+    ! 4. Clean up
+    call destroy_skiplist(active_edges)
+
+    ! Finalize output safely
+    if (output_box_count > 0 .and. output_box_count < size(boxes)) then
+       boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+    else
+       allocate(resized_boxes(output_box_count))
+       if (output_box_count > 0) resized_boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+       call move_alloc(from=resized_boxes, to=boxes)
+    end if
+
+  contains
+
+    subroutine emit_region(region, x_end)
+       type(ActiveRegion), intent(in) :: region
+       integer(kind=K_COORDINATE_KIND), intent(in) :: x_end
+       
+       output_box_count = output_box_count + 1
+       
+       if (output_box_count > max_boxes) then
+          max_boxes = max_boxes + (max_boxes / 2_int64) + 1_int64
+          allocate(resized_boxes(max_boxes))
+          resized_boxes(1:output_box_count-1) = temp_boxes(1:output_box_count-1)
+          call move_alloc(from=resized_boxes, to=temp_boxes)
+       end if
+
+       temp_boxes(output_box_count)%x1 = region%x_start
+       temp_boxes(output_box_count)%x2 = x_end
+       temp_boxes(output_box_count)%y1 = region%y1
+       temp_boxes(output_box_count)%y2 = region%y2
+    end subroutine emit_region
+
+  end subroutine heal_boxes4
+  subroutine heal_boxes(input_box_count, boxes, output_box_count)
+    integer(kind=int64), intent(in) :: input_box_count  
+    type(Box), allocatable, intent(inout) :: boxes(:)
+    integer(kind=int64), intent(out) :: output_box_count
+
+    type(SkipList) :: active_edges
+    type(SkipListNode), pointer :: current_node
+
+    type(XYTracker), allocatable :: events(:)
+    integer :: i
+    integer(kind=int64) :: n
+    integer(kind=K_COORDINATE_KIND) :: current_x, y_start, y_end, min_y, max_y, min_x, max_x
+    integer(kind=int64) :: current_lap
+
+    ! O(1) Pointer Swap variables
+    type(ActiveRegion), target, allocatable :: region_bank_A(:), region_bank_B(:), temp_regions(:)
+    type(ActiveRegion), pointer :: prev_regions(:), curr_regions(:), swap_ptr(:)
+    integer :: n_prev, n_curr, p, c
+
+    ! Output collection
+    type(Box), allocatable :: temp_boxes(:), resized_boxes(:)
+    integer(kind=int64) :: max_boxes, max_sweep_capacity
+
+    n = input_box_count
+    if (n == 0) then
+       output_box_count = 0
+       return
+    end if
+
+    ! 1. Generate O(1) Point Boundaries (The Derivative Trick)
+    allocate(events(4 * n))
+    do i = 1, n
+       min_x = min(boxes(i)%x1, boxes(i)%x2)
+       max_x = max(boxes(i)%x1, boxes(i)%x2)
+       min_y = min(boxes(i)%y1, boxes(i)%y2)
+       max_y = max(boxes(i)%y1, boxes(i)%y2)
+
+       ! Left Edge (+1 interval interval start, -1 interval end)
+       events(4*i - 3) = XYTracker(X = min_x, Y = min_y, polygonNumber =  1_int64) 
+       events(4*i - 2) = XYTracker(X = min_x, Y = max_y, polygonNumber = -1_int64) 
+       
+       ! Right Edge (-1 interval interval start, +1 interval end)
+       events(4*i - 1) = XYTracker(X = max_x, Y = min_y, polygonNumber = -1_int64) 
+       events(4*i)     = XYTracker(X = max_x, Y = max_y, polygonNumber =  1_int64) 
+    end do
+
+    ! 2. Sort and Initialize
+    call sort_trackers(events)
+    
+    ! Cap SkipList to safe memory maximum (e.g., 5M concurrent active Y edges)
+    call init_skiplist(active_edges, min(n * 4_int64, 5000000_int64))
+
+    max_boxes = max(100000_int64, n)
+    allocate(temp_boxes(max_boxes))
+    output_box_count = 0
+
+    max_sweep_capacity = min(n/2_int64 + 1_int64, 2000000_int64)
+    allocate(region_bank_A(max_sweep_capacity), region_bank_B(max_sweep_capacity))
+    prev_regions => region_bank_A
+    curr_regions => region_bank_B
+    n_prev = 0
+
+    ! 3. Sweep Line Algorithm
+    do i = 1, 4*n
+       ! OPTIMIZATION: Bypass sign() intrinsic, directly use polygonNumber as lap_delta
+       call update_active_edges(active_edges, events(i)%Y, events(i)%polygonNumber)
+
+       if (i == 4*n .or. events(i)%X < events(i+1)%X) then
+          current_x = events(i)%X
+          n_curr = 0
+
+          current_node => active_edges%header%Forward(1)%ptr
+          current_lap = 0
+
+          ! Walk ONLY the active edges (O(M) instead of O(Total Y Universe))
+          do while (associated(current_node))
+             ! Integrate lap counts
+             if (current_lap <= 0 .and. current_lap + current_node%lap_change > 0) then
+                y_start = current_node%y_val
+             else if (current_lap > 0 .and. current_lap + current_node%lap_change <= 0) then
+                y_end = current_node%y_val
+                n_curr = n_curr + 1
+                
+                ! Dynamic Bank Expansion (Safe Fallback)
+                if (n_curr > size(region_bank_B)) then
+                   max_sweep_capacity = size(region_bank_B) * 2_int64
+                   
+                   allocate(temp_regions(max_sweep_capacity))
+                   temp_regions(1:n_curr-1) = curr_regions(1:n_curr-1)
+                   call move_alloc(from=temp_regions, to=region_bank_B)
+                   curr_regions => region_bank_B
+                   
+                   allocate(temp_regions(max_sweep_capacity))
+                   if (n_prev > 0) temp_regions(1:n_prev) = prev_regions(1:n_prev)
+                   call move_alloc(from=temp_regions, to=region_bank_A)
+                   prev_regions => region_bank_A
+                end if
+
+                curr_regions(n_curr)%y1 = y_start
+                curr_regions(n_curr)%y2 = y_end
+                curr_regions(n_curr)%x_start = current_x 
+             end if
+             
+             current_lap = current_lap + current_node%lap_change
+             current_node => current_node%Forward(1)%ptr
+          end do
+
+          ! Fast Two-Pointer Merge (Heals adjacent segments horizontally)
+          p = 1
+          c = 1
+          do while (p <= n_prev .and. c <= n_curr)
+             if (prev_regions(p)%y1 == curr_regions(c)%y1 .and. prev_regions(p)%y2 == curr_regions(c)%y2) then
+                curr_regions(c)%x_start = prev_regions(p)%x_start
+                p = p + 1
+                c = c + 1
+             else if (prev_regions(p)%y1 < curr_regions(c)%y1) then
+                if (current_x > prev_regions(p)%x_start) call emit_region(prev_regions(p), current_x)
+                p = p + 1
+             else if (prev_regions(p)%y1 > curr_regions(c)%y1) then
+                c = c + 1
+             else 
+                if (current_x > prev_regions(p)%x_start) call emit_region(prev_regions(p), current_x)
+                p = p + 1
+             end if
+          end do
+
+          do while (p <= n_prev)
+             if (current_x > prev_regions(p)%x_start) call emit_region(prev_regions(p), current_x)
+             p = p + 1
+          end do
+
+          ! OPTIMIZATION: Unconditional O(1) Swap. 
+          ! Prevents stale 'prev_regions' data from polluting future sparse intervals.
+          swap_ptr => prev_regions
+          prev_regions => curr_regions
+          curr_regions => swap_ptr
+          n_prev = n_curr
+       end if
+    end do
+
+    ! 4. Clean up
+    call destroy_skiplist(active_edges)
+
+    ! Finalize output safely
+    if (output_box_count > 0 .and. output_box_count < size(boxes)) then
+       boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+    else
+       allocate(resized_boxes(output_box_count))
+       if (output_box_count > 0) resized_boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+       call move_alloc(from=resized_boxes, to=boxes)
+    end if
+
+  contains
+
+    subroutine emit_region(region, x_end)
+       type(ActiveRegion), intent(in) :: region
+       integer(kind=K_COORDINATE_KIND), intent(in) :: x_end
+       
+       output_box_count = output_box_count + 1
+       
+       if (output_box_count > max_boxes) then
+          max_boxes = max_boxes + (max_boxes / 2_int64) + 1_int64
+          allocate(resized_boxes(max_boxes))
+          resized_boxes(1:output_box_count-1) = temp_boxes(1:output_box_count-1)
+          call move_alloc(from=resized_boxes, to=temp_boxes)
+       end if
+
+       temp_boxes(output_box_count)%x1 = region%x_start
+       temp_boxes(output_box_count)%x2 = x_end
+       temp_boxes(output_box_count)%y1 = region%y1
+       temp_boxes(output_box_count)%y2 = region%y2
+    end subroutine emit_region
+
+  end subroutine heal_boxes
+
+end module PolygonFractureModule

@@ -1,4 +1,4 @@
 module version_mod
   implicit none
-  character(len=*), parameter :: commit_hash = '04c6706'
+  character(len=*), parameter :: commit_hash = '365cada'
 end module version_mod

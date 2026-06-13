@@ -11,7 +11,7 @@ module GeometryModule
 
   public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid, &
        box_not_interact, box_interact, box_area, box_perimeter, calculate_union_area, get_sort_permutation, &
-       calculate_polygon_union_area, PolygonBooleanAND, heal_boxes, sort_int_array, box_grow
+       calculate_polygon_union_area, PolygonBooleanAND, heal_boxes3, sort_int_array, box_grow, is_square
   ! Enum-like constants for the sorting axis
   integer, parameter :: AXIS_X = 1
   integer, parameter :: AXIS_Y = 2
@@ -65,6 +65,10 @@ contains
     !box is valid if x1 < x2 and y1 < y2
     is_valid = (this%x1 < this%x2 .and. this%y1 < this%y2)
   end function is_valid
+  pure elemental logical function is_square(this)
+    class(Box), intent(in) :: this
+    is_square = (is_valid(this) .and. ( (this%x2 - this%x1) == (this%y2 - this%y1) ) )
+  end function is_square
   pure logical function MBRValid(this)
     class(Box), intent(in) :: this
     !box is valid if x1 <= x2 and y1 <= y2
@@ -235,8 +239,63 @@ contains
        end do
     end if
   end function CheckSortOrder
-
   recursive subroutine quicksort_boxes(arr, left, right)
+    type(Box), intent(inout), dimension(:) :: arr
+    integer(kind=8), intent(in) :: left, right
+    integer(kind=8) :: i, j, k, m
+    type(Box) :: pivot, temp
+
+    ! Register optimization threshold for L1 Cache
+    integer(kind=8), parameter :: K_SMALL_THRESHOLD = 32_8
+
+    if (left < right) then
+       if (right - left <= K_SMALL_THRESHOLD) then
+          ! Terminal branch: Insertion Sort for small contiguous partitions
+          do k = left + 1, right
+             temp = arr(k)
+             m = k - 1
+             do while (m >= left)
+                if (temp%x1 < arr(m)%x1 .or. (temp%x1 == arr(m)%x1 .and. temp%y1 < arr(m)%y1)) then
+                   arr(m + 1) = arr(m)
+                   m = m - 1
+                else
+                   exit
+                end if
+             end do
+             arr(m + 1) = temp
+          end do
+       else
+          ! Primary branch: O(N log N) Quicksort partition
+          pivot = arr((left + right) / 2)
+          i = left
+          j = right
+
+          do while (i <= j)
+             ! INLINED COMPARATOR 1
+             do while (arr(i)%x1 < pivot%x1 .or. (arr(i)%x1 == pivot%x1 .and. arr(i)%y1 < pivot%y1))
+                i = i + 1
+             end do
+
+             ! INLINED COMPARATOR 2
+             do while (pivot%x1 < arr(j)%x1 .or. (pivot%x1 == arr(j)%x1 .and. pivot%y1 < arr(j)%y1))
+                j = j - 1
+             end do
+
+             if (i <= j) then
+                temp = arr(i)
+                arr(i) = arr(j)
+                arr(j) = temp
+                i = i + 1
+                j = j - 1
+             end if
+          end do
+
+          if (left < j)  call quicksort_boxes(arr, left, j)
+          if (i < right) call quicksort_boxes(arr, i, right)
+       end if
+    end if
+  end subroutine quicksort_boxes
+  recursive subroutine quicksort_boxes_noinsertion_sort(arr, left, right)
     type(Box), intent(inout), dimension(:) :: arr
     integer(kind=8), intent(in) :: left, right  ! Use kind=8 for 100M arrays
     integer(kind=8) :: i, j
@@ -248,10 +307,20 @@ contains
        j = right
 
        do while (i <= j)
-          do while (box_less_than(arr(i), pivot))
+          !> we can inline these for better performance <!
+          !do while (box_less_than(arr(i), pivot))
+          !   i = i + 1
+          !end do
+          !do while (box_less_than(pivot, arr(j)))
+          !   j = j - 1
+          !end do
+          ! INLINED COMPARATOR 1
+          do while (arr(i)%x1 < pivot%x1 .or. (arr(i)%x1 == pivot%x1 .and. arr(i)%y1 < pivot%y1))
              i = i + 1
           end do
-          do while (box_less_than(pivot, arr(j)))
+
+          ! INLINED COMPARATOR 2
+          do while (pivot%x1 < arr(j)%x1 .or. (pivot%x1 == arr(j)%x1 .and. pivot%y1 < arr(j)%y1))
              j = j - 1
           end do
           if (i <= j) then
@@ -264,10 +333,10 @@ contains
           end if
        end do
 
-       if (left < j)  call quicksort_boxes(arr, left, j)
-       if (i < right) call quicksort_boxes(arr, i, right)
+       if (left < j)  call quicksort_boxes_noinsertion_sort(arr, left, j)
+       if (i < right) call quicksort_boxes_noinsertion_sort(arr, i, right)
     end if
-  end subroutine quicksort_boxes
+  end subroutine quicksort_boxes_noinsertion_sort
 
   subroutine str_pack(arr, node_capacity)
     type(Box), intent(inout), dimension(:) :: arr
@@ -777,7 +846,7 @@ contains
        call move_alloc(from=healed_boxes, to=boxes)
     end if
   end subroutine old_heal_boxes
-  pure subroutine heal_boxes(input_box_count, boxes, output_box_count)
+  pure subroutine heal_boxes3(input_box_count, boxes, output_box_count)
     integer(kind=int64), intent(in) :: input_box_count  
     type(Box), allocatable, intent(inout) :: boxes(:)
     integer(kind=int64), intent(out) :: output_box_count
@@ -929,7 +998,7 @@ contains
        end if
        call move_alloc(from=healed_boxes, to=boxes)
     end if
-  end subroutine heal_boxes
+  end subroutine heal_boxes3
 
   pure function calculate_polygon_union_area(X, Y, poly_start, poly_end) result(area)
     integer(kind=int32), intent(in) :: X(:), Y(:)

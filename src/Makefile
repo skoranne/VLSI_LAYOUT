@@ -7,7 +7,7 @@
 FC = /scratch1/skoranne/INTELCOMPILERS/bin/h5fc
 # Debug flags (commented out, but easily swappable)
 # FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3
-FCFLAGS = -O3 -parallel -qopenmp -qopt-report=3
+FCFLAGS = -pg -O3 -parallel -qopenmp -qopt-report=3
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables ---
 LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
@@ -18,7 +18,7 @@ LIBRARY = libmagparser.a
 LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
-	   polygon_fracture.o boxmerge.o
+	   polygon_fracture.o boxmerge.o skiplist_module.o
 
 # Create a list of all object files that will be compiled
 ALL_OBJS = $(LIB_OBJS) mainmagparser.o test_contour.o
@@ -54,6 +54,8 @@ clean:
 # $@ = the target (the .o file)
 %.o: %.f90
 	$(FC) $(FCFLAGS) -gen-dep=$(@:.o=.d) -c $< -o $@
+%.o: %.F90
+	$(FC) $(FCFLAGS) -fpp -gen-dep=$(@:.o=.d) -c $< -o $@
 
 # --- Library Creation ---
 # Bundles all the core objects into a single static library.
@@ -70,7 +72,7 @@ test_contour.exe: test_contour.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_morton.exe: test_morton.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
-test_polygonfracture.exe: test_polygonfracture.o $(LIBRARY)
+CONVERT.exe: test_polygonfracture.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_boxmerge.exe: test_boxmerge.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)

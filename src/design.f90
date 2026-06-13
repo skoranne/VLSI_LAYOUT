@@ -8,6 +8,7 @@ module DesignModule
   use RTreeBuilder
   use DataStructuresModule
   use PNumMergeModule
+  use PolygonFractureModule
   use iso_c_binding
   use iso_fortran_env, only : int32, int64, real64
   implicit none  

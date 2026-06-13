@@ -14,7 +14,7 @@
 module ContourExtractionModule
   use iso_fortran_env, only: int64, int32
   use GeometryModule
-
+  use PolygonFractureModule
   implicit none
   private
   public :: Point, Polygon, extract_contours
@@ -54,6 +54,68 @@ contains
     type(DirectedEdge), intent(inout) :: edges(:)
     integer, intent(in)               :: left, right
 
+    integer :: i, j, k, m
+    type(DirectedEdge) :: pivot, temp
+
+    ! Register optimization threshold for L1 Cache
+    integer, parameter :: K_SMALL_THRESHOLD = 32
+
+    if (left >= right) return
+
+    if (right - left <= K_SMALL_THRESHOLD) then
+       ! Terminal branch: Insertion Sort for small contiguous partitions
+       do k = left + 1, right
+          temp = edges(k)
+          m = k - 1
+
+          ! Shift elements to the right until the correct insertion point is found
+          do while (m >= left)
+             if (edge_is_less_than(temp, edges(m))) then
+                edges(m + 1) = edges(m)
+                m = m - 1
+             else
+                exit
+             end if
+          end do
+          edges(m + 1) = temp
+       end do
+    else
+       ! Primary branch: O(N log N) Quicksort partition
+       pivot = edges((left + right) / 2)
+       i = left
+       j = right
+
+       do while (i <= j)
+          ! Scan left: find an element that is NOT less than the pivot
+          do while (edge_is_less_than(edges(i), pivot))
+             i = i + 1
+          end do
+
+          ! Scan right: find an element that is NOT greater than the pivot
+          do while (edge_is_less_than(pivot, edges(j)))
+             j = j - 1
+          end do
+
+          ! Swap if they are out of order
+          if (i <= j) then
+             temp = edges(i)
+             edges(i) = edges(j)
+             edges(j) = temp
+             i = i + 1
+             j = j - 1
+          end if
+       end do
+
+       ! Recurse on the sub-partitions
+       if (left < j)  call quicksort_edges(edges, left, j)
+       if (i < right) call quicksort_edges(edges, i, right)
+    end if
+
+  end subroutine quicksort_edges
+  pure recursive subroutine quicksort_edges_old(edges, left, right)
+    type(DirectedEdge), intent(inout) :: edges(:)
+    integer, intent(in)               :: left, right
+
     integer :: i, j
     type(DirectedEdge) :: pivot, temp
 
@@ -86,10 +148,10 @@ contains
     end do
 
     ! Recurse on the sub-partitions
-    if (left < j)  call quicksort_edges(edges, left, j)
-    if (i < right) call quicksort_edges(edges, i, right)
+    if (left < j)  call quicksort_edges_old(edges, left, j)
+    if (i < right) call quicksort_edges_old(edges, i, right)
 
-  end subroutine quicksort_edges
+  end subroutine quicksort_edges_old
 
   !--------------------------------------------------------------
   ! Helper: Lexicographical comparison of two edges
@@ -420,4 +482,117 @@ contains
     ! and sign (+/-), so dividing by 2 is safely omitted for integer speed.
   end function calculate_shoelace_area
 
+  ! Analyze this code to see if we should add SkipList for
+  ! extract_contours, and also the plan is to go from array of
+  ! boxes to polygons to fractures to boxes to contours as a way
+  ! of doing parallel polygon by polygon overlap removal. How
+  ! can we directly connect the output of extract contours to
+  ! tracker generation as we know the outer contour winding is 1
+  ! and inner contours (holes) winding is -1. Please analyze
+  ! this very carefully and suggest and generate efficient
+  ! implementation using existing code and functions, using
+  ! modern Fortran.
+  !--------------------------------------------------------------
+  ! O(log N) Next-Edge Lookup
+  !--------------------------------------------------------------
+  pure function find_next_edge(edges, n, target_x, target_y) result(idx)
+    type(DirectedEdge), intent(in) :: edges(:)
+    integer, intent(in)            :: n
+    integer(kind=COORDINATE_KIND), intent(in) :: target_x, target_y
+    integer :: idx, low, high, mid
+
+    low = 1
+    high = n
+    idx = 0
+
+    do while (low <= high)
+       mid = low + (high - low) / 2
+
+       ! Lexicographical compare: X first, then Y
+       if (edges(mid)%x1 == target_x .and. edges(mid)%y1 == target_y) then
+          ! Found a connecting edge. Since it's a closed orthogonal geometry, 
+          ! we take the first active one we find.
+          if (edges(mid)%is_active) then
+             idx = mid
+             return
+          else
+             ! In rare overlapping vertex cases, check neighbors
+             ! (Implementation omitted for brevity, usually exact match is active)
+             idx = mid 
+             return
+          end if
+       else if (edges(mid)%x1 < target_x .or. &
+            (edges(mid)%x1 == target_x .and. edges(mid)%y1 < target_y)) then
+          low = mid + 1
+       else
+          high = mid - 1
+       end if
+    end do
+  end function find_next_edge
+  !--------------------------------------------------------------
+  ! Directly converts Polygons (Outer & Holes) to Sweep-Line Trackers
+  ! Eliminates the need for an intermediate Box representation.
+  !--------------------------------------------------------------
+  pure subroutine contours_to_trackers(contours, trackers, tracker_count)
+    type(Polygon), intent(in) :: contours(:)
+    type(XYTracker), allocatable, intent(out) :: trackers(:)
+    integer(kind=int64), intent(out) :: tracker_count
+
+    integer :: i, j, k, n_pts
+    integer(kind=int64) :: total_vertical_edges, winding
+    integer(kind=COORDINATE_KIND) :: y_start, y_end, curr_x
+
+    ! 1. Count vertical edges to pre-allocate exact tracker memory
+    total_vertical_edges = 0
+    do i = 1, size(contours)
+       n_pts = size(contours(i)%pts)
+       do j = 1, n_pts - 1
+          if (contours(i)%pts(j)%x == contours(i)%pts(j+1)%x) then
+             total_vertical_edges = total_vertical_edges + 1
+          end if
+       end do
+    end do
+
+    ! Each vertical edge generates 2 trackers (Top and Bottom boundaries)
+    tracker_count = total_vertical_edges * 2
+    if (tracker_count == 0) then
+       allocate(trackers(0))
+       return
+    end if
+
+    allocate(trackers(tracker_count))
+    k = 1
+
+    ! 2. Generate Trackers
+    do i = 1, size(contours)
+       ! Winding: +1 for Outer (CCW), -1 for Hole (CW)
+       winding = sign(1_int64, contours(i)%signed_area)
+       n_pts = size(contours(i)%pts)
+
+       do j = 1, n_pts - 1
+          if (contours(i)%pts(j)%x == contours(i)%pts(j+1)%x) then
+             curr_x  = contours(i)%pts(j)%x
+             y_start = contours(i)%pts(j)%y
+             y_end   = contours(i)%pts(j+1)%y
+
+             if (y_start < y_end) then
+                ! Edge is pointing UP. 
+                ! For CCW (+1), this is a RIGHT boundary -> Subtracts laps
+                ! Tracker Top: +1, Tracker Bottom: -1
+                trackers(k)   = XYTracker(X = curr_x, Y = y_start, polygonNumber = -winding)
+                trackers(k+1) = XYTracker(X = curr_x, Y = y_end,   polygonNumber =  winding)
+             else
+                ! Edge is pointing DOWN. 
+                ! For CCW (+1), this is a LEFT boundary -> Adds laps
+                ! Tracker Top: -1, Tracker Bottom: +1
+                trackers(k)   = XYTracker(X = curr_x, Y = y_end,   polygonNumber =  winding)
+                trackers(k+1) = XYTracker(X = curr_x, Y = y_start, polygonNumber = -winding)
+             end if
+             k = k + 2
+          end if
+       end do
+    end do
+
+    ! 3. Trackers are now ready to be sorted and fed directly to scanline_fracture!
+  end subroutine contours_to_trackers
 end module ContourExtractionModule

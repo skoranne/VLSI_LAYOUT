@@ -193,7 +193,18 @@ Self-test passed: All boxes were successfully found in the tree!
 With MT
 julia> @time SelfTestTree(df,tree)
 Self-test passed: All boxes were successfully found in the tree!
-422.064508 seconds (24.13 G allocations: 696.696 GiB, 35.99% gc time, 4.68% compilation time)                                                    
+422.064508 seconds (24.13 G allocations: 696.696 GiB, 35.99% gc time, 4.68% compilation time)
+
+SDT16
+julia> @time t=BulkLoadTree(df);
+Successfully bulk-loaded 108331787 elements into the index.
+220.979952 seconds (2.00 G allocations: 78.424 GiB, 7.94% gc time)                                                            
+
+julia> @time SelfTestTree(df,t);
+Self-test passed: All boxes were successfully found in the tree!                                                              
+2399.523159 seconds (11.08 G allocations: 323.573 GiB, 2.60% gc time, 0.00% compilation time)                                 
+With MT: 201.943511 seconds (11.23 G allocations: 331.378 GiB, 37.44% gc time, 12.35% compilation time)                                
+
 
 =#
 function SelfTestTree(df,tree)

@@ -68,6 +68,7 @@ module MagicVLSILayoutParser
   use PNumMergeModule
   use SystemInformationModule
   use MortonSortModule
+  use PolygonFractureModule
   use iso_c_binding
   use iso_fortran_env, only : int32, int64
   implicit none
@@ -151,6 +152,7 @@ contains
     real(kind=real64)             :: area_by_union
     type(Box), allocatable :: extents(:)
     type(Box)              :: DESIGN_EXTENT
+    integer(kind=int64)    :: num_squares
     ! 1. Get the number of ticks per second
     call system_clock(count_rate=clock_rate)
 
@@ -451,11 +453,18 @@ contains
 
     !do concurrent (i = 1:MAX_LAYERS)
     do i = 1,size(layers)
+       if( layers(i)%n_used == 0 ) cycle
        !for SDT6x6 it went from 16.8 to ~21
-       !boxes => layers(i)%layer_boxes
+       boxes => layers(i)%layer_boxes
        if( NeedsSorting( layers(i) ) ) then
-          !call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
-          call MortonSort( layers(i)%layer_boxes )
+          num_squares = count( is_square(boxes) )
+          !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
+          if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > 0.8 ) then
+             !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated.'
+             call MortonSort( layers(i)%layer_boxes )
+          else
+             call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
+          end if
           layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_SORT )
        end if
        call BuildRTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index)

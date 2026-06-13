@@ -76,7 +76,26 @@
       nullify(Sl%Header)
       nullify(Sl%FreeHead%Ptr)
   end subroutine SL_DESTROY
-
+  ! function SL_GET_FREE3(list) result(node)
+  !   type(SL_TYPE), intent(inout) :: Sl
+  !   type(SL_NODE), pointer :: node
+  !   integer :: j
+    
+  !   if (associated(list%FreeHead%ptr)) then
+  !       ! Fast Path: Pop from LIFO Arena
+  !       node => list%FreeHead%ptr
+  !       list%FreeHead%ptr => node%NextFree%ptr
+  !       node%NextFree%ptr => null()
+  !   else
+  !       ! Slow Path Fallback: Arena Exhausted, grab from OS Heap safely
+  !       allocate(node)
+  !       do j = 1, MAX_SKIP_LEVEL
+  !           node%Forward(j)%ptr  => null()
+  !           node%Backward(j)%ptr => null()
+  !       end do
+  !       node%NextFree%ptr => null()
+  !   end if
+  ! end function SL_GET_FREE3
   function SL_GET_FREE(Sl) result(Node)
       type(SL_TYPE), intent(inout) :: Sl
       type(SL_NODE), pointer :: Node
