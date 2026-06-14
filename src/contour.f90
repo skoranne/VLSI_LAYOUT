@@ -320,7 +320,7 @@ contains
           contours(num_contours)%signed_area = calculate_shoelace_area(contours(num_contours)%pts)
        end if
     end do
-    
+
     ! 6. Sort (using your established bubble sort method, promoted to int64)
     do i = 1_int64, num_contours - 1_int64
        do j = i + 1_int64, num_contours
@@ -331,7 +331,7 @@ contains
           end if
        end do
     end do
-    
+
   end subroutine extract_contours
   !--------------------------------------------------------------
   ! O(log N) Next-Edge Lookup (Upgraded to int64)
@@ -486,5 +486,5 @@ contains
        end do
     end do
   end subroutine contours_to_trackers
-
+  
 end module ContourExtractionModule

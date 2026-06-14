@@ -8,7 +8,8 @@ FC = /scratch1/skoranne/INTELCOMPILERS/bin/h5fc
 # Debug flags (commented out, but easily swappable)
 # FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3 -xHost 
 # Use -pg
-FCFLAGS = -g -O0 -check bounds -check all -traceback -warn all -qopenmp -qopt-report=3
+#FCFLAGS = -g -O0 -check bounds -check all -traceback -warn all -qopenmp -qopt-report=3
+FCFLAGS = -O3 -parallel -qopenmp -qopt-report=3
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables ---
 LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
@@ -79,7 +80,8 @@ test_boxmerge.exe: test_boxmerge.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_skiplist.exe: test_skiplist.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
-
+generate_bin.exe: generate_bin.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 # --- Fortran Module Dependencies ---
 # CRITICAL: If file B "USE"s a module from file A, file B.o depends on file A.o.
 # This ensures Make compiles A.f90 first, generating the .mod file before B.f90 needs it.

@@ -12,7 +12,6 @@ program test_fracture
   use RTreeBuilder
   use DataStructuresModule
   use PNumMergeModule
-
   use iso_fortran_env
   implicit none
 
@@ -50,13 +49,13 @@ program test_fracture
   case (0)                     ! No arguments → use defaults
      write(*,*), '0. Executing Token Tracking Fracture/Scanline Fracturing with Skip List...'
      write(*,*), '1. BBOX GROW by ', K_BBOX_GROW_X, ' ', K_BBOX_GROW_Y
-     write(*,*), '2. Run SCANLINE Merge and save result'
+     write(*,*), '2. Run HORIZONTAL Merge and save result'
      write(*,*), '3. Check input and save sorted data'
      write(*,*), '4. Convert input to HDF5'
      write(*,*)  '5. Print Detailed Information: '     
      write(*,*)  '6. Convert input to COMPLEMENT and run Fracture/Contour/Fracture'
      write(*,*)  '7. Fracture/Contour/Fracture'
-
+     write(*,*)  '8. Run HEAL on whole layer'
      stop "./CONVERT.exe <input-filename> control"     
   case (2)
      error stop "./CONVERT.exe <input-filename> <output-filename> control"
@@ -98,49 +97,63 @@ program test_fracture
   call LoadKLBin(filename,input_layer%layer_boxes)
   boxes => input_layer%layer_boxes
   input_layer%n_used  = size(boxes)
-  layer_area = sum( box_area( input_layer%layer_boxes ) )
-  sl_union_area = calculate_union_area_sl(boxes) 
   bbox = mbr_of_array( boxes, input_layer%n_used )
   select case(control_parameter)
   case (0)
-     call box_grow(bbox,K_BBOX_GROW_X,K_BBOX_GROW_Y)     
+     write(*,*), '0. Executing Token Tracking Fracture/Scanline Fracturing with Skip List...'     
+     call box_grow(bbox,K_BBOX_GROW_X,K_BBOX_GROW_Y)
+     !> SCANLINE_FRACTURE does not support overlapping boxes, so we need to accomodate that till thats fixed
+     call heal_boxes( input_layer%n_used, input_layer%layer_boxes, updated_box_count)
+     current_polygon_boxes = input_layer%layer_boxes(1:updated_box_count)
+     input_layer%layer_boxes = current_polygon_boxes
+     write(*,*) 'Polygon healing: ', input_layer%n_used, ' to ', updated_box_count
+     input_layer%n_used = updated_box_count
+     call WriteKLBin( "merged.bin", input_layer%layer_boxes )
+     boxes => input_layer%layer_boxes
      call generate_trackers( boxes, bbox, trackers ) !> this does CW ordering of inner contours
      !call sort_trackers(trackers) !> this is done inside as well
      n_trackers = size(trackers)
 
      !print *, "Sorting tokens by X/Y..."
      !do i = 1, n_trackers
-     !   !write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
+     !   write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
      !end do     
      write(*,*) 'Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...'
+     
      call scanline_fracture(trackers, output_layer%layer_boxes)
+     
      output_layer%n_used = size( output_layer%layer_boxes)
      print *, "Fracturing algorithm finished without memory leaks."
+     n_trackers = size(trackers)     
      !do i = 1, n_trackers
-     !   !write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
+     !   write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
      !end do
      call WriteKLBin(outFileName, output_layer%layer_boxes)
+     layer_area = sum( box_area( input_layer%layer_boxes ) )
+     !sl_union_area = calculate_union_area_sl(boxes)  !< this is too slow
+     sl_union_area = calculate_union_area_fast(boxes) !< uses SegmentTreeModule
+     if( layer_area /= sl_union_area ) then
+        write(*,*) 'Maybe there is OVLP on input: ', layer_area, ' |SL| = ', sl_union_area
+     end if
      complement_area = sum( box_area( output_layer%layer_boxes ) )
      if( complement_area /= (box_area(bbox) - layer_area)) then
         layer_area = sum( box_area( input_layer%layer_boxes ) )
-        sl_union_area = calculate_union_area(boxes) 
-        write(*,*) 'Expected AREA of complement = ', box_area(bbox) - layer_area, ' while ', complement_area
+        write(*,'(A,F25.8,A,F25.8)') 'Expected AREA of complement = ', box_area(bbox) - layer_area, ' while ', complement_area        
         error stop "INCORRECT FRACTURING detected."
+     else
+        write(*,'(A,F25.8,A,F25.8)') 'Expected AREA of complement = ', box_area(bbox) - layer_area, ' and ', complement_area
      end if
      stop
   case (1)
      write(*,*), '1. BBOX GROW by ', K_BBOX_GROW_X, ' ', K_BBOX_GROW_Y     
      call box_grow(bbox,K_BBOX_GROW_X,K_BBOX_GROW_Y)
-     layer_area = sum( box_area( input_layer%layer_boxes ) )
-     sl_union_area = calculate_union_area(boxes) 
-     write(*,*) 'Expected AREA of complement = ', box_area(bbox) - layer_area
      allocate(output_layer%layer_boxes(1))
      output_layer%layer_boxes(1) = bbox
      output_layer%n_used = 1
      call WriteKLBin(outFileName, output_layer%layer_boxes)
      stop
   case (2)
-     write(*,*) 'Running SCANLINE based merge: '
+     write(*,*) 'Running HORIZONTAL based merge: '
      output_layer%layer_boxes = input_layer%layer_boxes
      call merge_boxes_using_scanline( output_layer%layer_boxes )
      output_layer%n_used = size( output_layer%layer_boxes )
@@ -159,11 +172,13 @@ program test_fracture
           input_layer%tree%root_index, overlap_area, overlap_perimeter)
      input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )     
      psl_union_area = calculate_union_area_by_polygon( input_layer )
-     write(*,*) 'OVLP AREA by pnum =', overlap_area, ' |SL| = ', sl_union_area, ' |PSL| = ', psl_union_area
-
-     call input_layer%pnumtable%expand_roots()
+     layer_area = sum( box_area( input_layer%layer_boxes ) )
+     !sl_union_area = calculate_union_area_sl(boxes)  !< this is too slow
+     sl_union_area = calculate_union_area_fast(boxes) !< uses SegmentTreeModule     
+     write(*,*) 'OVLP AREA by pnum =', overlap_area, ' |AL| = ', layer_area, ' |SL| = ', sl_union_area, ' |PSL| = ', psl_union_area
      num_roots = input_layer%pnumtable%count_roots()
      num_rects = count(input_layer%pnumtable%arr == 0)
+     call input_layer%pnumtable%expand_roots() !< ALWAYS REMEMBER after this there are no RECTS
      if( num_rects == input_layer%n_used ) then
         if( num_roots /= 0 ) error stop "INCONSISTENT ROOT/RECT count."
      end if
@@ -265,12 +280,20 @@ program test_fracture
            !write(*,*) 'Polygon healing: ', box_count, ' to ', updated_box_count
            call extract_contours(current_polygon_boxes, box_count, contours, num_contours)
            write(*,*) 'Extracted ', num_contours, ' contours'
-           !do j=1,num_contours
-           !   write(*,*) 'Polygon ',j,' : ', contours(j)%pts
-           !end do
+           do j=1,num_contours
+              write(*,*) 'Polygon ',j,' : ', contours(j)%pts
+           end do
         end do
         deallocate( current_polygon_boxes )     
      end if
+     stop
+  case (8)
+     write(*,*)  '8. Run HEAL on whole layer'
+     output_layer%layer_boxes = input_layer%layer_boxes
+     output_layer%n_used = size( output_layer%layer_boxes )     
+     call heal_boxes( output_layer%n_used, output_layer%layer_boxes, output_layer%n_used )
+     output_layer%n_used = size( output_layer%layer_boxes )
+     call WriteKLBin(outFileName, output_layer%layer_boxes)
      stop
   case default
      write(*,*) 'Print Information: '

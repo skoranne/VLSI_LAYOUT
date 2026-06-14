@@ -400,7 +400,7 @@ contains
     !write(*,*) '|Layer| = ', size(input_layer%layer_boxes), ' n = ', input_layer%n_used
   end subroutine PerformPolygonUnion
 
-  function calculate_union_area_by_polygon( input_layer ) result( retval_area )
+  pure function calculate_union_area_by_polygon( input_layer ) result( retval_area )
     type(Layer), intent(in) :: input_layer
     real(kind=real64) :: retval_area, temp_areaA, temp_areaB
     integer, parameter :: K_POLYGON_INIT_BOX_COUNT = 64
@@ -434,7 +434,7 @@ contains
     !write(*,*) 'Segments = ', segments
     !> Usually the first segment comprises of the rectangles which we dont need to care about
     if( input_layer%pnumtable%arr( permutation( segments(1)%end_idx ) ) == 0 ) then
-       write (*,*) 'Indeed, RECTS ', segments(1)%end_idx
+       !write (*,*) 'Indeed, RECTS ', segments(1)%end_idx
        do i = 1, segments(1)%end_idx
           retval_area = retval_area + box_area( input_layer%layer_boxes( permutation( i ) ) )
        end do
@@ -473,7 +473,8 @@ contains
           !write(*,'(A,I,A,4I)') 'Box ', j, ': ', current_polygon_boxes(j)%x1, current_polygon_boxes(j)%y1, &
           !     current_polygon_boxes(j)%x2, current_polygon_boxes(j)%y2
        end do
-       temp_areaB = calculate_union_area( current_polygon_boxes(1:box_count) )
+       !temp_areaB = calculate_union_area( current_polygon_boxes(1:box_count) )
+       temp_areaB = calculate_union_area_fast( current_polygon_boxes(1:box_count) )
        if( temp_areaB > temp_areaA ) error stop "INCONSISTENT AREA CALCULATION"
        retval_area = retval_area + temp_areaB
        !retval_area = retval_area + temp_areaA
@@ -481,5 +482,9 @@ contains
     deallocate( current_polygon_boxes )
   end function calculate_union_area_by_polygon
 
+  pure subroutine CalculateSingleLayerAND( input_layer )
+    type(Layer), intent(inout) :: input_layer
+  end subroutine CalculateSingleLayerAND
+  
 end module DesignModule
 

@@ -581,8 +581,8 @@ contains
     write (*,*) '+-----------------------------------------------------------------------------+'    
     call StopMarkTime("PNumLoop")
     call StartMarkTime("ExtentLoop")    
-    !do concurrent (i = 1:MAX_LAYERS)    
-    do i = 1,size(layers)
+    do concurrent (i = 1:MAX_LAYERS)    
+    !do i = 1,size(layers)
        if( layers(i)%n_used == 0 ) then
           cycle
        end if

@@ -195,3 +195,16 @@ END 23868.55 CPU seconds.  857.38 REAL seconds. FULL TIME:   857.38
  In PF (Fractured Count):      6311489     
  Expected AREA of complement =    1017481385151.00 while 1017481477575.00        
 Layer 1/0 Area: 1017481.4775749999 um^2
+
+FOR SDT16_6x6
+ 0. Executing Token Tracking Fracture/Scanline Fracturing with Skip List...                                                   
+ Polygon healing:               96707934  to               95027435                                                           
+INFO: Writing array of         95027435 boxes.
+INFO: Write successful for     95027435 boxes.
+ Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...                                                          
+ In PF (Fractured Count):              108331787
+ Fracturing algorithm finished without memory leaks.
+INFO: Writing array of        108331787 boxes.
+INFO: Write successful for    108331787 boxes.
+Expected AREA of complement =   15095805474375.00000000 and   15095805474375.00000000
+
