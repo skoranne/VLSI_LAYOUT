@@ -28,11 +28,11 @@ program test_fracture
   type(Box), allocatable :: current_polygon_boxes(:)
   integer(kind=int64) :: starting_segment
   type(Polygon), allocatable :: contours(:)
-  integer             :: num_contours
   type(BucketBoundary), allocatable :: segments(:)
   integer, parameter :: K_POLYGON_INIT_BOX_COUNT = 64
+  integer(kind=int64):: num_contours
 
-  real(kind=real64)   :: layer_area, complement_area
+  real(kind=real64)   :: layer_area, complement_area, sl_union_area, psl_union_area
   type(XYTracker), allocatable :: trackers(:)
   character(len=256)            :: filename      
   character(len=256)            :: outFileName   
@@ -99,6 +99,7 @@ program test_fracture
   boxes => input_layer%layer_boxes
   input_layer%n_used  = size(boxes)
   layer_area = sum( box_area( input_layer%layer_boxes ) )
+  sl_union_area = calculate_union_area_sl(boxes) 
   bbox = mbr_of_array( boxes, input_layer%n_used )
   select case(control_parameter)
   case (0)
@@ -121,6 +122,8 @@ program test_fracture
      call WriteKLBin(outFileName, output_layer%layer_boxes)
      complement_area = sum( box_area( output_layer%layer_boxes ) )
      if( complement_area /= (box_area(bbox) - layer_area)) then
+        layer_area = sum( box_area( input_layer%layer_boxes ) )
+        sl_union_area = calculate_union_area(boxes) 
         write(*,*) 'Expected AREA of complement = ', box_area(bbox) - layer_area, ' while ', complement_area
         error stop "INCORRECT FRACTURING detected."
      end if
@@ -128,6 +131,8 @@ program test_fracture
   case (1)
      write(*,*), '1. BBOX GROW by ', K_BBOX_GROW_X, ' ', K_BBOX_GROW_Y     
      call box_grow(bbox,K_BBOX_GROW_X,K_BBOX_GROW_Y)
+     layer_area = sum( box_area( input_layer%layer_boxes ) )
+     sl_union_area = calculate_union_area(boxes) 
      write(*,*) 'Expected AREA of complement = ', box_area(bbox) - layer_area
      allocate(output_layer%layer_boxes(1))
      output_layer%layer_boxes(1) = bbox
@@ -152,8 +157,10 @@ program test_fracture
      input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
      call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
           input_layer%tree%root_index, overlap_area, overlap_perimeter)
-     write(*,*) 'OVLP AREA by pnum =', overlap_area
-     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )
+     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )     
+     psl_union_area = calculate_union_area_by_polygon( input_layer )
+     write(*,*) 'OVLP AREA by pnum =', overlap_area, ' |SL| = ', sl_union_area, ' |PSL| = ', psl_union_area
+
      call input_layer%pnumtable%expand_roots()
      num_roots = input_layer%pnumtable%count_roots()
      num_rects = count(input_layer%pnumtable%arr == 0)
@@ -196,6 +203,7 @@ program test_fracture
      else
         error stop "NOT POSSIBLE"
      end if
+     if( size(input_layer%layer_boxes) == 0 ) error stop "INPUT_LAYER size has become 0"
      allocate( input_layer%tree%tree_nodes( CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY ) ) )
      call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
      input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
@@ -213,7 +221,7 @@ program test_fracture
      if( num_rects == input_layer%n_used ) then
         if( num_roots /= 0 ) error stop "INCONSISTENT ROOT/RECT count."
      end if
-     !write(*,*) '|Roots| = ', num_roots, '|Rects| = ', num_rects
+     write(*,*) '|Roots| = ', num_roots, '|Rects| = ', num_rects
      call GetSortPermutation( input_layer%pnumtable%arr, permutation )
      !write(*,*) 'Permutation = ', permutation
      call get_equal_key_segments( input_layer%pnumtable%arr, permutation,  segments )
@@ -252,9 +260,9 @@ program test_fracture
               allocate( current_polygon_boxes( 2*box_count ) )
            end if
            current_polygon_boxes(1:box_count) = input_layer%layer_boxes( &
-                permutation( segments( i )%start_idx:permutation( segments( i )%end_idx ) ) )
-           call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
-           write(*,*) 'Polygon healing: ', box_count, ' to ', updated_box_count
+                permutation( segments( i )%start_idx:segments( i )%end_idx ) )
+           !call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
+           !write(*,*) 'Polygon healing: ', box_count, ' to ', updated_box_count
            call extract_contours(current_polygon_boxes, box_count, contours, num_contours)
            write(*,*) 'Extracted ', num_contours, ' contours'
            !do j=1,num_contours

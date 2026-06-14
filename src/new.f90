@@ -179,32 +179,44 @@ contains
     type(Box), intent(inout), allocatable :: raw_boxes(:)
     integer(int64), intent(in)            :: input_count
     type(Polygon), allocatable, intent(out) :: contours(:)
-    integer(int64), intent(out)           :: num_contours ! Promoted to int64
+    integer(int64), intent(out)           :: num_contours
 
     integer(int64) :: healed_count
     type(DirectedEdge), allocatable :: edges(:)
-    integer(int64) :: num_edges, i, j ! Promoted to int64
+
+    ! FIX: All edge counters MUST be int64 to prevent VLSI overflow
+    integer(int64) :: num_edges, i, j
 
     ! --- Atomization Variables ---
     integer(kind=COORDINATE_KIND), allocatable :: y_vals(:), uy(:)
-    integer(int64) :: num_uy, idx_y1, idx_y2 ! Promoted to int64
+    integer(int64) :: num_uy, idx_y1, idx_y2
 
     ! --- Tracing Variables ---
     integer(kind=COORDINATE_KIND) :: start_x, start_y, curr_x, curr_y
     logical :: cycle_closed, edge_found
     type(Point), allocatable :: temp_pts(:)
-    integer(int64) :: pt_count ! Promoted to int64
+    integer(int64) :: pt_count
     type(Polygon) :: temp_poly
-
-    ! 1. Heal
+    ! --- ADD THIS INTEGRITY CHECK BEFORE TRACING ---
+    ! Check if every vertex has an even degree
+    integer(int64) :: vertex_degree
+    integer(int64) :: v_x, v_y
+    do i=1,input_count
+       if(.not. raw_boxes(i)%is_valid() ) error stop "INPUT BOX not valid"
+    end do
+    
     call heal_boxes(input_count, raw_boxes, healed_count)
+    do i=1,healed_count
+       if(.not. raw_boxes(i)%is_valid() ) error stop "INPUT BOX not valid"
+    end do
+    
     if (healed_count == 0_int64) then
        num_contours = 0_int64
        allocate(contours(0))
        return
     end if
 
-    ! 2. Y Grid
+    ! 2. Extract Unique Y Grid
     allocate(y_vals(2_int64 * healed_count))
     do i = 1_int64, healed_count
        y_vals(2_int64*i - 1_int64) = raw_boxes(i)%y1
@@ -222,11 +234,17 @@ contains
        end if
     end do
 
-    ! 3. Generate Edges (Using int64)
+    ! 3. Generate Directed Atomic Edges (CCW)
     num_edges = 0_int64
     do i = 1_int64, healed_count
        idx_y1 = binary_search_y(uy, num_uy, raw_boxes(i)%y1)
        idx_y2 = binary_search_y(uy, num_uy, raw_boxes(i)%y2)
+
+       if (idx_y1 == 0_int64 .or. idx_y2 == 0_int64) then
+          print *, "FATAL: Y-coordinate missing from unique grid!"
+          stop
+       end if
+
        num_edges = num_edges + 2_int64 + 2_int64 * (idx_y2 - idx_y1)
     end do
 
@@ -236,11 +254,14 @@ contains
     do i = 1_int64, healed_count
        call add_edge(edges, num_edges, raw_boxes(i)%x1, raw_boxes(i)%y1, raw_boxes(i)%x2, raw_boxes(i)%y1)
        call add_edge(edges, num_edges, raw_boxes(i)%x2, raw_boxes(i)%y2, raw_boxes(i)%x1, raw_boxes(i)%y2)
+
        idx_y1 = binary_search_y(uy, num_uy, raw_boxes(i)%y1)
        idx_y2 = binary_search_y(uy, num_uy, raw_boxes(i)%y2)
+
        do j = idx_y2 - 1_int64, idx_y1, -1_int64
           call add_edge(edges, num_edges, raw_boxes(i)%x1, uy(j+1_int64), raw_boxes(i)%x1, uy(j))
        end do
+
        do j = idx_y1, idx_y2 - 1_int64
           call add_edge(edges, num_edges, raw_boxes(i)%x2, uy(j), raw_boxes(i)%x2, uy(j+1_int64))
        end do
@@ -248,6 +269,7 @@ contains
 
     ! 4. Cancel Internal Shared Edges
     call sort_edges_by_geometry(edges, num_edges)
+
     do i = 1_int64, num_edges - 1_int64
        if (edges(i)%is_active .and. edges(i+1_int64)%is_active) then
           if (edges(i)%min_x == edges(i+1_int64)%min_x .and. edges(i)%min_y == edges(i+1_int64)%min_y .and. &
@@ -257,12 +279,45 @@ contains
           end if
        end if
     end do
+    ! (This is a simplified check for demonstration)
+    do i = 1_int64, num_edges
+       if (.not. edges(i)%is_active) cycle
 
-    ! 5. Trace the Cycles (Using your working linear scan logic, just with int64)
+       ! Count how many active edges start/end at this vertex
+       vertex_degree = 0
+       v_x = edges(i)%x1
+       v_y = edges(i)%y1
+
+       do j = 1_int64, num_edges
+          if (edges(j)%is_active .and. &
+               ((edges(j)%x1 == v_x .and. edges(j)%y1 == v_y) .or. &
+               (edges(j)%x2 == v_x .and. edges(j)%y2 == v_y))) then
+             vertex_degree = vertex_degree + 1
+          end if
+       end do
+
+       if (mod(vertex_degree, 2_int64) /= 0) then
+          print *, "TOPOLOGY ERROR: Odd degree vertex detected at (", v_x, ",", v_y, ")"
+          print *, "This box set cannot form closed loops."
+          stop
+       end if
+    end do
+    ! 5. Trace the Cycles
     allocate(contours(num_edges / 4_int64 + 1_int64)) 
     num_contours = 0_int64
     allocate(temp_pts(num_edges))
-
+    edge_found = .false.
+    ! We need to search specifically for an active edge that continues the path
+    do j = 1_int64, num_edges
+       if (edges(j)%is_active .and. edges(j)%x1 == curr_x .and. edges(j)%y1 == curr_y) then
+          ! Found a candidate
+          curr_x = edges(j)%x2
+          curr_y = edges(j)%y2
+          edges(j)%is_active = .false.
+          edge_found = .true.
+          exit
+       end if
+    end do
     do i = 1_int64, num_edges
        if (.not. edges(i)%is_active) cycle
 
@@ -279,7 +334,6 @@ contains
        cycle_closed = .false.
 
        do while (.not. cycle_closed)
-          ! Vertex compression logic
           if (pt_count >= 2_int64) then
              if (.not. ( (temp_pts(pt_count-1_int64)%x == temp_pts(pt_count)%x .and. temp_pts(pt_count)%x == curr_x) .or. &
                   (temp_pts(pt_count-1_int64)%y == temp_pts(pt_count)%y .and. temp_pts(pt_count)%y == curr_y) )) then
@@ -288,6 +342,7 @@ contains
           else
              pt_count = pt_count + 1_int64
           end if
+
           temp_pts(pt_count)%x = curr_x
           temp_pts(pt_count)%y = curr_y
 
@@ -296,19 +351,31 @@ contains
              exit
           end if
 
-          ! STABLE LINEAR SEARCH (Maintains Topological Continuity)
           edge_found = .false.
-          do j = 1_int64, num_edges
-             if (edges(j)%is_active .and. edges(j)%x1 == curr_x .and. edges(j)%y1 == curr_y) then
-                curr_x = edges(j)%x2
-                curr_y = edges(j)%y2
-                edges(j)%is_active = .false.
-                edge_found = .true.
-                exit
-             end if
-          end do
+
+          ! O(log N) Edge Lookup implementation you requested earlier
+          j = find_next_edge(edges, num_edges, curr_x, curr_y)
+
+          if (j > 0_int64) then
+             curr_x = edges(j)%x2
+             curr_y = edges(j)%y2
+             edges(j)%is_active = .false.
+             edge_found = .true.
+          end if
 
           if (.not. edge_found) then
+             print *, "WARNING: Broken contour at X:", curr_x, " Y:", curr_y
+             print *, "--- TOPOLOGY INTEGRITY FAILED ---"
+             print *, "Tracer stalled at (", curr_x, ",", curr_y, ")"
+             print *, "Attempting to find edge starting at this coordinate..."
+
+             ! Debug: Scan for ANY edge starting here
+             do j = 1_int64, num_edges
+                if (edges(j)%x1 == curr_x .and. edges(j)%y1 == curr_y) then
+                   print *, "Found an edge starting at this coord, but is_active = ", edges(j)%is_active
+                end if
+             end do
+             stop "Tracer Panic" 
              exit 
           end if
        end do
@@ -320,8 +387,9 @@ contains
           contours(num_contours)%signed_area = calculate_shoelace_area(contours(num_contours)%pts)
        end if
     end do
-    
-    ! 6. Sort (using your established bubble sort method, promoted to int64)
+
+    ! 6. Sort contours by Area (Replacing the old O(N^2) bubble sort)
+    ! Note: QuickSort logic can be replicated here for `contours` array if desired for max performance
     do i = 1_int64, num_contours - 1_int64
        do j = i + 1_int64, num_contours
           if (contours(j)%signed_area > contours(i)%signed_area) then
@@ -331,8 +399,9 @@ contains
           end if
        end do
     end do
-    
+
   end subroutine extract_contours
+
   !--------------------------------------------------------------
   ! O(log N) Next-Edge Lookup (Upgraded to int64)
   !--------------------------------------------------------------

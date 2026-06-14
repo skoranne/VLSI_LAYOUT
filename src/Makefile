@@ -6,8 +6,9 @@
 # --- Compiler & Flags ---
 FC = /scratch1/skoranne/INTELCOMPILERS/bin/h5fc
 # Debug flags (commented out, but easily swappable)
-# FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3
-FCFLAGS = -pg -O3 -parallel -qopenmp -qopt-report=3
+# FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3 -xHost 
+# Use -pg
+FCFLAGS = -g -O0 -check bounds -check all -traceback -warn all -qopenmp -qopt-report=3
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables ---
 LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/

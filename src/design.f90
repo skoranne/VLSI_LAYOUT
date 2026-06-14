@@ -348,7 +348,7 @@ contains
           allocate( current_polygon_boxes( 2*box_count ) )
        end if
        current_polygon_boxes(1:box_count) = input_layer%layer_boxes( &
-            permutation( segments( i )%start_idx:permutation( segments( i )%end_idx ) ) )
+            permutation( segments( i )%start_idx:segments( i )%end_idx ) )
        updated_box_count = 0
        call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
        n = size( current_polygon_boxes )
@@ -400,9 +400,9 @@ contains
     !write(*,*) '|Layer| = ', size(input_layer%layer_boxes), ' n = ', input_layer%n_used
   end subroutine PerformPolygonUnion
 
-  pure function calculate_union_area_by_polygon( input_layer ) result( retval_area )
+  function calculate_union_area_by_polygon( input_layer ) result( retval_area )
     type(Layer), intent(in) :: input_layer
-    real(kind=real64) :: retval_area
+    real(kind=real64) :: retval_area, temp_areaA, temp_areaB
     integer, parameter :: K_POLYGON_INIT_BOX_COUNT = 64
     integer(kind=int64) :: i,j,n, num_roots, num_rects, polygon_number, box_count
     type(Box), allocatable :: current_polygon_boxes(:)
@@ -434,7 +434,7 @@ contains
     !write(*,*) 'Segments = ', segments
     !> Usually the first segment comprises of the rectangles which we dont need to care about
     if( input_layer%pnumtable%arr( permutation( segments(1)%end_idx ) ) == 0 ) then
-       !write (*,*) 'Indeed, RECTS ', segments(1)%end_idx
+       write (*,*) 'Indeed, RECTS ', segments(1)%end_idx
        do i = 1, segments(1)%end_idx
           retval_area = retval_area + box_area( input_layer%layer_boxes( permutation( i ) ) )
        end do
@@ -443,13 +443,14 @@ contains
     else
        starting_segment = 1
     end if
+    !write(*,*) 'Rectangle accumulated AREA = ', retval_area
     if( num_roots == 0 ) return !> everything is in rects and we have accounted for all of them
     if( input_layer%pnumtable%arr( permutation( segments( starting_segment )%start_idx ) ) == 0 .or. &
          input_layer%pnumtable%arr( permutation( segments( starting_segment )%end_idx ) ) == 0 ) then
        error stop "INCONSISTENT BUCKET numbering detected"
     end if
     allocate( current_polygon_boxes( K_POLYGON_INIT_BOX_COUNT ) )
-    !write (*,*) 'Now processing non-rects: final_count starts at ', final_count
+    !write (*,*) 'Now processing non-rects: final_count starts at ', starting_segment
     do i=starting_segment, size(segments)
        !> processing polygon number segments( starting_segment )%start_idx
        polygon_number = input_layer%pnumtable%arr( permutation( segments( i )%start_idx ) )
@@ -463,8 +464,19 @@ contains
           allocate( current_polygon_boxes( 2*box_count ) )
        end if
        current_polygon_boxes(1:box_count) = input_layer%layer_boxes( &
-            permutation( segments( i )%start_idx:permutation( segments( i )%end_idx ) ) )
-       retval_area = retval_area + calculate_union_area( current_polygon_boxes )
+            permutation( segments( i )%start_idx: segments( i )%end_idx ) )
+       temp_areaA = 0.0_real64
+       temp_areaB = 0.0_real64
+       temp_areaA = sum( box_area( current_polygon_boxes(1:box_count) ) )
+       do j=1,box_count
+          if(.not. current_polygon_boxes(j)%is_valid() ) error stop "INVALID BOX"
+          !write(*,'(A,I,A,4I)') 'Box ', j, ': ', current_polygon_boxes(j)%x1, current_polygon_boxes(j)%y1, &
+          !     current_polygon_boxes(j)%x2, current_polygon_boxes(j)%y2
+       end do
+       temp_areaB = calculate_union_area( current_polygon_boxes(1:box_count) )
+       if( temp_areaB > temp_areaA ) error stop "INCONSISTENT AREA CALCULATION"
+       retval_area = retval_area + temp_areaB
+       !retval_area = retval_area + temp_areaA
     end do
     deallocate( current_polygon_boxes )
   end function calculate_union_area_by_polygon
