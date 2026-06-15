@@ -208,3 +208,25 @@ INFO: Writing array of        108331787 boxes.
 INFO: Write successful for    108331787 boxes.
 Expected AREA of complement =   15095805474375.00000000 and   15095805474375.00000000
 
+Next we are trying to "thin" the SkipList by removing the 'Backward' edges
+Baseline
+43.13user 1.26system 0:44.47elapsed 99%CPU (0avgtext+0avgdata 2688324maxresident)k
+After removing Backward
+40.31user 0.92system 0:41.30elapsed 99%CPU (0avgtext+0avgdata 1748976maxresident)k
+After removing FreeList holder
+40.51user 1.04system 0:41.65elapsed 99%CPU (0avgtext+0avgdata 1711420maxresident)k
+
+ Polygon healing:              206167552  to              209090656                                                           
+INFO: Writing array of        209090656 boxes.
+INFO: Write successful for    209090656 boxes.
+ In PF (Fractured Count):              245862265
+ Fracturing algorithm finished without memory leaks.
+INFO: Write successful for    245862265 boxes.
+Expected AREA of complement =   93278996063000.00000000 and   93278996063000.00000000                                         
+(base) [skoranne@localhost src]$ cat rt_MW4x4.txt 
+2326.27user 36.38system 39:46.06elapsed 99%CPU (0avgtext+0avgdata 33313464maxresident)k
+6442736inputs+14217288outputs (0major+9128153minor)pagefaults 0swaps
+
+2212.05user 27.66system 37:24.10elapsed 99%CPU (0avgtext+0avgdata 33313924maxresident)k                                       
+
+

@@ -46,8 +46,6 @@ module PolygonFractureModule
      integer(kind=int64)             :: lap_change
      ! Bi-directional Routing and LIFO Memory Chain
      type(NodePtr) :: Forward(MAX_SKIP_LEVEL)
-     type(NodePtr) :: Backward(MAX_SKIP_LEVEL) 
-     type(NodePtr) :: NextFree
   end type SkipListNode
 
   type :: SkipList
@@ -75,17 +73,15 @@ contains
 
     ! Chain the LIFO free list
     do i = 1, capacity
-       list%Arena(i)%NextFree%ptr => list%Arena(i+1)
-       do j = 1, MAX_SKIP_LEVEL
+       list%Arena(i)%Forward(1)%ptr => list%Arena(i+1)
+       do j = 2, MAX_SKIP_LEVEL
           list%Arena(i)%Forward(j)%ptr  => null()
-          list%Arena(i)%Backward(j)%ptr => null()
        end do
     end do
 
-    list%Arena(capacity + 1)%NextFree%ptr => null()
+    list%Arena(capacity + 1)%Forward(1)%ptr => null()
     do j = 1, MAX_SKIP_LEVEL
        list%Arena(capacity + 1)%Forward(j)%ptr  => null()
-       list%Arena(capacity + 1)%Backward(j)%ptr => null()
     end do
 
     list%FreeHead%ptr => list%Arena(1)
@@ -108,13 +104,15 @@ contains
   pure subroutine SL_GET_FREE(list, node)
     type(SkipList), intent(inout), target :: list
     type(SkipListNode), pointer, intent(out) :: node
-
+    integer(kind=int64) :: i
     if (.not. associated(list%FreeHead%ptr)) then
        error stop "CRITICAL: Polygon Fracture SkipList Arena Exhausted!"
     end if
     node => list%FreeHead%ptr
-    list%FreeHead%ptr => node%NextFree%ptr
-    node%NextFree%ptr => null()
+    list%FreeHead%ptr => node%Forward(1)%ptr
+    do i = 1, MAX_SKIP_LEVEL
+       node%Forward(i)%ptr => null()
+    end do
   end subroutine SL_GET_FREE
 
   pure subroutine SL_RELEASE(list, node)
@@ -125,9 +123,8 @@ contains
     ! Wipe pointers to prevent ghost links
     do i = 1, MAX_SKIP_LEVEL
        node%Forward(i)%ptr  => null()
-       node%Backward(i)%ptr => null()
     end do
-    node%NextFree%ptr => list%FreeHead%ptr
+    node%Forward(1)%ptr => list%FreeHead%ptr
     list%FreeHead%ptr => node
   end subroutine SL_RELEASE
 
@@ -153,64 +150,86 @@ contains
   ! ============================================================================
   ! O(log N) UP/DOWN SWEEP-LINE ENGINE
   ! ============================================================================
-  pure subroutine update_active_edges(list, y_val, lap_delta)
+  subroutine update_active_edges(list, y_val, lap_delta)
+    !--------------------------------------------------------------------
+    ! PURPOSE
+    !   Insert a new boundary (y_val, lap_delta) into the skip‑list
+    !   or, if the y‑coordinate already exists, add lap_delta to its
+    !   lap_change field.  When the accumulated lap_change becomes zero
+    !   the node is removed.
+    !
+    !   The implementation uses **forward links only** – the
+    !   Backward array has been eliminated.
+    !--------------------------------------------------------------------
+    use, intrinsic :: iso_fortran_env, only: int64
+    implicit none
+
     type(SkipList), intent(inout), target :: list
     integer(kind=K_COORDINATE_KIND), intent(in) :: y_val
-    integer(kind=int64), intent(in) :: lap_delta
+    integer(kind=int64), intent(in)              :: lap_delta
 
-    type(NodePtr) :: update(MAX_SKIP_LEVEL)
-    ! Renamed 'target' to 'target_node' to avoid keyword shadowing
-    type(SkipListNode), pointer :: current, target_node, new_node
-    integer :: i, lvl
+    ! Local helpers ----------------------------------------------------
+    type(NodePtr)                :: update(MAX_SKIP_LEVEL)   ! predecessor per level
+    type(SkipListNode), pointer :: current   => null()
+    type(SkipListNode), pointer :: target_node => null()
+    type(SkipListNode), pointer :: new_node    => null()
+    integer                      :: i, lvl
 
+    !--------------------------------------------------------------------
+    ! 1.  Find the place where y_val would belong (standard skip‑list search)
+    !--------------------------------------------------------------------
     current => list%header
 
-    ! 1. O(log N) Search for the target Y coordinate
     do i = list%current_level, 1, -1
-       do while (associated(current%Forward(i)%ptr))
-          if (current%Forward(i)%ptr%y_val < y_val) then
-             current => current%Forward(i)%ptr
-          else
-             exit
-          end if
+       ! walk forward while the next node on this level is still < y_val
+       do while (associated(current%Forward(i)%ptr) .and. &
+            current%Forward(i)%ptr%y_val < y_val)
+          current => current%Forward(i)%ptr
        end do
-       update(i)%ptr => current
+       update(i)%ptr => current               ! remember predecessor on level i
     end do
 
+    ! The first node at level‑1 after the predecessor is the possible match
     target_node => current%Forward(1)%ptr
 
-    ! 2. Coordinate MATCH: Accumulate or Delete
+    !--------------------------------------------------------------------
+    ! 2.  If we found the exact y‑coordinate, just update the payload
+    !--------------------------------------------------------------------
     if (associated(target_node)) then
        if (target_node%y_val == y_val) then
           target_node%lap_change = target_node%lap_change + lap_delta
 
-          ! If boundary resolves, O(1) Un-splice using doubly-linked pointers
-          if (target_node%lap_change == 0) then
+          ! If the net change is now zero we have to delete the node
+          if (target_node%lap_change == 0_int64) then
+             !--- splice it out on every level where it appears -----------------
              do i = 1, list%current_level
                 if (.not. associated(update(i)%ptr%Forward(i)%ptr)) exit
                 if (.not. associated(update(i)%ptr%Forward(i)%ptr, target_node)) exit
-
                 update(i)%ptr%Forward(i)%ptr => target_node%Forward(i)%ptr
-                if (associated(target_node%Forward(i)%ptr)) then
-                   target_node%Forward(i)%ptr%Backward(i)%ptr => update(i)%ptr
-                end if
              end do
 
+             !--- possibly shrink the current_level -----------------------------
              do while (list%current_level > 1 .and. &
                   .not. associated(list%header%Forward(list%current_level)%ptr))
                 list%current_level = list%current_level - 1
              end do
 
-             call SL_RELEASE(list, target_node)
+             call SL_RELEASE(list, target_node)   ! return node to the free‑list
           end if
-          return 
+
+          return                               ! we are done
        end if
     end if
 
-    ! 3. Coordinate NOT FOUND: Insert New Boundary
-    if (lap_delta == 0) return 
+    !--------------------------------------------------------------------
+    ! 3.  No existing node with this y‑value – we must insert a new one.
+    !     (If the delta is zero there is nothing to insert.)
+    !--------------------------------------------------------------------
+    if (lap_delta == 0_int64) return
 
-    lvl = get_skip_level(y_val)
+    lvl = get_skip_level(y_val)                ! randomised level for the new node
+
+    ! If the new level is higher than anything we have seen, extend the header
     if (lvl > list%current_level) then
        do i = list%current_level + 1, lvl
           update(i)%ptr => list%header
@@ -218,60 +237,21 @@ contains
        list%current_level = lvl
     end if
 
-    ! Replace function assignment with Subroutine call
+    ! Grab a fresh node from the pool (or allocate one)
     call SL_GET_FREE(list, new_node)
-    new_node%y_val = y_val
+
+    new_node%y_val      = y_val
     new_node%lap_change = lap_delta
 
-    ! Doubly-Linked Splice
+    !--------------------------------------------------------------------
+    ! 4.  Forward‑only splice: link the new node into every level ≤ lvl
+    !--------------------------------------------------------------------
     do i = 1, lvl
-       new_node%Forward(i)%ptr => update(i)%ptr%Forward(i)%ptr
-       update(i)%ptr%Forward(i)%ptr => new_node
-
-       new_node%Backward(i)%ptr => update(i)%ptr
-       if (associated(new_node%Forward(i)%ptr)) then
-          new_node%Forward(i)%ptr%Backward(i)%ptr => new_node
-       end if
+       new_node%Forward(i)%ptr          => update(i)%ptr%Forward(i)%ptr
+       update(i)%ptr%Forward(i)%ptr     => new_node
     end do
+
   end subroutine update_active_edges
-
-  pure subroutine find_bounding_edges(list, target_y, floor_y, ceil_y, found_floor, found_ceil)
-    type(SkipList), intent(inout),target :: list
-    integer(kind=K_COORDINATE_KIND), intent(in) :: target_y
-    integer(kind=K_COORDINATE_KIND), intent(out) :: floor_y, ceil_y
-    logical, intent(out) :: found_floor, found_ceil
-    integer :: i
-    type(SkipListNode), pointer :: current
-
-    found_floor = .false.
-    found_ceil = .false.
-    current => list%header
-
-    ! 1. O(log N) Traversal
-    do i = list%current_level, 1, -1
-       do while (associated(current%Forward(i)%ptr))
-          if (current%Forward(i)%ptr%y_val <= target_y) then
-             current => current%Forward(i)%ptr
-          else
-             exit
-          end if
-       end do
-    end do
-
-    ! 2. Look DOWN (Floor)
-    if (associated(current%Backward(1)%ptr)) then
-       if (current%Backward(1)%ptr%y_val /= -huge(1_int64)) then
-          floor_y = current%Backward(1)%ptr%y_val
-          found_floor = .true.
-       end if
-    end if
-
-    ! 3. Look UP (Ceiling)
-    if (associated(current%Forward(1)%ptr)) then
-       ceil_y = current%Forward(1)%ptr%y_val
-       found_ceil = .true.
-    end if
-  end subroutine find_bounding_edges
 
   pure subroutine get_covered_y(sl, covered)
     type(SkipList), intent(inout),target :: sl
