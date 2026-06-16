@@ -34,7 +34,7 @@ module DesignModule
      integer(kind=8)        :: n_used   = 0   ! how many slots are filled
      integer(kind=8)        :: n_alloc  = 0   ! current allocation size
      type(Box), allocatable :: layer_boxes(:)
-     integer(kind=8)        :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
+     integer(kind=c_int)        :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
      type(LayerTree)        :: tree
      type(UnionFind)        :: pnumtable
      real(kind=real64)      :: area, perimeter

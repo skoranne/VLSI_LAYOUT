@@ -160,7 +160,7 @@ contains
     type(Box) :: agg_mbr
     n_boxes = size( sorted_boxes )
     tempNode = tree_nodes( current_node )
-    write (*,'(A,I0,A,I0,A,4I)') 'Explaining Node: ', current_node, ' ', &
+    write (*,'(A,I0,A,I0,A,4I0)') 'Explaining Node: ', current_node, ' ', &
          FixNumberChildren(tempNode%num_children,capacity), ' children w/MBR ', tempNode%mbr
     is_leaf = .false.
     num_children = tempNode%num_children
@@ -182,7 +182,7 @@ contains
        do i = 1,tempNode%num_children
           j = tempNode%child_indices(i)
           childNode = tree_nodes( j )
-          write (*,'(A,I0,A,I0,A,I0,A,I0,A,4I)') 'Child: ',i, ' node ', j,' of parent ', current_node, ' has ', &
+          write (*,'(A,I0,A,I0,A,I0,A,I0,A,4I0)') 'Child: ',i, ' node ', j,' of parent ', current_node, ' has ', &
                FixNumberChildren(childNode%num_children,capacity), ' children, with MBR: ', childNode%mbr
           call ExplainTheNode( sorted_boxes, capacity, tree_nodes, j )
        end do

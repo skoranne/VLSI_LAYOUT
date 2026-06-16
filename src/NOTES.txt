@@ -229,4 +229,16 @@ Expected AREA of complement =   93278996063000.00000000 and   93278996063000.000
 
 2212.05user 27.66system 37:24.10elapsed 99%CPU (0avgtext+0avgdata 33313924maxresident)k                                       
 
+ Reading filename: /home/skoranne/MICROWATT/MICROWATT_FLAT_L67_D20.bin                                                        
+ --- Initializing Polygon Fracturing Test ---
+ 3. Check input and save sorted data
+ OVLP AREA by pnum =    0.000000000000000       |AL| =
+    4842023286825.000       |SL| =     4842023286825.000       |PSL| =                                                        
+    4842023286825.000
+|Roots| =      1222592 |Rects| =       561536
+INFO: Writing array of         10154715 boxes.
+INFO: Write successful for     10154715 boxes.
+Warning: ieee_inexact is signaling
+FORTRAN STOP
+On DGX
 

@@ -44,8 +44,8 @@ contains
     ! 4. The "Move" step (transfers allocation status and data instantly)
     call move_alloc(from=temp_boxes, to=boxes)
   end subroutine MortonSort
-  
-    
+
+
   subroutine morton_sort_boxes(boxes, sorted_aux)
     type(Box),               intent(in)  :: boxes(:)
     type(BoxWithMortonCode), intent(out) :: sorted_aux(:)
@@ -87,38 +87,48 @@ contains
     end do
   end subroutine build_aux_array
 
-  !-----------------------------------------------------------------
-  !  Morton (Z‑order) code for two 32‑bit coordinates.
-  !  The algorithm interleaves the bits of x and y.
-  !  It works for the full 32‑bit range – the result fits into 64 bits.
-  !-----------------------------------------------------------------
-  function morton2D(x, y) result(code)
-    integer(kind=int32), intent(in) :: x, y
-    integer(kind=int64)             :: code
-    integer(kind=int64) :: xx, yy, inter
+     !--------------------------------------------------------------------
+   !  2‑D Morton (Z‑order) code – interleaves the bits of x and y.
+   !  Input  : x, y  – 32‑bit unsigned coordinates (stored in signed int32)
+   !  Result : 64‑bit Morton code
+   !--------------------------------------------------------------------
+   pure function morton2D (x, y) result (code)
+      integer(kind=int32), intent(in) :: x, y
+      integer(kind=int64)             :: code
+      integer(kind=int64) :: xx, yy, inter
 
-    xx = int(x, kind=int64)
-    yy = int(y, kind=int64)
+      ! promote to 64‑bit first
+      xx = int(x, kind=int64)
+      yy = int(y, kind=int64)
 
-    ! --- split each 32‑bit word so that there are empty bits between
-    !     every original bit (see “Bit Twiddling Hacks” by Sean Eron Anderson)
-    ! use SHIFTL(xx,16)
-    xx = (xx .or. SHIFTL(xx,16)) .and. int(z'0000FFFF0000FFFF',kind=int64)
-    xx = (xx .or. SHIFTL(xx, 8)) .and. int(z'00FF00FF00FF00FF',kind=int64)
-    xx = (xx .or. SHIFTL(xx, 4)) .and. int(z'0F0F0F0F0F0F0F0F',kind=int64)
-    xx = (xx .or. SHIFTL(xx, 2)) .and. int(z'3333333333333333',kind=int64)
-    xx = (xx .or. SHIFTL(xx, 1)) .and. int(z'5555555555555555',kind=int64)
+      ! ----- spread the bits of xx -------------------------------------------------
+      xx = IOR( xx, SHIFTL(xx, 16) )
+      xx = IAND( xx, int(z'0000FFFF0000FFFF', kind=int64) )
+      xx = IOR( xx, SHIFTL(xx, 8) )
+      xx = IAND( xx, int(z'00FF00FF00FF00FF', kind=int64) )
+      xx = IOR( xx, SHIFTL(xx, 4) )
+      xx = IAND( xx, int(z'0F0F0F0F0F0F0F0F', kind=int64) )
+      xx = IOR( xx, SHIFTL(xx, 2) )
+      xx = IAND( xx, int(z'3333333333333333', kind=int64) )
+      xx = IOR( xx, SHIFTL(xx, 1) )
+      xx = IAND( xx, int(z'5555555555555555', kind=int64) )
 
-    yy = (yy .or. SHIFTL(yy,16)) .and. int(z'0000FFFF0000FFFF',kind=int64)
-    yy = (yy .or. SHIFTL(yy, 8)) .and. int(z'00FF00FF00FF00FF',kind=int64)
-    yy = (yy .or. SHIFTL(yy, 4)) .and. int(z'0F0F0F0F0F0F0F0F',kind=int64)
-    yy = (yy .or. SHIFTL(yy, 2)) .and. int(z'3333333333333333',kind=int64)
-    yy = (yy .or. SHIFTL(yy, 1)) .and. int(z'5555555555555555',kind=int64)
+      ! ----- spread the bits of yy -------------------------------------------------
+      yy = IOR( yy, SHIFTL(yy, 16) )
+      yy = IAND( yy, int(z'0000FFFF0000FFFF', kind=int64) )
+      yy = IOR( yy, SHIFTL(yy, 8) )
+      yy = IAND( yy, int(z'00FF00FF00FF00FF', kind=int64) )
+      yy = IOR( yy, SHIFTL(yy, 4) )
+      yy = IAND( yy, int(z'0F0F0F0F0F0F0F0F', kind=int64) )
+      yy = IOR( yy, SHIFTL(yy, 2) )
+      yy = IAND( yy, int(z'3333333333333333', kind=int64) )
+      yy = IOR( yy, SHIFTL(yy, 1) )
+      yy = IAND( yy, int(z'5555555555555555', kind=int64) )
 
-    inter = ior(xx, SHIFTL(yy,1))! x‑bits are even, y‑bits odd
-    code = inter
-  end function morton2D
-
+      ! ----- interleave – x‑bits go to even positions, y‑bits to odd positions -----
+      inter = IOR( xx, SHIFTL(yy, 1) )
+      code  = inter
+    end function morton2D
   !-----------------------------------------------------------------
   !  Simple in‑place quicksort for an array of BoxWithMortonCode.
   !  It sorts by the mortonCode component (ascending).
