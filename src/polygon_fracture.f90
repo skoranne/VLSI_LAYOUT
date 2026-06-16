@@ -29,7 +29,7 @@ module PolygonFractureModule
 
   type :: XYTracker
      integer(kind=K_COORDINATE_KIND) :: X, Y
-     integer(kind=int64) :: polygonNumber 
+     integer(kind=int8) :: polygonNumber 
      ! the winding number of the vertex is the sign of polygonNumber
   end type XYTracker
 
@@ -425,7 +425,7 @@ contains
     !  Main scan‑line loop
     !-----------------------------------------------------------------
     do i = 1, n
-       winding_sign = sign(1_int64, trackers(i)%polygonNumber)
+       winding_sign = sign(1_int8, trackers(i)%polygonNumber)
        call update_active_edges(active_edges, trackers(i)%Y, winding_sign)
 
        process_x_slice = .false.

@@ -6,6 +6,7 @@
 !  HDF5_FC=ifx /scratch1/skoranne/INTELCOMPILERS/bin/h5fc -O3 disk.f90 -o disk.exe
 !  h5ls and h5stat show file info, and also use Julia HDF5 package
 !=====================================================================
+#ifdef USE_HDF5
 module HDFDataModule
   use iso_fortran_env,only: int32, int64
   use GeometryModule
@@ -544,3 +545,7 @@ contains
     close(file_unit)
   end subroutine WriteKLBin
 end module HDFDataModule
+#else
+module HDFDataModule
+end module HDFDataModule
+#endif

@@ -75,7 +75,7 @@ contains
           call StopMarkTime("program")
        case ('decl')
           rest = adjustl( rest ) !> remove leading whitespace
-          write(*,*), 'Declaration found: ', trim(rest)
+          write(*,*) 'Declaration found: ', trim(rest)
           ! Further logic to parse types (int, real, design, etc.)
           pos = index( rest, ' ' )
           write(*,*) 'KW (design/output) = ', trim(rest(1:pos-1))
@@ -115,7 +115,7 @@ contains
        case ('exec')
           print *, "Execution command:", rest
           rest = adjustl( rest ) !> remove leading whitespace
-          write(*,*), 'Declaration found: ', trim(rest)
+          write(*,*) 'Declaration found: ', trim(rest)
           ! Further logic to parse types (int, real, design, etc.)
           pos = index( rest, ' ' )
           write(*,*) 'KW (design/output) = ', trim(rest(1:pos-1))

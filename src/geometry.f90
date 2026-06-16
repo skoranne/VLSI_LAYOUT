@@ -178,7 +178,7 @@ contains
     logical :: res
     res = ( ( b1%x1 >= b1%x2) .or. ( b1%y1 >= b1%y2) )
     if( res ) then
-       write(*,'(A,4I)') 'Box ', b1%x1, b1%y1, b1%x2, b1%y2
+       write(*,'(A,4I8)') 'Box ', b1%x1, b1%y1, b1%x2, b1%y2
     end if
   end function CheckBox
   pure elemental function box_area(b) result(retval)
@@ -232,8 +232,8 @@ contains
           res = box_less_than( arr(i), arr(i+1) )
           if( .not. res ) then
              write(*,*) 'Box ',i, ' failed '
-             write(*,'(A,I,A,4I)') 'Box ', i, ': ', arr(i)%x1, arr(i)%y1, arr(i)%x2, arr(i)%y2
-             write(*,'(A,I,A,4I)') 'Box ', i+1, ': ', arr(i+1)%x1, arr(i+1)%y1, arr(i+1)%x2, arr(i+1)%y2             
+             write(*,'(A,I8,A,4I8)') 'Box ', i, ': ', arr(i)%x1, arr(i)%y1, arr(i)%x2, arr(i)%y2
+             write(*,'(A,I8,A,4I8)') 'Box ', i+1, ': ', arr(i+1)%x1, arr(i+1)%y1, arr(i+1)%x2, arr(i+1)%y2             
              return
           end if
        end do

@@ -6,7 +6,7 @@ program test_fracture
   use PolygonFractureModule
   use GeometryModule
   use DesignModule
-  use HDFDataModule
+  use KLDataModule
   use ContourExtractionModule
   !use BoxMergeModule
   use RTreeBuilder
@@ -47,11 +47,11 @@ program test_fracture
   !write(*,*) 'NARG = ', narg
   select case (narg)
   case (0)                     ! No arguments → use defaults
-     write(*,*), '0. Executing Token Tracking Fracture/Scanline Fracturing with Skip List...'
-     write(*,*), '1. BBOX GROW by ', K_BBOX_GROW_X, ' ', K_BBOX_GROW_Y
-     write(*,*), '2. Run HORIZONTAL Merge and save result'
-     write(*,*), '3. Check input and save sorted data'
-     write(*,*), '4. Convert input to HDF5'
+     write(*,*) '0. Executing Token Tracking Fracture/Scanline Fracturing with Skip List...'
+     write(*,*) '1. BBOX GROW by ', K_BBOX_GROW_X, ' ', K_BBOX_GROW_Y
+     write(*,*) '2. Run HORIZONTAL Merge and save result'
+     write(*,*) '3. Check input and save sorted data'
+     write(*,*) '4. Convert input to HDF5'
      write(*,*)  '5. Print Detailed Information: '     
      write(*,*)  '6. Convert input to COMPLEMENT and run Fracture/Contour/Fracture'
      write(*,*)  '7. Fracture/Contour/Fracture'
@@ -166,7 +166,7 @@ program test_fracture
      write(*,*), '3. Check input and save sorted data'
      allocate( input_layer%tree%tree_nodes( CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY ) ) )  
      call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
-     call saveToHDF(outFileName, input_layer%layer_boxes)
+     !call saveToHDF(outFileName, input_layer%layer_boxes)
      input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
      call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
      input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
@@ -192,14 +192,14 @@ program test_fracture
      call WriteKLBin(outFileName, input_layer%layer_boxes)     
      stop
   case (4)
-     call saveToHDF( outFileName, input_layer%layer_boxes )
+     !call saveToHDF( outFileName, input_layer%layer_boxes )
      stop
   case (5)
      write(*,*) '5. Print Detailed Information: '
      write(*,'(A5,I12,A,F18.8)') 'Num: ', input_layer%n_used, ' area = ', layer_area
      write(*,'(A,4I10,A,F18.8)') 'MBR: ', bbox, ' BOX_AREA: ', box_area(bbox)
      do i = 1, min(input_layer%n_used,10)
-        write(*,'(A,I,A,4I)') 'Box ', i, ': ', boxes(i)%x1, boxes(i)%y1, boxes(i)%x2, boxes(i)%y2
+        write(*,'(A,I8,A,4I8)') 'Box ', i, ': ', boxes(i)%x1, boxes(i)%y1, boxes(i)%x2, boxes(i)%y2
      end do
   case (6,7)
      if( control_parameter == 6 ) then

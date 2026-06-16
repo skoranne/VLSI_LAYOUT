@@ -17,7 +17,7 @@ module DataStructuresModule
   implicit none
   private                     ! hide everything by default
 
-  public :: UnionFind, uf_init_int64, uf_init_int64, uf_root_int64, uf_merge_int64, uf_reduce_int64,&
+  public :: UnionFind, uf_init_int64, uf_root_int64, uf_merge_int64, uf_reduce_int64,&
        uf_fullreduce_int64, uf_count_roots_int64, uf_expand_roots_int64
 
   !-----------------------------------------------------------------
