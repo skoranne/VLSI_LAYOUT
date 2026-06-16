@@ -25,6 +25,9 @@ module BoxMergeModule
      type(Box) :: pbox
      logical   :: active = .true. !> this is important
   end type ScanBox
+  type :: SkipListPointer
+     type(SkipListNode), pointer :: ptr => null()
+  end type SkipListPointer
 
   type :: SkipListNode
      integer(kind=K_COORDINATE_KIND) :: x1, y1, y2, x2
@@ -32,9 +35,6 @@ module BoxMergeModule
      type(SkipListPointer), allocatable :: forward(:)
   end type SkipListNode
 
-  type :: SkipListPointer
-     type(SkipListNode), pointer :: ptr => null()
-  end type SkipListPointer
 
   type :: SkipList
      type(SkipListNode), pointer :: header => null()

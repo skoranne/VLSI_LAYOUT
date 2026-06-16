@@ -4,15 +4,19 @@
 ################################################################################
 
 # --- Compiler & Flags ---
-FC = /scratch1/skoranne/INTELCOMPILERS/bin/h5fc
+FC = nvfortran
+#FORTRAN_COMPILER = /scratch1/skoranne/INTELCOMPILERS/bin/h5fc
+FORTRAN_COMPILER = /scratch1/skoranne/NVCOMPILERS/bin/h5fc
 # Debug flags (commented out, but easily swappable)
 # FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3 -xHost 
 # Use -pg
 #FCFLAGS = -g -O0 -check bounds -check all -traceback -warn all -qopenmp -qopt-report=3
-FCFLAGS = -O3 -parallel -qopenmp -qopt-report=3
+#FCFLAGS = -O3 -parallel -qopenmp -qopt-report=3
+FCFLAGS = -O3 
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables ---
-LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
+#LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
+LDFLAGS = -L/scratch1/skoranne/NVCOMPILERS/lib/
 LDLIBS = -lz -lhdf5_fortran -lhdf5
 
 # --- Library Definition ---
@@ -20,7 +24,9 @@ LIBRARY = libmagparser.a
 LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
-	   polygon_fracture.o boxmerge.o skiplist_module.o
+	   polygon_fracture.o boxmerge.o
+
+#skiplist_module.o
 
 # Create a list of all object files that will be compiled
 ALL_OBJS = $(LIB_OBJS) mainmagparser.o test_contour.o
@@ -54,10 +60,12 @@ clean:
 # This single rule replaces all the individual ".f90 -> .o" targets.
 # $< = the first dependency (the .f90 file)
 # $@ = the target (the .o file)
+#%.o: %.f90
+#	$(FORTRAN_COMPILER) $(FCFLAGS) -gen-dep=$(@:.o=.d) -c $< -o $@
 %.o: %.f90
-	$(FC) $(FCFLAGS) -gen-dep=$(@:.o=.d) -c $< -o $@
+	$(FORTRAN_COMPILER) $(FCFLAGS) -c $< -o $@
 %.o: %.F90
-	$(FC) $(FCFLAGS) -fpp -gen-dep=$(@:.o=.d) -c $< -o $@
+	$(FORTRAN_COMPILER) $(FCFLAGS) -fpp -gen-dep=$(@:.o=.d) -c $< -o $@
 
 # --- Library Creation ---
 # Bundles all the core objects into a single static library.

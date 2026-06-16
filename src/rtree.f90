@@ -1,48 +1,25 @@
 ! File    : rtree.f90
 ! Author  : Sandeep Koranne (C) All rights.reserved.
 ! Purpose : Implementation of MAGIC VLSI format parser and RTree
-
-module RTreeModule
-  use GeometryModule
-  implicit none
-  private
-  public :: ConstructRTree
-  ! This is a very special type of RTree
-  integer(kind=8), parameter :: MAX_LEAF_SIZE = 16
-  integer(kind=8), parameter :: MAX_NODE_SIZE = 16
-  type :: MemoryAllocator
-  end type MemoryAllocator
-  type :: RNode
-     integer(kind=8),dimension(MAX_LEAF_SIZE) :: slots
-  end type RNode
-contains
-  function ConstructRTree(boxes,n,allocator) result(retval)
-    type(Box), intent(in) :: boxes(:)
-    integer(kind=8), intent(in) :: n
-    type(MemoryAllocator), intent(inout) :: allocator
-    type(RNode) :: retval
-    retval%slots = 0
-  end function ConstructRTree
-end module RTreeModule
-
 module RTReeBuilder
+  use CommonModule
   use GeometryModule
   implicit none
   private
   public:: RTReeNode, CalculateTotalNodes, BuildRTree, ExplainTheTree, SelfTestTheTree, SearchTree, K_MAX_SEARCH_LEAVES
   type :: RTreeNode
      type(Box) :: mbr
-     integer(kind=4) :: num_children
+     integer(kind=K_COORDINATE_KIND) :: num_children
      integer(kind=8) :: child_start = -1
      integer(kind=8), allocatable :: child_indices(:)
   end type RTreeNode
   integer, parameter :: K_MAX_SEARCH_LEAVES = 16*4096
 contains
   pure function CalculateTotalNodes( n_boxes, capacity ) result(total_nodes)
-    integer(kind=8), intent(in) :: n_boxes
-    integer, intent(in) :: capacity    
-    integer(kind=8) :: total_nodes
-    integer(kind=8) :: current_level_nodes
+    integer(kind=int64), intent(in) :: n_boxes
+    integer(kind=int64), intent(in) :: capacity    
+    integer(kind=int64) :: total_nodes
+    integer(kind=int64) :: current_level_nodes
     total_nodes = 0    
     if (n_boxes == 0) return
 
@@ -63,12 +40,12 @@ contains
   !> pure
   pure subroutine BuildRTree(sorted_boxes, capacity, tree_nodes, root_index)
     type(Box), intent(in) :: sorted_boxes(:)
-    integer(kind=8), intent(in) :: capacity
+    integer(kind=int64), intent(in) :: capacity
     type(RTreeNode), intent(inout) :: tree_nodes(:)
-    integer(kind=8), intent(out) :: root_index
-    integer(kind=8) :: n_boxes, total_nodes, current_level_nodes, prev_level_nodes
-    integer(kind=8) :: i, j, child_start, child_end, node_idx, parent_idx
-    integer(kind=8) :: current_level_start, prev_level_start
+    integer(kind=int64), intent(out) :: root_index
+    integer(kind=int64) :: n_boxes, total_nodes, current_level_nodes, prev_level_nodes
+    integer(kind=int64) :: i, j, child_start, child_end, node_idx, parent_idx
+    integer(kind=int64) :: current_level_start, prev_level_start
     type(Box) :: agg_mbr
 
     n_boxes = size(sorted_boxes)
@@ -223,14 +200,14 @@ contains
   end function FixNumberChildren
   pure recursive subroutine SearchTree(tree_nodes, index, qbox, leafboxes, number_leaves)
     type(RTreeNode), intent(in) :: tree_nodes(:)
-    integer(kind=8), intent(in) :: index
+    integer(kind=int64), intent(in) :: index
     type(Box), intent(in)       :: qbox
-    integer(kind=8), intent(inout) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
-    integer(kind=8), intent(inout) :: number_leaves
+    integer(kind=int64), intent(inout) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
+    integer(kind=int64), intent(inout) :: number_leaves
     ! in case we are not sure we have found everything, we have to return -1
     type(Box) :: cmbr
     type(Box) :: tempBox
-    integer(kind=8) :: i, j
+    integer(kind=int64) :: i, j
     type(RTreeNode) :: childNode
     if( size(tree_nodes) == 0 ) then
        leafboxes(1) = 1
@@ -271,16 +248,16 @@ contains
   !+----------------------------------------------------------------------------------+        
   subroutine SelfTestTheTree(sorted_boxes, capacity, tree_nodes, root_index)
     type(Box), intent(in) :: sorted_boxes(:)
-    integer, intent(in) :: capacity
-    integer(kind=8), intent(in) :: root_index
+    integer(kind=int64), intent(in) :: capacity
+    integer(kind=int64), intent(in) :: root_index
     type(RTreeNode), intent(in) :: tree_nodes(:)
     !type(RTreeNode) :: tempNode, childNode
-    integer(kind=8) :: num_boxes
+    integer(kind=int64) :: num_boxes
     logical         :: BIG_FAIL
-    integer(kind=8) :: i
-    integer(kind=8) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
-    integer(kind=8) :: number_leaves
-    integer(kind=8) :: j, k
+    integer(kind=int64) :: i
+    integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
+    integer(kind=int64) :: number_leaves
+    integer(kind=int64) :: j, k
     logical         :: found         
     
     BIG_FAIL = .false.

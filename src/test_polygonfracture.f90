@@ -8,7 +8,7 @@ program test_fracture
   use DesignModule
   use HDFDataModule
   use ContourExtractionModule
-  use BoxMergeModule
+  !use BoxMergeModule
   use RTreeBuilder
   use DataStructuresModule
   use PNumMergeModule
@@ -143,8 +143,8 @@ program test_fracture
      else
         write(*,'(A,F25.8,A,F25.8)') 'Expected AREA of complement = ', box_area(bbox) - layer_area, ' and ', complement_area
      end if
-     call extract_contours(input_layer%layer_boxes, box_count, contours, num_contours)
-     write(*,*) 'Extracted ', num_contours, ' contours'
+     !call extract_contours(input_layer%layer_boxes, box_count, contours, num_contours)
+     !write(*,*) 'Extracted ', num_contours, ' contours'
      stop
   case (1)
      write(*,*), '1. BBOX GROW by ', K_BBOX_GROW_X, ' ', K_BBOX_GROW_Y     
@@ -157,7 +157,7 @@ program test_fracture
   case (2)
      write(*,*) 'Running HORIZONTAL based merge: '
      output_layer%layer_boxes = input_layer%layer_boxes
-     call merge_boxes_using_scanline( output_layer%layer_boxes )
+     !call merge_boxes_using_scanline( output_layer%layer_boxes )
      output_layer%n_used = size( output_layer%layer_boxes )
      call WriteKLBin(outFileName, output_layer%layer_boxes)
      !call saveToHDF( outFileName, output_layer%layer_boxes)

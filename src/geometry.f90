@@ -3,7 +3,7 @@
 ! Purpose : Implementation of MAGIC VLSI format parser
 
 module GeometryModule
-  use iso_fortran_env, only: int32, int64, real64
+  use iso_fortran_env, only: int8, int32, int64, real64
   use CommonModule
   implicit none
   private
@@ -14,8 +14,8 @@ module GeometryModule
        calculate_polygon_union_area, PolygonBooleanAND, heal_boxes3, sort_int_array, box_grow, is_square, &
        calculate_union_area_fast, sort_events, Event
   ! Enum-like constants for the sorting axis
-  integer, parameter :: AXIS_X = 1
-  integer, parameter :: AXIS_Y = 2
+  integer(kind=int64), parameter :: AXIS_X = 1
+  integer(kind=int64), parameter :: AXIS_Y = 2
   !>   type, bind(C) :: Box
   type :: Box
      integer(kind=K_COORDINATE_KIND) :: x1, y1, x2, y2
@@ -47,7 +47,7 @@ module GeometryModule
   ! Auxiliary data structure for the sweep-line
   type :: Event
      integer(kind=K_COORDINATE_KIND) :: x, y1, y2
-     integer(kind=K_COORDINATE_KIND) :: lap_change ! +1 for left edge, -1 for right edge
+     integer(kind=int8) :: lap_change ! +1 for left edge, -1 for right edge
      integer :: owner ! 1 for Shape A, 2 for Shape B     
   end type Event
 
@@ -340,11 +340,10 @@ contains
 
   subroutine str_pack(arr, node_capacity)
     type(Box), intent(inout), dimension(:) :: arr
-    integer, intent(in) :: node_capacity
-
-    integer :: n, num_leaves, num_slices
-    integer :: slice_size, slice_start, slice_end
-    integer :: i
+    integer(kind=int64), intent(in) :: node_capacity
+    integer(kind=int64) :: n, num_leaves, num_slices
+    integer(kind=int64) :: slice_size, slice_start, slice_end
+    integer(kind=int64) :: i
 
     n = size(arr)
     if (n <= node_capacity) return
@@ -360,7 +359,7 @@ contains
     slice_size = ceiling(real(n) / real(num_slices))
 
     ! 2. Sort the entire array by the X-center coordinate
-    call quicksort_boxes_STR(arr, 1, n, AXIS_X)
+    call quicksort_boxes_STR(arr, 1_int64, n, AXIS_X)
 
     ! 3. Divide into S vertical slices and sort each by Y-center
     do i = 1, num_slices
@@ -376,9 +375,9 @@ contains
   end subroutine str_pack
   subroutine insertion_sort_boxes(arr, left, right, axis)
     type(Box), intent(inout), dimension(:) :: arr
-    integer, intent(in) :: left, right, axis
+    integer(kind=int64), intent(in) :: left, right, axis
 
-    integer :: i, j
+    integer(kind=int64) :: i, j
     type(Box) :: key
     real :: key_center, current_center
 
@@ -416,9 +415,9 @@ contains
   end subroutine insertion_sort_boxes
   recursive subroutine quicksort_boxes_STR(arr, left, right, axis)
     type(Box), intent(inout), dimension(:) :: arr
-    integer, intent(in) :: left, right, axis
+    integer(kind=int64), intent(in) :: left, right, axis
     integer, parameter :: K_SMALL_THRESHOLD = 64 !> 16 was worse than 32
-    integer :: i, j
+    integer(kind=int64) :: i, j
     real :: pivot_center, current_center
     type(Box) :: temp
 
@@ -490,7 +489,7 @@ contains
   ! Wrapper subroutine to match your original interface
   subroutine omt_pack(arr, node_capacity)
     type(Box), intent(inout), dimension(:) :: arr
-    integer, intent(in) :: node_capacity
+    integer(kind=int64), intent(in) :: node_capacity
     type(Box), allocatable, dimension(:) :: workspace
 
     if (size(arr) <= node_capacity) return
@@ -500,7 +499,7 @@ contains
     allocate(workspace(size(arr)))
     !$omp parallel default(none) shared(arr,workspace) firstprivate(node_capacity)
     !$omp single nowait
-    call omt_pack_recursive(arr, 1, size(arr), node_capacity, workspace)
+    call omt_pack_recursive(arr, 1_int64, int(size(arr),kind=int64), node_capacity, workspace)
     !$omp end single
     !$omp end parallel
 
@@ -511,7 +510,7 @@ contains
   ! Recursive Top-Down Partitioning
   recursive subroutine omt_pack_recursive(arr, start_idx, end_idx, node_capacity, workspace)
     type(Box), intent(inout), dimension(:) :: arr
-    integer, intent(in) :: start_idx, end_idx, node_capacity
+    integer(kind=int64), intent(in) :: start_idx, end_idx, node_capacity
     type(Box), intent(inout), dimension(:) :: workspace
     integer, parameter :: MIN_TASK_SIZE = 32768
     !On MW
@@ -520,7 +519,7 @@ contains
     !OpenMP with 32768
     !Sorting/OMT completed in     39305.40 CPU seconds.     1304.20 REAL seconds.                                                  
 
-    integer :: n, num_leaves, left_leaves, split_idx
+    integer(kind=int64) :: n, num_leaves, left_leaves, split_idx
     real :: overlap_x, area_x, overlap_y, area_y
 
     n = end_idx - start_idx + 1
@@ -574,13 +573,13 @@ contains
   ! Helper Subroutine: Computes the cost (Overlap and Area) of a proposed split
   subroutine evaluate_split(arr, start_idx, split_idx, end_idx, overlap, total_area)
     type(Box), intent(in), dimension(:) :: arr
-    integer, intent(in) :: start_idx, split_idx, end_idx
+    integer(kind=int64), intent(in) :: start_idx, split_idx, end_idx
     real, intent(out) :: overlap, total_area
 
-    integer(kind=4) :: l_xmin, l_xmax, l_ymin, l_ymax
-    integer(kind=4) :: r_xmin, r_xmax, r_ymin, r_ymax
-    integer(kind=4) :: over_x, over_y
-    integer :: i
+    integer(kind=int64) :: l_xmin, l_xmax, l_ymin, l_ymax
+    integer(kind=int64) :: r_xmin, r_xmax, r_ymin, r_ymax
+    integer(kind=int64) :: over_x, over_y
+    integer(kind=int64) :: i
 
     ! Initialize left MBR
     l_xmin = arr(start_idx)%x1; l_xmax = arr(start_idx)%x2
@@ -1622,7 +1621,7 @@ contains
   !--------------------------------------------------------------
   pure recursive subroutine update_tree(node, start_idx, end_idx, l, r, val, unique_y, count, length)
     integer, intent(in) :: node, start_idx, end_idx, l, r
-    integer(int32), intent(in) :: val
+    integer(kind=int8), intent(in) :: val
     integer(int32), intent(in) :: unique_y(:)
     integer(int32), intent(inout) :: count(:)
     integer(int64), intent(inout) :: length(:)

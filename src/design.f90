@@ -36,7 +36,7 @@ module DesignModule
      type(Box), allocatable :: layer_boxes(:)
      integer(kind=8)        :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
      type(LayerTree)        :: tree
-     type(UnionFind(int64)) :: pnumtable
+     type(UnionFind)        :: pnumtable
      real(kind=real64)      :: area, perimeter
   end type Layer
   type :: Design
@@ -315,7 +315,7 @@ contains
     if( input_layer%pnumtable%arr( permutation( segments(1)%end_idx ) ) == 0 ) then
        !write (*,*) 'Indeed, RECTS ', segments(1)%end_idx
        final_boxes(1:segments(1)%end_idx) = input_layer%layer_boxes( &
-            permutation( segments( 1 )%start_idx:permutation( segments( 1 )%end_idx ) ) )
+            permutation( segments( 1 )%start_idx: segments( 1 )%end_idx ) )
        final_count = segments(1)%end_idx
        if( input_layer%pnumtable%arr( permutation( segments(1)%start_idx ) ) /= 0 ) error stop "END_IDX=0, but START_IDX /= 0"
        !write (*,*) 'Input RECTANGLES copied over directly'

@@ -7,7 +7,7 @@ module PolygonFractureModule
   use CommonModule
   use GeometryModule
   use HDFDataModule
-  use, intrinsic :: iso_fortran_env, only: int32, int64, real64
+  use, intrinsic :: iso_fortran_env, only: int8, int32, int64, real64
   implicit none
   private
 
@@ -89,7 +89,7 @@ contains
     ! Consume the first node as the Sentinel Header via subroutine call
     call SL_GET_FREE(list, temp_node)
     list%header => temp_node
-    list%header%y_val = -huge(1_int64)
+    list%header%y_val = -huge(1_K_COORDINATE_KIND)
     list%header%lap_change = 0
   end subroutine init_skiplist
 
@@ -161,12 +161,12 @@ contains
     !   The implementation uses **forward links only** – the
     !   Backward array has been eliminated.
     !--------------------------------------------------------------------
-    use, intrinsic :: iso_fortran_env, only: int64
+    use, intrinsic :: iso_fortran_env, only: int8, int64
     implicit none
 
     type(SkipList), intent(inout), target :: list
     integer(kind=K_COORDINATE_KIND), intent(in) :: y_val
-    integer(kind=int64), intent(in)              :: lap_delta
+    integer(kind=int8), intent(in)              :: lap_delta
 
     ! Local helpers ----------------------------------------------------
     type(NodePtr)                :: update(MAX_SKIP_LEVEL)   ! predecessor per level
@@ -375,7 +375,7 @@ contains
     !  OUTPUT
     !    fractured_boxes(:) – non‑overlapping boxes produced by the scan.
     !-----------------------------------------------------------------
-    use iso_fortran_env, only: int64
+    use iso_fortran_env, only: int8, int64
     implicit none
 
     type(XYTracker),               intent(inout) :: trackers(:)
@@ -388,7 +388,8 @@ contains
     type(SkipListNode), pointer        :: current_node
     integer                            :: i, n
     integer(kind=K_COORDINATE_KIND)    :: current_x, y_start, y_end
-    integer(kind=int64)                :: winding_sign, current_lap
+    integer(kind=int64)                :: current_lap
+    integer(kind=int8)                 :: winding_sign
     integer(kind=int64)                :: max_sweep_capacity
     type(ActiveRegion), target, allocatable :: region_bank_A(:), region_bank_B(:), temp_regions(:)
     type(ActiveRegion), pointer        :: prev_regions(:), curr_regions(:), swap_ptr(:)
@@ -618,7 +619,8 @@ contains
 
     integer :: i, n
     integer(kind=K_COORDINATE_KIND) :: current_x, y_start, y_end
-    integer(kind=int64) :: winding_sign, current_lap, max_sweep_capacity
+    integer(kind=int8)                 :: winding_sign    
+    integer(kind=int64) :: current_lap, max_sweep_capacity
 
     type(ActiveRegion), target, allocatable :: region_bank_A(:), region_bank_B(:), temp_regions(:)
     type(ActiveRegion), pointer :: prev_regions(:), curr_regions(:), swap_ptr(:)
@@ -648,7 +650,7 @@ contains
     n_prev = 0
 
     do i = 1, n
-       winding_sign = sign(1_int64, trackers(i)%polygonNumber)
+       winding_sign = sign(1_int8, trackers(i)%polygonNumber)
        call update_active_edges(active_edges, trackers(i)%Y, winding_sign)
 
        process_x_slice = .false.
@@ -813,7 +815,7 @@ contains
     integer(kind=int64) :: n
     integer(kind=K_COORDINATE_KIND) :: current_x, y_start, y_end, min_y, max_y, min_x, max_x
     integer(kind=int64) :: current_lap
-
+    integer(kind=int8)                 :: winding_sign
     type(ActiveRegion), target, allocatable :: region_bank_A(:), region_bank_B(:), temp_regions(:)
     type(ActiveRegion), pointer :: prev_regions(:), curr_regions(:), swap_ptr(:)
     integer :: n_prev, n_curr, p, c
@@ -854,7 +856,8 @@ contains
     n_prev = 0
 
     do i = 1, 4*n
-       call update_active_edges(active_edges, events(i)%Y, events(i)%polygonNumber)
+       winding_sign = sign(1_int8, events(i)%polygonNumber)       
+       call update_active_edges(active_edges, events(i)%Y, winding_sign)
 
        process_x_slice = .false.
        if (i == 4*n) then
@@ -1009,7 +1012,7 @@ contains
        do while (ev_idx <= 2*n)
           if (events(ev_idx)%x /= current_x) exit
 
-          call update_active_edges(sl, events(ev_idx)%y1, events(ev_idx)%lap_change)
+          call update_active_edges(sl, events(ev_idx)%y1,  events(ev_idx)%lap_change)
           call update_active_edges(sl, events(ev_idx)%y2, -events(ev_idx)%lap_change)
 
           ev_idx = ev_idx + 1

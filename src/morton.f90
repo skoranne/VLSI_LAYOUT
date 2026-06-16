@@ -29,11 +29,18 @@ contains
     type(Box),allocatable,   intent(inout)  :: boxes(:)
     type(BoxWithMortonCode), allocatable    :: sorted_aux(:)
     type(Box), allocatable                  :: temp_boxes(:)
+    integer(kind=int64)                     :: i,n
     allocate(sorted_aux(size(boxes)))
     call morton_sort_boxes( boxes, sorted_aux )
     allocate(temp_boxes(size(boxes)))
     ! 3. The "Gather" step using vector subscripts
-    temp_boxes = boxes(sorted_aux(:)%boxId)
+    !temp_boxes = boxes(sorted_aux(:)%boxId)
+    n = size(boxes)
+    do i = 1, n
+       ! sorted_aux(i)%boxId is the original 1‑based index of the box that
+       ! must appear at position i in the sorted order.
+       temp_boxes(i) = boxes( sorted_aux(i)%boxId )
+    end do
     ! 4. The "Move" step (transfers allocation status and data instantly)
     call move_alloc(from=temp_boxes, to=boxes)
   end subroutine MortonSort

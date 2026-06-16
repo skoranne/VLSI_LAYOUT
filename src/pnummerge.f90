@@ -67,7 +67,7 @@ contains
 
   subroutine process_edges(uf,eb)
     ! We fix the first dimension to 2, and leave the second as assumed-shape
-    type(UnionFind(int64)), intent(inout) :: uf
+    type(UnionFind), intent(inout) :: uf
     type(EdgeBuffer), intent(in) :: eb
     integer :: k
     do k = 1, eb%count
@@ -79,9 +79,9 @@ contains
   end subroutine process_edges
 
   subroutine PerformMerge(uf, sorted_boxes, capacity, tree_nodes, root_index, overlap_area, overlap_perimeter)
-    type(UnionFind(int64)), intent(out) :: uf        
+    type(UnionFind), intent(out) :: uf        
     type(Box), intent(in) :: sorted_boxes(:)
-    integer, intent(in) :: capacity
+    integer(kind=int64), intent(in) :: capacity
     type(RTreeNode), intent(in) :: tree_nodes(:)
     integer(kind=int64), intent(in) :: root_index
     real(kind=real64), intent(out)   :: overlap_area
@@ -103,7 +103,7 @@ contains
     allocate(overlap_areas(nthreads))
     allocate(overlap_perimeters(nthreads))    
     do i=1,nthreads
-       call init_buffer(buffers(i), initial_capacity=10000)
+       call init_buffer(buffers(i), initial_capacity=int(10000,kind=int64))
        overlap_areas(i) = 0.0
        overlap_perimeters(i) = 0.0
     end do
