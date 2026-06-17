@@ -99,7 +99,6 @@ contains
 
 
     nthreads = omp_get_max_threads()
-    write(*,*) ' Running on ', nthreads
     allocate(buffers(nthreads))
     allocate(overlap_areas(nthreads))
     allocate(overlap_perimeters(nthreads))    
@@ -171,7 +170,7 @@ contains
     end if
     call uf%fullreduce()
   end subroutine PerformMerge
-  
+
 end module PNumMergeModule
 
 

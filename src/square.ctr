@@ -1,9 +1,11 @@
 # Control file for MAGPARSER
 program square
 systeminfo
-decl design d1 = square.mag
+decl design d1 = INV.mag
 decl output o1 = foo.mag
 decl output o2 = bar.mag
+decl memory f1 = nothing
 info
-# decl design d2 = MY_SED.mag
+exec run f1:diff = d1:pdiff + d1:ndiff
+exec run o1:gate = d1:poly * f1:diff
 end 

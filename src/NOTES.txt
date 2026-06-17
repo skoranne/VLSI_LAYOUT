@@ -334,5 +334,11 @@ OUTPUT_COUNT =              48305128
                 AND  8150.02 CPU seconds.  492.33 REAL seconds. FULL TIME:   493.60 MEM: VM      8243012 RSS:      4485492
  POLY AND DIFF		
                 AND 10093.01 CPU seconds.  532.24 REAL seconds. FULL TIME:   533.45 MEM: VM      7633600 RSS:      3925300
+  Running on            20
+On DGX Spark
+                AND   197.95 CPU seconds.  197.95 REAL seconds. FULL TIME:   201.01 MEM: VM     13601752 RSS:      4222132
+INFO: Writing array of         33824011 boxes.
 		
 ```
+apptainer exec --bind /scratch1/ MAGPARSER.sif /opt/CONVERT.exe POLY.bin DIFF.bin z.bin 11
+OMP_NUM_THREADS=4 in the container and we get decent runs

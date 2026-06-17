@@ -636,7 +636,7 @@ contains
     write (*,*) '+-----------------------------------------------------------------+'    
     write(*,*) ''
     do i = 1, size(layers)
-       deallocate( layers(i)%layer_boxes )
+       !deallocate( layers(i)%layer_boxes ) !? > this is not expected
     end do
   end subroutine parseMagicLayoutFile
 

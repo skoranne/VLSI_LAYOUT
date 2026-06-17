@@ -16,6 +16,7 @@ module DesignModule
   private
   public :: Design, Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
        LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, &
+       DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY,&
        NeedsSorting, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
        get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon, &
        CalculateSingleLayerAND, CalculateAND, CalculateOR
@@ -515,7 +516,7 @@ contains
        !$komp critical (heal_boxes_lock) !> work around
        call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
        !$komp end critical (heal_boxes_lock)
-       write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
+       !write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
        input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
        input_layer%n_used = output_box_count
     end if
@@ -549,7 +550,6 @@ contains
     if( alloc_status /= 0 ) then
        error stop "ALLOCATION FAILED: "
     end if
-    !do i=1,input_layer_A%n_used
     output_layer%layer_boxes(1:input_layer_A%n_used) = input_layer_A%layer_boxes
     output_layer%layer_boxes(1+input_layer_A%n_used:) = input_layer_B%layer_boxes
     output_layer%n_used = input_layer_A%n_used + input_layer_B%n_used

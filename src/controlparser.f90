@@ -27,6 +27,9 @@ module ControlModule
   use MagicVLSILayoutParser  
   implicit none
   public :: ParseControlFile, GetLayerFromDBName
+  integer, parameter :: PARSE_OK = 0
+  integer, parameter :: PARSE_ERR_SYNTAX = 1
+  integer, parameter :: PARSE_ERR_UNKNOWN = 2
 contains
 
   !=================================================================
@@ -78,16 +81,47 @@ contains
     input_layer = design_dbs(db_index)%layers(layer_index)
 
   end subroutine GetLayerFromDBName
+  !=================================================================
+  ! EvaluateExpression – parses a whole expression and returns a Layer.
+  !=================================================================
+  function EvaluateExpression( expr, design_hash_table, design_dbs, status ) result(res_layer)
+    character(len=*), intent(in) :: expr
+    type(hash_type),   intent(in) :: design_hash_table
+    type(Design), allocatable, intent(in) :: design_dbs(:)
+    integer,            intent(out) :: status
+    type(Layer) :: res_layer
+    integer :: pos, err
+
+    pos = 1
+    err = PARSE_OK
+
+    call skip_spaces( expr, pos )
+    call parse_expr( expr, pos, design_hash_table, design_dbs, &
+         res_layer, err )
+    call skip_spaces( expr, pos )
+    if ( pos <= len_trim(expr) .and. err == PARSE_OK ) err = PARSE_ERR_SYNTAX
+
+    status = err
+    if ( err /= PARSE_OK ) then
+       write(*,*) "Parse error (code=", err, ") near: '", &
+            expr(pos:), "'"
+       error stop "Expression parsing failed"
+    end if
+  end function EvaluateExpression
 
   subroutine ParseControlFile( fileName, MAX_LAYERS )
     character(len=*), intent(in) :: fileName
     integer, intent(in) :: MAX_LAYERS
     integer, parameter  :: K_MAX_DBS = 32 !< will this work
     character(len=256) :: line, keyword, rest
-    integer :: unit, ios, pos, line_number, db_count
+    integer :: unit, ios, pos, line_number, db_count, parse_status
+    integer :: lhs_db_index, rhs1_db_index, rhs2_db_index
+    integer :: lhs_layer_index, rhs1_layer_index, rhs2_layer_index    
     type(Design), allocatable :: design_dbs(:)
+    type(Layer) :: lhs_layer, rhs1_layer, rhs2_layer
     type(hash_type) :: ht
     logical :: ins
+    character :: operator_char !> single letter only
     db_count = 1
     call hash_create(ht,K_MAX_DBS)
     allocate( design_dbs( K_MAX_DBS ) )
@@ -129,7 +163,7 @@ contains
           write(*,*) 'Declaration found: ', trim(rest)
           ! Further logic to parse types (int, real, design, etc.)
           pos = index( rest, ' ' )
-          write(*,*) 'KW (design/output) = ', trim(rest(1:pos-1))
+          write(*,*) 'KW (design/output/memory) = ', trim(rest(1:pos-1))
           if( trim(rest(1:pos-1)) == 'output' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
@@ -140,6 +174,9 @@ contains
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
              write(*,*) 'Generating output in MAGIC file: ', trim(keyword(1:pos)) !> file
+             design_dbs(db_count)%design_direction = DESIGN_DIRECTION_OUTPUT
+             call hash_create(design_dbs(db_count)%ht, MAX_LAYERS )
+             allocate( design_dbs(db_count)%layers( MAX_LAYERS ) )
              db_count = db_count+1
           else if( trim(rest(1:pos-1)) == 'design' ) then
              rest = adjustl(rest(pos+1:))             
@@ -153,6 +190,22 @@ contains
              write(*,*) 'DB handle = ', trim(keyword(1:pos)) !> file
              call parseMagicLayoutFile(design_dbs(db_count), trim(keyword(1:pos)), MAX_LAYERS)
              db_count = db_count + 1
+          else if( trim(rest(1:pos-1)) == 'memory' ) then
+             rest = adjustl(rest(pos+1:))             
+             pos = index( rest, ' ' )
+             write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
+             call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
+             if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
+             pos = index( rest, ' ' )          
+             keyword = adjustl(rest(pos+2:))
+             pos = index( keyword, ' ' )
+             write(*,*) 'DB handle = ', trim(keyword(1:pos)), ' assigned DB_COUNT: ', db_count !> file
+             !call parseMagicLayoutFile(design_dbs(db_count), trim(keyword(1:pos)), MAX_LAYERS)
+             design_dbs(db_count)%design_direction = DESIGN_DIRECTION_MEMORY
+             call hash_create(design_dbs(db_count)%ht, MAX_LAYERS )
+             allocate( design_dbs(db_count)%layers( MAX_LAYERS ) )
+             db_count = db_count + 1
+             cycle read_loop
           else
              write(*,*) 'Syntax ERROR: line: ', line_number
              error stop "Syntax ERROR."
@@ -160,27 +213,94 @@ contains
        case ('systeminfo') !> print information about the state of the system
           call PrintFullInformation()
        case ('info') !> print information about RSS of current pid
+          call StopMarkTime("info")
        case ('var')
           print *, "Variable definition:", rest
-
        case ('exec')
           print *, "Execution command:", rest
+          !lhs_layer = EvaluateExpression( rest, ht, design_dbs, parse_status )
           rest = adjustl( rest ) !> remove leading whitespace
           write(*,*) 'Declaration found: ', trim(rest)
           ! Further logic to parse types (int, real, design, etc.)
           pos = index( rest, ' ' )
-          write(*,*) 'KW (design/output) = ', trim(rest(1:pos-1))
-          if( trim(rest(1:pos-1)) == 'output' ) then
+          write(*,*) 'KW? (run/push/group) = ', trim(rest(1:pos-1))
+          if( trim(rest(1:pos-1)) == 'run' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
-             write(*,*) 'Output DB handle = ', trim(rest(1:pos-1)) !> o1
-             call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
-             if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
-             pos = index( rest, ' ' )          
-             keyword = adjustl(rest(pos+2:))
-             pos = index( keyword, ' ' )
-             write(*,*) 'Generating output in MAGIC file: ', trim(keyword(1:pos)) !> file
-             db_count = db_count+1
+             write(*,*) 'LHS = ', trim(rest(1:pos-1)) !> f1:gate
+             pos = index( trim(rest(1:pos-1)),':')
+             call hash_get( ht, trim(rest(1:pos-1)), lhs_db_index, ins )
+             if( .not. ins ) then
+                write(*,*) 'DB: ', trim(rest(1:pos-1)), ' not found.'
+                write(*,*) 'Syntax ERROR: line: ', line_number                
+                error stop "Syntax ERROR"
+             else
+                write(*,*) 'Using LHS DB Index: ', lhs_db_index
+             end if
+             rest = adjustl(rest(pos+1:))
+             pos  = index( rest, ' ')
+             call hash_get( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
+             if( ins .and. design_dbs( lhs_db_index )%design_direction == DESIGN_DIRECTION_MEMORY ) then
+                write(*,*) 'MEMORY LEAK: Reusing LHS Layer name: ', trim(rest(1:pos-1)), ' index: ', lhs_layer_index
+             end if
+             lhs_layer_index = hash_nitems(design_dbs( lhs_db_index )%ht)+1
+             write(*,*) 'Using DB Index, we get LHS layer index = ', lhs_layer_index, ' for ', trim(rest(1:pos-1))
+             call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index,ins )
+             lhs_layer = design_dbs( lhs_db_index )%layers(lhs_layer_index)
+             rest = adjustl(rest(pos+1:))
+             write(*,*) 'RESTA = ', trim(rest)
+             pos  = index( rest, '= ')
+             rest = adjustl(rest(pos+1:))
+             write(*,*) 'RESTB = ', trim(rest)
+             pos = index( rest, ':' )
+             write(*,*) 'RESTC = ', trim(rest(1:pos-1))
+             call hash_get( ht, trim(rest(1:pos-1)), rhs1_db_index, ins )
+             rest = adjustl(rest(pos+1:))
+             pos  = index( rest, ' ')
+             call hash_get( design_dbs( rhs1_db_index )%ht, trim(rest(1:pos-1)), rhs1_layer_index, ins )
+             rhs1_layer = design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
+
+             rest = adjustl(rest(pos+1:))
+             write(*,*) 'RESTD = ', trim(rest)
+             pos  = scan( rest, '+-*%^.')
+             if( pos == 0 ) then
+                write(*,*) 'Syntax ERROR: line: ', line_number                
+                error stop "SYNTAX ERROR"
+             end if
+             !> valid operator found
+             operator_char = rest(pos:pos)
+             write(*,*) 'Found character operator: ', operator_char
+             rest = adjustl(rest(pos+1:))
+             write(*,*) 'RESTE = ', trim(rest)
+             pos = index( rest, ':' )
+             write(*,*) 'RESTF = ', trim(rest(1:pos-1))
+             call hash_get( ht, trim(rest(1:pos-1)), rhs2_db_index, ins )
+             rest = adjustl(rest(pos+1:))
+             pos  = index( rest, ' ')
+             call hash_get( design_dbs( rhs2_db_index )%ht, trim(rest(1:pos-1)), rhs2_layer_index, ins )
+             rhs2_layer = design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
+             pos  = index( rest, ' ')
+             write(*,'(A,I3,A,I3,A,I3,A,I3,A4,I3,A,I3)') 'Getting ready to execute: ', &
+                  lhs_db_index,':',lhs_layer_index, ' = ', &
+                  rhs1_db_index,':',rhs1_layer_index, operator_char, rhs2_db_index,':',rhs2_layer_index
+             select case (operator_char)
+             case('+')
+                call StartMarkTime("OR")
+                write(*,'(A,I8,A,I8)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used
+                call CalculateOR( rhs1_layer, rhs2_layer, lhs_layer )
+                call StopMarkTime("OR")                
+             case('*')
+                call StartMarkTime("AND")
+                write(*,'(A,I8,A,I8)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used
+                call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )                
+                call StopMarkTime("AND")                
+             case('-')
+             case('^')
+             case('%')
+             case('.')
+             end select
+             
+             cycle read_loop
           else if( trim(rest(1:pos-1)) == 'design' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
@@ -192,6 +312,7 @@ contains
              pos = index( keyword, ' ' )
              write(*,*) 'DB handle = ', trim(keyword(1:pos)) !> file
              call parseMagicLayoutFile(design_dbs(db_count), trim(keyword(1:pos)), MAX_LAYERS)
+             design_dbs(db_count)%design_direction = DESIGN_DIRECTION_INPUT
              db_count = db_count + 1
           else
              write(*,*) 'Syntax ERROR: line: ', line_number
@@ -210,5 +331,270 @@ contains
 100 continue !end of file
     close(unit)
   end subroutine ParseControlFile
+
+  !> helper function, hopefully we do not have to debug them often
+  !---------------------------------------------------------------
+  ! Skip blanks – tiny utility used everywhere.
+  !---------------------------------------------------------------
+  pure subroutine skip_spaces( str, i )
+    character(len=*), intent(in) :: str
+    integer,          intent(inout) :: i
+    do while ( i <= len_trim(str) .and. str(i:i) == ' ' )
+       i = i + 1
+    end do
+  end subroutine skip_spaces
+
+  !---------------------------------------------------------------
+  ! parse_expr  →  term { (+|-) term }
+  !---------------------------------------------------------------
+  subroutine parse_expr( str, i, dhash, dbs, result, err )
+    character(len=*), intent(in)    :: str
+    integer,          intent(inout) :: i
+    type(hash_type),  intent(in)    :: dhash
+    type(Design), allocatable, intent(in) :: dbs(:)
+    type(Layer),      intent(out)   :: result
+    integer,          intent(inout) :: err
+
+    type(Layer) :: left, right
+    character(len=1) :: op
+
+    call parse_term( str, i, dhash, dbs, left, err )
+    if ( err /= PARSE_OK ) return
+
+    call skip_spaces( str, i )
+    do while ( i <= len_trim(str) .and. ( str(i:i) == '+' .or. &
+         str(i:i) == '-' ) )
+       op = str(i:i)
+       i = i + 1
+       call skip_spaces( str, i )
+       call parse_term( str, i, dhash, dbs, right, err )
+       if ( err /= PARSE_OK ) return
+
+       select case (op)
+       case ('+')
+          call CalculateOR ( left, right, left )
+       case ('-')
+          call CalculateOR( left, right, left )
+       end select
+       call skip_spaces( str, i )
+    end do
+    result = left
+  end subroutine parse_expr
+
+  !---------------------------------------------------------------
+  ! parse_term  →  factor { (*|%) factor }
+  !---------------------------------------------------------------
+  subroutine parse_term( str, i, dhash, dbs, result, err )
+    character(len=*), intent(in)    :: str
+    integer,          intent(inout) :: i
+    type(hash_type),  intent(in)    :: dhash
+    type(Design), allocatable, intent(in) :: dbs(:)
+    type(Layer),      intent(out)   :: result
+    integer,          intent(inout) :: err
+
+    type(Layer) :: left, right
+    character(len=1) :: op
+
+    call parse_factor( str, i, dhash, dbs, left, err )
+    if ( err /= PARSE_OK ) return
+
+    call skip_spaces( str, i )
+    do while ( i <= len_trim(str) .and. ( str(i:i) == '*' .or. &
+         str(i:i) == '%' ) )
+       op = str(i:i)
+       i = i + 1
+       call skip_spaces( str, i )
+       call parse_factor( str, i, dhash, dbs, right, err )
+       if ( err /= PARSE_OK ) return
+
+       select case (op)
+       case ('*')
+          call CalculateAND ( left, right, left )
+       case ('%')
+          call CalculateAND  ( left, right, left )
+       end select
+       call skip_spaces( str, i )
+    end do
+    result = left
+  end subroutine parse_term
+
+  !---------------------------------------------------------------
+  ! parse_factor → primary { ^ primary }
+  !---------------------------------------------------------------
+  subroutine parse_factor( str, i, dhash, dbs, result, err )
+    character(len=*), intent(in)    :: str
+    integer,          intent(inout) :: i
+    type(hash_type),  intent(in)    :: dhash
+    type(Design), allocatable, intent(in) :: dbs(:)
+    type(Layer),      intent(out)   :: result
+    integer,          intent(inout) :: err
+
+    type(Layer) :: left, right
+
+    call parse_primary( str, i, dhash, dbs, left, err )
+    if ( err /= PARSE_OK ) return
+
+    call skip_spaces( str, i )
+    do while ( i <= len_trim(str) .and. str(i:i) == '^' )
+       i = i + 1
+       call skip_spaces( str, i )
+       call parse_primary( str, i, dhash, dbs, right, err )
+       if ( err /= PARSE_OK ) return
+       call CalculateAND( left, right, left )
+       call skip_spaces( str, i )
+    end do
+    result = left
+  end subroutine parse_factor
+
+  !---------------------------------------------------------------
+  ! parse_primary → layer_ref | number | '(' expr ')'
+  !---------------------------------------------------------------
+  subroutine parse_primary( str, i, dhash, dbs, result, err )
+    character(len=*), intent(in)    :: str
+    integer,          intent(inout) :: i
+    type(hash_type),  intent(in)    :: dhash
+    type(Design), allocatable, intent(in) :: dbs(:)
+    type(Layer),      intent(out)   :: result
+    integer,          intent(inout) :: err
+
+    character(len=:), allocatable :: token
+    integer :: db_index, layer_index
+    logical :: present
+
+    call skip_spaces( str, i )
+    if ( i > len_trim(str) ) then
+       err = PARSE_ERR_SYNTAX
+       return
+    end if
+
+    select case ( str(i:i) )
+    case ( '(' )
+       i = i + 1
+       call parse_expr( str, i, dhash, dbs, result, err )
+       if ( err /= PARSE_OK ) return
+       call skip_spaces( str, i )
+       if ( i > len_trim(str) .or. str(i:i) /= ')' ) then
+          err = PARSE_ERR_SYNTAX
+          return
+       end if
+       i = i + 1
+
+    case default
+       ! Try to see if we have a design:layer reference.
+       call extract_until( str, i, ':', token )
+       if ( token /= '' .and. i <= len_trim(str) .and. str(i:i) == ':' ) then
+          ! We really have a layer reference.
+          i = i + 1          ! skip the ':'
+          call extract_word( str, i, token )   ! token now holds the layer name
+
+          ! ---- look up the design ----
+          call hash_get( dhash, token, db_index, present )
+          if ( .not. present ) then
+             err = PARSE_ERR_UNKNOWN
+             return
+          end if
+
+          ! ---- look up the layer inside that design ----
+          call hash_get( dbs(db_index)%ht, token, layer_index, present )
+          if ( .not. present ) then
+             err = PARSE_ERR_UNKNOWN
+             return
+          end if
+
+          result = dbs(db_index)%layers(layer_index)
+       else
+          ! No ':' → must be a numeric constant.
+          call extract_number( str, i, token )
+          if ( token == '' ) then
+             err = PARSE_ERR_SYNTAX
+             return
+          end if
+          ! For the moment we treat a constant as a *dummy* layer.
+          ! You can replace this by a proper conversion routine that
+          ! creates a Layer from a real value.
+          !result%dummy = int(token)   ! <-- placeholder
+       end if
+    end select
+  end subroutine parse_primary
+  !---------------------------------------------------------------
+  ! extract_until – returns characters from i up to (but not
+  !                 including) the delimiter.  i is left pointing
+  !                 at the delimiter (or at the end of the string).
+  !---------------------------------------------------------------
+  pure subroutine extract_until( str, i, delim, token )
+    character(len=*), intent(in)  :: str
+    integer,          intent(inout):: i
+    character(len=1), intent(in)   :: delim
+    character(len=:), allocatable, intent(out) :: token
+
+    integer :: start, finish
+
+    start = i
+    do while ( i <= len_trim(str) .and. str(i:i) /= delim )
+       i = i + 1
+    end do
+    finish = i - 1
+    if ( finish < start ) then
+       token = ''
+    else
+       token = str(start:finish)
+    end if
+  end subroutine extract_until
+
+  !---------------------------------------------------------------
+  ! extract_word – reads a sequence of non‑blank characters.
+  !---------------------------------------------------------------
+  pure subroutine extract_word( str, i, token )
+    character(len=*), intent(in)  :: str
+    integer,          intent(inout):: i
+    character(len=:), allocatable, intent(out) :: token
+
+    integer :: start
+
+    call skip_spaces( str, i )
+    start = i
+    do while ( i <= len_trim(str) .and. str(i:i) > ' ' )
+       i = i + 1
+    end do
+    token = str(start:i-1)
+  end subroutine extract_word
+
+  !---------------------------------------------------------------
+  ! extract_number – reads a Fortran‑compatible real literal.
+  !---------------------------------------------------------------
+  pure subroutine extract_number( str, i, token )
+    character(len=*), intent(in)  :: str
+    integer,          intent(inout):: i
+    character(len=:), allocatable, intent(out) :: token
+
+    integer :: start
+    logical :: dot_seen, exp_seen, sign_seen
+
+    call skip_spaces( str, i )
+    start = i
+    dot_seen = .false.
+    exp_seen = .false.
+    sign_seen = .false.
+
+    do while ( i <= len_trim(str) )
+       select case ( str(i:i) )
+       case ( '0':'9' )
+          i = i + 1
+       case ( '.' )
+          if ( dot_seen ) exit
+          dot_seen = .true.
+          i = i + 1
+       case ( 'e','E','d','D' )
+          if ( exp_seen ) exit
+          exp_seen = .true.
+          i = i + 1
+          if ( i <= len_trim(str) .and. &
+               ( str(i:i) == '+' .or. str(i:i) == '-' ) ) i = i + 1
+       case default
+          exit
+       end select
+    end do
+    token = str(start:i-1)
+  end subroutine extract_number
 end module ControlModule
 
