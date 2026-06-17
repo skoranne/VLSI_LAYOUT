@@ -461,5 +461,38 @@ contains
 end module HDFDataModule
 #else
 module HDFDataModule
+  use GeometryModule
+  use iso_fortran_env, only: int32
+  implicit none
+  public :: saveToHDF, loadFromHDF, LoadJuliaHDF5, LoadPolygonOffsetsHDF5
+contains
+  subroutine saveToHDF(filename, boxes)
+    implicit none
+    character(*),               intent(in) :: filename
+    type(Box),   intent(in),target :: boxes(:)
+  end subroutine saveToHDF
+  
+  subroutine loadFromHDF(filename, boxes)
+    character(*),               intent(in)  :: filename
+    type(Box), allocatable, target, intent(out) :: boxes(:)
+  end subroutine loadFromHDF
+  subroutine LoadJuliaHDF5(filename, boxes, scaling_factor)
+    character(len=*), intent(in)  :: filename
+    type(Box), allocatable, intent(out) :: boxes(:)
+    integer, intent(in)           :: scaling_factor
+  end subroutine LoadJuliaHDF5
+  
+  subroutine NewLoadJuliaHDF5(filename, boxes, scaling_factor)
+    character(len=*), intent(in)  :: filename
+    type(Box), allocatable, intent(out) :: boxes(:)
+    integer, intent(in)           :: scaling_factor
+  end subroutine NewLoadJuliaHDF5
+  
+  subroutine LoadPolygonOffsetsHDF5(filename, X, Y, poly_start, poly_end)
+    character(len=*), intent(in)  :: filename
+    integer(int32), allocatable, intent(out) :: X(:), Y(:)
+    integer(int32), allocatable, intent(out) :: poly_start(:), poly_end(:)
+  end subroutine LoadPolygonOffsetsHDF5
+  
 end module HDFDataModule
 #endif

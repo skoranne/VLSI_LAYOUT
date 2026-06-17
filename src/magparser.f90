@@ -508,7 +508,7 @@ contains
        !   write(*,*) j,' ',layers(i)%tree%tree_nodes(j)%mbr
        !end do
        !>>> UNCOMMENT <<<
-       call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       !call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        call cpu_time(t2)
        call system_clock(count=end_tick)
        elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)

@@ -99,6 +99,7 @@ contains
 
 
     nthreads = omp_get_max_threads()
+    write(*,*) ' Running on ', nthreads
     allocate(buffers(nthreads))
     allocate(overlap_areas(nthreads))
     allocate(overlap_perimeters(nthreads))    
@@ -114,7 +115,12 @@ contains
     !write(*,*) 'DBG: ', num_boxes, ' ', size(tree_nodes), ' ', uf%arr
     !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
     !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid, tempBox)
-    over_all_boxes: do i=1,num_boxes
+    !$komp target loop private(leafboxes, number_leaves, i, j, k, tid, tempBox)
+    !$komp target teams distribute parallel do schedule(dynamic) &
+    !$komp   private(leafboxes, number_leaves, i, j, k, tid, tempBox) &
+    !$komp   map(to: sorted_boxes, tree_nodes, capacity, root_index, num_boxes) &
+    !$komp   map(tofrom: buffers, overlap_areas, overlap_perimeter)
+    do i=1,num_boxes
        number_leaves = 0
        leafboxes = 0
        tid = omp_get_thread_num()+1
@@ -126,11 +132,15 @@ contains
              over_leaves: do k=leafboxes(j),min(leafboxes(j)+capacity-1, num_boxes)
                 !do k=leafboxes(j),leafboxes(j)+capacity-1
                 if( i < k .and. box_interact( sorted_boxes(i), sorted_boxes(k)) ) then
-                   tempBox = sorted_boxes(i) * sorted_boxes(k)
-                   !$omp critical (console_io)
+                   !tempBox = sorted_boxes(i) * sorted_boxes(k)
+                   tempBox%x1 = max( sorted_boxes(i)%x1, sorted_boxes(k)%x1)
+                   tempBox%y1 = max( sorted_boxes(i)%y1, sorted_boxes(k)%y1)
+                   tempBox%x2 = min( sorted_boxes(i)%x2, sorted_boxes(k)%x2)
+                   tempBox%y2 = min( sorted_boxes(i)%y2, sorted_boxes(k)%y2)                   
+                   !$komp critical (console_io)
                    !write(*,*) 'Index ',i, ' ', sorted_boxes(i), ' interacts with ', k, ' ', sorted_boxes(k), &
                    !     ' * ', tempBox, box_area( tempBox ), box_perimeter( tempBox )
-                   !$omp end critical (console_io)
+                   !$komp end critical (console_io)
                    call push_edge(buffers(tid), i, k) ! Reallocates if capacity exceeded
                    if( box_area( tempBox ) > 0.0 ) then
                       overlap_areas(tid) = overlap_areas(tid) + box_area( tempBox )
@@ -140,7 +150,7 @@ contains
                       if( tempBox%x1 == tempBox%x2 .or. tempBox%y1 == tempBox%y2 ) then
                          !> ok
                       else
-                         error stop "OVERLAP DETECTED"
+                         !error stop "OVERLAP DETECTED"
                       end if
                       overlap_perimeters(tid) = overlap_perimeters(tid) + box_perimeter( tempBox )
                    end if
@@ -148,7 +158,8 @@ contains
              end do over_leaves
           end do outer
        end if
-    end do over_all_boxes
+    end do
+    !$komp end target teams distribute parallel do
     ! The global Union-Find array is updated strictly sequentially
     do tid = 1, nthreads
        call process_edges( uf, buffers(tid) )

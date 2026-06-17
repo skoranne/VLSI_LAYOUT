@@ -431,7 +431,7 @@ contains
        error stop "PLEASE RUN PNUM before."
     end if
     do i = 1, input_layer%n_used
-       retval_area = retval_area + box_area( input_layer%layer_boxes(i) )
+       retval_area = retval_area + box_area_vectorized( input_layer%layer_boxes(i) )
     end do
     !>>> PLEASE UNCOMMENT <<<
     if( .not. NeedsHealing( input_layer ) ) return !bravo
@@ -452,7 +452,7 @@ contains
     if( input_layer%pnumtable%arr( permutation( segments(1)%end_idx ) ) == 0 ) then
        !write (*,*) 'Indeed, RECTS ', segments(1)%end_idx
        do i = 1, segments(1)%end_idx
-          retval_area = retval_area + box_area( input_layer%layer_boxes( permutation( i ) ) )
+          retval_area = retval_area + box_area_vectorized( input_layer%layer_boxes( permutation( i ) ) )
        end do
        if( input_layer%pnumtable%arr( permutation( segments(1)%start_idx ) ) /= 0 ) error stop "END_IDX=0, but START_IDX /= 0"
        starting_segment = 2
@@ -483,7 +483,8 @@ contains
             permutation( segments( i )%start_idx: segments( i )%end_idx ) )
        temp_areaA = 0.0_real64
        temp_areaB = 0.0_real64
-       temp_areaA = sum( box_area( current_polygon_boxes(1:box_count) ) )
+
+       temp_areaA = sum( box_area_vectorized( current_polygon_boxes(1:box_count) ) )
        do j=1,box_count
           if(.not. current_polygon_boxes(j)%is_valid() ) error stop "INVALID BOX"
           !write(*,'(A,I,A,4I)') 'Box ', j, ': ', current_polygon_boxes(j)%x1, current_polygon_boxes(j)%y1, &

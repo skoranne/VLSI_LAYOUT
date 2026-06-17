@@ -12,7 +12,7 @@ module GeometryModule
   public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid, &
        box_not_interact, box_interact, box_area, box_perimeter, calculate_union_area, get_sort_permutation, &
        calculate_polygon_union_area, PolygonBooleanAND, heal_boxes3, sort_int_array, box_grow, is_square, &
-       calculate_union_area_fast, sort_events, Event
+       calculate_union_area_fast, sort_events, Event, box_area_vectorized
   ! Enum-like constants for the sorting axis
   integer(kind=int64), parameter :: AXIS_X = 1
   integer(kind=int64), parameter :: AXIS_Y = 2
@@ -91,15 +91,16 @@ contains
     retval = ( ( this%x1 > other%x2) .or. ( this%y1 > other%y2) .or. &
          ( this%x2 < other%x1) .or. ( this%y2 < other%y1) )
   end function box_not_interact
-  pure elemental function box_interact(this, other) result(retval)
-    class(Box), intent(in) :: this, other
+  pure function box_interact(this, other) result(retval)
+    type(Box), intent(in),value :: this, other
+    logical                     :: retval
     type(Box)              :: tempBox
-    logical :: retval
+    retval = .false.
     if( box_not_interact(this, other) ) then
        retval = .false.
        return
     else !> its possible that there is a corner to corner touch
-       tempBox = this * other
+       tempBox  = box_intersection(this, other)
        if( tempBox%x1 == tempBox%x2 .and. tempBox%y1 == tempBox%y2 ) then
           retval = .false. ! point intersection
        else
@@ -156,7 +157,6 @@ contains
   pure function box_intersection(this, other) result(intersection_box)
     class(Box), intent(in) :: this, other
     type(Box) :: intersection_box
-
     ! Find the intersection box
     intersection_box%x1 = max(this%x1, other%x1)
     intersection_box%y1 = max(this%y1, other%y1)
@@ -181,7 +181,7 @@ contains
        write(*,'(A,4I8)') 'Box ', b1%x1, b1%y1, b1%x2, b1%y2
     end if
   end function CheckBox
-  pure elemental function box_area(b) result(retval)
+  pure function box_area(b) result(retval)
     type(Box), intent(in) :: b
     real(kind=real64)     :: retval
     if( is_valid(b) ) then
@@ -190,7 +190,16 @@ contains
        retval = 0.0
     end if
   end function box_area
-  pure elemental function box_perimeter(b) result(retval)
+  pure elemental function box_area_vectorized(b) result(retval)
+    type(Box), intent(in) :: b
+    real(kind=real64)     :: retval
+    if( is_valid(b) ) then
+       retval = real(b%x2 - b%x1,real64) * real(b%y2 - b%y1,real64)
+    else
+       retval = 0.0
+    end if
+  end function box_area_vectorized
+  pure function box_perimeter(b) result(retval)
     type(Box), intent(in) :: b
     real(kind=real64)     :: retval
     if( MBRValid(b) ) then !> because we can have interaction with line segment overlap
@@ -199,7 +208,6 @@ contains
        retval = 0.0
     end if
   end function box_perimeter
-
   pure elemental function box_less_than(b1, b2) result(res)
     type(Box), intent(in) :: b1, b2
     logical :: res

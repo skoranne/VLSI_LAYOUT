@@ -149,15 +149,15 @@ program test_fracture
      !   write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
      !end do
      call WriteKLBin(outFileName, output_layer%layer_boxes)
-     layer_area = sum( box_area( input_layer%layer_boxes ) )
+     layer_area = sum( box_area_vectorized( input_layer%layer_boxes ) )
      !sl_union_area = calculate_union_area_sl(boxes)  !< this is too slow
      sl_union_area = calculate_union_area_fast(boxes) !< uses SegmentTreeModule
      if( layer_area /= sl_union_area ) then
         write(*,*) 'Maybe there is OVLP on input: ', layer_area, ' |SL| = ', sl_union_area
      end if
-     complement_area = sum( box_area( output_layer%layer_boxes ) )
+     complement_area = sum( box_area_vectorized( output_layer%layer_boxes ) )
      if( complement_area /= (box_area(bbox) - layer_area)) then
-        layer_area = sum( box_area( input_layer%layer_boxes ) )
+        layer_area = sum( box_area_vectorized( input_layer%layer_boxes ) )
         write(*,'(A,F25.8,A,F25.8)') 'Expected AREA of complement = ', box_area(bbox) - layer_area, ' while ', complement_area        
         error stop "INCORRECT FRACTURING detected."
      else
@@ -194,7 +194,7 @@ program test_fracture
           input_layer%tree%root_index, overlap_area, overlap_perimeter)
      input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )     
      psl_union_area = calculate_union_area_by_polygon( input_layer )
-     layer_area = sum( box_area( input_layer%layer_boxes ) )
+     layer_area = sum( box_area_vectorized( input_layer%layer_boxes ) )
      !sl_union_area = calculate_union_area_sl(boxes)  !< this is too slow
      sl_union_area = calculate_union_area_fast(boxes) !< uses SegmentTreeModule     
      write(*,*) 'OVLP AREA by pnum =', overlap_area, ' |AL| = ', layer_area, ' |SL| = ', sl_union_area, ' |PSL| = ', psl_union_area
@@ -343,14 +343,14 @@ program test_fracture
      !   write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
      !end do
      call WriteKLBin(outFileName, output_layer%layer_boxes)
-     layer_area = sum( box_area( input_layer%layer_boxes ) )
+     layer_area = sum( box_area_vectorized( input_layer%layer_boxes ) )
      sl_union_area = calculate_union_area_fast(boxes) !< uses SegmentTreeModule
      if( layer_area /= sl_union_area ) then
         write(*,*) 'Maybe there is OVLP on input: ', layer_area, ' |SL| = ', sl_union_area
      end if
-     complement_area = sum( box_area( output_layer%layer_boxes ) )
+     complement_area = sum( box_area_vectorized( output_layer%layer_boxes ) )
      if( complement_area /= (box_area(bbox) - layer_area)) then
-        layer_area = sum( box_area( input_layer%layer_boxes ) )
+        layer_area = sum( box_area_vectorized( input_layer%layer_boxes ) )
         write(*,'(A,F25.8,A,F25.8)') 'Expected AREA of complement = ', box_area(bbox) - layer_area, ' while ', complement_area        
         !error stop "INCORRECT FRACTURING detected."
      else
