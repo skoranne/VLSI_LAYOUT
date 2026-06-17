@@ -25,7 +25,7 @@ program testContour
   type(Box), allocatable :: current_polygon_boxes(:)
   integer(int64) :: starting_segment
   type(Polygon), allocatable :: contours(:)
-  integer             :: num_contours
+  integer(kind=int64)             :: num_contours
   
   call LoadFromHDF("a.h5", input_layer%layer_boxes )
   input_layer%n_used = size( input_layer%layer_boxes )

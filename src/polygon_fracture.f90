@@ -179,12 +179,12 @@ contains
     ! 1.  Find the place where y_val would belong (standard skip‑list search)
     !--------------------------------------------------------------------
     current => list%header
-
     do i = list%current_level, 1, -1
-       ! walk forward while the next node on this level is still < y_val
-       do while (associated(current%Forward(i)%ptr) .and. &
-            current%Forward(i)%ptr%y_val < y_val)
-          current => current%Forward(i)%ptr
+       ! Walk forward while the next node on this level is still < y_val
+       do
+          if (.not. associated(current%Forward(i)%ptr)) exit          ! no next node
+          if (current%Forward(i)%ptr%y_val >= y_val) exit              ! y_val too large
+          current => current%Forward(i)%ptr                           ! advance
        end do
        update(i)%ptr => current               ! remember predecessor on level i
     end do
@@ -879,6 +879,34 @@ contains
                 y_end = current_node%y_val
                 n_curr = n_curr + 1
 
+                if (n_curr > max_sweep_capacity) then
+                   max_sweep_capacity = max_sweep_capacity * 2_int64
+
+                   if (associated(curr_regions, region_bank_A)) then
+                      ! curr_regions is looking at A, prev_regions is looking at B
+                      allocate(temp_regions(max_sweep_capacity))
+                      temp_regions(1:n_curr-1) = curr_regions(1:n_curr-1)
+                      call move_alloc(from=temp_regions, to=region_bank_A)
+                      curr_regions => region_bank_A
+
+                      allocate(temp_regions(max_sweep_capacity))
+                      if (n_prev > 0) temp_regions(1:n_prev) = prev_regions(1:n_prev)
+                      call move_alloc(from=temp_regions, to=region_bank_B)
+                      prev_regions => region_bank_B
+                   else
+                      ! curr_regions is looking at B, prev_regions is looking at A
+                      allocate(temp_regions(max_sweep_capacity))
+                      temp_regions(1:n_curr-1) = curr_regions(1:n_curr-1)
+                      call move_alloc(from=temp_regions, to=region_bank_B)
+                      curr_regions => region_bank_B
+
+                      allocate(temp_regions(max_sweep_capacity))
+                      if (n_prev > 0) temp_regions(1:n_prev) = prev_regions(1:n_prev)
+                      call move_alloc(from=temp_regions, to=region_bank_A)
+                      prev_regions => region_bank_A
+                   end if
+                end if
+                #ifdef OLD_CODE
                 if (n_curr > size(region_bank_B)) then
                    max_sweep_capacity = size(region_bank_B) * 2_int64
 
@@ -892,7 +920,7 @@ contains
                    call move_alloc(from=temp_regions, to=region_bank_A)
                    prev_regions => region_bank_A
                 end if
-
+                #endif
                 curr_regions(n_curr)%y1 = y_start
                 curr_regions(n_curr)%y2 = y_end
                 curr_regions(n_curr)%x_start = current_x 
@@ -935,7 +963,12 @@ contains
     call destroy_skiplist(active_edges)
 
     if (output_box_count > 0 .and. output_box_count < size(boxes)) then
-       boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+       block
+         type(Box), allocatable :: temp(:)
+         temp = temp_boxes(1:output_box_count)
+         boxes = temp
+       end block ! Temp is automatically cleaned up here
+       !boxes(1:output_box_count) = temp_boxes(1:output_box_count)
     else
        allocate(resized_boxes(output_box_count))
        if (output_box_count > 0) resized_boxes(1:output_box_count) = temp_boxes(1:output_box_count)

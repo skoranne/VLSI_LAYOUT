@@ -12,14 +12,16 @@ program test_fracture
   use RTreeBuilder
   use DataStructuresModule
   use PNumMergeModule
+  use SystemInformationModule
   use iso_fortran_env
   implicit none
 
   type(Layer),target :: input_layer
+  type(Layer),target :: input_layerB
   type(Layer),target :: output_layer
   type(Layer),target :: temp_layer    
   type(Box), pointer :: boxes(:)
-  type(Box) :: tempBox, bbox
+  type(Box) :: tempBox, bbox, bboxB
   real(kind=real64) :: overlap_area, overlap_perimeter
   integer(kind=int64), allocatable :: permutation(:)
   !type(BucketBoundary), allocatable :: segments(:)
@@ -33,7 +35,7 @@ program test_fracture
 
   real(kind=real64)   :: layer_area, complement_area, sl_union_area, psl_union_area
   type(XYTracker), allocatable :: trackers(:)
-  character(len=256)            :: filename      
+  character(len=256)            :: filenameA, filenameB      
   character(len=256)            :: outFileName   
   integer                       :: control_parameter
   integer                       :: narg          ! # of arguments on the command line
@@ -43,40 +45,55 @@ program test_fracture
   !-----------------------------------------------------------------
   !  Get the number of arguments supplied on the command line
   !-----------------------------------------------------------------
+  call InitSystem()
   narg = command_argument_count()
   !write(*,*) 'NARG = ', narg
   select case (narg)
   case (0)                     ! No arguments → use defaults
-     write(*,*) '0. Executing Token Tracking Fracture/Scanline Fracturing with Skip List...'
-     write(*,*) '1. BBOX GROW by ', K_BBOX_GROW_X, ' ', K_BBOX_GROW_Y
-     write(*,*) '2. Run HORIZONTAL Merge and save result'
-     write(*,*) '3. Check input and save sorted data'
-     write(*,*) '4. Convert input to HDF5'
-     write(*,*)  '5. Print Detailed Information: '     
-     write(*,*)  '6. Convert input to COMPLEMENT and run Fracture/Contour/Fracture'
-     write(*,*)  '7. Fracture/Contour/Fracture'
-     write(*,*)  '8. Run HEAL on whole layer'
-     stop "./CONVERT.exe <input-filename> control"     
+     write(*,*) '0.  Executing Token Tracking Fracture/Scanline Fracturing with Skip List...'
+     write(*,*) '1.  BBOX GROW by ', K_BBOX_GROW_X, ' ', K_BBOX_GROW_Y
+     write(*,*) '2.  Run HORIZONTAL Merge and save result'
+     write(*,*) '3.  Check input and save sorted data'
+     write(*,*) '4.  Convert input to HDF5'
+     write(*,*) '5.  Print Detailed Information: '     
+     write(*,*) '6.  Convert input to COMPLEMENT and run Fracture/Contour/Fracture'
+     write(*,*) '7.  Fracture/Contour/Fracture'
+     write(*,*) '8.  Run HEAL on whole layer'
+     write(*,*) '9.  Run COMPLEMENT and analysis'
+     write(*,*) '10. Run op = A OR  B'
+     write(*,*) '11. Run op = A AND B'               
+     write(*,*) '12. Run op =   AND A'
+     write(*,*) '13. Run op = A NOT A'     
+     write(*,*) '14. Run op = A XOR B'               
+     write(*,*) '15. Run op = COMPLEMENT A'
+     write(*,*) '16. Run op = SIZE A BY '               
+     stop "./CONVERT.exe <input-filenameA> <input-filenameB> <output-file> control"     
   case (2)
      error stop "./CONVERT.exe <input-filename> <output-filename> control"
 
-  case (3)                     ! Two arguments: <file> <maxLayers>
+  case (4)                     ! Two arguments: <fileA> <fileB> <outFile> <control>
      ! ---- first argument: file name ---------------------------------
-     call get_command_argument(1, filename, status=iostat)   ! allocates automatically
+     call get_command_argument(1, filenameA, status=iostat)   ! allocates automatically
      if (iostat /= 0) then
         write (*,*) "ERROR: 1st argument must be a filename."
         stop 2
      end if
-     write (*,*) 'Reading filename: ', trim(filename)
-     call get_command_argument(2, outFileName, status=iostat)   ! allocates automatically
+     write (*,*) 'Reading 1st filename: ', trim(filenameA)
+     call get_command_argument(2, filenameB, status=iostat)   ! allocates automatically
      if (iostat /= 0) then
-        write (*,*) "ERROR: 2nd argument must be a filename."
+        write (*,*) "ERROR: 2st argument must be a filename."
+        stop 2
+     end if
+     write (*,*) 'Reading 2nd filename: ', trim(filenameB)
+     call get_command_argument(3, outFileName, status=iostat)   ! allocates automatically
+     if (iostat /= 0) then
+        write (*,*) "ERROR: 3rd argument must be a filename."
         stop 2
      end if
      ! ---- third argument: integer (max number of layers) ----------
-     call get_command_argument(3, arg_string, status=iostat)
+     call get_command_argument(4, arg_string, status=iostat)
      if (iostat /= 0) then
-        write (*,*) "ERROR: 2nd argument must be an integer."
+        write (*,*) "ERROR: 4th argument must be an integer."
         stop 2
      end if
      read (arg_string, *, iostat=iostat) control_parameter
@@ -94,10 +111,13 @@ program test_fracture
   end select
 
   print *, "--- Initializing Polygon Fracturing Test ---"
-  call LoadKLBin(filename,input_layer%layer_boxes)
+  call LoadKLBin(filenameA,input_layer%layer_boxes)
+  call LoadKLBin(filenameB,input_layerB%layer_boxes)  
   boxes => input_layer%layer_boxes
   input_layer%n_used  = size(boxes)
+  input_layerB%n_used = size( input_layerB%layer_boxes )
   bbox = mbr_of_array( boxes, input_layer%n_used )
+  bboxB= mbr_of_array( input_layerB%layer_boxes, input_layerB%n_used )  
   select case(control_parameter)
   case (0)
      write(*,*), '0. Executing Token Tracking Fracture/Scanline Fracturing with Skip List...'     
@@ -295,6 +315,58 @@ program test_fracture
      output_layer%n_used = size( output_layer%layer_boxes )     
      call heal_boxes( output_layer%n_used, output_layer%layer_boxes, output_layer%n_used )
      output_layer%n_used = size( output_layer%layer_boxes )
+     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     stop
+  case (9)
+     write(*,*), '9. Executing Token Tracking Fracture/Scanline Fracturing with Skip List...'     
+     !> SCANLINE_FRACTURE does not support overlapping boxes, so we need to accomodate that till thats fixed
+     !call heal_boxes( input_layer%n_used, input_layer%layer_boxes, updated_box_count)
+     bbox = input_layer%layer_boxes(1) !> this is the convention
+     current_polygon_boxes = input_layer%layer_boxes(2:size(input_layer%layer_boxes))
+     input_layer%layer_boxes = current_polygon_boxes
+     input_layer%n_used = input_layer%n_used-1 !> one was the bbox
+     boxes => input_layer%layer_boxes
+     call generate_trackers( boxes, bbox, trackers ) !> this does CW ordering of inner contours
+     call sort_trackers(trackers) !> this is done inside as well
+     n_trackers = size(trackers)
+
+     print *, "Sorting tokens by X/Y..."
+     do i = 1, n_trackers
+        write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
+     end do     
+     write(*,*) 'Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...'
+     call scanline_fracture(trackers, output_layer%layer_boxes)
+     output_layer%n_used = size( output_layer%layer_boxes)
+     print *, "Fracturing algorithm finished without memory leaks."
+     n_trackers = size(trackers)     
+     !do i = 1, n_trackers
+     !   write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
+     !end do
+     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     layer_area = sum( box_area( input_layer%layer_boxes ) )
+     sl_union_area = calculate_union_area_fast(boxes) !< uses SegmentTreeModule
+     if( layer_area /= sl_union_area ) then
+        write(*,*) 'Maybe there is OVLP on input: ', layer_area, ' |SL| = ', sl_union_area
+     end if
+     complement_area = sum( box_area( output_layer%layer_boxes ) )
+     if( complement_area /= (box_area(bbox) - layer_area)) then
+        layer_area = sum( box_area( input_layer%layer_boxes ) )
+        write(*,'(A,F25.8,A,F25.8)') 'Expected AREA of complement = ', box_area(bbox) - layer_area, ' while ', complement_area        
+        !error stop "INCORRECT FRACTURING detected."
+     else
+        write(*,'(A,F25.8,A,F25.8)') 'Expected AREA of complement = ', box_area(bbox) - layer_area, ' and ', complement_area
+     end if
+     stop
+  case(10)
+     call StartMarkTime(" OR ")
+     call CalculateOR( input_layer, input_layerB, output_layer )
+     call StopMarkTime(" OR ")     
+     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     stop     
+  case(11)
+     call StartMarkTime(" AND ")     
+     call CalculateAND( input_layer, input_layerB, output_layer )
+     call StopMarkTime(" AND ")          
      call WriteKLBin(outFileName, output_layer%layer_boxes)
      stop
   case default

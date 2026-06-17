@@ -11,22 +11,25 @@ module DesignModule
   use PolygonFractureModule
   use iso_c_binding
   use iso_fortran_env, only : int32, int64, real64
+  use omp_lib
   implicit none  
   private
   public :: Design, Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
        LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, &
        NeedsSorting, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
-       get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon
+       get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon, &
+       CalculateSingleLayerAND, CalculateAND, CalculateOR
   type :: LayerTree
      integer(kind=8) :: root_index
      type(RTreeNode), allocatable :: tree_nodes(:)
   end type LayerTree
   enum, bind(C)                     ! bind(C) makes the values C‑compatible
      enumerator :: LAYER_STATE_NONE  = int(Z'00', kind=c_int)
-     enumerator :: LAYER_STATE_HEAL  = int(Z'01', kind=c_int)   ! 0b0001
-     enumerator :: LAYER_STATE_SORT  = int(Z'02', kind=c_int)   ! 0b0010
-     enumerator :: LAYER_STATE_PNUM  = int(Z'04', kind=c_int)   ! 0b0100
-     enumerator :: LAYER_STATE_RTREE = int(Z'08', kind=c_int)   ! 0b1000
+     enumerator :: LAYER_STATE_HEAL  = int(Z'01', kind=c_int)   ! 0b000001
+     enumerator :: LAYER_STATE_SORT  = int(Z'02', kind=c_int)   ! 0b000010
+     enumerator :: LAYER_STATE_PNUM  = int(Z'04', kind=c_int)   ! 0b000100
+     enumerator :: LAYER_STATE_RTREE = int(Z'08', kind=c_int)   ! 0b001000
+     enumerator :: LAYER_STATE_SLSORT= int(Z'16', kind=c_int)   ! 0b010000
   end enum
 
   type :: Layer
@@ -39,11 +42,19 @@ module DesignModule
      type(UnionFind)        :: pnumtable
      real(kind=real64)      :: area, perimeter
   end type Layer
+
+  enum, bind(C)                     ! bind(C) makes the values C‑compatible
+     enumerator :: DESIGN_DIRECTION_INPUT  =   int(Z'00', kind=c_int)
+     enumerator :: DESIGN_DIRECTION_OUTPUT =   int(Z'01', kind=c_int)
+     enumerator :: DESIGN_DIRECTION_MEMORY =   int(Z'02', kind=c_int)     
+  end enum
+
   type :: Design
      type(Layer), allocatable :: layers(:)
      type(hash_type) :: ht
      character(len=1024), dimension(:), allocatable :: layerNames(:)
      type(Box)              :: DESIGN_EXTENT
+     integer(kind=c_int)    :: design_direction = DESIGN_DIRECTION_INPUT
   end type Design
   
   ! A clean, modern derived type to hold our bucket boundaries
@@ -63,6 +74,11 @@ contains
     logical :: retval
     retval = iand(input_layer%layerState, LAYER_STATE_PNUM ) == 0
   end function NeedsPNum
+  pure function NeedsRTree(input_layer) result(retval)
+    type(Layer), intent(in) :: input_layer
+    logical :: retval
+    retval = iand(input_layer%layerState, LAYER_STATE_RTREE ) == 0
+  end function NeedsRTree
   pure function NeedsHealing(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
@@ -404,7 +420,7 @@ contains
     type(Layer), intent(in) :: input_layer
     real(kind=real64) :: retval_area, temp_areaA, temp_areaB
     integer, parameter :: K_POLYGON_INIT_BOX_COUNT = 64
-    integer(kind=int64) :: i,j,n, num_roots, num_rects, polygon_number, box_count
+    integer(kind=int64) :: i,j, num_roots, num_rects, polygon_number, box_count
     type(Box), allocatable :: current_polygon_boxes(:)
     integer(int64), allocatable :: permutation(:)
     type(BucketBoundary), allocatable :: segments(:)
@@ -482,9 +498,188 @@ contains
     deallocate( current_polygon_boxes )
   end function calculate_union_area_by_polygon
 
-  pure subroutine CalculateSingleLayerAND( input_layer )
+  subroutine CalculateSingleLayerAND( input_layer )
     type(Layer), intent(inout) :: input_layer
   end subroutine CalculateSingleLayerAND
+
+  subroutine PreprocessLayer( input_layer )
+    type(Layer), intent(inout) :: input_layer
+    real(kind=real64) :: overlap_area, overlap_perimeter
+    integer(kind=int64) :: output_box_count
+    if( input_layer%n_used == 0 ) then
+       input_layer%layerState = 31 !> we set everything
+       return
+    end if
+    if( NeedsHealing( input_layer ) ) then
+       !$komp critical (heal_boxes_lock) !> work around
+       call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+       !$komp end critical (heal_boxes_lock)
+       write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
+       input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
+       input_layer%n_used = output_box_count
+    end if
+    if( NeedsSorting( input_layer ) ) then
+       call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
+    end if
+    if( NeedsRTree( input_layer ) ) then
+       allocate( input_layer%tree%tree_nodes( CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY ) ) )
+       call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
+    end if
+    if( NeedsPNum( input_layer ) ) then
+       call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
+            input_layer%tree%root_index, overlap_area, overlap_perimeter)
+       if( overlap_area /= 0 ) then
+          error stop "HEALING failed"
+       end if
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )
+    end if
+  end subroutine PreprocessLayer
+
+  subroutine CalculateOR( input_layer_A, input_layer_B, output_layer )
+    type(Layer), intent(inout) :: input_layer_A, input_layer_B
+    type(Layer), intent(out)   :: output_layer
+    integer             :: alloc_status
+    !> we can create the RTree for A and B if needed
+    call PreprocessLayer( input_layer_A )
+    call PreprocessLayer( input_layer_B )
+    allocate( output_layer%layer_boxes( size(input_layer_A%layer_boxes) + size( input_layer_B%layer_boxes) ), stat=alloc_status )
+    if( alloc_status /= 0 ) then
+       error stop "ALLOCATION FAILED: "
+    end if
+    !do i=1,input_layer_A%n_used
+    output_layer%layer_boxes(1:input_layer_A%n_used) = input_layer_A%layer_boxes
+    output_layer%layer_boxes(1+input_layer_A%n_used:) = input_layer_B%layer_boxes
+    output_layer%n_used = input_layer_A%n_used + input_layer_B%n_used
+    call PreprocessLayer( output_layer )
+  end subroutine CalculateOR
+
+  !> utility subroutine, should move to more common place
+  subroutine push_box( xbox, th_layer )
+    type(Box), intent(in) :: xbox
+    type(Layer), intent(inout) :: th_layer
+    integer :: alloc_status
+    integer(kind=int64), parameter :: K_GROWTH_FACTOR = 2
+    if( th_layer%n_used == th_layer%n_alloc ) then
+       block
+         type(Box), allocatable :: temp(:)
+         integer :: i ! Explicitly scoped loop index
+         allocate( temp( th_layer%n_alloc*K_GROWTH_FACTOR ), stat=alloc_status )
+         if( alloc_status /= 0 ) then
+            error stop "Memory allocation failed"
+         end if
+         th_layer%n_alloc = th_layer%n_alloc*K_GROWTH_FACTOR
+         ! Element-by-element copy guarantees no hidden stack allocations
+         do i = 1, th_layer%n_used
+            temp(i) = th_layer%layer_boxes(i)
+         end do
+         call move_alloc( from=temp, to=th_layer%layer_boxes)
+       end block
+    end if       
+    th_layer%n_used = th_layer%n_used + 1       
+    th_layer%layer_boxes( th_layer%n_used ) = xbox
+  end subroutine push_box
+  
+  subroutine CalculateAND( input_layer_A, input_layer_B, output_layer )
+    type(Layer), intent(inout) :: input_layer_A, input_layer_B
+    type(Layer), intent(out)   :: output_layer
+    integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC
+    integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
+    integer(kind=int64) :: number_leaves
+    integer(kind=int64) :: i, j, k
+    type(Layer), allocatable :: buffers(:)
+    type(Box) :: tempBox
+    integer :: nthreads, tid, alloc_status
+    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 128
+    
+    !> we can create the RTree for A and B if needed
+    !> since the SkipList is not re-entrant, we cannot do parallel here (yet)
+    !$komp parallel
+    !$komp single
+    !$komp task
+    call PreprocessLayer( input_layer_A )
+    !$komp end task
+    !$komp task    
+    call PreprocessLayer( input_layer_B )
+    !$komp end task
+    !$komp taskwait
+    !$komp end single
+    !$komp end parallel    
+    nthreads = omp_get_max_threads()
+    allocate(buffers(nthreads))
+    do i=1,nthreads
+       !> we may still need some setup
+       allocate(buffers(i)%layer_boxes(K_INIT_BOX_COUNT))
+       buffers(i)%n_alloc = K_INIT_BOX_COUNT
+    end do
+    num_boxesA = input_layer_A%n_used
+    num_boxesB = input_layer_B%n_used    
+    !write(*,*) 'DBG: ', num_boxesA, ' ', num_boxesB, ' RTB ', size(input_layer_B%tree%tree_nodes)
+    !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
+    !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid, tempBox)
+    over_all_boxes: do i=1,num_boxesA
+       number_leaves = 0
+       leafboxes = 0
+       tid = omp_get_thread_num()+1
+       call SearchTree( input_layer_B%tree%tree_nodes, input_layer_B%tree%root_index, &
+            input_layer_A%layer_boxes(i), leafboxes, number_leaves )
+       !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
+       if( number_leaves > 0 ) then
+          !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
+          outer: do j=1,number_leaves
+             over_leaves: do k=leafboxes(j),min(leafboxes(j)+K_LEAF_CAPACITY-1, num_boxesB)
+                if( box_interact( input_layer_A%layer_boxes(i), input_layer_B%layer_boxes(k)) ) then
+                   tempBox = input_layer_A%layer_boxes(i) * input_layer_B%layer_boxes(k)
+                   !$komp critical (console_io)
+                   !write(*,*) 'Index ',i, ' ', input_layer_A%layer_boxes(i), ' interacts with ',&
+                   !     k, ' ', input_layer_B%layer_boxes(k), &
+                   !     ' * ', tempBox, box_area( tempBox )
+                   !$komp end critical (console_io)
+                   if( box_area( tempBox ) > 0.0 ) then
+                      call push_box(tempBox, buffers(tid)) ! Reallocates if capacity exceeded, and here i is very important
+                   end if
+                end if
+             end do over_leaves
+          end do outer
+       end if
+    end do over_all_boxes
+
+    !print *, "DEBUG: Is this loop in a parallel region? ", omp_in_parallel()
+    ! The global Union-Find array is updated strictly sequentially
+    num_boxesC = sum([ (buffers(i)%n_used, i=1,nthreads) ])
+    !write(*,*) 'OUTPUT_COUNT =', num_boxesC    
+    allocate( output_layer%layer_boxes( num_boxesC ), stat=alloc_status )
+    if( alloc_status /= 0 ) then
+       error stop "ALLOCATION FAILED: "
+    end if
+    i = 1
+    do tid = 1, nthreads
+       if( buffers(tid)%n_used == 0 ) cycle
+       ! 2. Check if we are writing out of bounds on the destination
+       if (i + buffers(tid)%n_used - 1 > size(output_layer%layer_boxes)) then
+          print *, "FATAL: Output layer capacity exceeded by thread ", tid
+          print *, "Current index: ", i, " Trying to add: ", buffers(tid)%n_used
+          print *, "Max capacity: ", size(output_layer%layer_boxes)
+          error stop
+       end if
+
+       ! 3. Check if we are reading out of bounds on the source
+       if (buffers(tid)%n_used > size(buffers(tid)%layer_boxes)) then
+          print *, "FATAL: Thread ", tid, " over-reported its used size!"
+          print *, "Claimed used: ", buffers(tid)%n_used
+          print *, "Actual buffer size: ", size(buffers(tid)%layer_boxes)
+          error stop
+       end if
+       ! Explicit loop strictly prevents temporary stack allocations
+       do j = 1, buffers(tid)%n_used
+          output_layer%layer_boxes(i + j - 1) = buffers(tid)%layer_boxes(j)
+       end do
+       i = i + buffers(tid)%n_used
+    end do
+    output_layer%n_used = num_boxesC
+    call PreprocessLayer( output_layer )
+  end subroutine CalculateAND
   
 end module DesignModule
 

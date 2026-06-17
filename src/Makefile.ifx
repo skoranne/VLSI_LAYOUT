@@ -1,22 +1,20 @@
 ################################################################################
-# File   : Makefile
+# File   : Makefile.ifx
 # Author : Sandeep Koranne (Refactored)
 ################################################################################
-
 # --- Compiler & Flags ---
-HDF5_FC=/opt/nvidia/hpc_sdk/Linux_aarch64/25.9/compilers/bin/nvfortran
-#FORTRAN_COMPILER = /scratch1/skoranne/INTELCOMPILERS/bin/h5fc
-FORTRAN_COMPILER = h5fc
+HDF5_FC=ifx
+FORTRAN_COMPILER=/scratch1/skoranne/INTELCOMPILERS/bin/h5fc
+#FORTRAN_COMPILER=/scratch1/skoranne/NVCOMPILERS/bin/h5fc
 # Debug flags (commented out, but easily swappable)
 # FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3 -xHost 
 # Use -pg
-#FCFLAGS = -g -O0 -check bounds -check all -traceback -warn all -qopenmp -qopt-report=3
-#FCFLAGS = -O3 -parallel -qopenmp -qopt-report=3
-FCFLAGS = -O3 -Mpreprocess -fopenmp -mp=gpu
+FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp 
+FCFLAGS = -g -fpp -O3 -parallel -qopenmp -qopt-report=3
+#FCFLAGS = -O3 -fpp
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables ---
-#LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
-LDFLAGS = -L/scratch1/skoranne/NVCOMPILERS/lib/
+LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
 LDLIBS = -lz -lhdf5_fortran -lhdf5
 
 # --- Library Definition ---
@@ -43,6 +41,8 @@ magparser.o:	polygon_fracture.o design.o morton.o kldata.o
 mainmagparser.o:	magparser.o controlparser.o
 controlparser.o:	design.o
 
+hdfdata.o:	hdfdata.f90
+	$(FORTRAN_COMPILER) -DUSE_HDF5 $(FCFLAGS) -c $< -o $@
 #skiplist_module.o
 
 # Create a list of all object files that will be compiled
@@ -82,7 +82,7 @@ clean:
 %.o: %.f90
 	$(FORTRAN_COMPILER) $(FCFLAGS) -c $< -o $@
 %.o: %.F90
-	$(FORTRAN_COMPILER) $(FCFLAGS) -fpp -gen-dep=$(@:.o=.d) -c $< -o $@
+	$(FORTRAN_COMPILER) $(FCFLAGS) -fpp -c $< -o $@
 
 # --- Library Creation ---
 # Bundles all the core objects into a single static library.
@@ -93,17 +93,17 @@ $(LIBRARY): $(LIB_OBJS)
 # --- Executable Builds ---
 # By linking against the library, we don't have to list out all objects again.
 MAGPARSER.exe: mainmagparser.o $(LIBRARY)
-	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)
-	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_morton.exe: test_morton.o $(LIBRARY)
-	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 CONVERT.exe: test_polygonfracture.o $(LIBRARY)
-	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_boxmerge.exe: test_boxmerge.o $(LIBRARY)
-	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_skiplist.exe: test_skiplist.o $(LIBRARY)
-	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 generate_bin.exe: generate_bin.o $(LIBRARY)
-	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)

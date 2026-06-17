@@ -26,8 +26,59 @@ module ControlModule
   use SystemInformationModule
   use MagicVLSILayoutParser  
   implicit none
-  public :: ParseControlFile
+  public :: ParseControlFile, GetLayerFromDBName
 contains
+
+  !=================================================================
+  ! 1) GetLayerFromDBName – the routine you asked for.
+  !=================================================================
+  subroutine GetLayerFromDBName( full_name, design_hash_table, design_dbs,db_index, input_layer )
+    character(len=*),          intent(in)    :: full_name
+    type(hash_type),           intent(in)    :: design_hash_table
+    type(Design), allocatable, intent(in)    :: design_dbs(:)
+    integer,                   intent(out)   :: db_index
+    type(Layer),               intent(out)   :: input_layer
+
+    character(len=:), allocatable :: design_name, layer_name
+    integer                        :: pos, layer_index
+    logical                        :: present
+
+    ! ----------------------------------------------------------------
+    ! Split the string on the first ':' – everything left of it is the
+    ! design name, everything right of it is the layer name.
+    ! ----------------------------------------------------------------
+    pos = index(full_name, ':')
+    if ( pos == 0 ) then
+       error stop "GetLayerFromDBName: missing ':' in '"//trim(full_name)//"'"
+    end if
+
+    design_name = trim(full_name(:pos-1))
+    layer_name  = trim(full_name(pos+1:))
+
+    ! ----------------------------------------------------------------
+    ! Look up the design index.
+    ! ----------------------------------------------------------------
+    call hash_get( design_hash_table, design_name, db_index, present )
+    if ( .not. present ) then
+       error stop "GetLayerFromDBName: unknown design '"//design_name//"'"
+    end if
+
+    ! ----------------------------------------------------------------
+    ! Look up the layer index inside the chosen design.
+    ! ----------------------------------------------------------------
+    call hash_get( design_dbs(db_index)%ht, layer_name, &
+         layer_index, present )   ! we temporarily reuse dummy
+    if ( .not. present ) then
+       error stop "GetLayerFromDBName: unknown layer '"//layer_name//"'"//" in design '"//design_name//"'"
+    end if
+
+    ! ----------------------------------------------------------------
+    ! Finally fetch the Layer object.
+    ! ----------------------------------------------------------------
+    input_layer = design_dbs(db_index)%layers(layer_index)
+
+  end subroutine GetLayerFromDBName
+
   subroutine ParseControlFile( fileName, MAX_LAYERS )
     character(len=*), intent(in) :: fileName
     integer, intent(in) :: MAX_LAYERS
@@ -146,7 +197,7 @@ contains
              write(*,*) 'Syntax ERROR: line: ', line_number
              error stop "Syntax ERROR."
           end if
-  
+
        case ('end')
           print *, "--- End of file"
           call StopMarkTime("END ")

@@ -260,3 +260,79 @@ Warning: ieee_inexact is signaling
 FORTRAN STOP
 On DGX
 
+```
+For FPU
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  Ts/call  Ts/call  name    
+ 28.58     11.93    11.93                             polygonfracturemodule_mp_scanline_fracture_
+ 26.54     23.01    11.08                             polygonfracturemodule_mp_heal_boxes_
+ 10.92     27.57     4.56                             geometrymodule_mp_update_tree_
+  9.20     31.41     3.84                             polygonfracturemodule_mp_quicksort_trackers_
+  9.15     35.23     3.82                             polygonfracturemodule_mp_update_active_edges_
+  6.95     38.13     2.90                             geometrymodule_mp_calculate_union_area_fast_
+  2.35     39.11     0.98                             polygonfracturemodulescanline_fracture_mp_sort_and_merge_regions_
+```
+```
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  Ts/call  Ts/call  name    
+ 30.45    248.79   248.79                             polygonfracturemodule_mp_heal_boxes_
+ 28.13    478.57   229.77                             polygonfracturemodule_mp_scanline_fracture_
+ 10.62    565.37    86.80                             polygonfracturemodule_mp_update_active_edges_
+  9.85    645.80    80.43                             polygonfracturemodule_mp_quicksort_trackers_
+  8.85    718.09    72.29                             geometrymodule_mp_update_tree_
+  6.11    768.01    49.93                             geometrymodule_mp_calculate_union_area_fast_
+  2.13    785.40    17.39                             polygonfracturemodulescanline_fracture_mp_sort_and_merge_regions_
+
+```
+Using RTree when using CONVERT 3
+```
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  Ts/call  Ts/call  name    
+ 39.67    544.95   544.95                             __intel_avx_rep_memset
+ 22.80    858.25   313.30                             rtreebuilder_mp_searchtree_
+  7.65    963.36   105.11                             geometrymodule_mp_quicksort_boxes_str_
+  7.21   1062.40    99.04                             geometrymodule_mp_update_tree_
+  5.60   1139.33    76.93                             geometrymodule_mp_calculate_union_area_fast_
+  4.70   1203.89    64.56                             geometrymodule_mp_box_intersection_
+  2.62   1239.85    35.96                             pnummergemodule_mp_performmerge_
+  1.84   1265.07    25.23                             geometrymodule_mp_sort_events_
+  1.67   1287.96    22.89                             geometrymodule_mp_mbrvalid_
+  1.49   1308.37    20.41                             designmodule_mp_indirectquicksort_
+  1.16   1324.35    15.98                             geometrymodule_mp_sort_int_array_
+```
+```
+ Reading 1st filename: POLY.bin
+ Reading 2nd filename: DIFF.bin
+ --- Initializing Polygon Fracturing Test ---
+ Healing from:                4872770  to                4649351
+ Healing from:                1503769  to                1489765
+ DBG:                4649351                 1489765  RTB        99321
+ OUTPUT_COUNT =                3518357
+ Healing from:                3518357  to                2221926
+                AND  1607.54 CPU seconds.  116.51 REAL seconds. FULL TIME:   116.95 MEM: VM      4124044 RSS:       520516
+INFO: Writing array of          2221926 boxes.
+INFO: Write successful for      2221926 boxes.
+This was DBG, optimized + profile:
+                AND   788.50 CPU seconds.   36.14 REAL seconds. FULL TIME:    36.26 MEM: VM      4139516 RSS:       517624    
+
+ 54.29     81.34    81.34                             __intel_avx_rep_memset
+ 21.70    113.85    32.51                             rtreebuilder_mp_searchtree_
+  6.63    123.78     9.93                             polygonfracturemodule_mp_heal_boxes_
+  3.89    129.61     5.83                             geometrymodule_mp_box_intersection_
+  2.90    133.96     4.35                             geometrymodule_mp_quicksort_boxes_str_
+  2.52    137.73     3.77                             polygonfracturemodule_mp_quicksort_trackers_
+  1.89    140.56     2.83                             polygonfracturemodule_mp_update_active_edges_
+
+```
+```
+SDT16_6x6 gate = DIFF AND POLY
+OUTPUT_COUNT =              48305128
+ Healing from:               48305128  to               33824011                                                              
+                AND  8150.02 CPU seconds.  492.33 REAL seconds. FULL TIME:   493.60 MEM: VM      8243012 RSS:      4485492
+ POLY AND DIFF		
+                AND 10093.01 CPU seconds.  532.24 REAL seconds. FULL TIME:   533.45 MEM: VM      7633600 RSS:      3925300
+		
+```

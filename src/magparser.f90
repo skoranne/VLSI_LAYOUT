@@ -65,6 +65,7 @@ module MagicVLSILayoutParser
   use DesignModule
   use RTreeBuilder
   use HDFDataModule
+  use KLDataModule
   use PNumMergeModule
   use SystemInformationModule
   use MortonSortModule
@@ -115,13 +116,12 @@ contains
     character(len=1024), dimension(:), pointer :: layerNames(:)
     type(Layer), pointer :: layers(:)
     type(Box), pointer :: boxes(:)
-    type(Layer),pointer:: l
     type(Box)          :: tempBox
     integer :: box_count = 0
     character(len=200) :: line
     character(len=200) :: section_name
     character(len=200) :: dummy  
-    integer :: i, j, k, pos
+    integer :: i, j
     integer :: x1, y1, x2, y2
     integer :: line_number = 0
     integer :: layer_count = 1
@@ -133,7 +133,6 @@ contains
     integer, parameter :: INIT_ALLOC = 4
     ! to support compressed files
     type(c_ptr) :: gz_file
-    character(kind=c_char, len=256) :: buffer
     integer(c_int) :: status
     type(c_ptr) :: res_ptr
     real        :: t1, t2
