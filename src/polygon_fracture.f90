@@ -27,11 +27,6 @@ module PolygonFractureModule
      integer(kind=K_COORDINATE_KIND) :: y1, y2, x_start
   end type ActiveRegion
 
-  type :: XYTracker
-     integer(kind=K_COORDINATE_KIND) :: X, Y
-     integer(kind=int8) :: polygonNumber 
-     ! the winding number of the vertex is the sign of polygonNumber
-  end type XYTracker
 
   ! ============================================================================
   ! HIGHEST-EFFORT SKIPLIST SCHEMA (Doubly-Linked, Arena-Allocated)

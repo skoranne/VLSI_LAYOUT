@@ -74,43 +74,39 @@ module MagicVLSILayoutParser
   use iso_fortran_env, only : int32, int64
   implicit none
   private
-  public:: parseMagicLayoutFile
-    interface
-        function gzopen(path, mode) bind(C, name="gzopen")
-            import :: c_ptr, c_char
-            type(c_ptr) :: gzopen
-            character(kind=c_char), intent(in) :: path(*)
-            character(kind=c_char), intent(in) :: mode(*)
-        end function gzopen
+  public:: parseMagicLayoutFile, writeMagicLayoutFile
+  interface
+     function gzopen(path, mode) bind(C, name="gzopen")
+       import :: c_ptr, c_char
+       type(c_ptr) :: gzopen
+       character(kind=c_char), intent(in) :: path(*)
+       character(kind=c_char), intent(in) :: mode(*)
+     end function gzopen
 
-        function gzgets(file, buf, len) bind(C, name="gzgets")
-            import :: c_ptr, c_char, c_int
-            type(c_ptr) :: gzgets
-            type(c_ptr), value :: file
-            character(kind=c_char), intent(out) :: buf(*)
-            integer(c_int), value :: len
-        end function gzgets
+     function gzgets(file, buf, len) bind(C, name="gzgets")
+       import :: c_ptr, c_char, c_int
+       type(c_ptr) :: gzgets
+       type(c_ptr), value :: file
+       character(kind=c_char), intent(out) :: buf(*)
+       integer(c_int), value :: len
+     end function gzgets
 
-        function gzclose(file) bind(C, name="gzclose")
-            import :: c_ptr, c_int
-            integer(c_int) :: gzclose
-            type(c_ptr), value :: file
-        end function gzclose
-    end interface
-  
+     function gzclose(file) bind(C, name="gzclose")
+       import :: c_ptr, c_int
+       integer(c_int) :: gzclose
+       type(c_ptr), value :: file
+     end function gzclose
+  end interface
+
   integer :: MAX_N = 10
-  !type(hash_type) :: ht
-  !character(len=20), dimension(:), allocatable :: layerNames
-  !type(Layer), pointer :: layers(:) => null()
-  !integer, allocatable :: geometry_count(:)
   integer, parameter :: M = 16                ! max entries per node
   integer, parameter :: MAX_CHILD = M         ! internal nodes have ≤ M children  
 contains
-  
-  subroutine parseMagicLayoutFile(load_design,fileName,MAX_LAYERS)
+
+  subroutine parseMagicLayoutFile(load_design, MAX_LAYERS)
+    implicit none
     ! Parses Magic VLSI layout files with component sections and rectangle definitions
-    type(Design), intent(out), target :: load_design
-    character(len=*), intent(in) :: fileName
+    type(Design), intent(inout), target :: load_design
     integer, intent(in) :: MAX_LAYERS
     type(hash_type), pointer :: ht
     character(len=1024), dimension(:), pointer :: layerNames(:)
@@ -118,13 +114,14 @@ contains
     type(Box), pointer :: boxes(:)
     type(Box)          :: tempBox
     integer :: box_count = 0
-    character(len=200) :: line
+    character(len=1024) :: line
+    character(len=:), allocatable :: fileName
     character(len=200) :: section_name
     character(len=200) :: dummy  
     integer :: i, j
     integer :: x1, y1, x2, y2
-    integer :: line_number = 0
-    integer :: layer_count = 1
+    integer :: line_number
+    integer :: layer_count
     logical :: found_section
     integer :: layer_id
     logical :: ins,ok
@@ -150,9 +147,12 @@ contains
     real(kind=real64),allocatable :: overlap_perimeter(:)
     real(kind=real64)             :: area_by_union
     type(Box), allocatable :: extents(:)
-    type(Box)              :: DESIGN_EXTENT
+    type(Box), pointer            :: DESIGN_EXTENT
     integer(kind=int64)    :: num_squares
     ! 1. Get the number of ticks per second
+    fileName = load_design%fileName
+    line_number = 0
+    layer_count = 1
     call system_clock(count_rate=clock_rate)
 
     ! Initialize the layer structure by allocating memory for box arrays
@@ -170,7 +170,7 @@ contains
     ht => load_design%ht
     layerNames => load_design%layerNames
     layers => load_design%layers
-    
+    DESIGN_EXTENT => load_design%DESIGN_EXTENT
     do i = 1, MAX_LAYERS
        allocate(layers(i)%layer_boxes(INIT_ALLOC))
        layers(i)%n_used  = 0
@@ -180,7 +180,7 @@ contains
        call extents(i)%reset_to_infinity()
     end do
     call DESIGN_EXTENT%reset_to_infinity()
-    call hash_create(ht,10)
+    call hash_create(ht,MAX_LAYERS)
     !write(*,*) '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
     !write(*,*)
     ! Open and parse the file
@@ -193,7 +193,7 @@ contains
        prefix = fileName( 1 : dot_pos - 1 )
        print *, "The file is a gzipped file!, w/prefix: ", prefix       
        gz_file = gzopen(fileName // c_null_char, "r" // c_null_char)
-       
+
        if (.not. c_associated(gz_file)) then
           print *, "Error: Could not open the gzipped file."
           stop
@@ -201,7 +201,7 @@ contains
        gz_file_processing_loop:do
           block
             integer :: null_pos
-            
+
             ! 1. Locate the C null character position
             line = repeat(c_null_char, len(line))
             res_ptr = gzgets(gz_file, line, int(len(line), c_int))
@@ -220,7 +220,7 @@ contains
                      exit
                   end if
                end do
-               
+
                ! 3. Clear everything from the data end to the end of the line variable
                line(null_pos:) = ' '
             else if (null_pos == 1) then
@@ -303,7 +303,7 @@ contains
                !do j = 1, layers(i)%n_used
                !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
                !end do
-            end if                        
+            end if
             ! Parse label definitions
             if (line(1:5) == 'rlabel' .and. found_section) then
                ! Parse label information
@@ -382,6 +382,8 @@ contains
              call loadFromHDF( section_name, layers(layer_id)%layer_boxes )
              layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
              layers(layer_id)%layerState = ior( layers(layer_id)%layerState, LAYER_STATE_SORT )
+             layers(layer_id)%n_alloc = layers(layer_id)%n_used
+             layers(layer_id)%fileName = section_name             
              !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from HDF5: ', section_name, ' ', layers(layer_id)%n_used
              !boxes => layers(i)%layer_boxes
              !do j = 1, layers(i)%n_used
@@ -395,6 +397,8 @@ contains
              section_name = trim(line(7:len_trim(line)))
              call LoadJuliaHDF5( section_name, layers(layer_id)%layer_boxes, 5 ) ! scaling_factor set to 5
              layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
+             layers(layer_id)%n_alloc = layers(layer_id)%n_used
+             layers(layer_id)%fileName = section_name             
              !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from JHDF5: ', section_name, ' ', layers(layer_id)%n_used
              !boxes => layers(i)%layer_boxes
              !do j = 1, layers(i)%n_used
@@ -406,15 +410,24 @@ contains
              call hash_get( ht, trim(section_name), layer_id, ok )
              ! Parse rectangle coordinates
              section_name = trim(line(7:len_trim(line)))
-             call LoadKLBin( section_name, layers(layer_id)%layer_boxes )
-             layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
+             if( load_design%design_direction == DESIGN_DIRECTION_INPUT ) then
+                call LoadKLBin( section_name, layers(layer_id)%layer_boxes )
+                layers(layer_id)%n_used = size( layers(layer_id)%layer_boxes )
+                layers(layer_id)%n_alloc = layers(layer_id)%n_used
+                !write(*,'(A,A8,A30)') 'Input  Request KLBIN: ', layerNames(layer_id), ' => ', section_name                
+             else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
+                write(*,'(A,A8,A30)') 'Output Request KLBIN: ', layerNames(layer_id), ' => ', section_name                          
+             end if
+             allocate( layers(layer_id)%fileName, source=section_name )
+             write(*,*) layers(layer_id)%fileName
+             !layers(layer_id)%fileName =section_name
              !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from KLBIN: ', section_name, ' ', layers(layer_id)%n_used
              !boxes => layers(i)%layer_boxes
              !do j = 1, layers(i)%n_used
              !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
              !end do
           end if
-          
+
           ! Parse label definitions
           if (line(1:5) == 'rlabel' .and. found_section) then
              ! Parse label information
@@ -431,10 +444,13 @@ contains
        close(10)
        nullify(boxes)
     end if ! for .gz vs simple files
-    
+
     ! Print parsed results
     write(*,*) 'Parsed ', hash_nitems(ht), ' layer(s).'
     call StopMarkTime("ReadDB")
+    if( load_design%design_direction /= DESIGN_DIRECTION_INPUT ) then
+       return
+    end if
     call StartMarkTime("SortBuildRTree")    
     call cpu_time(t1)
     call system_clock(count=start_tick)    
@@ -458,7 +474,7 @@ contains
        if( NeedsSorting( layers(i) ) ) then
           num_squares = count( is_square(boxes) )
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
-          if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > 0.8 ) then
+          if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
              !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated.'
              call MortonSort( layers(i)%layer_boxes )
           else
@@ -482,15 +498,16 @@ contains
     call StopMarkTime("SortBuildRTree")
     !print *, "=== number of boxes stored per layer ==="
     if( .false. ) then
-    do i = 1, size(layers)
-       if( layers(i)%n_used == 0 ) then
-          cycle
-       end if
-       write(num_str,'(I0)') i
-       layerFileName = prefix // '_L' // trim(num_str) // '.h5'
-       call saveToHDF( layerFileName, layers(i)%layer_boxes )
-    end do
+       do i = 1, size(layers)
+          if( layers(i)%n_used == 0 ) then
+             cycle
+          end if
+          write(num_str,'(I0)') i
+          layerFileName = prefix // '_L' // trim(num_str) // '.h5'
+          call saveToHDF( layerFileName, layers(i)%layer_boxes )
+       end do
     end if
+    !> everything else after this is mostly informatics, except the UNION/OVLP check
     write (*,*) '+--------------------------------------------------+'
     call StartMarkTime("TreeCheckLoop")
     write (*,*) '+--------------------------------------------------+'        
@@ -508,7 +525,7 @@ contains
        !   write(*,*) j,' ',layers(i)%tree%tree_nodes(j)%mbr
        !end do
        !>>> UNCOMMENT <<<
-       !call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        call cpu_time(t2)
        call system_clock(count=end_tick)
        elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
@@ -536,7 +553,7 @@ contains
        call system_clock(count=start_tick)           
        call cpu_time(t1)
        call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes,&
-       layers(i)%tree%root_index, overlap_areas(i), overlap_perimeter(i))
+            layers(i)%tree%root_index, overlap_areas(i), overlap_perimeter(i))
        call cpu_time(t2)
        call system_clock(count=end_tick)
        elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
@@ -581,7 +598,7 @@ contains
     call StopMarkTime("PNumLoop")
     call StartMarkTime("ExtentLoop")    
     do concurrent (i = 1:MAX_LAYERS)    
-    !do i = 1,size(layers)
+       !do i = 1,size(layers)
        if( layers(i)%n_used == 0 ) then
           cycle
        end if
@@ -626,7 +643,7 @@ contains
     end do
     write (*,*) '+-----------------------------------------------------------------+'    
     write(*,*) ''
-    
+
     write (*,*) '+-------------------------- Design Extent ------------------------+'
     call DESIGN_EXTENT%print_box()
     write (*,*) '+---------------------------Layers Extent ------------------------+'
@@ -669,5 +686,29 @@ contains
     l%layer_boxes(l%n_used) = tempBox
     !write (*,*) 'Reading box into lid: ', layer_id, ' |x| = ', l%n_used
   end subroutine addBoxToLayer
-  
+
+  !> support for writing VLSI Magic format with binary payload of geometry data
+  subroutine writeMagicLayoutFile(load_design)
+    ! Write Magic VLSI layout files with component sections and rectangle definitions
+    type(Design), intent(in), target :: load_design
+    integer :: i, pos
+    if( load_design%design_direction /= DESIGN_DIRECTION_OUTPUT ) then
+       error stop "Non-output DB being written out" !> I may relax this, but not good idea
+    end if
+    write(*,*) 'Writing DB: ', load_design%fileName
+    write(*,*) 'Writing: ', size(load_design%layers), ' potential layers.'
+    do i=1,size(load_design%layers)
+       if( load_design%layers(i)%n_used == 0 ) cycle
+       !> Lets just assume we are writing in KLBIN
+       if(.not. allocated( load_design%layers(i)%fileName ) ) then
+          error stop "ERROR: layer backing store name not allocated"
+       end if
+       pos = index( load_design%layers(i)%fileName, ".bin" )
+       write(*,*) 'pos = ', pos, ' len = ', len_trim(load_design%layers(i)%fileName)
+       if( pos /= len_trim(load_design%layers(i)%fileName)-3 ) then
+          error stop "DBOUT only supports KLBIN, edit the output MAG file to fix"
+       end if
+       call WriteKLBin( load_design%layers(i)%fileName, load_design%layers(i)%layer_boxes )
+    end do
+  end subroutine writeMagicLayoutFile
 end module MagicVLSILayoutParser

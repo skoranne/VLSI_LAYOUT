@@ -9,32 +9,49 @@ module DesignModule
   use DataStructuresModule
   use PNumMergeModule
   use PolygonFractureModule
+  use MortonSortModule
   use iso_c_binding
   use iso_fortran_env, only : int32, int64, real64
   use omp_lib
   implicit none  
   private
   public :: Design, Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
-       LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, &
+       LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, LAYER_STATE_EVERYTHING, &
        DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY,&
        NeedsSorting, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
        get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon, &
-       CalculateSingleLayerAND, CalculateAND, CalculateOR
+       CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
+       CalculateGROWLayer, CalculateSHRINKLayer 
   type :: LayerTree
      integer(kind=8) :: root_index
      type(RTreeNode), allocatable :: tree_nodes(:)
   end type LayerTree
   enum, bind(C)                     ! bind(C) makes the values C‑compatible
-     enumerator :: LAYER_STATE_NONE  = int(Z'00', kind=c_int)
+     enumerator :: LAYER_STATE_NONE  = int(Z'00', kind=c_int)   ! 0b000000
      enumerator :: LAYER_STATE_HEAL  = int(Z'01', kind=c_int)   ! 0b000001
      enumerator :: LAYER_STATE_SORT  = int(Z'02', kind=c_int)   ! 0b000010
      enumerator :: LAYER_STATE_PNUM  = int(Z'04', kind=c_int)   ! 0b000100
      enumerator :: LAYER_STATE_RTREE = int(Z'08', kind=c_int)   ! 0b001000
      enumerator :: LAYER_STATE_SLSORT= int(Z'16', kind=c_int)   ! 0b010000
+     enumerator :: LAYER_STATE_EVERYTHING = int(Z'31', kind=c_int)   ! 0b011111
+  end enum
+  enum, bind(C)
+     enumerator :: CONJUGATE_LAYER_PURPOSE_NONE       = int(Z'00', kind=c_int)   ! 0b000000
+     enumerator :: CONJUGATE_LAYER_PURPOSE_COMPLEMENT = int(Z'01', kind=c_int)   ! 0b000001
+     enumerator :: CONJUGATE_LAYER_PURPOSE_SECTION    = int(Z'02', kind=c_int)   ! 0b000100
+     enumerator :: CONJUGATE_LAYER_PURPOSE_GENERAL    = int(Z'04', kind=c_int)   ! 0b001000
   end enum
 
+  type :: ConjugateLayer
+     integer :: conjugate_lid
+     integer(kind=c_int) :: purpose = CONJUGATE_LAYER_PURPOSE_NONE
+  end type ConjugateLayer
+  type :: Repetition
+     integer(kind=K_COORDINATE_KIND) :: num_rows, num_cols, dx, dy
+  end type Repetition
+
   type :: Layer
-     integer :: lid
+     !integer :: lid
      integer(kind=8)        :: n_used   = 0   ! how many slots are filled
      integer(kind=8)        :: n_alloc  = 0   ! current allocation size
      type(Box), allocatable :: layer_boxes(:)
@@ -42,6 +59,9 @@ module DesignModule
      type(LayerTree)        :: tree
      type(UnionFind)        :: pnumtable
      real(kind=real64)      :: area, perimeter
+     character(len=:), allocatable :: fileName
+     type(ConjugateLayer) :: paired_layer
+     type(Repetition)     :: in_place_repetition
   end type Layer
 
   enum, bind(C)                     ! bind(C) makes the values C‑compatible
@@ -56,8 +76,9 @@ module DesignModule
      character(len=1024), dimension(:), allocatable :: layerNames(:)
      type(Box)              :: DESIGN_EXTENT
      integer(kind=c_int)    :: design_direction = DESIGN_DIRECTION_INPUT
+     character(len=:), allocatable :: fileName     
   end type Design
-  
+
   ! A clean, modern derived type to hold our bucket boundaries
   type :: BucketBoundary
      integer(int64) :: start_idx
@@ -297,7 +318,7 @@ contains
   subroutine PerformPolygonUnion( input_layer )
     type(Layer), intent(inout) :: input_layer
     integer, parameter :: K_POLYGON_INIT_BOX_COUNT = 64
-    integer(kind=int64) :: i,j,n, num_roots, num_rects, polygon_number, box_count
+    integer(kind=int64) :: i,j,n, num_roots, num_rects, polygon_number, box_count, num_squares
     integer(kind=int64) :: updated_box_count, final_count, final_capacity
     type(Box) :: tempBox
     type(Box), allocatable :: current_polygon_boxes(:)
@@ -306,6 +327,9 @@ contains
     type(BucketBoundary), allocatable :: segments(:)
     integer(int64) :: starting_segment
     real(kind=real64) :: overlap_area, overlap_perimeter
+    logical :: dominated_by_squares
+
+    dominated_by_squares = .false.
     if( input_layer%n_used == 0 ) return
     if( NeedsPNum( input_layer ) ) then
        error stop "PLEASE RUN PNUM before."
@@ -314,6 +338,7 @@ contains
     if( .not. NeedsHealing( input_layer ) ) return !bravo
     num_roots = input_layer%pnumtable%count_roots()
     num_rects = count(input_layer%pnumtable%arr == 0)
+    num_squares = 0
     if( num_rects == input_layer%n_used ) then
        if( num_roots /= 0 ) error stop "INCONSISTENT ROOT/RECT count."
        return
@@ -331,8 +356,10 @@ contains
     final_count = 0
     if( input_layer%pnumtable%arr( permutation( segments(1)%end_idx ) ) == 0 ) then
        !write (*,*) 'Indeed, RECTS ', segments(1)%end_idx
+       !TODO: we have had some problem with this type of looping, better to use explicit for-loop
        final_boxes(1:segments(1)%end_idx) = input_layer%layer_boxes( &
             permutation( segments( 1 )%start_idx: segments( 1 )%end_idx ) )
+       num_squares = count( is_square( final_boxes(1:segments(1)%end_idx) ) )
        final_count = segments(1)%end_idx
        if( input_layer%pnumtable%arr( permutation( segments(1)%start_idx ) ) /= 0 ) error stop "END_IDX=0, but START_IDX /= 0"
        !write (*,*) 'Input RECTANGLES copied over directly'
@@ -345,6 +372,10 @@ contains
     else
        starting_segment = 1
     end if
+    if( num_squares*1.0_real64 / (input_layer%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+       dominated_by_squares = .true.
+    end if
+
     if( input_layer%pnumtable%arr( permutation( segments( starting_segment )%start_idx ) ) == 0 .or. &
          input_layer%pnumtable%arr( permutation( segments( starting_segment )%end_idx ) ) == 0 ) then
        error stop "INCONSISTENT BUCKET numbering detected"
@@ -358,7 +389,7 @@ contains
        if( input_layer%pnumtable%arr( permutation( segments( i )%end_idx ) ) /= polygon_number ) then
           error stop "INCONSISTENT polygon numbering detected"
        end if
-       
+
        if( box_count > size( current_polygon_boxes ) ) then
           !write(*,'(4(A,I0),A)') 'Processing polygon number: ', polygon_number, ' with ', box_count, ' rects, |cpb| = ', size( current_polygon_boxes ), ' |FC| = ', final_capacity, ' '
           deallocate( current_polygon_boxes )
@@ -407,7 +438,13 @@ contains
     input_layer%n_alloc = final_count
     deallocate( input_layer%tree%tree_nodes )
     allocate( input_layer%tree%tree_nodes( CalculateTotalNodes( final_count, K_LEAF_CAPACITY ) ) )
-    call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+    !> the layer could be square dominated, lets look at pre-healed rectangles and decide
+    if( dominated_by_squares ) then
+       call MortonSort( input_layer%layer_boxes )
+    else
+       call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+    end if
+    input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_HEAL ) !> I hope so    
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
@@ -504,24 +541,38 @@ contains
     type(Layer), intent(inout) :: input_layer
   end subroutine CalculateSingleLayerAND
 
-  subroutine PreprocessLayer( input_layer )
+  subroutine PreprocessLayerSL( input_layer )
     type(Layer), intent(inout) :: input_layer
     real(kind=real64) :: overlap_area, overlap_perimeter
-    integer(kind=int64) :: output_box_count
+    integer(kind=int64) :: output_box_count, num_squares
+    logical             :: dominated_by_squares
     if( input_layer%n_used == 0 ) then
        input_layer%layerState = 31 !> we set everything
        return
     end if
+
     if( NeedsHealing( input_layer ) ) then
+       !> by the time we come here this should not be needed
        !$komp critical (heal_boxes_lock) !> work around
        call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
        !$komp end critical (heal_boxes_lock)
-       !write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
+       write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
        input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
        input_layer%n_used = output_box_count
     end if
+
     if( NeedsSorting( input_layer ) ) then
-       call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+       dominated_by_squares = .false.
+       num_squares = count( is_square( input_layer%layer_boxes ) )
+       if( num_squares*1.0_real64 / (input_layer %n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+          write(*,*) 'Using MORTON as layer is dominated by squares.'
+          dominated_by_squares = .true.
+       end if
+       if( dominated_by_squares ) then
+          call MortonSort( input_layer%layer_boxes )
+       else
+          call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+       end if
        input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     end if
     if( NeedsRTree( input_layer ) ) then
@@ -537,15 +588,74 @@ contains
        end if
        input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )
     end if
+  end subroutine PreprocessLayerSL
+  !> we have an alternative method using the RTree which we should compare
+  subroutine PreprocessLayerByPolygon( input_layer )
+    type(Layer), intent(inout) :: input_layer
+    real(kind=real64) :: overlap_area, overlap_perimeter
+    integer(kind=int64) :: output_box_count, num_squares
+    logical             :: dominated_by_squares
+    if( input_layer%n_used == 0 ) then
+       input_layer%layerState = LAYER_STATE_EVERYTHING !> we set everything
+       return
+    end if
+
+    if( NeedsSorting( input_layer ) ) then
+       dominated_by_squares = .false.
+       num_squares = count( is_square( input_layer%layer_boxes ) )
+       if( num_squares*1.0_real64 / (input_layer %n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+          write(*,*) 'Using MORTON as layer is dominated by squares.'
+          dominated_by_squares = .true.
+       end if
+       if( dominated_by_squares ) then
+          call MortonSort( input_layer%layer_boxes )
+       else
+          call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+       end if
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
+    end if
+    if( NeedsRTree( input_layer ) ) then
+       allocate( input_layer%tree%tree_nodes( CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY ) ) )
+       call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
+    end if
+    if( NeedsPNum( input_layer ) ) then
+       call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
+            input_layer%tree%root_index, overlap_area, overlap_perimeter)
+       if( overlap_area /= 0 ) then
+          !> wipe HEALING state
+          input_layer%layerState = iand( input_layer%layerState, NOT(LAYER_STATE_PNUM ) )
+       else
+          input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_HEAL )
+       end if
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )
+    end if
+    call PerformPolygonUnion( input_layer )
+  end subroutine PreprocessLayerByPolygon
+
+  subroutine PreprocessLayer( input_layer )
+    implicit none
+    type(Layer), intent(inout) :: input_layer
+    character(len=255) :: val
+    integer            :: status
+    call get_environment_variable( 'MAGPARSER_CONTROL_PREPROCESS_LAYER_BY_POLYGON', val, status )
+    if( status == 0 ) then
+       call PreprocessLayerByPolygon( input_layer )
+    else
+       call PreprocessLayerSL( input_layer )
+    end if
   end subroutine PreprocessLayer
 
   subroutine CalculateOR( input_layer_A, input_layer_B, output_layer )
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
-    type(Layer), intent(out)   :: output_layer
+    type(Layer), intent(inout)   :: output_layer
     integer             :: alloc_status
     !> we can create the RTree for A and B if needed
-    call PreprocessLayer( input_layer_A )
-    call PreprocessLayer( input_layer_B )
+    !call PreprocessLayer( input_layer_A )
+    !call PreprocessLayer( input_layer_B )
+    if( allocated( output_layer%layer_boxes ) ) then
+       deallocate( output_layer%layer_boxes ) !> since we are now doing inout, 
+    end if
     allocate( output_layer%layer_boxes( size(input_layer_A%layer_boxes) + size( input_layer_B%layer_boxes) ), stat=alloc_status )
     if( alloc_status /= 0 ) then
        error stop "ALLOCATION FAILED: "
@@ -577,14 +687,14 @@ contains
          end do
          call move_alloc( from=temp, to=th_layer%layer_boxes)
        end block
-    end if       
+    end if
     th_layer%n_used = th_layer%n_used + 1       
     th_layer%layer_boxes( th_layer%n_used ) = xbox
   end subroutine push_box
-  
+
   subroutine CalculateAND( input_layer_A, input_layer_B, output_layer )
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
-    type(Layer), intent(out)   :: output_layer
+    type(Layer), intent(inout)   :: output_layer
     integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC
     integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
     integer(kind=int64) :: number_leaves
@@ -592,8 +702,8 @@ contains
     type(Layer), allocatable :: buffers(:)
     type(Box) :: tempBox
     integer :: nthreads, tid, alloc_status
-    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 128
-    
+    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
+
     !> we can create the RTree for A and B if needed
     !> since the SkipList is not re-entrant, we cannot do parallel here (yet)
     !$komp parallel
@@ -649,7 +759,10 @@ contains
     !print *, "DEBUG: Is this loop in a parallel region? ", omp_in_parallel()
     ! The global Union-Find array is updated strictly sequentially
     num_boxesC = sum([ (buffers(i)%n_used, i=1,nthreads) ])
-    !write(*,*) 'OUTPUT_COUNT =', num_boxesC    
+    !write(*,*) 'OUTPUT_COUNT =', num_boxesC
+    if( allocated( output_layer%layer_boxes ) ) then
+       deallocate( output_layer%layer_boxes ) !> since we are now doing inout, 
+    end if
     allocate( output_layer%layer_boxes( num_boxesC ), stat=alloc_status )
     if( alloc_status /= 0 ) then
        error stop "ALLOCATION FAILED: "
@@ -679,8 +792,122 @@ contains
        i = i + buffers(tid)%n_used
     end do
     output_layer%n_used = num_boxesC
+    !> we can use the optimization that by construction the output is HEALED
+    output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
     call PreprocessLayer( output_layer )
   end subroutine CalculateAND
+
+  !> Multiple algorithms for A NOT B
+  subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer )
+    type(Layer), intent(inout) :: input_layer_A, input_layer_B
+    type(Layer), intent(inout)   :: output_layer
+    integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC
+    type(XYTracker), allocatable :: trackers(:)
+    integer(kind=int64) :: number_leaves
+    integer(kind=int64) :: i, j, k
+    type(Box) :: tempBox, bboxA, bboxB
+    type(Layer) :: temp_layer
+    integer :: nthreads, tid, alloc_status
+    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
+
+    !> we can create the RTree for A and B if needed
+    !> since the SkipList is not re-entrant, we cannot do parallel here (yet)
+    !$komp parallel
+    !$komp single
+    !$komp task
+    call PreprocessLayer( input_layer_A )
+    !$komp end task
+    !$komp task    
+    call PreprocessLayer( input_layer_B )
+    !$komp end task
+    !$komp taskwait
+    !$komp end single
+    !$komp end parallel
+
+    !> Step 1
+    write(*,*) 'Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...'
+    bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )  
+    call generate_trackers( input_layer_B%layer_boxes, bboxA, trackers ) !> this does CW ordering of inner contours
+    call scanline_fracture(trackers, temp_layer%layer_boxes)
+    temp_layer%layerState = ior( temp_layer%layerState, LAYER_STATE_HEAL )
+    temp_layer%n_used = size( temp_layer%layer_boxes)    
+    call CalculateAND( input_layer_A, temp_layer, output_layer )
+  end subroutine CalculateNOT
+
+  subroutine DeleteLayer( input_layer_A )
+    type(Layer), intent(inout) :: input_layer_A
+    if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
+    if( allocated( input_layer_A%fileName ) ) deallocate( input_layer_A%fileName )
+    input_layer_A%n_used = 0
+    input_layer_A%n_alloc = 0
+    input_layer_A%layerState = LAYER_STATE_EVERYTHING
+  end subroutine DeleteLayer
+  
+  subroutine CopyLayer( input_layer_A, output_layer )
+    type(Layer), intent(inout) :: input_layer_A
+    type(Layer), intent(inout) :: output_layer
+    integer(kind=int64) :: i
+    if( input_layer_A%n_used == 0 ) then
+       call DeleteLayer( output_layer )
+    end if
+    allocate( output_layer%layer_boxes( input_layer_A%n_used ) )
+    do i=1,input_layer_A%n_used
+       output_layer%layer_boxes(i) = input_layer_A%layer_boxes(i)
+    end do
+    
+  end subroutine CopyLayer
+  
+  subroutine CalculateGROWLayer( input_layer_A, grow_value, output_layer )
+    type(Layer), intent(inout) :: input_layer_A
+    type(Layer), intent(inout) :: output_layer
+    type(Layer)                :: temp_layer
+    integer(kind=K_COORDINATE_KIND), intent(in) :: grow_value
+    integer(kind=int64) :: num_boxesA, output_box_count
+    type(XYTracker), allocatable :: trackers(:)
+    integer(kind=int64) :: i, j, k
+    type(Box) :: tempBox, bboxA, bboxB
+    integer :: nthreads, tid, alloc_status
+    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
+
+    call CopyLayer( input_layer_A, output_layer )
+    call box_grow(output_layer%layer_boxes, grow_value, grow_value )
+    call PreprocessLayer( output_layer )
+  end subroutine CalculateGROWLayer
+
+  subroutine CalculateSHRINKLayer( input_layer_A, shrink_value, output_layer )
+    type(Layer), intent(inout) :: input_layer_A
+    type(Layer), intent(inout)   :: output_layer
+    integer(kind=K_COORDINATE_KIND), intent(in) :: shrink_value
+    integer(kind=int64) :: num_boxesA, output_box_count
+    type(XYTracker), allocatable :: trackers(:)
+    integer(kind=int64) :: i, j, k
+    type(Box) :: tempBox, bboxA, bboxB
+    type(Layer) :: temp_layer
+    integer :: nthreads, tid, alloc_status
+    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
+
+    !> we can create the RTree for A and B if needed
+    !> since the SkipList is not re-entrant, we cannot do parallel here (yet)
+    !$komp parallel
+    !$komp single
+    !$komp task
+    call PreprocessLayer( input_layer_A )
+    !$komp end task
+    !$komp taskwait
+    !$komp end single
+    !$komp end parallel
+
+    !> Step 1
+    bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
+    call box_grow( bboxA, shrink_value, shrink_value )
+    call generate_trackers( input_layer_A%layer_boxes, bboxA, trackers ) !> this does CW ordering of inner contours
+    call scanline_fracture(trackers, temp_layer%layer_boxes)
+    temp_layer%n_used = size( temp_layer%layer_boxes)        
+    !> now grow each box
+    call box_grow(temp_layer%layer_boxes, shrink_value, shrink_value )
+    call PreprocessLayer( temp_layer )
+    call CalculateNOT( input_layer_A, temp_layer, output_layer )
+  end subroutine CalculateSHRINKLayer
   
 end module DesignModule
 

@@ -18,6 +18,8 @@
 ! exec run g1
 ! exec push g1 o1:gate
 ! exec push g1 o2:10:0
+! sync
+! flush !< writes data to disk
 ! end my_control
 
 module ControlModule
@@ -114,14 +116,15 @@ contains
     integer, intent(in) :: MAX_LAYERS
     integer, parameter  :: K_MAX_DBS = 32 !< will this work
     character(len=256) :: line, keyword, rest
-    integer :: unit, ios, pos, line_number, db_count, parse_status
+    integer :: unit, ios, pos, line_number, db_count, parse_status, i
     integer :: lhs_db_index, rhs1_db_index, rhs2_db_index
     integer :: lhs_layer_index, rhs1_layer_index, rhs2_layer_index    
-    type(Design), allocatable :: design_dbs(:)
-    type(Layer) :: lhs_layer, rhs1_layer, rhs2_layer
+    type(Design), allocatable, target :: design_dbs(:)
+    type(Layer), pointer :: lhs_layer, rhs1_layer, rhs2_layer !> either dont use
     type(hash_type) :: ht
     logical :: ins
     character :: operator_char !> single letter only
+    character(len=256) :: TEMPORARY_FOLDER
     db_count = 1
     call hash_create(ht,K_MAX_DBS)
     allocate( design_dbs( K_MAX_DBS ) )
@@ -158,6 +161,18 @@ contains
           call InitSystem()
           call StartMarkTime("program")
           call StopMarkTime("program")
+       case ('var')
+          rest = adjustl( rest ) !> remove leading whitespace
+          write(*,*) 'Variable found: ', trim(rest)
+          pos = index( rest, ' ' )
+          write(*,*) 'VAR x = ', trim(rest(1:pos-1))
+          if( trim(rest(1:pos-1)) == 'temp_folder' ) then
+             rest = adjustl(rest)
+             pos = index( rest, ' ' )             
+             write(*,*) 'TEMP_FOLDER = ', trim(rest(1:pos-1))
+             TEMPORARY_FOLDER = trim(rest(1:pos-1))
+          end if
+          cycle read_loop
        case ('decl')
           rest = adjustl( rest ) !> remove leading whitespace
           write(*,*) 'Declaration found: ', trim(rest)
@@ -167,7 +182,7 @@ contains
           if( trim(rest(1:pos-1)) == 'output' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
-             write(*,*) 'Output DB handle = ', trim(rest(1:pos-1)) !> o1
+             write(*,*) 'Output DB handle = ', trim(rest(1:pos-1)), ' db_index = ', db_count !> o1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
              pos = index( rest, ' ' )          
@@ -175,8 +190,12 @@ contains
              pos = index( keyword, ' ' )
              write(*,*) 'Generating output in MAGIC file: ', trim(keyword(1:pos)) !> file
              design_dbs(db_count)%design_direction = DESIGN_DIRECTION_OUTPUT
-             call hash_create(design_dbs(db_count)%ht, MAX_LAYERS )
-             allocate( design_dbs(db_count)%layers( MAX_LAYERS ) )
+             write(*,*) 'Setting direction of ', db_count, ' to ', design_dbs(db_count)%design_direction
+             !call hash_create(design_dbs(db_count)%ht, MAX_LAYERS )
+             !allocate( design_dbs(db_count)%layers( MAX_LAYERS ) )
+             !> we also want output association of layer data with disk
+             design_dbs(db_count)%fileName = trim(keyword(1:pos))             
+             call parseMagicLayoutFile(design_dbs(db_count), MAX_LAYERS)             
              db_count = db_count+1
           else if( trim(rest(1:pos-1)) == 'design' ) then
              rest = adjustl(rest(pos+1:))             
@@ -188,7 +207,8 @@ contains
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
              write(*,*) 'DB handle = ', trim(keyword(1:pos)) !> file
-             call parseMagicLayoutFile(design_dbs(db_count), trim(keyword(1:pos)), MAX_LAYERS)
+             design_dbs(db_count)%fileName = trim(keyword(1:pos))
+             call parseMagicLayoutFile(design_dbs(db_count), MAX_LAYERS)
              db_count = db_count + 1
           else if( trim(rest(1:pos-1)) == 'memory' ) then
              rest = adjustl(rest(pos+1:))             
@@ -214,8 +234,6 @@ contains
           call PrintFullInformation()
        case ('info') !> print information about RSS of current pid
           call StopMarkTime("info")
-       case ('var')
-          print *, "Variable definition:", rest
        case ('exec')
           print *, "Execution command:", rest
           !lhs_layer = EvaluateExpression( rest, ht, design_dbs, parse_status )
@@ -243,10 +261,21 @@ contains
              if( ins .and. design_dbs( lhs_db_index )%design_direction == DESIGN_DIRECTION_MEMORY ) then
                 write(*,*) 'MEMORY LEAK: Reusing LHS Layer name: ', trim(rest(1:pos-1)), ' index: ', lhs_layer_index
              end if
-             lhs_layer_index = hash_nitems(design_dbs( lhs_db_index )%ht)+1
-             write(*,*) 'Using DB Index, we get LHS layer index = ', lhs_layer_index, ' for ', trim(rest(1:pos-1))
-             call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index,ins )
-             lhs_layer = design_dbs( lhs_db_index )%layers(lhs_layer_index)
+             if( ins .and. design_dbs( lhs_db_index )%design_direction == DESIGN_DIRECTION_OUTPUT ) then
+                !> normal situation, we have a layer handle and output file
+             else
+                lhs_layer_index = hash_nitems(design_dbs( lhs_db_index )%ht)+1
+                write(*,*) 'Using DB Index, we create NEW LHS layer index = ', lhs_layer_index, ' for ', trim(rest(1:pos-1))
+                call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
+                if( ins ) error stop "DB HASH TABLE CORRUPTED"
+                lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
+                allocate(lhs_layer%fileName, source = TEMPORARY_FOLDER//trim(rest(1:pos-1)))
+             end if
+             write(*,*) 'LHS index = ', lhs_layer_index
+             lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
+             if(.not. allocated( lhs_layer%fileName ) ) then
+                error stop "ERROR: Each layer must have a backing-store/name by now"
+             end if
              rest = adjustl(rest(pos+1:))
              write(*,*) 'RESTA = ', trim(rest)
              pos  = index( rest, '= ')
@@ -258,7 +287,7 @@ contains
              rest = adjustl(rest(pos+1:))
              pos  = index( rest, ' ')
              call hash_get( design_dbs( rhs1_db_index )%ht, trim(rest(1:pos-1)), rhs1_layer_index, ins )
-             rhs1_layer = design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
+             rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
 
              rest = adjustl(rest(pos+1:))
              write(*,*) 'RESTD = ', trim(rest)
@@ -278,7 +307,7 @@ contains
              rest = adjustl(rest(pos+1:))
              pos  = index( rest, ' ')
              call hash_get( design_dbs( rhs2_db_index )%ht, trim(rest(1:pos-1)), rhs2_layer_index, ins )
-             rhs2_layer = design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
+             rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
              pos  = index( rest, ' ')
              write(*,'(A,I3,A,I3,A,I3,A,I3,A4,I3,A,I3)') 'Getting ready to execute: ', &
                   lhs_db_index,':',lhs_layer_index, ' = ', &
@@ -295,13 +324,17 @@ contains
                 call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )                
                 call StopMarkTime("AND")                
              case('-')
+                call StartMarkTime("NOT")
+                write(*,'(A,I8,A,I8)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used
+                call CalculateNOT( rhs1_layer, rhs2_layer, lhs_layer )                
+                call StopMarkTime("NOT")                
              case('^')
              case('%')
              case('.')
              end select
              
              cycle read_loop
-          else if( trim(rest(1:pos-1)) == 'design' ) then
+          else if( trim(rest(1:pos-1)) == 'modedesign' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
              write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
@@ -311,14 +344,24 @@ contains
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
              write(*,*) 'DB handle = ', trim(keyword(1:pos)) !> file
-             call parseMagicLayoutFile(design_dbs(db_count), trim(keyword(1:pos)), MAX_LAYERS)
+             design_dbs(db_count)%fileName = trim(keyword(1:pos))
+             call parseMagicLayoutFile(design_dbs(db_count), MAX_LAYERS)
              design_dbs(db_count)%design_direction = DESIGN_DIRECTION_INPUT
              db_count = db_count + 1
           else
              write(*,*) 'Syntax ERROR: line: ', line_number
              error stop "Syntax ERROR."
           end if
-
+          cycle read_loop
+       case ('flush')
+          call StartMarkTime("dbFlush")
+          do i=1,size(design_dbs)
+             if( design_dbs(i)%design_direction == DESIGN_DIRECTION_OUTPUT ) then
+                call writeMagicLayoutFile( design_dbs(i) )
+             end if
+          end do
+          call StopMarkTime("dbFlush")          
+          cycle read_loop
        case ('end')
           print *, "--- End of file"
           call StopMarkTime("END ")

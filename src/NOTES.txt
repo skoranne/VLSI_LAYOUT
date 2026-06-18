@@ -328,17 +328,26 @@ This was DBG, optimized + profile:
 
 ```
 ```
+This is using SL 
 SDT16_6x6 gate = DIFF AND POLY
+ Healing from:               18217908  to               18480588                                                              
+ Healing from:               62441994  to               58298559
+
 OUTPUT_COUNT =              48305128
  Healing from:               48305128  to               33824011                                                              
                 AND  8150.02 CPU seconds.  492.33 REAL seconds. FULL TIME:   493.60 MEM: VM      8243012 RSS:      4485492
+                AND  8053.80 CPU seconds.  496.36 REAL seconds. FULL TIME:   497.64 MEM: VM      8245032 RSS:      4461668		
  POLY AND DIFF		
                 AND 10093.01 CPU seconds.  532.24 REAL seconds. FULL TIME:   533.45 MEM: VM      7633600 RSS:      3925300
   Running on            20
 On DGX Spark
                 AND   197.95 CPU seconds.  197.95 REAL seconds. FULL TIME:   201.01 MEM: VM     13601752 RSS:      4222132
 INFO: Writing array of         33824011 boxes.
-		
+
+SMALL SDT_16 (polygon method)
+                AND     621.09 CPU seconds.     17.33 REAL seconds. FULL TIME:    17.48 MEM: VM      3771244 RSS:       234532
+
+
 ```
 apptainer exec --bind /scratch1/ MAGPARSER.sif /opt/CONVERT.exe POLY.bin DIFF.bin z.bin 11
 OMP_NUM_THREADS=4 in the container and we get decent runs

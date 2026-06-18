@@ -142,7 +142,7 @@ contains
     this%y1 = (this%y1*ascale)/bscale
     this%y2 = (this%y2*ascale)/bscale    
   end subroutine box_scale
-  pure subroutine box_grow(this, xgrow, ygrow)
+  pure elemental subroutine box_grow(this, xgrow, ygrow)
     class(Box), intent(inout) :: this
     integer, intent(in) :: xgrow, ygrow
     if( .not. this%is_valid() ) error stop "INBOX NOT VALID"

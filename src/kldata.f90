@@ -20,8 +20,8 @@ contains
     ! 1. Query the filesystem for the total file size in bytes
     inquire(file=trim(filename), size=file_bytes)
     if (file_bytes <= 0) then
-       write(*,*) 'Error: File ', trim(filename), ' is empty or does not exist.'
-       stop
+       write(*,*) 'Error: KLBIN File ', trim(filename), ' is empty or does not exist.'
+       error stop
     end if
     ! 2. Calculate the exact number of box structs in the array
     total_boxes = file_bytes / BOX_SIZE_BYTES

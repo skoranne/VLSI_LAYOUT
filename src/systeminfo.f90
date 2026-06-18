@@ -3,7 +3,7 @@
 ! Purpose: In Modern fortran, print the system information such as time/date, CPU, Linux, and process memory used
 module SystemInformationModule
   implicit none
-
+  private
   ! Date and Time variables
   character(len=8)  :: date_str
   character(len=10) :: time_str
@@ -18,7 +18,7 @@ module SystemInformationModule
   integer(kind=8) :: full_start_tick
   integer(kind=8) :: start_tick, end_tick, clock_rate
   real        :: full_start_time, t1, t2
-  
+  public:: InitSystem, StartMarkTime, StopMarkTime, PrintFullInformation, ReadProcessMemoryUsage
 contains
   subroutine InitSystem()
     call system_clock(count_rate=clock_rate)
@@ -39,7 +39,7 @@ contains
     call system_clock(count=end_tick)
     elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
     full_elapsed_time = real(end_tick - full_start_tick, kind=8) / real(clock_rate, kind=8)    
-    write(*,'(A20, F8.2, A,F8.2,A,F8.2,A,I12,A,I12)') checkpointName, t2 - t1, &
+    write(*,'(A20, F10.2, A,F10.2,A,F8.2,A,I12,A,I12)') checkpointName, t2 - t1, &
          ' CPU seconds.', elapsed_time, ' REAL seconds. FULL TIME: ', &
          full_elapsed_time, ' MEM: VM ', virtual_memory_used, ' RSS: ', rss_used 
   end subroutine StopMarkTime
