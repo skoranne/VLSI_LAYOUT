@@ -13,8 +13,8 @@ FORTRAN_COMPILER =nvfortran
 #FCFLAGS = -g -O0 -check bounds -check all -traceback -warn all -qopenmp -qopt-report=3
 #FCFLAGS = -O3 -parallel -qopenmp -qopt-report=3
 GIT_HASH := $(shell git rev-parse --short HEAD)
-FCFLAGS = -O3 -Mpreprocess 
-FCFLAGS = -O3 -Mpreprocess -Minfo=accel -fopenmp -mp=gpu
+FCFLAGS = -O3 -Mpreprocess -mp=gpu
+#FCFLAGS = -g -O3 -Mpreprocess -Minfo=accel -fopenmp -mp=gpu
 # --- Linker Variables ---
 #LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
 LDFLAGS = -L/scratch1/skoranne/NVCOMPILERS/lib/
@@ -25,25 +25,11 @@ LIBRARY = libmagparser.a
 LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
-	   polygon_fracture.o boxmerge.o kldata.o
+	   polygon_fracture.o boxmerge.o kldata.o gpu_morton_sort.o\
+	   systeminfo_gpu.o
 
-systeminfo.o:	commonmodule.o version_mod.o
-hashtable.o:	systeminfo.o
-geometry.o:	hashtable.o
-morton.o:	commonmodule.o geometry.o
-rtree.o:	geometry.o
-boxmerge.o:	geometry.o
-contour.o:	geometry.o polygon_fracture.o
-hdfdata.o:	geometry.o
-kldata.o:	geometry.o
-datastructures.o:	commonmodule.o
-pnummerge.o:	datastructures.o rtree.o geometry.o
-polygon_fracture.o:	hdfdata.o
-design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o
-magparser.o:	polygon_fracture.o design.o morton.o kldata.o
-mainmagparser.o:	magparser.o controlparser.o
-controlparser.o:	design.o
 
+include DEPENDENCIES.txt
 #skiplist_module.o
 
 # Create a list of all object files that will be compiled

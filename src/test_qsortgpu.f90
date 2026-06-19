@@ -33,7 +33,7 @@ contains
       tmp = arr(p+1); arr(p+1) = arr(hi); arr(hi) = tmp
       piv = p + 1
    end subroutine partition
-!$omp end declare target
+!$komp end declare target
 
    !--------------------------------------------------------------
    !  Tiny insertion sort – also a device routine
@@ -55,7 +55,7 @@ contains
          a(j+1) = key
       end do
    end subroutine insertion_sort
-!$omp end declare target
+!$komp end declare target
 
    !--------------------------------------------------------------
    !  Iterative quick‑sort – device routine that calls the two above
@@ -96,14 +96,14 @@ contains
 
       deallocate (L, R)
    end subroutine quicksort_iterative
-!$omp end declare target
+!$komp end declare target
 
    !--------------------------------------------------------------
    !  GPU wrapper – **correct nesting** (see comment block above)
    !--------------------------------------------------------------
    subroutine quicksort_gpu(arr)
       real(wp), intent(inout) :: arr(:)
-      integer :: n
+      integer :: n,i
 
       n = size(arr)
 
@@ -134,7 +134,7 @@ program test_qs
    use gpu_qs_mod
    implicit none
 
-   integer, parameter :: N = 20_000_000
+   integer, parameter :: N = 20000000
    real(wp), allocatable :: a(:), a_ref(:)
    real :: t0, t1, t_cpu, t_gpu
 
