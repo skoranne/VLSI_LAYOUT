@@ -69,6 +69,7 @@ module MagicVLSILayoutParser
   use PNumMergeModule
   use SystemInformationModule
   use MortonSortModule
+  use MortonSortOMT
   use PolygonFractureModule
   use iso_c_binding
   use iso_fortran_env, only : int32, int64
@@ -477,11 +478,12 @@ contains
        if( NeedsSorting( layers(i) ) ) then
           num_squares = count( is_square(boxes) )
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
+          call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used )
           if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
              write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated.'
-             call MortonSort( layers(i)%layer_boxes )
+             !call MortonSort( layers(i)%layer_boxes )
           else
-             call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
+             !call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
           end if
           layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_SORT )
        end if

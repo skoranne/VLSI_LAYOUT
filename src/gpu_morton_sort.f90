@@ -1,15 +1,8 @@
 module MortonSortOMT
+  use CommonModule
+  use GeometryModule
   use omp_lib
   implicit none
-
-  ! Precision bindings
-  integer, parameter :: K_COORDINATE_KIND = selected_int_kind(9)  ! 32-bit coords
-  integer, parameter :: int64 = selected_int_kind(18)             ! 64-bit indices/loops
-
-  type :: Box
-     integer(kind=K_COORDINATE_KIND) :: X1, Y1, X2, Y2
-  end type Box
-
   ! Bit-mask constants for 64-bit Morton Code generation
   integer(kind=int64), parameter :: MASK1 = int(Z'0000FFFF0000FFFF', kind=int64)
   integer(kind=int64), parameter :: MASK2 = int(Z'00FF00FF00FF00FF', kind=int64)

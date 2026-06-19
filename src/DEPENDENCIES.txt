@@ -1,6 +1,7 @@
 systeminfo.o:	commonmodule.o version_mod.o
 hashtable.o:	systeminfo.o
 geometry.o:	hashtable.o
+gpu_morton_sort.o: commonmodule.o geometry.o
 morton.o:	commonmodule.o geometry.o
 rtree.o:	geometry.o
 boxmerge.o:	geometry.o
@@ -10,8 +11,10 @@ kldata.o:	geometry.o
 datastructures.o:	commonmodule.o
 pnummerge.o:	datastructures.o rtree.o geometry.o
 polygon_fracture.o:	hdfdata.o
-design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o
+design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o
 design_impl.o:	design.o geometry.o
 magparser.o:	polygon_fracture.o design.o morton.o kldata.o
 mainmagparser.o:	magparser.o controlparser.o
 controlparser.o:	design.o
+systeminfo_gpu.o:	systeminfo.o
+

@@ -19,6 +19,11 @@ module SystemInformationModule
   integer(kind=8) :: start_tick, end_tick, clock_rate
   real        :: full_start_time, t1, t2
   public:: InitSystem, StartMarkTime, StopMarkTime, PrintFullInformation, ReadProcessMemoryUsage
+  interface
+     module subroutine PrintGPUInfo()
+     end subroutine PrintGPUInfo
+  end interface
+  
 contains
   subroutine InitSystem()
     call system_clock(count_rate=clock_rate)
@@ -78,6 +83,8 @@ contains
     call ReadProcessMemoryUsage( vm_size, vm_rss )
     if (vm_size /= -1) write(*, '(A,I12,A)') "  Virtual Memory (VmSize): ", vm_size, " kB"
     if (vm_rss /= -1)  write(*, '(A,I12,A)') "  Resident Memory (VmRSS): ", vm_rss, " kB"
+    write(*,*) 'GPU Information:'
+    call PrintGPUInfo()
     print *, "========================================================="    
   end subroutine PrintFullInformation
   subroutine ReadProcessMemoryUsage( virtual_memory_used, rss_used )
