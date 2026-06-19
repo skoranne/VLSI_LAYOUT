@@ -218,6 +218,7 @@ contains
     tempBox = cmbr * qbox
     !write (*,'(A,4I,A,4I)') 'QBOX: ', qbox, ' CMBR: ', cmbr
     if( .not. MBRValid( tempBox ) ) then
+       return
        !write (*,*) 'QBOX: ', qbox, ' not within CMBR: ', cmbr
        error stop "ERROR: QBOX FAIL"
        return

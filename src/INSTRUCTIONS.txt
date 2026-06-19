@@ -1,0 +1,111 @@
+In modern Fortran we already have types
+  type :: Box
+     integer(kind=K_COORDINATE_KIND) :: x1, y1, x2, y2
+   contains
+     procedure, pass :: reset_to_infinity
+     procedure, pass :: is_valid
+     procedure, pass :: print_box
+     procedure, pass :: box_union
+     procedure, pass :: box_intersection
+     procedure, pass :: box_equal
+     generic :: operator(+) => box_union
+     generic :: operator(*) => box_intersection
+     generic :: operator(==) => box_equal
+  end type Box
+  type :: Layer
+     integer(kind=8)        :: n_used   = 0   ! how many slots are filled
+     integer(kind=8)        :: n_alloc  = 0   ! current allocation size
+     type(Box), allocatable :: layer_boxes(:)
+  end type Layer
+
+!     Using these write a subroutine like this which will fracture
+!     the given input box into rows x cols boxes
+!     (using integer(kind=K_COORDINATE_KIND) arithmetic) and add
+!     them to the output_layer%layer_boxes array      
+
+      subroutine CreateGrid( input_box, output_layer, rows, cols )
+      
+      end subroutine CreateGrid
+
+Using this function as a template, and to see how to use my
+RTree, develop a provable optimal O(n log n + k) time and
+memory algorithm to do A NOT B, where A and B are similarly
+structured arrays of boxes with RTrees. You can assume that
+their wont be pathological cases of overlap and each box in
+A will overlap only few (10-20) boxes of B. Generate a
+subroutine for CalculateNOTRTree and document it thoroughly
+including the algorithm method used. Use idomatic modern
+Fortran and use CamelCase for coding and
+integer(kind=K_COORDINATE_KIND) for type(Box) and
+integer(kind=int64) for all loop variables. Make sure to use
+OpenMP for parallelism. Check your design and implementation
+thoroughly.
+
+      Since the RTree is built using OMT and MortonSort, I
+would like to put these on a GPU using target offload OpenMP
+with NVFORTRAN   type :: Box    
+ integer(kind=K_COORDINATE_KIND) :: x1, y1, x2, y2 end
+Devise and generate a direct as well as indirect (use int64
+for index) sorting routines which are known to work on
+nvidia GPU. If possible I dont want to use thrust and C++, I
+prefer native modern fortran with do concurrent, but it has
+issues with procedure calls so we have to develop everything
+in one big function or use preprocessor. Use your best
+effort.
+
+      
+
+program my_control
+ decl design d1 = FPU.mag
+ decl output o1 = FOO.mag
+ decl temp   t1 = NOTHING
+ info
+ decl int ctr = 2
+ decl real dmin = 3.0
+ var layer t1:gate = ( d1:diff * d1:poly )
+ var layer t1:source_drain = ( d1:diff - d1:poly )
+ var layer t1:fake = ( d1:diff + d1:poly )
+ var layer t1:check = ( d1:diff ^ d1:poly )
+ var layer t1:met1_density = ( d1:met1 % [0.25:0.5] ) 
+ end my_control
+
+Given the file above and given that we have already read the strings
+corresponding to d1 and o1 into a hash_table called design_hash_table, we can convert
+d1 to the number 1 and o1 to 2, and t1 to 3, using this type
+    type(hash_type) :: design_hash_table
+We also have a Fortran type Design
+  type :: Design
+     type(Layer), allocatable :: layers(:)
+     type(hash_type) :: ht
+     character(len=1024), dimension(:), allocatable :: layerNames(:)
+     type(Box)              :: DESIGN_EXTENT
+  end type Design
+and we have created an array of these
+    type(Design), allocatable :: design_dbs(:)
+Using the hash_table object design_hash_table we convert d1 and o1 into design_dbs(1)
+and design_dbs(2) to get a design object. As you can see each design
+type also has a hash_table, and using that hash table we can conver
+a string like d1:poly to a type(Layer) using the following steps:
+
+Step 1: use the design_hash_table to convert string d1 into db_index
+
+Step 2: index into design_dbs array to get a type(Design)
+
+Step 3: call hash_get( design_dbs(db_index)%ht, layer_name ) to get layer index
+
+Step 4: index into design_dbs(db_index)%layers(layer_index) to get array
+
+pure subroutine GetLayerFromDBName( full_name, design_hash_table, design_dbs )
+  character(len=*), intent(in) :: full_name
+  type(hash_type), intent(in) :: design_hash_table
+  type(Design),intent(in)     :: design_dbs(:)
+  character(len=*), allocatable:: layerName
+  integer                     :: db_index, layer_index
+  logical :: ins
+  integer :: pos
+  pos = index( full_name, ":")
+  call hash_get( design_hash_table, full_name(1:pos), db_index, ins )
+  layerName = trim( full_name(1+pos,:) )
+  call hash_get( design_dbs(db_index)%ht, layerName, layer_index, ins )
+end subroutine GetLayerFromDBName
+

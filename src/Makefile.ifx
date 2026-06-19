@@ -9,7 +9,7 @@ FORTRAN_COMPILER=/scratch1/skoranne/INTELCOMPILERS/bin/h5fc
 # Debug flags (commented out, but easily swappable)
 # FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3 -xHost 
 # Use -pg
-#FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp 
+FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp 
 FCFLAGS = -g -fpp -O3 -parallel -qopenmp -qopt-report=3
 #FCFLAGS = -O3 -fpp
 GIT_HASH := $(shell git rev-parse --short HEAD)
@@ -22,24 +22,9 @@ LIBRARY = libmagparser.a
 LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
-	   polygon_fracture.o boxmerge.o kldata.o
+	   polygon_fracture.o boxmerge.o kldata.o design_impl.o
 
-systeminfo.o:	commonmodule.o version_mod.o
-hashtable.o:	systeminfo.o
-geometry.o:	hashtable.o
-morton.o:	commonmodule.o geometry.o
-rtree.o:	geometry.o
-boxmerge.o:	geometry.o
-contour.o:	geometry.o polygon_fracture.o
-hdfdata.o:	geometry.o
-kldata.o:	geometry.o
-datastructures.o:	commonmodule.o
-pnummerge.o:	datastructures.o rtree.o geometry.o
-polygon_fracture.o:	hdfdata.o
-design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o
-magparser.o:	polygon_fracture.o design.o morton.o kldata.o
-mainmagparser.o:	magparser.o controlparser.o
-controlparser.o:	design.o
+include DEPENDENCIES.txt
 
 hdfdata.o:	hdfdata.f90
 	$(FORTRAN_COMPILER) -DUSE_HDF5 $(FCFLAGS) -c $< -o $@

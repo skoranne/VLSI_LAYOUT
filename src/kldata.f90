@@ -60,13 +60,12 @@ contains
     end if
     close(file_unit)
   end subroutine LoadKLBin
-  subroutine WriteKLBin(fileName, boxes)
+  subroutine WriteKLBin(fileName, boxes, total_boxes)
     character(len=*), intent(in) :: filename
     type(Box), intent(in)        :: boxes(:)
-    integer(kind=int64)          :: i, total_boxes
+    integer(kind=int64),intent(in) :: total_boxes
+    integer(kind=int64)          :: i
     integer                      :: file_unit, io_status
-    ! 1. Determine the total number of boxes to write
-    total_boxes = size(boxes, kind=int64)
     do i=1,total_boxes
        if( .not. boxes(i)%is_valid() ) then
           write(*,*) 'Box: ', i, ' ', boxes(i), ' WRONG.'

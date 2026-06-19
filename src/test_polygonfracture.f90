@@ -128,7 +128,7 @@ program test_fracture
      input_layer%layer_boxes = current_polygon_boxes
      write(*,*) 'Polygon healing: ', input_layer%n_used, ' to ', updated_box_count
      input_layer%n_used = updated_box_count
-     call WriteKLBin( "merged.bin", input_layer%layer_boxes )
+     call WriteKLBin( "merged.bin", input_layer%layer_boxes, input_layer%n_used )
      boxes => input_layer%layer_boxes
      call generate_trackers( boxes, bbox, trackers ) !> this does CW ordering of inner contours
      !call sort_trackers(trackers) !> this is done inside as well
@@ -148,7 +148,7 @@ program test_fracture
      !do i = 1, n_trackers
      !   write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
      !end do
-     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      layer_area = sum( box_area_vectorized( input_layer%layer_boxes ) )
      !sl_union_area = calculate_union_area_sl(boxes)  !< this is too slow
      sl_union_area = calculate_union_area_fast(boxes) !< uses SegmentTreeModule
@@ -172,14 +172,14 @@ program test_fracture
      allocate(output_layer%layer_boxes(1))
      output_layer%layer_boxes(1) = bbox
      output_layer%n_used = 1
-     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      stop
   case (2)
      write(*,*) 'Running HORIZONTAL based merge: '
      output_layer%layer_boxes = input_layer%layer_boxes
      !call merge_boxes_using_scanline( output_layer%layer_boxes )
      output_layer%n_used = size( output_layer%layer_boxes )
-     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      !call saveToHDF( outFileName, output_layer%layer_boxes)
      stop
   case (3)
@@ -209,7 +209,7 @@ program test_fracture
      !write(*,*) 'Permutation = ', permutation
      call get_equal_key_segments( input_layer%pnumtable%arr, permutation,  segments )
      !write(*,*) 'Segments = ', segments
-     call WriteKLBin(outFileName, input_layer%layer_boxes)     
+     call WriteKLBin(outFileName, input_layer%layer_boxes, input_layer%n_used )     
      stop
   case (4)
      !call saveToHDF( outFileName, input_layer%layer_boxes )
@@ -315,7 +315,7 @@ program test_fracture
      output_layer%n_used = size( output_layer%layer_boxes )     
      call heal_boxes( output_layer%n_used, output_layer%layer_boxes, output_layer%n_used )
      output_layer%n_used = size( output_layer%layer_boxes )
-     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      stop
   case (9)
      write(*,*), '9. Executing Token Tracking Fracture/Scanline Fracturing with Skip List...'     
@@ -342,7 +342,7 @@ program test_fracture
      !do i = 1, n_trackers
      !   write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
      !end do
-     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      layer_area = sum( box_area_vectorized( input_layer%layer_boxes ) )
      sl_union_area = calculate_union_area_fast(boxes) !< uses SegmentTreeModule
      if( layer_area /= sl_union_area ) then
@@ -361,13 +361,13 @@ program test_fracture
      call StartMarkTime(" OR ")
      call CalculateOR( input_layer, input_layerB, output_layer )
      call StopMarkTime(" OR ")     
-     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      stop     
   case(11)
      call StartMarkTime(" AND ")     
      call CalculateAND( input_layer, input_layerB, output_layer )
      call StopMarkTime(" AND ")          
-     call WriteKLBin(outFileName, output_layer%layer_boxes)
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      stop
   case default
      write(*,*) 'Print Information: '

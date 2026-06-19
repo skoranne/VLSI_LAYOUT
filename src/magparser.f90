@@ -149,6 +149,9 @@ contains
     type(Box), allocatable :: extents(:)
     type(Box), pointer            :: DESIGN_EXTENT
     integer(kind=int64)    :: num_squares
+    character(len=255) :: env_val
+    integer            :: env_len, env_status
+    
     ! 1. Get the number of ticks per second
     fileName = load_design%fileName
     line_number = 0
@@ -416,10 +419,10 @@ contains
                 layers(layer_id)%n_alloc = layers(layer_id)%n_used
                 !write(*,'(A,A8,A30)') 'Input  Request KLBIN: ', layerNames(layer_id), ' => ', section_name                
              else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
-                write(*,'(A,A8,A30)') 'Output Request KLBIN: ', layerNames(layer_id), ' => ', section_name                          
+                write(*,'(A,A8,A30)') 'Output Request KLBIN: ', layerNames(layer_id), ' => ', len_trim(section_name)               
              end if
              allocate( layers(layer_id)%fileName, source=section_name )
-             write(*,*) layers(layer_id)%fileName
+             !write(*,*) layers(layer_id)%fileName
              !layers(layer_id)%fileName =section_name
              !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from KLBIN: ', section_name, ' ', layers(layer_id)%n_used
              !boxes => layers(i)%layer_boxes
@@ -475,7 +478,7 @@ contains
           num_squares = count( is_square(boxes) )
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
           if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
-             !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated.'
+             write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated.'
              call MortonSort( layers(i)%layer_boxes )
           else
              call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
@@ -525,7 +528,12 @@ contains
        !   write(*,*) j,' ',layers(i)%tree%tree_nodes(j)%mbr
        !end do
        !>>> UNCOMMENT <<<
-       call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       env_status = 1
+       call get_environment_variable( 'MAGPARSER_CONTROL_SELFTEST_TREE', length=env_len, status=env_status )
+       if( env_status == 0 ) then
+          write(*,*) 'ENV MAGPARSER_CONTROL_SELFTEST_TREE is ON'
+          call SelfTestTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
+       end if
        call cpu_time(t2)
        call system_clock(count=end_tick)
        elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
@@ -704,11 +712,11 @@ contains
           error stop "ERROR: layer backing store name not allocated"
        end if
        pos = index( load_design%layers(i)%fileName, ".bin" )
-       write(*,*) 'pos = ', pos, ' len = ', len_trim(load_design%layers(i)%fileName)
+       !write(*,*) 'pos = ', pos, ' len = ', len_trim(load_design%layers(i)%fileName)
        if( pos /= len_trim(load_design%layers(i)%fileName)-3 ) then
           error stop "DBOUT only supports KLBIN, edit the output MAG file to fix"
        end if
-       call WriteKLBin( load_design%layers(i)%fileName, load_design%layers(i)%layer_boxes )
+       call WriteKLBin( load_design%layers(i)%fileName, load_design%layers(i)%layer_boxes, load_design%layers(i)%n_used )
     end do
   end subroutine writeMagicLayoutFile
 end module MagicVLSILayoutParser

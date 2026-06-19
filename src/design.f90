@@ -21,9 +21,9 @@ module DesignModule
        NeedsSorting, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
        get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon, &
        CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
-       CalculateGROWLayer, CalculateSHRINKLayer 
+       CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT
   type :: LayerTree
-     integer(kind=8) :: root_index
+     integer(kind=int64) :: root_index
      type(RTreeNode), allocatable :: tree_nodes(:)
   end type LayerTree
   enum, bind(C)                     ! bind(C) makes the values C‑compatible
@@ -40,6 +40,7 @@ module DesignModule
      enumerator :: CONJUGATE_LAYER_PURPOSE_COMPLEMENT = int(Z'01', kind=c_int)   ! 0b000001
      enumerator :: CONJUGATE_LAYER_PURPOSE_SECTION    = int(Z'02', kind=c_int)   ! 0b000100
      enumerator :: CONJUGATE_LAYER_PURPOSE_GENERAL    = int(Z'04', kind=c_int)   ! 0b001000
+     enumerator :: CONJUGATE_LAYER_PURPOSE_EXTENT     = int(Z'08', kind=c_int)   ! 0b001000     
   end enum
 
   type :: ConjugateLayer
@@ -51,7 +52,6 @@ module DesignModule
   end type Repetition
 
   type :: Layer
-     !integer :: lid
      integer(kind=8)        :: n_used   = 0   ! how many slots are filled
      integer(kind=8)        :: n_alloc  = 0   ! current allocation size
      type(Box), allocatable :: layer_boxes(:)
@@ -85,6 +85,23 @@ module DesignModule
      integer(int64) :: end_idx
   end type BucketBoundary
 
+  !------------------------------------------------------------------
+  !  Public interface
+  !------------------------------------------------------------------
+  interface
+     module subroutine CreateGrid( input_layer, output_layer, rows, cols )
+       type(Layer),      intent(in)    :: input_layer
+       type(Layer),      intent(inout) :: output_layer
+       integer,          intent(in)    :: rows, cols   ! must be >0
+     end subroutine CreateGrid
+     
+     module subroutine CreateEXTENT( input_layer, output_layer )
+       type(Layer),      intent(in)    :: input_layer         
+       type(Layer),      intent(inout) :: output_layer
+     end subroutine CreateEXTENT
+
+  end interface
+ 
 contains
   pure function NeedsSorting(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
@@ -637,11 +654,11 @@ contains
     implicit none
     type(Layer), intent(inout) :: input_layer
     character(len=255) :: val
-    integer            :: status
-    call get_environment_variable( 'MAGPARSER_CONTROL_PREPROCESS_LAYER_BY_POLYGON', val, status )
-    if( status == 0 ) then
+    integer            :: env_len, env_status
+    call get_environment_variable( 'MAGPARSER_CONTROL_PREPROCESS_LAYER_BY_POLYGON', length=env_len, status=env_status )
+    if( env_status == 0 ) then !> value is not set
        call PreprocessLayerByPolygon( input_layer )
-    else
+    elseif( env_status == 1 ) then !> value is not set
        call PreprocessLayerSL( input_layer )
     end if
   end subroutine PreprocessLayer
@@ -908,6 +925,7 @@ contains
     call PreprocessLayer( temp_layer )
     call CalculateNOT( input_layer_A, temp_layer, output_layer )
   end subroutine CalculateSHRINKLayer
+
   
 end module DesignModule
 
