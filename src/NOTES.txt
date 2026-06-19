@@ -351,3 +351,33 @@ SMALL SDT_16 (polygon method)
 ```
 apptainer exec --bind /scratch1/ MAGPARSER.sif /opt/CONVERT.exe POLY.bin DIFF.bin z.bin 11
 OMP_NUM_THREADS=4 in the container and we get decent runs
+
+```
++--------------------------------------------------------------------------------+
+| Now we are onto NVFORTRAN OpenMP target
+| INFO: Total file size =       3298680832  bytes
+| INFO: Allocating array for     206167552  boxes.
++--------------------------------------------------------------------------------+
+CPU Run (non-OpenMP) of Morton coded sort on DGX Spark
+real    4m31.079s
+user    4m27.581s
+sys     0m3.480s
+
+CPU Run + -O3
+real    1m35.172s
+user    1m31.619s
+sys     0m3.534s
+
+
+CPU w/ OpenMP
+real    0m31.985s
+user    7m4.473s
+sys     1m9.775s
+
+Full GPU Implementation
+real    0m23.230s
+user    0m20.678s
+sys     0m2.542s
+
+
+```
