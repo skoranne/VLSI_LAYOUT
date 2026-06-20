@@ -21,21 +21,10 @@ module RTreeBuilderGPU
   end type RTreeNodeGPU
 
 contains
-  ! subroutine InitInteractionCount()
-  !   !count_interactions = 0    
-  !   !$omp target update to(count_interactions)
-  ! end subroutine InitInteractionCount
-  
-  ! function GetInteractionCount() result(r)
-  !   integer(kind=int64) :: r
-  !   ! Fetch the final tallied count from the device back to the host
-  !   !$omp target update from(count_interactions)
-  !   !r = count_interactions
-  ! end function GetInteractionCount
-  
-  #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)    
+
+#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)    
   !$omp declare target
-  #endif
+#endif
   subroutine DO_INTERACTION(I, J)
     integer(kind=int64) :: I, J
     ! Interaction logic goes here
@@ -132,31 +121,36 @@ contains
   end subroutine BuildRTreeGPU
 
   !> GPU Offloaded All-Query Interaction Generator
-  function ComputeInteractionsGPU(TreeNodes, SortedBoxes, RootIndex) result(KernelCount)
-    type(RTreeNodeGPU), intent(in) :: TreeNodes(:)
-    type(Box), intent(in) :: SortedBoxes(:)
-    integer(kind=int64), intent(in) :: RootIndex
+  ! Notice we changed it to a subroutine, and explicitly pass NumNodes and NumBoxes
+  subroutine ComputeInteractionsGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex, KernelCount)
+    ! 1. The exact sizes MUST come first
+    integer(kind=int64), intent(in) :: NumNodes, NumBoxes
 
-    integer(kind=int64) :: NumBoxes, NumNodes
+    ! 2. Force Explicit-Shape (No colons allowed!)
+    type(RTreeNodeGPU), intent(in) :: TreeNodes(NumNodes)
+    type(Box), intent(in) :: SortedBoxes(NumBoxes)
+
+    integer(kind=int64), intent(in) :: RootIndex
+    integer(kind=int64), intent(out) :: KernelCount
+
     integer(kind=int64) :: I, J, K, ChildIdx, CurrNode
-    integer(kind=int64) :: KernelCount !> this will count kernel specific interactions
-    ! Thread-local traversal stack
-    integer(kind=int64) :: Stack(K_MAX_TREE_DEPTH)
+
+    ! 3. Hardcode to 256. 1024 crashes the GPU's local memory limits.
+    integer(kind=int64) :: Stack(256) 
     integer(kind=int64) :: StackPtr
 
     type(Box) :: QBox, NodeMbr, TargetBox
     logical :: OverlapX, OverlapY
 
-    NumBoxes = size(SortedBoxes, kind=int64)
-    NumNodes = size(TreeNodes, kind=int64)
     KernelCount = 0
-    ! Map immutable tree and geometry to device memory
-    !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
-    
-    !$omp target teams distribute parallel do default(none) &
-    !$omp shared(TreeNodes, SortedBoxes, NumBoxes, RootIndex) &
+
+    ! Map the explicit bounds
+    !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
+
+    ! Launch kernel
+    !$omp target teams distribute parallel do &
     !$omp private(I, J, K, ChildIdx, CurrNode, Stack, StackPtr, &
-    !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY)&
+    !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY) &
     !$omp reduction(+:KernelCount)
 
     do I = 1, NumBoxes
@@ -207,6 +201,8 @@ contains
           end if
        end do
     end do
-    !$omp end target data
-  end function ComputeInteractionsGPU
+    !$omp target exit data map(delete:  TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
+
+  end subroutine ComputeInteractionsGPU
+
 end module RTreeBuilderGPU

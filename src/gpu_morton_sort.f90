@@ -1,3 +1,7 @@
+! File   : gpu_morton_sort.f90
+! Author : Sandeep Koranne (C) 2026.
+! Purpose: Simple Morton coded sort using OpenMP target
+
 module MortonSortOMT
   use CommonModule
   use GeometryModule
@@ -38,8 +42,8 @@ contains
     allocate(MortonPad(M))
 
     ! Map data to GPU and persist it across all sorting phases
-    !$omp target data map(tofrom: Boxes(1:N)) map(alloc: BoxesPad(1:M), MortonPad(1:M))
-
+    !$omp target enter data map(to: Boxes(1:N)) &
+    !$omp map(alloc: BoxesPad(1:M), MortonPad(1:M))
     ! ==========================================
     ! PHASE 1: Initialize Pads and Inline Morton
     ! ==========================================
@@ -126,8 +130,8 @@ contains
     do I = 1, N
        Boxes(I) = BoxesPad(I)
     end do
-
-    !$omp end target data
+    !$omp target exit data map(delete:  Boxes(1:N), BoxesPad(1:M), MortonPad(1:M))    !> leave the boxes on the device
+    !$komp target exit data map(delete: Boxes(1:N), BoxesPad(1:M), MortonPad(1:M))
 
     deallocate(BoxesPad)
     deallocate(MortonPad)
@@ -157,8 +161,8 @@ contains
 
     allocate(IndicesPad(M))
     allocate(MortonPad(M))
-
-    !$omp target data map(to: Boxes(1:N)) map(tofrom: SortedIndices(1:N)) map(alloc: IndicesPad(1:M), MortonPad(1:M))
+    !$omp target enter data map(to: Boxes(1:N)) &
+    !$omp map(alloc: SortedIndices(1:N)) map(alloc: IndicesPad(1:M), MortonPad(1:M))
 
     !$omp target teams distribute parallel do private(I, CX, CY, MX, MY)
     do I = 1, M
@@ -226,8 +230,10 @@ contains
        SortedIndices(I) = IndicesPad(I)
     end do
 
-    !$omp end target data
-
+    !$omp target exit data map(from: SortedIndices(1:N)) &
+    !$omp map(delete: Boxes(1:N), IndicesPad(1:M), MortonPad(1:M))
+    !> There is a good opportunity to keep the boxes on the GPU, then
+    !> do not delete these here
     deallocate(IndicesPad)
     deallocate(MortonPad)
 

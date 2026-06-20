@@ -495,11 +495,12 @@ contains
        call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used ) 
        #else
        !call StartMarkTime("RI_SORT")
-       !call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used ) !> 20s for SDT16_6x6_MCON (67/44)      
-       call MortonSort( layers(i)%layer_boxes ) !> 7s for SDT16_6x6_MCON (67/44)
+       call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used ) !> 20s for SDT16_6x6_MCON (67/44)      
+       !call MortonSort( layers(i)%layer_boxes ) !> 7s for SDT16_6x6_MCON (67/44)
        !call StopMarkTime("RI_SORT")
        #endif
        number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
+       !number_expected_interactions = 0
        if( number_expected_interactions > 0 ) then
           block
             integer(kind=int64) :: original_count, thinned_count
@@ -522,6 +523,7 @@ contains
           if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
              write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated, ', num_squares, ' / ', size(boxes)
              #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+             !call MortonSort( layers(i)%layer_boxes )
              call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used )
              #else
              call MortonSort( layers(i)%layer_boxes )

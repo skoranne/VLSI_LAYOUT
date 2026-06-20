@@ -46,12 +46,14 @@ program main
   write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(TreeNodes)
   write(*,'(4I8)') boxes(1:10)
   call StartMarkTime("RTree")
-  interaction_count = ComputeInteractionsGPU( TreeNodes, boxes, RootIndex)
+  call ComputeInteractionsGPU( TreeNodes, total_nodes, boxes, N, RootIndex, interaction_count)
   write(*,*) '|TOTAL INTERACTIONS| = ', interaction_count
   call StopMarkTime("RTree")
-  call StartMarkTime("PNUM")
+  call StartMarkTime("Singleton")
   call FindSingletonsGPU( boxes, TreeNodes, RootIndex, is_singleton, num_singletons)
   write(*,*) '|NUM_SINGLETONS| = ', num_singletons
+  call StopMarkTime("Singleton")
+  call StartMarkTime("PNUM")  
   !call PerformMergeGPU(uf, boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex, overlap_area, overlap_perimeter)
   call StopMarkTime("PNUM")    
 

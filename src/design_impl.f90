@@ -148,7 +148,7 @@ contains
     call SortBoxesDirect( input_layer_A%layer_boxes, N )
     allocate( TreeNodes( total_nodes ) )
     call BuildRTreeGPU( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
-    interaction_count = ComputeInteractionsGPU( TreeNodes, input_layer_A%layer_boxes, RootIndex)
+    call ComputeInteractionsGPU( TreeNodes, total_nodes, input_layer_A%layer_boxes, N, RootIndex, interaction_count)
   end function CalculateOverlapCount
   #else
   module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
@@ -221,7 +221,7 @@ contains
     allocate( TreeNodes( total_nodes ) )
     call BuildRTreeGPU( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
     write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(TreeNodes)
-    interaction_count = ComputeInteractionsGPU( TreeNodes, input_layer_A%layer_boxes, RootIndex)
+    call ComputeInteractionsGPU( TreeNodes, total_nodes, input_layer_A%layer_boxes, N, RootIndex, interaction_count)
     if( interaction_count == 0 ) then
        output_layer%n_used = 0
        output_layer%layerState = LAYER_STATE_EVERYTHING
