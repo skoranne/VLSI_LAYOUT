@@ -98,8 +98,9 @@ module DesignModule
        integer(kind=int64) :: interaction_count
      end function CalculateOverlapCount
 
-     module function CalculateSingletonCount( input_layer_A ) result( interaction_count )
+     module function CalculateSingletonCount( input_layer_A, is_singleton ) result( interaction_count )
        type(Layer), intent(in) :: input_layer_A
+       logical, allocatable, intent(out) :: is_singleton(:)
        integer(kind=int64) :: interaction_count
      end function CalculateSingletonCount
      

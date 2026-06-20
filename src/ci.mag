@@ -5,6 +5,8 @@ timestamp 1780872228
 KLBIN gate.bin
 << via1_overlap >>
 KLBIN via1_overlap.bin
+<< via1 >>
+KLBIN via1.bin
 << end >>
 /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6_L67_D44.bin
 KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT16_L67_D44.bin

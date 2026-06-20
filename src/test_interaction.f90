@@ -9,6 +9,8 @@ program main
   use RTreeBuilderGPU
   use MortonSortOMT
   use SystemInformationModule
+  use GPUMergeModule
+  use DatastructuresModule
   use iso_fortran_env, only: int32, int64, real64
   use omp_lib
   implicit none
@@ -21,6 +23,15 @@ program main
   integer(kind=int64), parameter :: K_LEAF_CAPACITY_GPU = K_LEAF_CAPACITY
   type(RTreeNodeGPU), allocatable:: TreeNodes(:)
   integer(kind=int64) :: RootIndex
+
+  type(UnionFind) :: uf        
+  real(kind=real64) :: overlap_area
+  real(kind=real64) :: overlap_perimeter
+  integer(kind=int64)  :: max_edges 
+  integer, parameter :: K_MAX_TREE_DEPTH = 1024
+  integer(kind=int64) :: num_boxes, num_nodes
+  integer(kind=int64) :: limit_edges, global_edge_count
+  max_edges = 10000
   call LoadKLBin("b.bin", boxes)
   N = size( boxes )
   total_nodes = CalculateTotalNodesGPU( N, K_LEAF_CAPACITY_GPU ) !> for GPU we might change
@@ -35,5 +46,8 @@ program main
   interaction_count = ComputeInteractionsGPU( TreeNodes, boxes, RootIndex)
   write(*,*) '|TOTAL INTERACTIONS| = ', interaction_count
   call StopMarkTime("RTree")
-  !public :: ComputeInteractionsGPU
+  call StartMarkTime("PNUM")
+  !call PerformMergeGPU(uf, boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex, overlap_area, overlap_perimeter)
+  call StopMarkTime("PNUM")    
+
 end program main

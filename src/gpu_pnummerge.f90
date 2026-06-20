@@ -1,6 +1,9 @@
 ! File    : gpu_pnummerge.f90
 ! Author  : Sandeep Koranne (C) 2026. (Adapted for GPU Offload)
 ! Purpose : Combines GPU R-Tree traversal with edge extraction for Union-Find
+! File    : gpu_pnummerge.f90
+! Author  : Sandeep Koranne (C) 2026. 
+! Purpose : Handles massive-scale R-Tree Union-Find using GPU chunking without mapping segfaults
 
 module GPUMergeModule
   use iso_fortran_env, only : int32, int64, real64
@@ -14,8 +17,7 @@ module GPUMergeModule
 
 contains
 
-  !> GPU Offloaded R-Tree Traversal and Edge Extraction for Union-Find
-  subroutine PerformMergeGPU(uf, sorted_boxes, capacity, tree_nodes, root_index, overlap_area, overlap_perimeter, max_edges)
+  subroutine PerformMergeGPU(uf, sorted_boxes, capacity, tree_nodes, root_index, overlap_area, overlap_perimeter)
     type(UnionFind), intent(inout) :: uf        
     type(Box), intent(in) :: sorted_boxes(:)
     integer(kind=int64), intent(in) :: capacity
@@ -23,123 +25,137 @@ contains
     integer(kind=int64), intent(in) :: root_index
     real(kind=real64), intent(out) :: overlap_area
     real(kind=real64), intent(out) :: overlap_perimeter
-    integer(kind=int64), intent(in), optional :: max_edges 
 
     integer(kind=int64) :: num_boxes, num_nodes
-    integer(kind=int64) :: limit_edges, global_edge_count
+    integer(kind=int64) :: global_edge_count, limit_edges, valid_edges
     integer(kind=int64), allocatable :: d_edges(:,:)
-
+    
+    ! Batching Parameters
+    integer(kind=int64), parameter :: CHUNK_SIZE = 1000_int64
+    integer(kind=int64) :: chunk_start, chunk_end, c
+    real(kind=real64)   :: chunk_area, chunk_perimeter
+    
     integer(kind=int64) :: i, j, k, childidx, currnode
     integer(kind=int64) :: stackptr, idx
-    integer(kind=int64) :: stack(K_MAX_TREE_DEPTH)
-
+    integer(kind=int64) :: stack(64) 
+    
     type(Box) :: qbox, nodembr, targetbox, tempBox
     logical :: overlapx, overlapy
+    real(kind=real64) :: w, h
 
     num_boxes = size(sorted_boxes, kind=int64)
     num_nodes = size(tree_nodes, kind=int64)
 
-    ! 1. Pre-allocate a large buffer to avoid in-kernel dynamic allocation
-    if (present(max_edges)) then
-       limit_edges = max_edges
-    else
-       limit_edges = num_boxes * 50 ! Adjust heuristic multiplier based on expected graph density
-    end if
-
+    limit_edges = CHUNK_SIZE * 50_int64
     allocate(d_edges(2, limit_edges))
-    global_edge_count = 0
+    
     overlap_area = 0.0_real64
     overlap_perimeter = 0.0_real64
+    call uf%init(num_boxes)
 
-    ! 2. Map data to the GPU environment
+    ! CRITICAL FIX 1: global_edge_count MUST be in this map to prevent Error 719 Segfaults
     !$omp target data map(to: tree_nodes(1:num_nodes), sorted_boxes(1:num_boxes)) &
     !$omp map(alloc: d_edges(1:2, 1:limit_edges)) &
-    !$omp map(tofrom: global_edge_count, overlap_area, overlap_perimeter)
+    !$omp map(tofrom: global_edge_count)
 
-    !$omp target teams distribute parallel do default(none) &
-    !$omp shared(tree_nodes, sorted_boxes, num_boxes, root_index, d_edges, limit_edges, global_edge_count) &
-    !$omp private(i, j, k, childidx, currnode, stack, stackptr, qbox, nodembr, targetbox, tempBox, overlapx, overlapy, idx) &
-    !$omp reduction(+:overlap_area, overlap_perimeter)
-    do i = 1, num_boxes
-       qbox = sorted_boxes(i)
-       stackptr = 1
-       stack(stackptr) = root_index
+    do chunk_start = 1, num_boxes, CHUNK_SIZE
+       chunk_end = min(chunk_start + CHUNK_SIZE - 1, num_boxes)
+       ! Because global_edge_count is mapped above, this update is safe
+       global_edge_count = 0
+       !$omp target update to(global_edge_count)
 
-       ! Iterative Depth-First Search
-       do while (stackptr > 0)
-          currnode = stack(stackptr)
-          stackptr = stackptr - 1
-          nodembr = tree_nodes(currnode)%mbr
+       chunk_area = 0.0_real64
+       chunk_perimeter = 0.0_real64
 
-          ! Bounding box pruning
-          overlapx = max(nodembr%X1, qbox%X1) <= min(nodembr%X2, qbox%X2)
-          overlapy = max(nodembr%Y1, qbox%Y1) <= min(nodembr%Y2, qbox%Y2)
-          if (.not. (overlapx .and. overlapy)) cycle
+       ! CRITICAL FIX: Removed default(none) and the shared() clauses for scalars. 
+       ! OpenMP will now correctly register-map the scalars and memory-map the arrays.
+       !$omp target teams distribute parallel do &
+       !$omp private(i, j, k, childidx, currnode, stack, stackptr, qbox, nodembr, targetbox, tempBox, overlapx, overlapy, idx, w, h) &
+       !$omp reduction(+:chunk_area, chunk_perimeter)
+       do i = chunk_start, chunk_end
+          qbox = sorted_boxes(i)
+          stackptr = 1
+          stack(stackptr) = root_index
 
-          if (tree_nodes(currnode)%IsLeaf) then
-             do k = 0, tree_nodes(currnode)%NumChildren - 1
-                j = tree_nodes(currnode)%ChildStart + k
-                if (j <= i) cycle ! Avoid self-interaction and double counting
+          do while (stackptr > 0)
+             currnode = stack(stackptr)
+             stackptr = stackptr - 1
+             nodembr = tree_nodes(currnode)%mbr
 
-                targetbox = sorted_boxes(j)
-                overlapx = max(targetbox%X1, qbox%X1) < min(targetbox%X2, qbox%X2)
-                overlapy = max(targetbox%Y1, qbox%Y1) < min(targetbox%Y2, qbox%Y2)
+             overlapx = max(nodembr%X1, qbox%X1) <= min(nodembr%X2, qbox%X2)
+             overlapy = max(nodembr%Y1, qbox%Y1) <= min(nodembr%Y2, qbox%Y2)
+             if (.not. (overlapx .and. overlapy)) cycle
 
-                if (overlapx .and. overlapy) then
+             if (tree_nodes(currnode)%IsLeaf) then
+                do k = 0, tree_nodes(currnode)%NumChildren - 1
+                   j = tree_nodes(currnode)%ChildStart + k
+                   if (j <= i) cycle 
+                   
+                   targetbox = sorted_boxes(j)
+                   overlapx = max(targetbox%X1, qbox%X1) < min(targetbox%X2, qbox%X2)
+                   overlapy = max(targetbox%Y1, qbox%Y1) < min(targetbox%Y2, qbox%Y2)
 
-                   ! Calculate the intersected box dimensions
-                   tempBox%X1 = max(qbox%X1, targetbox%X1)
-                   tempBox%Y1 = max(qbox%Y1, targetbox%Y1)
-                   tempBox%X2 = min(qbox%X2, targetbox%X2)
-                   tempBox%Y2 = min(qbox%Y2, targetbox%Y2)
+                   if (overlapx .and. overlapy) then
+                      tempBox%X1 = max(qbox%X1, targetbox%X1)
+                      tempBox%Y1 = max(qbox%Y1, targetbox%Y1)
+                      tempBox%X2 = min(qbox%X2, targetbox%X2)
+                      tempBox%Y2 = min(qbox%Y2, targetbox%Y2)
 
-                   ! Accumulate Area and Perimeter via OpenMP Reductions
-                   if (box_area(tempBox) > 0.0_real64) then
-                      overlap_area = overlap_area + box_area(tempBox)
-                   else
-                      overlap_perimeter = overlap_perimeter + box_perimeter(tempBox)
+                      w = max(0.0_real64, tempBox%X2 - tempBox%X1)
+                      h = max(0.0_real64, tempBox%Y2 - tempBox%Y1)
+
+                      if ((w * h) > 0.0_real64) then
+                         chunk_area = chunk_area + (w * h)
+                      else
+                         chunk_perimeter = chunk_perimeter + (2.0_real64 * (w + h))
+                      end if
+
+                      !$omp atomic capture
+                      idx = global_edge_count
+                      global_edge_count = global_edge_count + 1
+                      !$omp end atomic
+                      
+                      if (idx < limit_edges) then
+                         d_edges(1, idx + 1) = i
+                         d_edges(2, idx + 1) = j
+                      end if
                    end if
-
-                   ! 3. Hardware-Optimized Atomic Capture
-                   ! Safely reserve an index without locking the thread block
-                   !$omp atomic capture
-                   idx = global_edge_count
-                   global_edge_count = global_edge_count + 1
-                   !$omp end atomic
-
-                   ! Store edge if within capacity bounds
-                   if (idx < limit_edges) then
-                      d_edges(1, idx + 1) = i
-                      d_edges(2, idx + 1) = j
+                end do
+             else
+                do k = 0, tree_nodes(currnode)%NumChildren - 1
+                   childidx = tree_nodes(currnode)%ChildStart + k
+                   if (stackptr < 64) then
+                      stackptr = stackptr + 1
+                      stack(stackptr) = childidx
                    end if
-
-                end if
-             end do
-          else
-             ! Internal Node: Push to stack
-             do k = 0, tree_nodes(currnode)%NumChildren - 1
-                childidx = tree_nodes(currnode)%ChildStart + k
-                stackptr = stackptr + 1
-                stack(stackptr) = childidx
-             end do
-          end if
+                end do
+             end if
+          end do
        end do
-    end do
+       
+       ! Fetch counts safely back to the host
+       !$omp target update from(global_edge_count)
+       
+       ! Accumulate the strictly local reductions into the global trackers
+       overlap_area = overlap_area + chunk_area
+       overlap_perimeter = overlap_perimeter + chunk_perimeter
+       
+       valid_edges = min(global_edge_count, limit_edges)
+       if (global_edge_count > limit_edges) then
+          print *, "WARNING: Chunk ", chunk_start, " to ", chunk_end, " exceeded buffer! Found ", global_edge_count, " edges."
+       end if
+
+       if (valid_edges > 0) then
+          !$omp target update from(d_edges(1:2, 1:valid_edges))
+          do c = 1, valid_edges
+             call uf%insert(d_edges(1, c))
+             call uf%insert(d_edges(2, c))
+             call uf%merge(d_edges(1, c), d_edges(2, c))
+          end do
+       end if
+
+    end do 
     !$omp end target data
-
-    ! 4. Error Handling: Detect buffer saturation
-    if (global_edge_count > limit_edges) then
-       print *, "WARNING: Device Edge Buffer Overflow! Found ", global_edge_count, " edges. Limit was ", limit_edges
-       global_edge_count = limit_edges
-    end if
-
-    ! 5. Sequential Merge on Host
-    call uf%init(num_boxes)
-    do i = 1, global_edge_count
-       call uf%insert(d_edges(1, i))
-       call uf%insert(d_edges(2, i))
-       call uf%merge(d_edges(1, i), d_edges(2, i))
-    end do
 
     if (overlap_area > 0.0_real64) overlap_perimeter = 0.0_real64
     call uf%fullreduce()

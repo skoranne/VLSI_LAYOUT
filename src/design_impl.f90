@@ -11,6 +11,7 @@ submodule (DesignModule) DesignImplModule
   use GeometryModule
   use MortonSortOMT
   use RTreeBuilderGPU
+  use GPUMergeModule
   implicit none
 
 contains
@@ -158,17 +159,14 @@ contains
   #endif
 
   #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)      
-  module function CalculateSingletonCount( input_layer_A ) result( interaction_count )
+  module function CalculateSingletonCount( input_layer_A, is_singleton ) result( interaction_count )
     type(Layer), intent(in) :: input_layer_A
     integer(kind=int64) :: interaction_count, N, total_nodes
     type(RTreeNodeGPU), allocatable:: TreeNodes(:)
     integer(kind=int64) :: RootIndex    
+    logical, allocatable, intent(out) :: is_singleton(:)
     interaction_count = 0
     if( input_layer_A%n_used == 0 ) then
-       return
-    end if
-    if( .not. NeedsHealing( input_layer_A ) ) then
-       write(*,*) 'ERROR: CalculateOverlapCount should be called prior to LAYER HEALING'
        return
     end if
     N = input_layer_A%n_used
@@ -176,11 +174,12 @@ contains
     call SortBoxesDirect( input_layer_A%layer_boxes, N )
     allocate( TreeNodes( total_nodes ) )
     call BuildRTreeGPU( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
-    call FindSingletonsGPU( TreeNodes, input_layer_A%layer_boxes, RootIndex, interaction_count)
+    call FindSingletonsGPU( input_layer_A%layer_boxes, TreeNodes, RootIndex, is_singleton, interaction_count)
   end function CalculateSingletonCount
   #else
-  module function CalculateSingletonCount( input_layer_A ) result( interaction_count )
+  module function CalculateSingletonCount( input_layer_A, is_singleton ) result( interaction_count )
     type(Layer), intent(in) :: input_layer_A
+    logical, allocatable, intent(out) :: is_singleton(:)
     integer(kind=int64) :: interaction_count
     interaction_count = 0
   end function CalculateSingletonCount
