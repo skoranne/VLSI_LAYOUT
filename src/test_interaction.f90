@@ -29,11 +29,14 @@ program main
   real(kind=real64) :: overlap_perimeter
   integer(kind=int64)  :: max_edges 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024
-  integer(kind=int64) :: num_boxes, num_nodes
+  integer(kind=int64) :: num_boxes, num_nodes, num_singletons
   integer(kind=int64) :: limit_edges, global_edge_count
+  logical, allocatable :: is_singleton(:)
   max_edges = 10000
   call LoadKLBin("b.bin", boxes)
   N = size( boxes )
+  allocate( is_singleton( N ) )
+  is_singleton = .false.
   total_nodes = CalculateTotalNodesGPU( N, K_LEAF_CAPACITY_GPU ) !> for GPU we might change
   bbox = mbr_of_array( boxes, N )
   write(*,*) 'Loaded : ', N, ' BBOX = ', bbox, ' |T| = ', total_nodes
@@ -47,6 +50,8 @@ program main
   write(*,*) '|TOTAL INTERACTIONS| = ', interaction_count
   call StopMarkTime("RTree")
   call StartMarkTime("PNUM")
+  call FindSingletonsGPU( boxes, TreeNodes, RootIndex, is_singleton, num_singletons)
+  write(*,*) '|NUM_SINGLETONS| = ', num_singletons
   !call PerformMergeGPU(uf, boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex, overlap_area, overlap_perimeter)
   call StopMarkTime("PNUM")    
 
