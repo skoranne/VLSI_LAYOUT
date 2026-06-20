@@ -5,33 +5,45 @@
 module RTreeBuilderGPU
   use iso_fortran_env, only: int32, int64, real64
   use omp_lib
+  use GeometryModule
   implicit none
   private
 
-  public :: ComputeInteractionsGPU
+  public :: RTreeNodeGPU, ComputeInteractionsGPU, BuildRTreeGPU, CalculateTotalNodesGPU
 
-  integer, parameter :: K_MAX_TREE_DEPTH = 64
+  integer, parameter :: K_MAX_TREE_DEPTH = 1024
 
-  type :: Box
-     integer(kind=int32) :: X1, Y1, X2, Y2
-  end type Box
-
-  type :: RTreeNode
+  type :: RTreeNodeGPU
      type(Box) :: Mbr
      integer(kind=int64) :: NumChildren
      integer(kind=int64) :: ChildStart
      logical :: IsLeaf
-     ! Note: child_indices array removed for contiguous flat-array mapping
-  end type RTreeNode
+  end type RTreeNodeGPU
 
 contains
-  !$komp declare target  
+  ! subroutine InitInteractionCount()
+  !   !count_interactions = 0    
+  !   !$omp target update to(count_interactions)
+  ! end subroutine InitInteractionCount
+  
+  ! function GetInteractionCount() result(r)
+  !   integer(kind=int64) :: r
+  !   ! Fetch the final tallied count from the device back to the host
+  !   !$omp target update from(count_interactions)
+  !   !r = count_interactions
+  ! end function GetInteractionCount
+  
+  #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)    
+  !$omp declare target
+  #endif
   subroutine DO_INTERACTION(I, J)
-    integer(kind=int64), value :: I, J
+    integer(kind=int64) :: I, J
     ! Interaction logic goes here
+    !$komp atomic
+    !count_interactions = count_interactions + 1
   end subroutine DO_INTERACTION
 
-  pure function CalculateTotalNodes(NumBoxes, Capacity) result(TotalNodes)
+  pure function CalculateTotalNodesGPU(NumBoxes, Capacity) result(TotalNodes)
     integer(kind=int64), intent(in) :: NumBoxes, Capacity
     integer(kind=int64) :: TotalNodes, CurrentLevelNodes
 
@@ -43,13 +55,13 @@ contains
        CurrentLevelNodes = (CurrentLevelNodes + Capacity - 1) / Capacity
        TotalNodes = TotalNodes + CurrentLevelNodes
     end do
-  end function CalculateTotalNodes
+  end function CalculateTotalNodesGPU
 
   !> Builds the flat array RTree. Safe to run on CPU host prior to offload.
-  pure subroutine BuildRTree(SortedBoxes, Capacity, TreeNodes, RootIndex)
+  pure subroutine BuildRTreeGPU(SortedBoxes, Capacity, TreeNodes, RootIndex)
     type(Box), intent(in) :: SortedBoxes(:)
     integer(kind=int64), intent(in) :: Capacity
-    type(RTreeNode), intent(inout) :: TreeNodes(:)
+    type(RTreeNodeGPU), intent(inout) :: TreeNodes(:)
     integer(kind=int64), intent(out) :: RootIndex
 
     integer(kind=int64) :: NumBoxes, CurrentLevelNodes, PrevLevelNodes
@@ -117,18 +129,17 @@ contains
     end do
 
     RootIndex = NodeIdx - 1
-  end subroutine BuildRTree
-
+  end subroutine BuildRTreeGPU
 
   !> GPU Offloaded All-Query Interaction Generator
-  subroutine ComputeInteractionsGPU(TreeNodes, SortedBoxes, RootIndex)
-    type(RTreeNode), intent(in) :: TreeNodes(:)
+  function ComputeInteractionsGPU(TreeNodes, SortedBoxes, RootIndex) result(KernelCount)
+    type(RTreeNodeGPU), intent(in) :: TreeNodes(:)
     type(Box), intent(in) :: SortedBoxes(:)
     integer(kind=int64), intent(in) :: RootIndex
 
     integer(kind=int64) :: NumBoxes, NumNodes
     integer(kind=int64) :: I, J, K, ChildIdx, CurrNode
-
+    integer(kind=int64) :: KernelCount !> this will count kernel specific interactions
     ! Thread-local traversal stack
     integer(kind=int64) :: Stack(K_MAX_TREE_DEPTH)
     integer(kind=int64) :: StackPtr
@@ -138,15 +149,16 @@ contains
 
     NumBoxes = size(SortedBoxes, kind=int64)
     NumNodes = size(TreeNodes, kind=int64)
-
+    KernelCount = 0
     ! Map immutable tree and geometry to device memory
     !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
-
-    ! Dispatch parallel kernel to GPU
+    
     !$omp target teams distribute parallel do default(none) &
     !$omp shared(TreeNodes, SortedBoxes, NumBoxes, RootIndex) &
     !$omp private(I, J, K, ChildIdx, CurrNode, Stack, StackPtr, &
-    !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY)
+    !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY)&
+    !$omp reduction(+:KernelCount)
+
     do I = 1, NumBoxes
        QBox = SortedBoxes(I)
 
@@ -172,14 +184,15 @@ contains
              ! Leaf Node: Check exact geometry intersections
              do K = 0, TreeNodes(CurrNode)%NumChildren - 1
                 J = TreeNodes(CurrNode)%ChildStart + K
+                if (J <= I) cycle                
                 TargetBox = SortedBoxes(J)
-
-                OverlapX = max(TargetBox%X1, QBox%X1) <= min(TargetBox%X2, QBox%X2)
-                OverlapY = max(TargetBox%Y1, QBox%Y1) <= min(TargetBox%Y2, QBox%Y2)
+                OverlapX = max(TargetBox%X1, QBox%X1) < min(TargetBox%X2, QBox%X2) !> for overlap check
+                OverlapY = max(TargetBox%Y1, QBox%Y1) < min(TargetBox%Y2, QBox%Y2) !> for overlap check
 
                 ! If interaction found, call the procedure
                 if (OverlapX .and. OverlapY) then
                    call DO_INTERACTION(I, J)
+                   KernelCount = KernelCount + 1
                 end if
              end do
           else
@@ -195,7 +208,5 @@ contains
        end do
     end do
     !$omp end target data
-
-  end subroutine ComputeInteractionsGPU
-
+  end function ComputeInteractionsGPU
 end module RTreeBuilderGPU

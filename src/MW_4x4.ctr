@@ -2,7 +2,11 @@
 program square
 systeminfo
 decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
-decl output o2 = bar.mag
+# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
+decl output o1 = foo.mag
+decl memory t1 = nothing
 info
-# decl design d2 = MY_SED.mag
+exec run o1:gate = d1:poly * d1:diff
+exec run t1:sd   = d1:diff - d1:poly
+exec run t1:ng_poly = d1:poly - o1:gate
 end 

@@ -10,6 +10,7 @@ module DesignModule
   use PNumMergeModule
   use PolygonFractureModule
   use MortonSortModule
+  use MortonSortOMT
   use iso_c_binding
   use iso_fortran_env, only : int32, int64, real64
   use omp_lib
@@ -20,6 +21,7 @@ module DesignModule
        DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY,&
        NeedsSorting, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
        get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon, &
+       PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
        CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
        CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT
   type :: LayerTree
@@ -563,6 +565,9 @@ contains
     real(kind=real64) :: overlap_area, overlap_perimeter
     integer(kind=int64) :: output_box_count, num_squares
     logical             :: dominated_by_squares
+    integer            :: env_len, env_status
+    call get_environment_variable( 'MAGPARSER_CONTROL_PREPROCESS_GPU_SORT', length=env_len, status=env_status )
+    
     if( input_layer%n_used == 0 ) then
        input_layer%layerState = 31 !> we set everything
        return
@@ -579,20 +584,25 @@ contains
     end if
 
     if( NeedsSorting( input_layer ) ) then
-       dominated_by_squares = .false.
-       num_squares = count( is_square( input_layer%layer_boxes ) )
-       if( num_squares*1.0_real64 / (input_layer %n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
-          write(*,*) 'Using MORTON as layer is dominated by squares.'
-          dominated_by_squares = .true.
-       end if
-       if( dominated_by_squares ) then
-          call MortonSort( input_layer%layer_boxes )
+       if( env_status /= 0 ) then !> value is set
+          call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
        else
-          call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+          dominated_by_squares = .false.
+          num_squares = count( is_square( input_layer%layer_boxes ) )
+          if( num_squares*1.0_real64 / (input_layer %n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+             write(*,*) 'Using MORTON as layer is dominated by squares.'
+             dominated_by_squares = .true.
+          end if
+          if( dominated_by_squares ) then
+             call MortonSort( input_layer%layer_boxes )
+          else
+             call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+          end if
        end if
        input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     end if
     if( NeedsRTree( input_layer ) ) then
+       if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )
        allocate( input_layer%tree%tree_nodes( CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY ) ) )
        call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
        input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )

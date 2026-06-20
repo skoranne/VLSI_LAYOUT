@@ -139,7 +139,7 @@ contains
     ! Read line by line
     read_loop: do
        read(unit, '(A)', end=100,iostat=ios) line
-       write(*,'(A,I4,A,A80)') 'Line number: ', line_number, ' ', line       
+       !write(*,'(A,I4,A,A80)') 'Line number: ', line_number, ' ', line       
        if (ios < 0) exit read_loop ! End of file
        line_number = line_number+1
        line = adjustl(line)       ! Remove leading whitespace
@@ -161,7 +161,7 @@ contains
           print *, "--- Starting Program:", trim(rest)
           call InitSystem()
           call StartMarkTime("program")
-          call StopMarkTime("program")
+          !call StopMarkTime("program")
        case ('var')
           rest = adjustl( rest ) !> remove leading whitespace
           write(*,*) 'Variable found: ', trim(rest)
@@ -176,14 +176,14 @@ contains
           cycle read_loop
        case ('decl')
           rest = adjustl( rest ) !> remove leading whitespace
-          write(*,*) 'Declaration found: ', trim(rest)
+          !write(*,*) 'Declaration found: ', trim(rest)
           ! Further logic to parse types (int, real, design, etc.)
           pos = index( rest, ' ' )
-          write(*,*) 'KW (design/output/memory) = ', trim(rest(1:pos-1))
+          !write(*,*) 'KW (design/output/memory) = ', trim(rest(1:pos-1))
           if( trim(rest(1:pos-1)) == 'output' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
-             write(*,*) 'Output DB handle = ', trim(rest(1:pos-1)), ' db_index = ', db_count !> o1
+             !write(*,*) 'Output DB handle = ', trim(rest(1:pos-1)), ' db_index = ', db_count !> o1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
              pos = index( rest, ' ' )          
@@ -191,7 +191,7 @@ contains
              pos = index( keyword, ' ' )
              write(*,*) 'Generating output in MAGIC file: ', trim(keyword(1:pos)) !> file
              design_dbs(db_count)%design_direction = DESIGN_DIRECTION_OUTPUT
-             write(*,*) 'Setting direction of ', db_count, ' to ', design_dbs(db_count)%design_direction
+             !write(*,*) 'Setting direction of ', db_count, ' to ', design_dbs(db_count)%design_direction
              !call hash_create(design_dbs(db_count)%ht, MAX_LAYERS )
              !allocate( design_dbs(db_count)%layers( MAX_LAYERS ) )
              !> we also want output association of layer data with disk
@@ -201,27 +201,28 @@ contains
           else if( trim(rest(1:pos-1)) == 'design' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
-             write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
+             !write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
              pos = index( rest, ' ' )          
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
-             write(*,*) 'DB file handle = ', trim(keyword(1:pos)) !> file
+             !write(*,*) 'DB file handle = ', trim(keyword(1:pos)) !> file
              design_dbs(db_count)%fileName = trim(keyword(1:pos))
              call parseMagicLayoutFile(design_dbs(db_count), MAX_LAYERS)
              db_count = db_count + 1
           else if( trim(rest(1:pos-1)) == 'memory' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
-             write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
+             !write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
              pos = index( rest, ' ' )          
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
              if( trim(keyword(1:pos)) /= 'nothing' ) error stop "MEMORY DB must have backing store nothing"
-             write(*,*) 'DB file handle = ', trim(keyword(1:pos)), ' assigned DB_COUNT: ', db_count !> file
+             write(*,*) 'Creating MEMORY db: ', trim(keyword(1:pos))
+             !write(*,*) 'DB file handle = ', trim(keyword(1:pos)), ' assigned DB_COUNT: ', db_count !> file
              !call parseMagicLayoutFile(design_dbs(db_count), trim(keyword(1:pos)), MAX_LAYERS)
              design_dbs(db_count)%design_direction = DESIGN_DIRECTION_MEMORY
              call hash_create(design_dbs(db_count)%ht, MAX_LAYERS )
@@ -240,16 +241,16 @@ contains
           print *, "Execution command:", rest
           !lhs_layer = EvaluateExpression( rest, ht, design_dbs, parse_status )
           rest = adjustl( rest ) !> remove leading whitespace
-          write(*,*) 'Declaration found: ', trim(rest)
+          !write(*,*) 'Declaration found: ', trim(rest)
           ! Further logic to parse types (int, real, design, etc.)
           pos = index( rest, ' ' )
-          write(*,*) 'KW? (run/push/group) = ', trim(rest(1:pos-1))
+          !write(*,*) 'KW? (run/push/group) = ', trim(rest(1:pos-1))
           !> RUN section immediate mode for now, but we can create a graph
           !> the assumption is that this microcode is generated by a compiler
           if( trim(rest(1:pos-1)) == 'run' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
-             write(*,*) 'LHS = ', trim(rest(1:pos-1)) !> f1:gate
+             !write(*,*) 'LHS = ', trim(rest(1:pos-1)) !> f1:gate
              pos = index( trim(rest(1:pos-1)),':')
              call hash_get( ht, trim(rest(1:pos-1)), lhs_db_index, ins )
              if( .not. ins ) then
@@ -257,7 +258,7 @@ contains
                 write(*,*) 'Syntax ERROR: line: ', line_number                
                 error stop "Syntax ERROR"
              else
-                write(*,*) 'Using LHS DB Index: ', lhs_db_index
+                !write(*,*) 'Using LHS DB Index: ', lhs_db_index
              end if
              rest = adjustl(rest(pos+1:))
              pos  = index( rest, ' ')
@@ -277,18 +278,15 @@ contains
                 allocate(lhs_layer%fileName, source = TEMPORARY_FOLDER//trim(rest(1:pos-1)))
              end if
              if( lhs_layer_index < 0 ) error stop "DB INDEX layer corruption"
-             write(*,*) 'LHS index = ', lhs_layer_index
+             !write(*,*) 'LHS index = ', lhs_layer_index
              lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
              if(.not. allocated( lhs_layer%fileName ) ) then
                 error stop "ERROR: Each layer must have a backing-store/name by now"
              end if
              rest = adjustl(rest(pos+1:))
-             write(*,*) 'RESTA = ', trim(rest)
              pos  = index( rest, '= ')
              rest = adjustl(rest(pos+1:))
-             write(*,*) 'RESTB = ', trim(rest)
              pos = index( rest, ':' )
-             write(*,*) 'RESTC = ', trim(rest(1:pos-1))
              call hash_get( ht, trim(rest(1:pos-1)), rhs1_db_index, ins )
              rest = adjustl(rest(pos+1:))
              pos  = index( rest, ' ')
@@ -298,18 +296,13 @@ contains
                 error stop "ERROR: layer not found"
              end if
              rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
-
-             rest = adjustl(rest(pos+1:))
-             write(*,*) 'RESTD = ', trim(rest)
+             rest = adjustl(rest(pos+1:)) !> write(*,*) 'RESTD = ', trim(rest)
              pos  = scan( rest, '+-*%^.')
              if( pos /= 0 ) then !> single char operators for brevity
                 !> valid operator found
                 operator_char = rest(pos:pos)
-                write(*,*) 'Found character operator: ', operator_char
                 rest = adjustl(rest(pos+1:))
-                write(*,*) 'RESTE = ', trim(rest)
                 pos = index( rest, ':' )
-                write(*,*) 'RESTF = ', trim(rest(1:pos-1))
                 call hash_get( ht, trim(rest(1:pos-1)), rhs2_db_index, ins )
                 if( .not. ins ) error stop "RHS2 DB INDEX not located"
                 rest = adjustl(rest(pos+1:))
@@ -364,7 +357,7 @@ contains
                      if( .not. associated( lhs_layer ) )  error stop "LHS  layer not associated"                     
                      if( rhs2_source_name /= 'nothing' ) then
                         pos = index( rhs2_source_name, ':' )
-                        write(*,*) 'RESTG = ', trim(rhs2_source_name(1:pos-1))
+                        !write(*,*) 'RESTG = ', trim(rhs2_source_name(1:pos-1))
                         call hash_get( ht, trim(rhs2_source_name(1:pos-1)), rhs2_db_index, ins )
                         if( .not. ins ) error stop "TEXT OPERATOR RHS2 DB INDEX not located"
                         rest = adjustl(trim(rhs2_source_name(1+pos:)))

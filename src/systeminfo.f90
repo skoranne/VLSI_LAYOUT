@@ -74,7 +74,7 @@ contains
     call execute_command_line("uname -sr")
     print *, "---------------------------------------------------------"
 
-    print *, "CPU Metrics:"
+    write(*,*) 'CPU Metrics:'
     ! Grabs core counts and model details from the system topology
     call execute_command_line("lscpu | grep -E 'Model name|CPU\(s\):|Thread'")
     print *, "---------------------------------------------------------"

@@ -3,14 +3,26 @@
 # Author : Sandeep Koranne (Refactored)
 ################################################################################
 # --- Compiler & Flags ---
+DEBUG ?= 0
+VERBOSE ?= 0
+PROFILE ?= 0
+
 HDF5_FC=ifx
 FORTRAN_COMPILER=/scratch1/skoranne/INTELCOMPILERS/bin/h5fc
 #FORTRAN_COMPILER=/scratch1/skoranne/NVCOMPILERS/bin/h5fc
 # Debug flags (commented out, but easily swappable)
 # FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3 -xHost 
 # Use -pg
-FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp 
-FCFLAGS = -g -fpp -O3 -parallel -qopenmp -qopt-report=3
+
+ifeq ($(DEBUG),1)
+   FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp
+else
+   FCFLAGS = -g -fpp -O3 -parallel -qopenmp -qopt-report=3
+endif
+ifeq ($(PROFILE),1)
+   FCFLAGS += -pg
+endif
+
 #FCFLAGS = -O3 -fpp
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables ---
@@ -19,11 +31,6 @@ LDLIBS = -lz -lhdf5_fortran -lhdf5
 
 # --- Library Definition ---
 LIBRARY = libmagparser.a
-LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
-           controlparser.o hdfdata.o datastructures.o \
-           rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
-	   polygon_fracture.o boxmerge.o kldata.o design_impl.o gpu_morton_sort.o\
-	   systeminfo_gpu.o
 
 include DEPENDENCIES.txt
 
@@ -93,3 +100,5 @@ test_skiplist.exe: test_skiplist.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 generate_bin.exe: generate_bin.o $(LIBRARY)
 	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_interaction.exe:	test_interaction.f90 interaction.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)

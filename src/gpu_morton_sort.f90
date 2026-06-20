@@ -9,7 +9,7 @@ module MortonSortOMT
   integer(kind=int64), parameter :: MASK3 = int(Z'0F0F0F0F0F0F0F0F', kind=int64)
   integer(kind=int64), parameter :: MASK4 = int(Z'3333333333333333', kind=int64)
   integer(kind=int64), parameter :: MASK5 = int(Z'5555555555555555', kind=int64)
-
+  public:: SortBoxesDirect
 contains
 
   !> Direct Sort: Physically sorts the array of Boxes based on Morton Code
@@ -232,5 +232,85 @@ contains
     deallocate(MortonPad)
 
   end subroutine SortBoxesIndirect
+  subroutine merge_sort_events_gpu(arr)
+    ! Note: Removed 'pure' prefix as OpenMP target directives perform 
+    ! hardware level synchronization and memory allocations.
+
+    ! The 'contiguous' keyword is highly recommended for GPU offload to prevent 
+    ! performance hits or mapping failures from strided array slices.
+    type(Event), intent(inout), contiguous :: arr(:)
+    type(Event), allocatable :: temp(:)
+
+    integer :: n, width, i
+    integer :: l, m, r, p1, p2, k
+
+    n = size(arr)
+    if (n <= 1) return
+
+    ! Allocate temporary workspace array needed for Merge Sort
+    allocate(temp(n))
+
+    ! Map the data to the device ONCE for the entire sorting process
+    ! arr is copied to the GPU at the start, and back to the CPU at the end.
+    ! temp is allocated purely in device memory.
+    !$omp target data map(tofrom: arr) map(alloc: temp)
+
+    width = 1
+    do while (width < n)
+
+       ! Farm out the independent merges across GPU teams and threads
+       ! Variables updated inside the loop MUST be marked as private
+       !$omp target teams distribute parallel do private(l, m, r, p1, p2, k)
+       do i = 1, n, 2 * width
+          l = i
+          m = min(i + width - 1, n)
+          r = min(i + 2 * width - 1, n)
+
+          p1 = l
+          p2 = m + 1
+          k  = l
+
+          ! Merge the two sorted halves into the temp array
+          do while (p1 <= m .and. p2 <= r)
+             ! <= maintains stable sorting, keeping relative order of equal x's
+             if (arr(p1)%x <= arr(p2)%x) then
+                temp(k) = arr(p1)
+                p1 = p1 + 1
+             else
+                temp(k) = arr(p2)
+                p2 = p2 + 1
+             end if
+             k = k + 1
+          end do
+
+          ! Exhaust left half (if any elements remain)
+          do while (p1 <= m)
+             temp(k) = arr(p1)
+             p1 = p1 + 1
+             k = k + 1
+          end do
+
+          ! Exhaust right half (if any elements remain)
+          do while (p2 <= r)
+             temp(k) = arr(p2)
+             p2 = p2 + 1
+             k = k + 1
+          end do
+       end do
+
+       ! Synchronize and copy the merged segments back to the main array
+       !$omp target teams distribute parallel do
+       do i = 1, n
+          arr(i) = temp(i)
+       end do
+
+       ! Double the merge width for the next pass
+       width = width * 2
+    end do
+
+    !$omp end target data
+
+    deallocate(temp)
+  end subroutine merge_sort_events_gpu
 
 end module MortonSortOMT

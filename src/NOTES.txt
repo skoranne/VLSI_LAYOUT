@@ -381,3 +381,46 @@ sys     0m2.542s
 
 
 ```
+
+```
+Collecting STATS for MERGE checking
+Converting MW4x4_FLAT_L67_D44_MERGED.oas to MW4x4_FLAT_L67_D44_MERGED.bin using TOP_CELL_NAME=FOO                             
+INFO: Reading LAYOUT: MW4x4_FLAT_L67_D44_MERGED.oas
+INFO: Database Unit (DBU): 0.0009999999999999998 µm
+--- Top Cell Extent ---
+Bottom-Left  : (5.664999999999999, 10.794999999999998) µm
+Top-Right    : (11943.954999999998, 14308.884999999997) µm
+Total Width  : 11938.289999999997 µm
+Total Height : 14298.089999999997 µm
+-----------------------
+INFO: Reading cell: MW4x4
+INFO: Writing into BIN: MW4x4_FLAT_L67_D44_MERGED.bin_L67_D44.bin                                                             
+INFO: Layer 67/44 -> True Area: 3928560.5728 µm², True Perimeter: 92436719.36 µm
+
+(base) [skoranne@localhost src]$ ./gds2bin.sh SDT16_6x6_L67_D20_MERGED.oas SDT16_6x6_L67_D20_MERGED.bin; ./gds2bin.sh SDT16_6x6_L67_D20_UNMERGED.oas SDT16_6x6_L67_D20_UNMERGED.bin                                                                          
+Converting SDT16_6x6_L67_D20_MERGED.oas to SDT16_6x6_L67_D20_MERGED.bin using TOP_CELL_NAME=                                  
+INFO: Reading LAYOUT: SDT16_6x6_L67_D20_MERGED.oas
+INFO: Database Unit (DBU): 0.0009999999999999998 µm
+--- Top Cell Extent ---
+Bottom-Left  : (5.519999999999999, 10.794999999999998) µm
+Top-Right    : (6257.539999999999, 6260.884999999998) µm
+Total Width  : 6252.019999999999 µm
+Total Height : 6250.089999999998 µm
+-----------------------
+INFO: Reading cell: SDT16_6x6
+INFO: Writing into BIN: SDT16_6x6_L67_D20_MERGED.bin_L1_D0.bin
+INFO: Layer 1/0 -> True Area: 24004890.4274 µm², True Perimeter: 134407767.37 µm                                              
+Converting SDT16_6x6_L67_D20_UNMERGED.oas to SDT16_6x6_L67_D20_UNMERGED.bin using TOP_CELL_NAME=                              
+INFO: Reading LAYOUT: SDT16_6x6_L67_D20_UNMERGED.oas
+INFO: Database Unit (DBU): 0.0009999999999999998 µm
+--- Top Cell Extent ---
+Bottom-Left  : (5.519999999999999, 10.794999999999998) µm
+Top-Right    : (6257.539999999999, 6260.884999999998) µm
+Total Width  : 6252.019999999999 µm
+Total Height : 6250.089999999998 µm
+-----------------------
+INFO: Reading cell: SDT16_6x6
+INFO: Writing into BIN: SDT16_6x6_L67_D20_UNMERGED.bin_L67_D20.bin                                                            
+INFO: Layer 67/20 -> True Area: 24004890.4274 µm², True Perimeter: 134407767.37 µm
+
+```
