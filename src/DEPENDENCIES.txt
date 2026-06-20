@@ -23,4 +23,5 @@ magparser.o:	polygon_fracture.o design.o morton.o kldata.o
 mainmagparser.o:	magparser.o controlparser.o
 controlparser.o:	design.o
 systeminfo_gpu.o:	systeminfo.o
+interaction.o:	gpu_morton_sort.o
 

@@ -1,5 +1,5 @@
 ################################################################################
-# File   : Makefile
+# File   : Makefile.nvf
 # Author : Sandeep Koranne (Refactored)
 ################################################################################
 
@@ -22,12 +22,6 @@ LDLIBS = -lz
 #LDLIBS = -lz -lhdf5_fortran -lhdf5
 # --- Library Definition ---
 LIBRARY = libmagparser.a
-LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
-           controlparser.o hdfdata.o datastructures.o \
-           rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
-	   polygon_fracture.o boxmerge.o kldata.o gpu_morton_sort.o\
-	   systeminfo_gpu.o
-
 
 include DEPENDENCIES.txt
 #skiplist_module.o
@@ -94,3 +88,6 @@ test_skiplist.exe: test_skiplist.o $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 generate_bin.exe: generate_bin.o $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_interaction.o:	test_interaction.f90 $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
