@@ -23,7 +23,9 @@ module DesignModule
        get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon, &
        PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
        CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
-       CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT
+       CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
+       RemoveIdentical
+  
   type :: LayerTree
      integer(kind=int64) :: root_index
      type(RTreeNode), allocatable :: tree_nodes(:)
@@ -91,6 +93,15 @@ module DesignModule
   !  Public interface
   !------------------------------------------------------------------
   interface
+     module subroutine RemoveIdentical(input_layer)
+       type(Layer), intent(inout) :: input_layer
+     end subroutine RemoveIdentical
+     
+     module subroutine CalculateSingleLayerAND( input_layer_A, output_layer )
+       type(Layer), intent(inout) :: input_layer_A
+       type(Layer), intent(inout) :: output_layer
+     end subroutine CalculateSingleLayerAND
+     
      module subroutine CreateGrid( input_layer, output_layer, rows, cols )
        type(Layer),      intent(in)    :: input_layer
        type(Layer),      intent(inout) :: output_layer
@@ -555,10 +566,6 @@ contains
     end do
     deallocate( current_polygon_boxes )
   end function calculate_union_area_by_polygon
-
-  subroutine CalculateSingleLayerAND( input_layer )
-    type(Layer), intent(inout) :: input_layer
-  end subroutine CalculateSingleLayerAND
 
   subroutine PreprocessLayerSL( input_layer )
     type(Layer), intent(inout) :: input_layer

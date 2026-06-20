@@ -1,10 +1,12 @@
 magic
 tech sky130A
 timestamp 1780872228
-<< via1 >>
-KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6_L67_D44.bin
+<< gate >>
+KLBIN gate.bin
+<< via1_overlap >>
+KLBIN via1_overlap.bin
 << end >>
-
+/scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6_L67_D44.bin
 KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT16_L67_D44.bin
 KLBIN SDT16_6x6_L67_D20_UNMERGED.bin_L67_D20.bin
 KLBIN /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT_L67_D44.bin

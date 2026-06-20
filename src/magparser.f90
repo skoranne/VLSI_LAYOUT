@@ -420,10 +420,10 @@ contains
                 layers(layer_id)%n_alloc = layers(layer_id)%n_used
                 !write(*,'(A,A8,A30)') 'Input  Request KLBIN: ', layerNames(layer_id), ' => ', section_name                
              else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
-                write(*,'(A,A8,A30)') 'Output Request KLBIN: ', layerNames(layer_id), ' => ', len_trim(section_name)               
+                write(*,'(A,A20,A30)') 'Output Request KLBIN: ', layerNames(layer_id), ' => ', trim(adjustl(section_name))
              end if
-             allocate( layers(layer_id)%fileName, source=section_name )
-             !write(*,*) layers(layer_id)%fileName
+             allocate( layers(layer_id)%fileName, source= trim(adjustl(section_name)))
+             write(*,*) layers(layer_id)%fileName
              !layers(layer_id)%fileName =section_name
              !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from KLBIN: ', section_name, ' ', layers(layer_id)%n_used
              !boxes => layers(i)%layer_boxes

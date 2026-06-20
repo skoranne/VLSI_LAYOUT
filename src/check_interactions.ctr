@@ -2,7 +2,10 @@
 program square
 systeminfo
 decl design d1 = check_interactions.mag
+decl output o1 = ci.mag
 decl memory f1 = nothing
 info
-
+exec run o1:gate = d1:via1 EXTENT nothing
+exec run o1:via1_overlap = d1:via1 AND nothing
+flush
 end 

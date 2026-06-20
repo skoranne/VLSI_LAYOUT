@@ -44,7 +44,14 @@ issues with procedure calls so we have to develop everything
 in one big function or use preprocessor. Use your best
 effort.
 
-      
+given an array of type(Box) with K_COORDINATE_KIND
+x1,y1,x2,y2 which is mostly SQUARES and this array called
+'boxes' is already sorted using Morton order. Devise a
+method and generate idiomatic modern Fortran subroutine to
+remove EXACT duplicates given that array as inout.
+
+subroutine RemoveIdentical(boxes)
+
 
 program my_control
  decl design d1 = FPU.mag
