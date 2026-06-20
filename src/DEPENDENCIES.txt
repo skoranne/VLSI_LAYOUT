@@ -17,7 +17,7 @@ kldata.o:	geometry.o
 datastructures.o:	commonmodule.o
 pnummerge.o:	datastructures.o rtree.o geometry.o
 polygon_fracture.o:	hdfdata.o
-design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o
+design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o interaction.o
 design_impl.o:	design.o geometry.o
 magparser.o:	polygon_fracture.o design.o morton.o kldata.o
 mainmagparser.o:	magparser.o controlparser.o

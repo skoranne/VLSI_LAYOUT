@@ -152,6 +152,7 @@ contains
     integer(kind=int64)    :: num_squares
     character(len=255) :: env_val
     integer            :: env_len, env_status
+    integer(kind=int64):: number_expected_interactions
     
     ! 1. Get the number of ticks per second
     fileName = load_design%fileName
@@ -491,9 +492,10 @@ contains
        if( layers(i)%n_used == 0 ) cycle
        !for SDT6x6 it went from 16.8 to ~21
        boxes => layers(i)%layer_boxes
-       num_squares = CalculateOverlapCount( layers(i) )
-       if( num_squares > 0 ) then
+       number_expected_interactions = CalculateOverlapCount( layers(i) )
+       if( number_expected_interactions > 0 ) then
           write(*,'(A,A12,A,I12)') ' Layer ', trim(layerNames(i)), ' may have OVERLAP ', num_squares
+          call RemoveIdentical( layers(i) )
        end if
        if( NeedsSorting( layers(i) ) ) then
           num_squares = count( is_square(boxes) )

@@ -341,6 +341,9 @@ contains
 
   module subroutine RemoveIdentical(input_layer)
     type(Layer), intent(inout) :: input_layer
+    if( input_layer%n_used < 2 ) return
+    call RemoveIdenticalBoxes( input_layer%layer_boxes )
+    input_layer%n_used = size( input_layer%layer_boxes )
   end subroutine RemoveIdentical
   
 
