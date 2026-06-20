@@ -130,7 +130,7 @@ contains
     do I = 1, N
        Boxes(I) = BoxesPad(I)
     end do
-    !$omp target exit data map(delete:  Boxes(1:N), BoxesPad(1:M), MortonPad(1:M))    !> leave the boxes on the device
+    !$omp target exit data map(release:  Boxes(1:N)) map(delete: BoxesPad(1:M), MortonPad(1:M))    !> leave the boxes on the device
     !$komp target exit data map(delete: Boxes(1:N), BoxesPad(1:M), MortonPad(1:M))
 
     deallocate(BoxesPad)
@@ -231,7 +231,7 @@ contains
     end do
 
     !$omp target exit data map(from: SortedIndices(1:N)) &
-    !$omp map(delete: Boxes(1:N), IndicesPad(1:M), MortonPad(1:M))
+    !$omp map(release: Boxes(1:N)) map(delete: IndicesPad(1:M), MortonPad(1:M))
     !> There is a good opportunity to keep the boxes on the GPU, then
     !> do not delete these here
     deallocate(IndicesPad)

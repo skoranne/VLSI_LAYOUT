@@ -201,7 +201,7 @@ contains
           end if
        end do
     end do
-    !$omp target exit data map(delete:  TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
+    !$omp target exit data map(release:  TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
 
   end subroutine ComputeInteractionsGPU
 
