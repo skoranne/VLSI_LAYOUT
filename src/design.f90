@@ -97,6 +97,11 @@ module DesignModule
        type(Layer), intent(in) :: input_layer_A
        integer(kind=int64) :: interaction_count
      end function CalculateOverlapCount
+
+     module function CalculateSingletonCount( input_layer_A ) result( interaction_count )
+       type(Layer), intent(in) :: input_layer_A
+       integer(kind=int64) :: interaction_count
+     end function CalculateSingletonCount
      
      module subroutine RemoveIdentical(input_layer)
        type(Layer), intent(inout) :: input_layer

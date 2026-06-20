@@ -10,7 +10,7 @@ module GPUMergeModule
   use omp_lib
   implicit none
 
-  public :: PerformMergeGPU
+  public :: PerformMergeGPU, FindSingletonsGPU
 
 contains
 
@@ -147,5 +147,98 @@ contains
     deallocate(d_edges)
 
   end subroutine PerformMergeGPU
+
+  ! Author  : Sandeep Koranne (C) 2026. (Adapted for GPU Offload)
+  ! Purpose : Identifies boxes that share no area or edges with any other box
+
+
+  subroutine FindSingletonsGPU(sorted_boxes, tree_nodes, root_index, is_singleton, num_singletons)
+    type(Box), intent(in) :: sorted_boxes(:)
+    type(RTreeNodeGPU), intent(in) :: tree_nodes(:)
+    integer(kind=int64), intent(in) :: root_index
+    logical, allocatable, intent(out) :: is_singleton(:)
+    integer(kind=int64), intent(out) :: num_singletons
+
+    integer(kind=int64) :: num_boxes, num_nodes
+    integer(kind=int64) :: i, j, k, childidx, currnode
+    integer(kind=int64) :: stackptr
+    integer(kind=int64) :: stack(64)
+
+    type(Box) :: qbox, nodembr, targetbox
+    logical :: overlapx, overlapy
+
+    num_boxes = size(sorted_boxes, kind=int64)
+    num_nodes = size(tree_nodes, kind=int64)
+
+    ! Allocate the output boolean mask to mirror the boxes array
+    allocate(is_singleton(num_boxes))
+
+    ! Assume all boxes are singletons until proven otherwise
+    is_singleton = .true.
+    num_singletons = 0
+
+    ! Map the immutable tree to the GPU, and the is_singleton array back to CPU
+    !$omp target data map(to: tree_nodes(1:num_nodes), sorted_boxes(1:num_boxes)) &
+    !$omp map(tofrom: is_singleton(1:num_boxes))
+
+    ! No default(none) or shared() needed - let the compiler autoscope safely
+    !$omp target teams distribute parallel do &
+    !$omp private(i, j, k, childidx, currnode, stack, stackptr, qbox, nodembr, targetbox, overlapx, overlapy)
+    do i = 1, num_boxes
+       qbox = sorted_boxes(i)
+       stackptr = 1
+       stack(stackptr) = root_index
+
+       ! We name the loop so we can break out of it instantly
+       search_tree: do while (stackptr > 0)
+          currnode = stack(stackptr)
+          stackptr = stackptr - 1
+          nodembr = tree_nodes(currnode)%mbr
+
+          ! MBR Overlap check (<= includes edge sharing)
+          overlapx = max(nodembr%X1, qbox%X1) <= min(nodembr%X2, qbox%X2)
+          overlapy = max(nodembr%Y1, qbox%Y1) <= min(nodembr%Y2, qbox%Y2)
+          if (.not. (overlapx .and. overlapy)) cycle search_tree
+
+          if (tree_nodes(currnode)%IsLeaf) then
+             do k = 0, tree_nodes(currnode)%NumChildren - 1
+                j = tree_nodes(currnode)%ChildStart + k
+
+                ! A box cannot intersect itself
+                if (j == i) cycle 
+
+                targetbox = sorted_boxes(j)
+
+                ! Strict geometry overlap check (<= catches zero-area edge touching)
+                overlapx = max(targetbox%X1, qbox%X1) <= min(targetbox%X2, qbox%X2)
+                overlapy = max(targetbox%Y1, qbox%Y1) <= min(targetbox%Y2, qbox%Y2)
+
+                if (overlapx .and. overlapy) then
+                   ! Interaction found! Mark as false and immediately stop searching.
+                   is_singleton(i) = .false.
+                   exit search_tree 
+                end if
+             end do
+          else
+             do k = 0, tree_nodes(currnode)%NumChildren - 1
+                childidx = tree_nodes(currnode)%ChildStart + k
+                if (stackptr < 64) then
+                   stackptr = stackptr + 1
+                   stack(stackptr) = childidx
+                end if
+             end do
+          end if
+       end do search_tree
+    end do
+    !$omp end target data
+
+    ! Quickly tally the singletons on the Host CPU
+    do i = 1, num_boxes
+       if (is_singleton(i)) then
+          num_singletons = num_singletons + 1
+       end if
+    end do
+
+  end subroutine FindSingletonsGPU
 
 end module GPUMergeModule

@@ -491,19 +491,41 @@ contains
     do i = 1,size(layers)
        if( layers(i)%n_used == 0 ) cycle
        !for SDT6x6 it went from 16.8 to ~21
-       boxes => layers(i)%layer_boxes
-       number_expected_interactions = CalculateOverlapCount( layers(i) )
+       #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+       call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used ) 
+       #else
+       !call StartMarkTime("RI_SORT")
+       !call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used ) !> 20s for SDT16_6x6_MCON (67/44)      
+       call MortonSort( layers(i)%layer_boxes ) !> 7s for SDT16_6x6_MCON (67/44)
+       !call StopMarkTime("RI_SORT")
+       #endif
+       number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
        if( number_expected_interactions > 0 ) then
-          write(*,'(A,A12,A,I12)') ' Layer ', trim(layerNames(i)), ' may have OVERLAP ', num_squares
-          call RemoveIdentical( layers(i) )
+          block
+            integer(kind=int64) :: original_count, thinned_count
+            original_count = layers(i)%n_used
+            write(*,'(A,A12,A,I12)') ' Layer ', trim(layerNames(i)), ' may have OVERLAP ', number_expected_interactions
+            call RemoveIdentical( layers(i) )
+            thinned_count = layers(i)%n_used
+            if( thinned_count > original_count ) then
+               error stop "ERROR: RemoveIdentical increased count"
+            else
+               write(*,*) 'RemoveIdentical decreased from: ', original_count, ' ', thinned_count
+               layers(i)%n_used = thinned_count
+            end if
+          end block
        end if
+       boxes => layers(i)%layer_boxes       
        if( NeedsSorting( layers(i) ) ) then
           num_squares = count( is_square(boxes) )
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
-          !call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used )
           if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
              write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated, ', num_squares, ' / ', size(boxes)
+             #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+             call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used )
+             #else
              call MortonSort( layers(i)%layer_boxes )
+             #endif
           else
              call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
           end if
