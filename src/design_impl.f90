@@ -8,7 +8,9 @@
 submodule (DesignModule) DesignImplModule
   use iso_fortran_env, only: int64, real64
   use CommonModule
-  use GeometryModule  
+  use GeometryModule
+  use MortonSortOMT
+  use RTreeBuilderGPU
   implicit none
 
 contains
@@ -126,19 +128,85 @@ contains
     call PreprocessLayer( output_layer )
   end subroutine CreateEXTENT
 
+  #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)      
+  module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
+    type(Layer), intent(in) :: input_layer_A
+    integer(kind=int64) :: interaction_count, N, total_nodes
+    type(RTreeNodeGPU), allocatable:: TreeNodes(:)
+    integer(kind=int64) :: RootIndex    
+    interaction_count = 0
+    if( input_layer_A%n_used == 0 ) then
+       return
+    end if
+    if( .not. NeedsHealing( input_layer_A ) ) then
+       write(*,*) 'ERROR: CalculateOverlapCount should be called prior to LAYER HEALING'
+       return
+    end if
+    N = input_layer_A%n_used
+    total_nodes = CalculateTotalNodesGPU( N, K_LEAF_CAPACITY ) !> for GPU we might change
+    call SortBoxesDirect( input_layer_A%layer_boxes, N )
+    allocate( TreeNodes( total_nodes ) )
+    call BuildRTreeGPU( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
+    interaction_count = ComputeInteractionsGPU( TreeNodes, input_layer_A%layer_boxes, RootIndex)
+  end function CalculateOverlapCount
+  #else
+  module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
+    type(Layer), intent(in) :: input_layer_A
+    integer(kind=int64) :: interaction_count
+    interaction_count = 1
+  end function CalculateOverlapCount
+  #endif
+  
+  
+  
+  
   module subroutine CalculateSingleLayerAND( input_layer_A, output_layer )
     type(Layer), intent(inout) :: input_layer_A
     type(Layer), intent(inout) :: output_layer
     integer(kind=int64) :: num_boxesA, num_boxesC
     integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
     integer(kind=int64) :: number_leaves
-    integer(kind=int64) :: i, j, k
+    integer(kind=int64) :: i, j, k, interaction_count, N, total_nodes
+    type(RTreeNodeGPU), allocatable:: TreeNodes(:)
+    integer(kind=int64) :: RootIndex    
     type(Layer), allocatable :: buffers(:)
-    type(Box) :: tempBox
+    type(Box) :: tempBox, bbox
+    type(Box), pointer :: boxes
     integer :: nthreads, tid, alloc_status
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
+    !> we cannot call Preprocess and neither should it be called prior
+    if( input_layer_A%n_used == 0 ) then
+       input_layer_A%layerState = 31 !> we set everything
+       return
+    end if
 
-    call PreprocessLayer( input_layer_A )
+    if( .not. NeedsHealing( input_layer_A ) ) then
+       write(*,*) 'ERROR: SingleLayerAND should be called prior to LAYER HEALING'
+       return
+    end if
+    
+    N = input_layer_A%n_used
+    total_nodes = CalculateTotalNodesGPU( N, K_LEAF_CAPACITY ) !> for GPU we might change
+    bbox = mbr_of_array( input_layer_A%layer_boxes, N )
+    write(*,*) 'Loaded : ', N, ' BBOX = ', bbox, ' |T| = ', total_nodes
+    call SortBoxesDirect( input_layer_A%layer_boxes, N )
+    allocate( TreeNodes( total_nodes ) )
+    call BuildRTreeGPU( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
+    write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(TreeNodes)
+    interaction_count = ComputeInteractionsGPU( TreeNodes, input_layer_A%layer_boxes, RootIndex)
+    if( interaction_count == 0 ) then
+       output_layer%n_used = 0
+       output_layer%layerState = LAYER_STATE_EVERYTHING
+       write(*,*) 'In SingleLayerAND no overlap detected: early exit'
+       return
+    end if
+    if( NeedsRTree( input_layer_A ) ) then
+       if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
+       allocate( input_layer_A%tree%tree_nodes( CalculateTotalNodes( input_layer_A%n_used, K_LEAF_CAPACITY ) ) )
+       call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, input_layer_A%tree%tree_nodes, input_layer_A%tree%root_index)
+       input_layer_A%layerState = ior( input_layer_A%layerState, LAYER_STATE_RTREE )
+    end if
+    
     nthreads = omp_get_max_threads()
     allocate(buffers(nthreads))
     do i=1,nthreads
@@ -216,7 +284,6 @@ contains
     output_layer%n_used = num_boxesC
     !> we can use the optimization that by construction the output is HEALED
     output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
-    call PreprocessLayer( output_layer )    
   end subroutine CalculateSingleLayerAND
 
 

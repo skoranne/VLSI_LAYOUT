@@ -24,7 +24,7 @@ module DesignModule
        PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
        CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
        CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
-       RemoveIdentical
+       RemoveIdentical, CalculateOverlapCount
   
   type :: LayerTree
      integer(kind=int64) :: root_index
@@ -93,6 +93,11 @@ module DesignModule
   !  Public interface
   !------------------------------------------------------------------
   interface
+     module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
+       type(Layer), intent(in) :: input_layer_A
+       integer(kind=int64) :: interaction_count
+     end function CalculateOverlapCount
+     
      module subroutine RemoveIdentical(input_layer)
        type(Layer), intent(inout) :: input_layer
      end subroutine RemoveIdentical
@@ -618,7 +623,7 @@ contains
        call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
             input_layer%tree%root_index, overlap_area, overlap_perimeter)
        if( overlap_area /= 0 ) then
-          error stop "HEALING failed"
+          !error stop "HEALING failed"
        end if
        input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )
     end if

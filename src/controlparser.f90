@@ -238,7 +238,7 @@ contains
        case ('info') !> print information about RSS of current pid
           call StopMarkTime("info")
        case ('exec')
-          print *, "Execution command:", rest
+          !print *, "Execution command:", rest
           !lhs_layer = EvaluateExpression( rest, ht, design_dbs, parse_status )
           rest = adjustl( rest ) !> remove leading whitespace
           !write(*,*) 'Declaration found: ', trim(rest)
@@ -345,7 +345,7 @@ contains
                   character(len=:), allocatable  :: primary_operator, rhs2_source_name
                   integer(kind=int64) :: ios, ivar1, ivar2, ivar3, ivar4, ivar5 !> add more if needed
                   integer(kind=real64):: rvar1, rvar2, rvar3, rvar4, rvar5 !> add more if needed
-                  write(*,*) 'REST HERE: = ', trim(rest), ' ', adjustl(rest)
+                  !write(*,*) 'REST HERE: = ', trim(rest), ' ', adjustl(rest)
                   rest = adjustl(rest)
                   rest = trim(rest)
                   read(rest, *, iostat=ios) buf1, buf2

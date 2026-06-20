@@ -471,6 +471,7 @@ contains
     end do
     !> The older method is much/much faster, so I think we should use this
     #define OLD_CODE
+    !#define NEW_CODE
     #ifdef NEW_CODE
     !do concurrent (i = 1:MAX_LAYERS)
     !$omp parallel do 
@@ -478,7 +479,7 @@ contains
        !$omp critical (console_io)
        write(*,'(A,A8,A,I12)') 'START Preprocess Layer ', layerNames(i), ' |N| = ', layers(i)%n_used
        !$omp end critical (console_io)       
-       call PreprocessLayer( layers(i) )
+       !call PreprocessLayer( layers(i) )
        !$omp critical (console_io)
        write(*,'(A,A8,A,I12)') 'END   Preprocess Layer ', layerNames(i), ' |N| = ', layers(i)%n_used
        !$omp end critical (console_io)              
@@ -490,6 +491,10 @@ contains
        if( layers(i)%n_used == 0 ) cycle
        !for SDT6x6 it went from 16.8 to ~21
        boxes => layers(i)%layer_boxes
+       num_squares = CalculateOverlapCount( layers(i) )
+       if( num_squares > 0 ) then
+          write(*,'(A,A12,A,I12)') ' Layer ', trim(layerNames(i)), ' may have OVERLAP ', num_squares
+       end if
        if( NeedsSorting( layers(i) ) ) then
           num_squares = count( is_square(boxes) )
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares

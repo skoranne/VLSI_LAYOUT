@@ -13,7 +13,7 @@ FORTRAN_COMPILER =nvfortran
 #FCFLAGS = -g -O0 -check bounds -check all -traceback -warn all -qopenmp -qopt-report=3
 #FCFLAGS = -O3 -parallel -qopenmp -qopt-report=3
 GIT_HASH := $(shell git rev-parse --short HEAD)
-FCFLAGS = -O3 -Mpreprocess -mp=gpu
+FCFLAGS = -cuda -O3 -Mpreprocess -mp=gpu -fopenmp -Minfo=accel
 #FCFLAGS = -g -O3 -Mpreprocess -Minfo=accel -fopenmp -mp=gpu
 # --- Linker Variables ---
 #LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
@@ -88,6 +88,6 @@ test_skiplist.exe: test_skiplist.o $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 generate_bin.exe: generate_bin.o $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
-test_interaction.o:	test_interaction.f90 $(LIBRARY)
+test_interaction.exe:	test_interaction.f90 $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
