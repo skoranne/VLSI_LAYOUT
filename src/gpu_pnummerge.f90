@@ -101,8 +101,8 @@ contains
                       tempBox%X2 = min(qbox%X2, targetbox%X2)
                       tempBox%Y2 = min(qbox%Y2, targetbox%Y2)
 
-                      w = max(0.0_real64, tempBox%X2 - tempBox%X1)
-                      h = max(0.0_real64, tempBox%Y2 - tempBox%Y1)
+                      w = max(0_int32, tempBox%X2 - tempBox%X1) !> TODO: find out how to use K_COORDINATE_KIND
+                      h = max(0_int32, tempBox%Y2 - tempBox%Y1) !> TODO: find out how to use K_COORDINATE_KIND
 
                       if ((w * h) > 0.0_real64) then
                          chunk_area = chunk_area + (w * h)
