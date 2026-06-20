@@ -17,16 +17,15 @@ module GPUMergeModule
 
 contains
 
-  subroutine PerformMergeGPU(uf, sorted_boxes, capacity, tree_nodes, root_index, overlap_area, overlap_perimeter)
-    type(UnionFind), intent(inout) :: uf        
-    type(Box), intent(in) :: sorted_boxes(:)
+  subroutine PerformMergeGPU(uf, sorted_boxes, num_boxes, capacity, tree_nodes, num_nodes, root_index, overlap_area, overlap_perimeter)
+    type(UnionFind), intent(inout) :: uf
+    integer(kind=int64),intent(in) :: num_boxes, num_nodes    
+    type(Box), intent(in) :: sorted_boxes(num_boxes)
     integer(kind=int64), intent(in) :: capacity
-    type(RTreeNodeGPU), intent(in) :: tree_nodes(:)
+    type(RTreeNodeGPU), intent(in) :: tree_nodes(num_nodes)
     integer(kind=int64), intent(in) :: root_index
     real(kind=real64), intent(out) :: overlap_area
     real(kind=real64), intent(out) :: overlap_perimeter
-
-    integer(kind=int64) :: num_boxes, num_nodes
     integer(kind=int64) :: global_edge_count, limit_edges, valid_edges
     integer(kind=int64), allocatable :: d_edges(:,:)
     
@@ -43,8 +42,8 @@ contains
     logical :: overlapx, overlapy
     real(kind=real64) :: w, h
 
-    num_boxes = size(sorted_boxes, kind=int64)
-    num_nodes = size(tree_nodes, kind=int64)
+    !num_boxes = size(sorted_boxes, kind=int64)
+    !num_nodes = size(tree_nodes, kind=int64)
 
     limit_edges = CHUNK_SIZE * 50_int64
     allocate(d_edges(2, limit_edges))

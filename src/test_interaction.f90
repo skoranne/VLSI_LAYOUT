@@ -57,7 +57,7 @@ program main
   call StartMarkTime("PNUM")
   overlap_area = 0
   overlap_perimeter = 0 !> if perimeter comes back zero => there was finite overlap, not just touch
-  call PerformMergeGPU(uf, boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex, overlap_area, overlap_perimeter)
+  call PerformMergeGPU(uf, boxes, N, K_LEAF_CAPACITY, TreeNodes, total_nodes, RootIndex, overlap_area, overlap_perimeter)
   write(*,*) 'OVLP AREA = ', overlap_area, ' OVLP PERIMETER = ', overlap_perimeter
   call StopMarkTime("PNUM")
   call StartMarkTime("PNUMRLE")
