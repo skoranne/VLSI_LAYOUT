@@ -2,15 +2,6 @@ In modern Fortran we already have types
   type :: Box
      integer(kind=K_COORDINATE_KIND) :: x1, y1, x2, y2
    contains
-     procedure, pass :: reset_to_infinity
-     procedure, pass :: is_valid
-     procedure, pass :: print_box
-     procedure, pass :: box_union
-     procedure, pass :: box_intersection
-     procedure, pass :: box_equal
-     generic :: operator(+) => box_union
-     generic :: operator(*) => box_intersection
-     generic :: operator(==) => box_equal
   end type Box
   type :: Layer
      integer(kind=8)        :: n_used   = 0   ! how many slots are filled

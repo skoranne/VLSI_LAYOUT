@@ -1,0 +1,26 @@
+ifx -E -fpp empty.f90 -dryrun 2>&1 | grep -oP '\-D\K\S+'
+__INTEL_LLVM_COMPILER=20250000
+__INTEL_LLVM_COMPILER_UPDATE=0
+__INTEL_COMPILER=20250000
+__INTEL_COMPILER_UPDATE=0
+__unix__
+__unix
+__linux__
+__linux
+__gnu_linux__
+unix
+linux
+__ELF__
+__x86_64
+__x86_64__
+__amd64
+__amd64__
+__INTEL_COMPILER_BUILD_DATE=20241008
+__MMX__
+__SSE__
+__SSE_MATH__
+__SSE2__
+__SSE2_MATH__
+__pentium4
+__pentium4__
+__tune_pentium4__

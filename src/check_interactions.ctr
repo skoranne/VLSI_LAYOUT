@@ -1,0 +1,8 @@
+# Control file for MAGPARSER
+program square
+systeminfo
+decl design d1 = check_interactions.mag
+decl memory f1 = nothing
+info
+
+end 

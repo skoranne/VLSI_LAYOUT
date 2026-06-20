@@ -469,8 +469,23 @@ contains
     do i = 1, size(layers)
        allocate( layers(i)%tree%tree_nodes( CalculateTotalNodes( layers(i)%n_used, K_LEAF_CAPACITY ) ) )
     end do
-
+    !> The older method is much/much faster, so I think we should use this
+    #define OLD_CODE
+    #ifdef NEW_CODE
     !do concurrent (i = 1:MAX_LAYERS)
+    !$omp parallel do 
+    do i = 1,size(layers)
+       !$omp critical (console_io)
+       write(*,'(A,A8,A,I12)') 'START Preprocess Layer ', layerNames(i), ' |N| = ', layers(i)%n_used
+       !$omp end critical (console_io)       
+       call PreprocessLayer( layers(i) )
+       !$omp critical (console_io)
+       write(*,'(A,A8,A,I12)') 'END   Preprocess Layer ', layerNames(i), ' |N| = ', layers(i)%n_used
+       !$omp end critical (console_io)              
+    end do
+    #endif
+    
+    #ifdef OLD_CODE
     do i = 1,size(layers)
        if( layers(i)%n_used == 0 ) cycle
        !for SDT6x6 it went from 16.8 to ~21
@@ -478,12 +493,12 @@ contains
        if( NeedsSorting( layers(i) ) ) then
           num_squares = count( is_square(boxes) )
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
-          call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used )
+          !call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used )
           if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
-             write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated.'
-             !call MortonSort( layers(i)%layer_boxes )
+             write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated, ', num_squares, ' / ', size(boxes)
+             call MortonSort( layers(i)%layer_boxes )
           else
-             !call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
+             call omt_pack( layers(i)%layer_boxes , K_LEAF_CAPACITY )
           end if
           layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_SORT )
        end if
@@ -496,6 +511,7 @@ contains
           write(*,*) 'Sorting failed for layer: ', i, layerNames(i)
        end if
     end do
+    #endif
     call cpu_time(t2)
     call system_clock(count=end_tick)
     elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)    

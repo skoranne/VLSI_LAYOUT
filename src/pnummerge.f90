@@ -112,13 +112,15 @@ contains
     num_boxes = size( sorted_boxes )
     call uf%init( num_boxes )    
     !write(*,*) 'DBG: ', num_boxes, ' ', size(tree_nodes), ' ', uf%arr
-    !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
-    !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid, tempBox)
+    #ifdef TARGET_CODE
     !$komp target loop private(leafboxes, number_leaves, i, j, k, tid, tempBox)
     !$komp target teams distribute parallel do schedule(dynamic) &
     !$komp   private(leafboxes, number_leaves, i, j, k, tid, tempBox) &
     !$komp   map(to: sorted_boxes, tree_nodes, capacity, root_index, num_boxes) &
     !$komp   map(tofrom: buffers, overlap_areas, overlap_perimeter)
+    #endif
+    !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
+    !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid, tempBox)
     do i=1,num_boxes
        number_leaves = 0
        leafboxes = 0

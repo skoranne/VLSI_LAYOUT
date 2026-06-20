@@ -1,5 +1,17 @@
+! File   : systeminfo_gpu.f90
+! Author : Sandeep Koranne (C) 2026.
+! Purpose: Print detailed information about GPU, if available
+!        : device property code from CUDA Fortran Book
+!        : url = git@github.com:NVIDIA/CUDA-Fortran-2ed.git
+
 submodule(SystemInformationModule) OpenMPDeviceQuery
   use omp_lib
+#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+  use cudafor
+#endif
+#if defined(__INTEL_LLVM_COMPILER) || defined(__INTEL_COMPILER)
+
+#endif
   implicit none
 
 contains
@@ -56,8 +68,74 @@ contains
     else
        write(*, '(A)') ' [INFO] No target devices detected by the OpenMP runtime.'
     end if
-
+#ifdef _CUDA
+    call PrintDetailedInformationCUDA()
+#endif
     write(*, '(A)') '========================================='
   end subroutine PrintGPUInfo
+  #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+  subroutine PrintDetailedInformationCUDA()
+    use cudafor
+    implicit none
+
+    type (cudaDeviceProp) :: prop
+    integer :: nDevices=0, i, ierr
+    ! Number of CUDA-capable devices
+    ierr = cudaGetDeviceCount(nDevices)
+    if (nDevices == 0) then
+       print "(/,'No CUDA devices found',/)"
+       stop
+    else if (nDevices == 1) then
+       print "(/,'One CUDA device found',/)"
+    else 
+       print "(/,i0,' CUDA devices found',/)", nDevices
+    end if
+    ! Loop over devices (N.B. 0-based enumeration)
+    do i = 0, nDevices-1
+       print "('Device Number: ',i0)", i
+       ierr = cudaGetDeviceProperties(prop, i)
+       ! General device info
+       print "('  Device Name: ', a)", trim(prop%name)
+       print "('  Compute Capability: ',i0,'.',i0)", &
+            prop%major, prop%minor
+       print "('  Number of Multiprocessors: ',i0)", &
+            prop%multiProcessorCount
+       print "('  Single- to Double-Precision Perf Ratio: &
+            &', i0)", &
+            prop%singleToDoublePrecisionPerfRatio
+       print "('  Max Threads per Multiprocessor: ',i0)", &
+            prop%maxThreadsPerMultiprocessor
+       if (prop%cooperativeLaunch == 0) then
+          print "('  Supports Cooperative Kernels: No',/)"
+       else
+          print "('  Supports Cooperative Kernels: Yes',/)"
+       end if
+       print "('  Global Memory (GB): ',f9.3,/)", &
+            prop%totalGlobalMem/1024.0**3
+       ! Execution Configuration
+       print "('  Execution Configuration Limits')"
+       print "('    Max Grid Dims: ',2(i0,' x '),i0)", &
+            prop%maxGridSize
+       print "('    Max Block Dims: ',2(i0,' x '),i0)", &
+            prop%maxThreadsDim
+       print "('    Max Threads per Block: ',i0,/)", &
+            prop%maxThreadsPerBlock
+       ! Has managed memory
+       print "('  Managed Memory')"
+       if (prop%managedMemory == 0) then
+          print "('    Can Allocate Managed Memory: No')"
+       else
+          print "('    Can Allocate Managed Memory: Yes')"
+       endif
+       if (prop%concurrentManagedAccess == 0) then
+          print "('    Device/CPU Concurrent Access &
+               &to Managed Memory: No',/)"
+       else
+          print "('    Device/CPU Concurrent Access &
+               &to Managed Memory: Yes',/)"
+       endif
+    enddo
+  end subroutine PrintDetailedInformationCUDA
+#endif
 
 end submodule OpenMPDeviceQuery
