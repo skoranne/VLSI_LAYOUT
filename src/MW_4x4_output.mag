@@ -1,0 +1,19 @@
+magic
+tech sky130A
+timestamp 1780872228
+<< gate >>
+KLBIN gate.bin
+<< source_drain >>
+KLBIN sd.bin
+<< met1_marker >>
+KLBIN met1_marker.bin
+<< met1_marker2 >>
+KLBIN met1_marker2.bin
+<< poly_bbox >>
+KLBIN poly_bbox_L1000_D0.bin
+<< poly_grid >>
+KLBIN poly_bbox_L1000_D10.bin
+<< met1_grow >>
+KLBIN met1_grow_L1000_D10.bin
+<< end >>
+

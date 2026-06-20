@@ -11,6 +11,7 @@ program main
   use SystemInformationModule
   use GPUMergeModule
   use DatastructuresModule
+  use RLEMergeModule
   use iso_fortran_env, only: int32, int64, real64
   use omp_lib
   implicit none
@@ -53,8 +54,16 @@ program main
   call FindSingletonsGPU( boxes, TreeNodes, RootIndex, is_singleton, num_singletons)
   write(*,*) '|NUM_SINGLETONS| = ', num_singletons
   call StopMarkTime("Singleton")
-  call StartMarkTime("PNUM")  
-  !call PerformMergeGPU(uf, boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex, overlap_area, overlap_perimeter)
-  call StopMarkTime("PNUM")    
-
+  call StartMarkTime("PNUM")
+  overlap_area = 0
+  overlap_perimeter = 0 !> if perimeter comes back zero => there was finite overlap, not just touch
+  call PerformMergeGPU(uf, boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex, overlap_area, overlap_perimeter)
+  write(*,*) 'OVLP AREA = ', overlap_area, ' OVLP PERIMETER = ', overlap_perimeter
+  call StopMarkTime("PNUM")
+  call StartMarkTime("PNUMRLE")
+  overlap_area = 0
+  overlap_perimeter = 0  
+  call PerformRLEMergeGPU(uf, boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex, overlap_area, overlap_perimeter)
+  write(*,*) 'OVLP AREA = ', overlap_area, ' OVLP PERIMETER = ', overlap_perimeter  
+  call StopMarkTime("PNUMRLW")
 end program main
