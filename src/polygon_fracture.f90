@@ -525,7 +525,7 @@ contains
     !-----------------------------------------------------------------
     !  Final output handling
     !-----------------------------------------------------------------
-    write(*,*) 'In PF (Fractured Count): ', output_count
+    !write(*,*) 'In PF (Fractured Count): ', output_count
     allocate(fractured_boxes(output_count))
     if (output_count > 0_int64) fractured_boxes = temp_boxes(1:output_count)
 

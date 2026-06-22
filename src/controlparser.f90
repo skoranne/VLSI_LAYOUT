@@ -23,6 +23,7 @@
 ! end my_control
 
 module ControlModule
+  use CommonModule
   use hash_mod
   use DesignModule
   use SystemInformationModule
@@ -126,7 +127,12 @@ contains
     logical :: ins
     character :: operator_char !> single letter only
     character(len=256) :: TEMPORARY_FOLDER
+    character(len=256) :: TEMPORARY_LAYER_PREFIX
+    real(kind=real64)  :: rvar(16)
+    integer(kind=K_COORDINATE_KIND):: ivar(16)
+    integer(kind=K_COORDINATE_KIND) :: used_precision
     db_count = 1
+    TEMPORARY_LAYER_PREFIX = "MAG_TEMP_LAYER_"
     call hash_create(ht,K_MAX_DBS)
     allocate( design_dbs( K_MAX_DBS ) )
     ! Open the file
@@ -186,6 +192,7 @@ contains
              !write(*,*) 'Output DB handle = ', trim(rest(1:pos-1)), ' db_index = ', db_count !> o1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
+             allocate( design_dbs( db_count )%designName, source = trim(rest(1:pos-1)) )
              pos = index( rest, ' ' )          
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
@@ -204,6 +211,7 @@ contains
              !write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
+             allocate( design_dbs( db_count )%designName, source = trim(rest(1:pos-1)) )             
              pos = index( rest, ' ' )          
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
@@ -217,6 +225,7 @@ contains
              !write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
+             allocate( design_dbs( db_count )%designName, source = trim(rest(1:pos-1)) )             
              pos = index( rest, ' ' )          
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
@@ -225,6 +234,7 @@ contains
              !write(*,*) 'DB file handle = ', trim(keyword(1:pos)), ' assigned DB_COUNT: ', db_count !> file
              !call parseMagicLayoutFile(design_dbs(db_count), trim(keyword(1:pos)), MAX_LAYERS)
              design_dbs(db_count)%design_direction = DESIGN_DIRECTION_MEMORY
+             allocate( design_dbs(db_count)%layerNames( MAX_LAYERS ) )
              call hash_create(design_dbs(db_count)%ht, MAX_LAYERS )
              allocate( design_dbs(db_count)%layers( MAX_LAYERS ) )
              db_count = db_count + 1
@@ -271,11 +281,15 @@ contains
                 !> normal situation, we have a layer handle and output file
              elseif(lhs_layer_index < 0 ) then
                 lhs_layer_index = hash_nitems(design_dbs( lhs_db_index )%ht)+1
-                write(*,*) 'Using DB Index, we create NEW LHS layer index = ', lhs_layer_index, ' for ', trim(rest(1:pos-1))
                 call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
                 if( .not. ins ) error stop "DB HASH TABLE CORRUPTED"
                 lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
-                allocate(lhs_layer%fileName, source = TEMPORARY_FOLDER//trim(rest(1:pos-1)))
+                if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
+                if( .not. allocated( design_dbs( lhs_db_index )%layerNames(lhs_layer_index) ) ) error stop "Layername not populated"
+                design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
+                write(*,*) 'NEW LHS layer index = ', lhs_layer_index, ' for ', trim(adjustl(rest(1:pos-1))), ' ', &
+                     trim(adjustl(design_dbs( lhs_db_index )%layerNames(lhs_layer_index)))
+                allocate(lhs_layer%fileName, source = trim(TEMPORARY_FOLDER)//trim(adjustl(rest(1:pos-1))))
              end if
              if( lhs_layer_index < 0 ) error stop "DB INDEX layer corruption"
              !write(*,*) 'LHS index = ', lhs_layer_index
@@ -296,15 +310,19 @@ contains
                 error stop "ERROR: layer not found"
              end if
              rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
-             rest = adjustl(rest(pos+1:)) !> write(*,*) 'RESTD = ', trim(rest)
-             pos  = scan( rest, '+-*%^.')
+             rest = adjustl(rest(pos+1:))
+             !write(*,*) 'RESTD = ', trim(rest)
+             pos  = scan( rest, '+-*%^')
              if( pos /= 0 ) then !> single char operators for brevity
                 !> valid operator found
                 operator_char = rest(pos:pos)
                 rest = adjustl(rest(pos+1:))
                 pos = index( rest, ':' )
                 call hash_get( ht, trim(rest(1:pos-1)), rhs2_db_index, ins )
-                if( .not. ins ) error stop "RHS2 DB INDEX not located"
+                if( .not. ins ) then
+                   write(*,*) 'ERROR RHS2 DB Indes for db: ', trim(rest(1:pos-1)), ' not located on line ', line_number
+                   error stop "RHS2 DB INDEX not located"
+                end if
                 rest = adjustl(rest(pos+1:))
                 pos  = index( rest, ' ')
                 call hash_get( design_dbs( rhs2_db_index )%ht, trim(rest(1:pos-1)), rhs2_layer_index, ins )
@@ -317,21 +335,27 @@ contains
                 write(*,'(A,I3,A,I3,A,I3,A,I3,A4,I3,A,I3)') 'Getting ready to execute: ', &
                      lhs_db_index,':',lhs_layer_index, ' = ', &
                      rhs1_db_index,':',rhs1_layer_index, operator_char, rhs2_db_index,':',rhs2_layer_index
+                write(*,'(A,A3,A,A3,A,A4,A,A3,A4,A3,A,A3)') 'Getting ready to execute: ', &
+                     design_dbs(lhs_db_index)%designName,':',&
+                     trim(design_dbs(lhs_db_index)%layerNames(lhs_layer_index)), ' = ', &
+                     design_dbs(rhs1_db_index)%designName,':',trim(design_dbs(rhs1_db_index)%layerNames(rhs1_layer_index)),&
+                     operator_char, &
+                     design_dbs(rhs2_db_index)%designName,':',trim(design_dbs(rhs2_db_index)%layerNames(rhs2_layer_index))
                 select case (operator_char)
                 case('+')
                    call StartMarkTime("OR")
-                   write(*,'(A,I8,A,I8)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used
                    call CalculateOR( rhs1_layer, rhs2_layer, lhs_layer )
+                   write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
                    call StopMarkTime("OR")                
                 case('*')
                    call StartMarkTime("AND")
-                   write(*,'(A,I8,A,I8)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used
-                   call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )                
+                   call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )
+                   write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used                   
                    call StopMarkTime("AND")                
                 case('-')
                    call StartMarkTime("NOT")
-                   write(*,'(A,I8,A,I8)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used
-                   call CalculateNOT( rhs1_layer, rhs2_layer, lhs_layer )                
+                   call CalculateNOT( rhs1_layer, rhs2_layer, lhs_layer )
+                   write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
                    call StopMarkTime("NOT")                
                 case('^')
                 case('%')
@@ -345,7 +369,7 @@ contains
                   character(len=:), allocatable  :: primary_operator, rhs2_source_name
                   integer(kind=int64) :: ios, ivar1, ivar2, ivar3, ivar4, ivar5 !> add more if needed
                   integer(kind=real64):: rvar1, rvar2, rvar3, rvar4, rvar5 !> add more if needed
-                  !write(*,*) 'REST HERE: = ', trim(rest), ' ', adjustl(rest)
+                  write(*,*) 'REST HERE: = ', trim(rest), ' ', adjustl(rest)
                   rest = adjustl(rest)
                   rest = trim(rest)
                   read(rest, *, iostat=ios) buf1, buf2
@@ -369,6 +393,7 @@ contains
                         end if
                         rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
                      end if
+                     call StartMarkTime(primary_operator)
                      select case (primary_operator)
                      case ('EXTENT')
                         !> d1:poly EXTENT nothing
@@ -385,10 +410,18 @@ contains
                         if( rhs2_source_name /= 'nothing' ) error stop "EXTENT must use nothing as second layer"
                         write(*,*) 'Found PRIMARY_OPERATOR = GRID'
                         call CreateGRID( rhs1_layer, lhs_layer, 10, 10 )                        
-                     case ('GROW')
-                        write(*,*) 'Found PRIMARY_OPERATOR = GROW'
+                     case ('GROW') !> lhs = rhs GROW nothing EAST NORTH WEST SOUTH (all positive)
+                        if( rhs2_source_name /= 'nothing' ) error stop "GROW must use nothing as second layer"
+                        read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
+                        write(*,*) 'Found PRIMARY_OPERATOR = GROW ', rvar(1), ' ', rvar(2), ' ', rvar(3), ' ', rvar(4)
+                        used_precision = GetPrecision()
+                        do i=1,4
+                           ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
+                        end do
+                        call CalculateGROWLayer( rhs1_layer, lhs_layer, ivar(1:4) )
                      case ('SHRINK')
-                        write(*,*) 'Found PRIMARY_OPERATOR = SHRINK'
+                        read(rest, *, iostat=ios) buf1, buf2, rvar(1)
+                        write(*,*) 'Found PRIMARY_OPERATOR = SHRINK ', rvar(1)
                      case ('WORMHOLE')
                         write(*,*) 'Found PRIMARY_OPERATOR = WORMHOLE'
                         !> d1:met1 WORMHOLE f1:met1_marker 5 100
@@ -396,7 +429,7 @@ contains
                         write(*,*) 'UNKNOWN primary_operator: ', primary_operator, ' on line: ', line_number
                         error stop "SYNTAX ERROR on TEXT based operator"
                      end select
-                     write(*,*) 'Processing: ', primary_operator, ' ', rhs2_source_name
+                     call StopMarkTime(primary_operator)
                   else
                      write(*,*) 'SYNTAX ERROR on line: ', line_number
                      error stop "SYNTAX ERROR on TEXT based operator"

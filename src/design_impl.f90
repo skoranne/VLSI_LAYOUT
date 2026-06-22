@@ -373,6 +373,39 @@ contains
     call RemoveIdenticalBoxes( input_layer%layer_boxes )
     input_layer%n_used = size( input_layer%layer_boxes )
   end subroutine RemoveIdentical
+
+  module subroutine CalculateGROWLayer( input_layer, output_layer, ivar )
+    type(Layer),      intent(in)    :: input_layer         
+    type(Layer),      intent(inout) :: output_layer
+    integer(kind=K_COORDINATE_KIND), intent(in)   :: ivar(4) 
+    call ClearLayer( output_layer )
+    output_layer%layer_boxes = input_layer%layer_boxes
+    output_layer%n_used = input_layer%n_used
+    call box_grow_directional(output_layer%layer_boxes, ivar(1), ivar(2), ivar(3), ivar(4) )
+    call PreprocessLayer( output_layer )
+  end subroutine CalculateGROWLayer
+  module subroutine CalculateSHRINKLayer( input_layer_A, shrink_value, output_layer )
+    type(Layer), intent(inout) :: input_layer_A
+    type(Layer), intent(inout)   :: output_layer
+    integer(kind=K_COORDINATE_KIND), intent(in) :: shrink_value
+    integer(kind=int64) :: num_boxesA, output_box_count
+    type(XYTracker), allocatable :: trackers(:)
+    type(Box) :: tempBox, bboxA, bboxB
+    type(Layer) :: temp_layer
+    integer :: nthreads, tid, alloc_status
+    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
+    call PreprocessLayer( input_layer_A )
+    !> Step 1
+    bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
+    call box_grow( bboxA, shrink_value, shrink_value )
+    call generate_trackers( input_layer_A%layer_boxes, bboxA, trackers ) !> this does CW ordering of inner contours
+    call scanline_fracture(trackers, temp_layer%layer_boxes)
+    temp_layer%n_used = size( temp_layer%layer_boxes)        
+    !> now grow each box
+    call box_grow(temp_layer%layer_boxes, shrink_value, shrink_value )
+    call PreprocessLayer( temp_layer )
+    call CalculateNOT( input_layer_A, temp_layer, output_layer )
+  end subroutine CalculateSHRINKLayer  
   
 
 end submodule DesignImplModule

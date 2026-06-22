@@ -356,7 +356,7 @@ contains
              write (*,'(3A10,I5)') 'Layer = ', section_name, ' = id: ', layer_count
              call hash_put( ht, section_name, layer_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate layer seen: ', section_name
-             layerNames(layer_count) = section_name
+             layerNames(layer_count) = trim(adjustl(section_name))
              if( layer_count > 1 ) then
                 call ResizeLayer( layers, layer_count-1, layers(layer_count-1)%n_used ) !in-time compaction
              end if
@@ -421,10 +421,10 @@ contains
                 layers(layer_id)%n_alloc = layers(layer_id)%n_used
                 !write(*,'(A,A8,A30)') 'Input  Request KLBIN: ', layerNames(layer_id), ' => ', section_name                
              else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
-                write(*,'(A,A20,A30)') 'Output Request KLBIN: ', layerNames(layer_id), ' => ', trim(adjustl(section_name))
+                write(*,'(A,A10,A30)') 'Output Request KLBIN: ', trim(layerNames(layer_id)), ' => ', trim(adjustl(section_name))
              end if
              allocate( layers(layer_id)%fileName, source= trim(adjustl(section_name)))
-             write(*,*) layers(layer_id)%fileName
+             !write(*,*) layers(layer_id)%fileName
              !layers(layer_id)%fileName =section_name
              !write (*,'(A,I0,3A15,I0)') 'RL: ', layer_id, ' from KLBIN: ', section_name, ' ', layers(layer_id)%n_used
              !boxes => layers(i)%layer_boxes
@@ -492,15 +492,15 @@ contains
        if( layers(i)%n_used == 0 ) cycle
        !for SDT6x6 it went from 16.8 to ~21
        #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
-       call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used ) 
+       !call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used ) 
        #else
        !call StartMarkTime("RI_SORT")
-       call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used ) !> 20s for SDT16_6x6_MCON (67/44)      
+       !call SortBoxesDirect( layers(i)%layer_boxes, layers(i)%n_used ) !> 20s for SDT16_6x6_MCON (67/44)      
        !call MortonSort( layers(i)%layer_boxes ) !> 7s for SDT16_6x6_MCON (67/44)
        !call StopMarkTime("RI_SORT")
        #endif
-       number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
-       !number_expected_interactions = 0
+       !number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
+       number_expected_interactions = 0
        if( number_expected_interactions > 0 ) then
           block
             integer(kind=int64) :: original_count, thinned_count
@@ -520,7 +520,7 @@ contains
        if( NeedsSorting( layers(i) ) ) then
           num_squares = count( is_square(boxes) )
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
-          if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+          if( .true. .or. num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
              write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated, ', num_squares, ' / ', size(boxes)
              #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
              !call MortonSort( layers(i)%layer_boxes )

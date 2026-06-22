@@ -24,7 +24,7 @@ module DesignModule
        PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
        CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
        CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
-       RemoveIdentical, CalculateOverlapCount
+       RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox
   
   type :: LayerTree
      integer(kind=int64) :: root_index
@@ -65,7 +65,7 @@ module DesignModule
      real(kind=real64)      :: area, perimeter
      character(len=:), allocatable :: fileName
      type(ConjugateLayer) :: paired_layer
-     type(Repetition)     :: in_place_repetition
+     !type(Repetition)     :: in_place_repetition
   end type Layer
 
   enum, bind(C)                     ! bind(C) makes the values C‑compatible
@@ -80,6 +80,7 @@ module DesignModule
      character(len=1024), dimension(:), allocatable :: layerNames(:)
      type(Box)              :: DESIGN_EXTENT
      integer(kind=c_int)    :: design_direction = DESIGN_DIRECTION_INPUT
+     character(len=:), allocatable :: designName
      character(len=:), allocatable :: fileName     
   end type Design
 
@@ -92,7 +93,26 @@ module DesignModule
   !------------------------------------------------------------------
   !  Public interface
   !------------------------------------------------------------------
-  interface
+  interface assignment(=)
+     module procedure AssignFromBox
+  end interface assignment(=)
+  
+  interface     
+     module subroutine AssignFromBox( output_layer, input_box )
+       type(Layer),intent(inout) :: output_layer
+       type(Box), intent(in) :: input_box       
+     end subroutine AssignFromBox
+     
+     module subroutine CalculateGROWLayer( input_layer, output_layer, ivar )
+       type(Layer),      intent(in)    :: input_layer         
+       type(Layer),      intent(inout) :: output_layer
+       integer(kind=K_COORDINATE_KIND), intent(in)   :: ivar(4) 
+     end subroutine CalculateGROWLayer
+     module subroutine CalculateSHRINKLayer( input_layer_A, shrink_value, output_layer )
+       type(Layer), intent(inout) :: input_layer_A
+       type(Layer), intent(inout)   :: output_layer
+       integer(kind=K_COORDINATE_KIND), intent(in) :: shrink_value
+     end subroutine CalculateSHRINKLayer
      module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
        type(Layer), intent(in) :: input_layer_A
        integer(kind=int64) :: interaction_count
@@ -369,6 +389,8 @@ contains
     integer(int64) :: starting_segment
     real(kind=real64) :: overlap_area, overlap_perimeter
     logical :: dominated_by_squares
+    integer(kind=int64) :: my_start
+
 
     dominated_by_squares = .false.
     if( input_layer%n_used == 0 ) return
@@ -422,6 +444,7 @@ contains
        error stop "INCONSISTENT BUCKET numbering detected"
     end if
     allocate( current_polygon_boxes( K_POLYGON_INIT_BOX_COUNT ) )
+    #ifdef OLD_WORKING_CODE
     !write (*,*) 'Now processing non-rects: final_count starts at ', final_count
     do i=starting_segment, size(segments)
        !> processing polygon number segments( starting_segment )%start_idx
@@ -467,6 +490,85 @@ contains
     allocate( current_polygon_boxes( final_count ) )
     current_polygon_boxes(1:final_count) = final_boxes(1:final_count)
     deallocate( final_boxes )
+#endif
+    ! Declare a local variable to help safely calculate insertion points
+    ! Start the parallel region
+    !$omp parallel default(shared) &
+    !$omp private(i, polygon_number, box_count, updated_box_count, n, j, tempBox, &
+    !$omp         current_polygon_boxes, my_start)
+
+    ! IMPORTANT: A private allocatable array starts unallocated in each thread.
+    ! We must allocate a baseline size before the loop so the size() check 
+    ! inside the loop doesn't trigger a segmentation fault.
+    if (allocated(current_polygon_boxes)) deallocate(current_polygon_boxes)
+    allocate(current_polygon_boxes(100)) ! Provide a sensible initial capacity
+
+    ! Use dynamic scheduling because heal_boxes likely takes variable time 
+    ! depending on the polygon size.
+    !$omp do schedule(dynamic)
+    do i = starting_segment, size(segments)
+       
+       !> processing polygon number segments( starting_segment )%start_idx
+       polygon_number = input_layer%pnumtable%arr( permutation( segments( i )%start_idx ) )
+       box_count = 1 + segments( i )%end_idx - segments( i )%start_idx
+       
+       if( input_layer%pnumtable%arr( permutation( segments( i )%end_idx ) ) /= polygon_number ) then
+          error stop "INCONSISTENT polygon numbering detected"
+       end if
+
+       ! Now safe to call size() because we pre-allocated outside the loop
+       if( box_count > size( current_polygon_boxes ) ) then
+          deallocate( current_polygon_boxes )
+          allocate( current_polygon_boxes( 2*box_count ) )
+       end if
+       
+       current_polygon_boxes(1:box_count) = input_layer%layer_boxes( &
+            permutation( segments( i )%start_idx:segments( i )%end_idx ) )
+       
+       updated_box_count = 0
+       call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
+       n = size( current_polygon_boxes )
+       
+       ! ---------------------------------------------------------
+       ! CRITICAL SECTION: Reserve space in the shared output array
+       ! ---------------------------------------------------------
+       !$omp critical (append_to_final)
+       if( final_count + updated_box_count >= final_capacity ) then
+          error stop "FINAL CAPACITY is too low."
+       end if
+       
+       ! Grab the starting index for this specific thread's data
+       my_start = final_count + 1
+       ! Update the global tracker for the next thread
+       final_count = final_count + updated_box_count
+       !$omp end critical (append_to_final)
+
+       ! ---------------------------------------------------------
+       ! CONCURRENT WRITE: Copy data outside the critical section
+       ! ---------------------------------------------------------
+       final_boxes(my_start : my_start + updated_box_count - 1) = &
+            current_polygon_boxes(1:updated_box_count)
+       
+       ! Verification loop
+       do j=1, updated_box_count
+          tempBox = current_polygon_boxes(j)
+          if( .not. tempBox%is_valid() ) error stop "BOX NOT VALID"
+       end do
+
+    end do
+    !$omp end do
+
+    ! Clean up thread-local memory before exiting the parallel region
+    if (allocated(current_polygon_boxes)) deallocate(current_polygon_boxes)
+
+    !$omp end parallel
+
+    ! ... Proceed with final allocations as in your original code ...
+    deallocate( current_polygon_boxes )
+    allocate( current_polygon_boxes( final_count ) )
+    current_polygon_boxes(1:final_count) = final_boxes(1:final_count)
+    deallocate( final_boxes )
+    
     !deallocate( input_layer%layer_boxes )
     call move_alloc(from=current_polygon_boxes, to=input_layer%layer_boxes )
     do i=1,final_count
@@ -681,7 +783,6 @@ contains
   subroutine PreprocessLayer( input_layer )
     implicit none
     type(Layer), intent(inout) :: input_layer
-    character(len=255) :: val
     integer            :: env_len, env_status
     call get_environment_variable( 'MAGPARSER_CONTROL_PREPROCESS_LAYER_BY_POLYGON', length=env_len, status=env_status )
     if( env_status == 0 ) then !> value is not set
@@ -849,8 +950,7 @@ contains
     integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC
     type(XYTracker), allocatable :: trackers(:)
     integer(kind=int64) :: number_leaves
-    integer(kind=int64) :: i, j, k
-    type(Box) :: tempBox, bboxA, bboxB
+    type(Box) :: bboxA
     type(Layer) :: temp_layer
     integer :: nthreads, tid, alloc_status
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
@@ -870,7 +970,7 @@ contains
     !$komp end parallel
 
     !> Step 1
-    write(*,*) 'Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...'
+    !write(*,*) 'Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...'
     bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )  
     call generate_trackers( input_layer_B%layer_boxes, bboxA, trackers ) !> this does CW ordering of inner contours
     call scanline_fracture(trackers, temp_layer%layer_boxes)
@@ -887,6 +987,14 @@ contains
     input_layer_A%n_alloc = 0
     input_layer_A%layerState = LAYER_STATE_EVERYTHING
   end subroutine DeleteLayer
+
+  subroutine ClearLayer( input_layer_A )
+    type(Layer), intent(inout) :: input_layer_A
+    if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
+    input_layer_A%n_used = 0
+    input_layer_A%n_alloc = 0
+    input_layer_A%layerState = LAYER_STATE_EVERYTHING
+  end subroutine ClearLayer
   
   subroutine CopyLayer( input_layer_A, output_layer )
     type(Layer), intent(inout) :: input_layer_A
@@ -901,58 +1009,7 @@ contains
     end do
     
   end subroutine CopyLayer
-  
-  subroutine CalculateGROWLayer( input_layer_A, grow_value, output_layer )
-    type(Layer), intent(inout) :: input_layer_A
-    type(Layer), intent(inout) :: output_layer
-    type(Layer)                :: temp_layer
-    integer(kind=K_COORDINATE_KIND), intent(in) :: grow_value
-    integer(kind=int64) :: num_boxesA, output_box_count
-    type(XYTracker), allocatable :: trackers(:)
-    integer(kind=int64) :: i, j, k
-    type(Box) :: tempBox, bboxA, bboxB
-    integer :: nthreads, tid, alloc_status
-    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
 
-    call CopyLayer( input_layer_A, output_layer )
-    call box_grow(output_layer%layer_boxes, grow_value, grow_value )
-    call PreprocessLayer( output_layer )
-  end subroutine CalculateGROWLayer
-
-  subroutine CalculateSHRINKLayer( input_layer_A, shrink_value, output_layer )
-    type(Layer), intent(inout) :: input_layer_A
-    type(Layer), intent(inout)   :: output_layer
-    integer(kind=K_COORDINATE_KIND), intent(in) :: shrink_value
-    integer(kind=int64) :: num_boxesA, output_box_count
-    type(XYTracker), allocatable :: trackers(:)
-    integer(kind=int64) :: i, j, k
-    type(Box) :: tempBox, bboxA, bboxB
-    type(Layer) :: temp_layer
-    integer :: nthreads, tid, alloc_status
-    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-
-    !> we can create the RTree for A and B if needed
-    !> since the SkipList is not re-entrant, we cannot do parallel here (yet)
-    !$komp parallel
-    !$komp single
-    !$komp task
-    call PreprocessLayer( input_layer_A )
-    !$komp end task
-    !$komp taskwait
-    !$komp end single
-    !$komp end parallel
-
-    !> Step 1
-    bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
-    call box_grow( bboxA, shrink_value, shrink_value )
-    call generate_trackers( input_layer_A%layer_boxes, bboxA, trackers ) !> this does CW ordering of inner contours
-    call scanline_fracture(trackers, temp_layer%layer_boxes)
-    temp_layer%n_used = size( temp_layer%layer_boxes)        
-    !> now grow each box
-    call box_grow(temp_layer%layer_boxes, shrink_value, shrink_value )
-    call PreprocessLayer( temp_layer )
-    call CalculateNOT( input_layer_A, temp_layer, output_layer )
-  end subroutine CalculateSHRINKLayer
 
   
 end module DesignModule

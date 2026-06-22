@@ -27,23 +27,24 @@ contains
   integer(kind=int32), allocatable :: d_edges(:,:)
 
   allocate(d_edges(2, LIMIT_EDGES))
-
   global_edge_count = 0
-  !$omp target data map(to: sorted_boxes(1:num_boxes), &
-  !$omp                tree_nodes(1:num_nodes)) &
-  !$omp               map(tofrom: d_edges) &
-  !$omp               map(tofrom: global_edge_count)
 
+  !$omp target teams distribute parallel do &
+  !$omp   map(to: sorted_boxes(1:num_boxes)) &
+  !$omp   map(from: d_edges(1:2, 1:LIMIT_EDGES)) &
+  !$omp   map(tofrom: global_edge_count) &
+  !$omp   private(j, idx)
   do i = 1, num_boxes
-     !$omp target teams distribute parallel do &
-     !$omp   private(j, idx) &
-     !$omp   reduction(+:global_edge_count)
+     ! The inner loop runs sequentially inside each thread
      do j = i+1, num_boxes
         if (abs(sorted_boxes(i)%X1 - sorted_boxes(j)%X1) < 1.0) then
+           
+           ! Safely capture the global counter across all threads
            !$omp atomic capture
            idx = global_edge_count
            global_edge_count = global_edge_count + 1
            !$omp end atomic
+           
            if (idx < LIMIT_EDGES) then
               d_edges(1, idx+1) = i
               d_edges(2, idx+1) = j
@@ -51,7 +52,6 @@ contains
         end if
      end do
   end do
-  !$omp end target data
 
   print *, "edges generated:", global_edge_count
 end subroutine PerformMergeGPU

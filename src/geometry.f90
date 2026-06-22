@@ -12,7 +12,7 @@ module GeometryModule
   public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid, &
        box_not_interact, box_interact, box_area, box_perimeter, calculate_union_area, get_sort_permutation, &
        calculate_polygon_union_area, PolygonBooleanAND, heal_boxes3, sort_int_array, box_grow, is_square, &
-       calculate_union_area_fast, sort_events, Event, box_area_vectorized
+       calculate_union_area_fast, sort_events, Event, box_area_vectorized, box_grow_directional
   ! Enum-like constants for the sorting axis
   integer(kind=int64), parameter :: AXIS_X = 1
   integer(kind=int64), parameter :: AXIS_Y = 2
@@ -152,6 +152,16 @@ contains
     this%y2 = (this%y2+ygrow)
     if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID"
   end subroutine box_grow
+  pure elemental subroutine box_grow_directional(this, gvar1, gvar2, gvar3, gvar4)
+    class(Box), intent(inout) :: this
+    integer(kind=K_COORDINATE_KIND),intent(in) :: gvar1, gvar2, gvar3, gvar4
+    if( .not. this%is_valid() ) error stop "INBOX NOT VALID"
+    this%x1 = (this%x1-gvar3)
+    this%x2 = (this%x2+gvar1)
+    this%y1 = (this%y1-gvar4)
+    this%y2 = (this%y2+gvar2)
+    if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID"
+  end subroutine box_grow_directional
 
   ! Type procedure for intersection of two boxes
   pure function box_intersection(this, other) result(intersection_box)

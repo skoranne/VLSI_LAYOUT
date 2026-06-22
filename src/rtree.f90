@@ -4,6 +4,7 @@
 module RTReeBuilder
   use CommonModule
   use GeometryModule
+  use iso_fortran_env, only: int32, int64, real64
   implicit none
   private
   public:: RTReeNode, CalculateTotalNodes, BuildRTree, ExplainTheTree, SelfTestTheTree, SearchTree, K_MAX_SEARCH_LEAVES
