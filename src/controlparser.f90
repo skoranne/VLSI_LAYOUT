@@ -285,7 +285,6 @@ contains
                 if( .not. ins ) error stop "DB HASH TABLE CORRUPTED"
                 lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
                 if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
-                if( .not. allocated( design_dbs( lhs_db_index )%layerNames(lhs_layer_index) ) ) error stop "Layername not populated"
                 design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
                 write(*,*) 'NEW LHS layer index = ', lhs_layer_index, ' for ', trim(adjustl(rest(1:pos-1))), ' ', &
                      trim(adjustl(design_dbs( lhs_db_index )%layerNames(lhs_layer_index)))
