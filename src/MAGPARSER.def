@@ -23,6 +23,8 @@ From: registry.access.redhat.com/ubi8/ubi:latest
     # 3. Copy your executable
     /home/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe /opt/MAGPARSER.exe
     /home/skoranne/GITHUB/VLSI_LAYOUT/src/CONVERT.exe /opt/CONVERT.exe
+    /home/skoranne/GITHUB/VLSI_LAYOUT/src/test_repetition.exe /opt/test_repetition.exe
+    /home/skoranne/GITHUB/VLSI_LAYOUT/src/test_interaction.exe /opt/test_interaction.exe        
 %post
     # Clean container environment build setup
     echo "Files copied successfully."
