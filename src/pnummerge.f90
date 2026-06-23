@@ -127,8 +127,8 @@ contains
              StackPtr = StackPtr - 1
              currNode = tree_nodes(curr_index)
 
-             if (currNode%is_leaf) then
-                do k = currNode%child_start, currNode%child_start + currNode%num_children - 1
+             if (currNode%IsLeaf) then
+                do k = currNode%ChildStart, currNode%ChildStart + currNode%NumChildren - 1
                    if (k <= i) cycle
                    boxK = sorted_boxes(k)
 
@@ -154,7 +154,7 @@ contains
                    end if
                 end do
              else
-                do child_idx = currNode%child_start, currNode%child_start + currNode%num_children - 1
+                do child_idx = currNode%ChildStart, currNode%ChildStart + currNode%NumChildren - 1
                    childNode = tree_nodes(child_idx)
                    overlapx = max(childNode%mbr%x1, boxI%x1) <= min(childNode%mbr%x2, boxI%x2)
                    overlapy = max(childNode%mbr%y1, boxI%y1) <= min(childNode%mbr%y2, boxI%y2)
@@ -230,10 +230,10 @@ contains
           if (.not. (overlapx .and. overlapy)) cycle search_tree
 
           ! 2. Process based on node type
-          if (tree_nodes(currnode)%is_leaf) then
+          if (tree_nodes(currnode)%IsLeaf) then
 
              ! Iterate exactly over the known number of children (No ghost boxes)
-             do j = tree_nodes(currnode)%child_start, tree_nodes(currnode)%child_start + tree_nodes(currnode)%num_children - 1
+             do j = tree_nodes(currnode)%ChildStart, tree_nodes(currnode)%ChildStart + tree_nodes(currnode)%NumChildren - 1
 
                 ! A box cannot intersect itself
                 if (j == i) cycle 
@@ -257,7 +257,7 @@ contains
           else
 
              ! Internal node: Push exact contiguous children to the stack
-             do j = tree_nodes(currnode)%child_start, tree_nodes(currnode)%child_start + tree_nodes(currnode)%num_children - 1
+             do j = tree_nodes(currnode)%ChildStart, tree_nodes(currnode)%ChildStart + tree_nodes(currnode)%NumChildren - 1
                 if (stackptr < K_STACK_SIZE) then
                    stackptr = stackptr + 1
                    stack(stackptr) = j
@@ -322,9 +322,9 @@ contains
              StackPtr = StackPtr - 1
              currNode = tree_nodes(curr_index)
 
-             if( currNode%is_leaf ) then
+             if( currNode%IsLeaf ) then
                 ! Direct interaction check: No leafboxes array needed!
-                do k = currNode%child_start, currNode%child_start + currNode%num_children - 1
+                do k = currNode%ChildStart, currNode%ChildStart + currNode%NumChildren - 1
                    ! Ensure we don't double count interactions
                    if( k <= i ) cycle 
 
@@ -339,7 +339,7 @@ contains
                 end do
              else
                 ! Internal node traversal
-                do child_idx = currNode%child_start, currNode%child_start + currNode%num_children - 1
+                do child_idx = currNode%ChildStart, currNode%ChildStart + currNode%NumChildren - 1
                    childNode = tree_nodes(child_idx)
 
                    overlapx = max( childNode%mbr%x1, sorted_boxes(i)%x1 ) <= min( childNode%mbr%x2, sorted_boxes(i)%x2 )

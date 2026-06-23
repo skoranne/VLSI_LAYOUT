@@ -10,9 +10,9 @@ module RTReeBuilder
   public:: RTReeNode, CalculateTotalNodes, BuildRTree, SelfTestTheTree, SearchTree, K_MAX_SEARCH_LEAVES
   type :: RTreeNode
      type(Box) :: mbr
-     integer(kind=int64) :: child_start   ! Index of first child in the flat array
-     integer(kind=int64) :: num_children  ! Number of contiguous children
-     logical :: is_leaf                   ! Clean boolean flag, no negative number hacks
+     integer(kind=int64) :: ChildStart   ! Index of first child in the flat array
+     integer(kind=int64) :: NumChildren  ! Number of contiguous children
+     logical :: IsLeaf                   ! Clean boolean flag, no negative number hacks
   end type RTreeNode
   integer, parameter :: K_MAX_SEARCH_LEAVES = 16*4096
 contains
@@ -27,11 +27,6 @@ contains
     ! 1. Calculate the total number of nodes needed for the flat array
     total_nodes = 0
     current_level_nodes = n_boxes
-    !> result = (n_boxes + capacity - 1) / capacity
-    !do while (current_level_nodes > 1)
-    !   current_level_nodes = ceiling(real(current_level_nodes) / real(capacity))
-    !   total_nodes = total_nodes + current_level_nodes
-    !end do
     do while (current_level_nodes > 1)
        ! Pure integer ceiling division: (A + B - 1) / B
        current_level_nodes = (current_level_nodes + capacity - 1) / capacity
@@ -45,7 +40,7 @@ contains
     integer(kind=int64), intent(out) :: root_index
 
     integer(kind=int64) :: n_boxes, current_level_nodes, prev_level_nodes
-    integer(kind=int64) :: i, j, child_start, child_end, node_idx
+    integer(kind=int64) :: i, j, ChildStart, child_end, node_idx
     integer(kind=int64) :: current_level_start, prev_level_start
     type(Box) :: agg_mbr
 
@@ -58,17 +53,17 @@ contains
     node_idx = 1
 
     do i = 1, current_level_nodes
-       child_start = (i - 1) * capacity + 1
+       ChildStart = (i - 1) * capacity + 1
        child_end   = min(i * capacity, n_boxes)
 
        ! Initialize the aggregate MBR with the first child
-       agg_mbr = sorted_boxes(child_start)
-       tree_nodes(node_idx)%child_start = child_start
-       tree_nodes(node_idx)%num_children = child_end - child_start + 1
-       tree_nodes(node_idx)%is_leaf = .true. 
+       agg_mbr = sorted_boxes(ChildStart)
+       tree_nodes(node_idx)%ChildStart = ChildStart
+       tree_nodes(node_idx)%NumChildren = child_end - ChildStart + 1
+       tree_nodes(node_idx)%IsLeaf = .true. 
 
        ! Compute MBR for this contiguous chunk of boxes
-       do j = child_start, child_end
+       do j = ChildStart, child_end
           agg_mbr%x1 = min(agg_mbr%x1, sorted_boxes(j)%x1)
           agg_mbr%y1 = min(agg_mbr%y1, sorted_boxes(j)%y1)
           agg_mbr%x2 = max(agg_mbr%x2, sorted_boxes(j)%x2)
@@ -88,18 +83,18 @@ contains
        current_level_nodes = (prev_level_nodes + capacity - 1) / capacity
 
        do i = 1, current_level_nodes
-          child_start = prev_level_start + (i - 1) * capacity
+          ChildStart = prev_level_start + (i - 1) * capacity
           child_end   = min(prev_level_start + i * capacity - 1, prev_level_start + prev_level_nodes - 1)
 
           ! Initialize aggregate MBR with the first child node
-          agg_mbr = tree_nodes(child_start)%mbr
+          agg_mbr = tree_nodes(ChildStart)%mbr
 
-          tree_nodes(node_idx)%child_start = child_start
-          tree_nodes(node_idx)%num_children = child_end - child_start + 1
-          tree_nodes(node_idx)%is_leaf = .false.
+          tree_nodes(node_idx)%ChildStart = ChildStart
+          tree_nodes(node_idx)%NumChildren = child_end - ChildStart + 1
+          tree_nodes(node_idx)%IsLeaf = .false.
 
           ! Compute MBR for this contiguous chunk of child nodes
-          do j = child_start, child_end
+          do j = ChildStart, child_end
              agg_mbr%x1 = min(agg_mbr%x1, tree_nodes(j)%mbr%x1)
              agg_mbr%y1 = min(agg_mbr%y1, tree_nodes(j)%mbr%y1)
              agg_mbr%x2 = max(agg_mbr%x2, tree_nodes(j)%mbr%x2)
@@ -146,19 +141,19 @@ contains
     if (.not. (overlapx .and. overlapy)) return
 
     ! 2. Process Leaf or Internal Node
-    if( tree_nodes(index)%is_leaf ) then
+    if( tree_nodes(index)%IsLeaf ) then
 
        !> We have found a leaf
        number_leaves = number_leaves + 1
        if( number_leaves > K_MAX_SEARCH_LEAVES ) then
           error stop "INCREASE NUMBER SEARCH LEAVES"
        end if
-       leafboxes( number_leaves ) = tree_nodes(index)%child_start
+       leafboxes( number_leaves ) = tree_nodes(index)%ChildStart
 
     else
 
        !> Internal Node: Iterate over contiguous children
-       do child_idx = tree_nodes(index)%child_start, tree_nodes(index)%child_start + tree_nodes(index)%num_children - 1
+       do child_idx = tree_nodes(index)%ChildStart, tree_nodes(index)%ChildStart + tree_nodes(index)%NumChildren - 1
 
           childNode = tree_nodes(child_idx)
 
@@ -223,16 +218,16 @@ contains
 
        currNode = tree_nodes(curr_index)
 
-       if( currNode%is_leaf ) then
+       if( currNode%IsLeaf ) then
           !> We have found a leaf
           number_leaves = number_leaves + 1
           if( number_leaves > K_MAX_SEARCH_LEAVES ) then
              error stop "INCREASE NUMBER SEARCH LEAVES"
           end if
-          leafboxes( number_leaves ) = currNode%child_start
+          leafboxes( number_leaves ) = currNode%ChildStart
        else
           !> Internal Node: Check contiguous children and push valid ones to stack
-          do child_idx = currNode%child_start, currNode%child_start + currNode%num_children - 1
+          do child_idx = currNode%ChildStart, currNode%ChildStart + currNode%NumChildren - 1
              childNode = tree_nodes(child_idx)
 
              ! Inline short-circuit overlap check
@@ -290,7 +285,7 @@ contains
 
        if( number_leaves > 0 ) then
           outer: do j = 1, number_leaves
-             ! In the DOD tree, leafboxes(j) contains the child_start index.
+             ! In the DOD tree, leafboxes(j) contains the ChildStart index.
              ! The builder guarantees children are contiguous up to capacity.
              over_leaves: do k = leafboxes(j), min(leafboxes(j) + capacity - 1, num_boxes)
                 if( i == k ) then

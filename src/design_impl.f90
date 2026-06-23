@@ -11,6 +11,7 @@ submodule (DesignModule) DesignImplModule
   use GeometryModule
   use MortonSortOMT
   use RTreeBuilderGPU
+  use RTreeBuilder
   use GPUMergeModule
   use PNumMergeModule  
   implicit none
@@ -134,7 +135,7 @@ contains
   module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
     type(Layer), intent(inout) :: input_layer_A
     integer(kind=int64) :: interaction_count, N, total_nodes
-    type(RTreeNodeGPU), allocatable:: TreeNodes(:)
+    type(RTreeNode), allocatable:: TreeNodes(:)
     integer(kind=int64) :: RootIndex    
     interaction_count = 0
     if( input_layer_A%n_used == 0 ) then
@@ -145,10 +146,10 @@ contains
        return
     end if
     N = input_layer_A%n_used
-    total_nodes = CalculateTotalNodesGPU( N, K_LEAF_CAPACITY ) !> for GPU we might change
+    total_nodes = CalculateTotalNodes( N, K_LEAF_CAPACITY ) !> for GPU we might change
     call SortBoxesDirect( input_layer_A%layer_boxes, N )
     allocate( TreeNodes( total_nodes ) )
-    call BuildRTreeGPU( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
+    call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
     call ComputeInteractionsGPU( TreeNodes, total_nodes, input_layer_A%layer_boxes, N, RootIndex, interaction_count)
   end function CalculateOverlapCount
   #else
@@ -177,7 +178,7 @@ contains
   module function CalculateSingletonCount( input_layer, is_singleton ) result( interaction_count )
     type(Layer), intent(inout) :: input_layer
     integer(kind=int64) :: interaction_count, N, total_nodes
-    type(RTreeNodeGPU), allocatable:: TreeNodes(:)
+    type(RTreeNode), allocatable:: TreeNodes(:)
     integer(kind=int64) :: RootIndex    
     logical, allocatable, intent(out) :: is_singleton(:)
     interaction_count = 0
@@ -185,10 +186,10 @@ contains
        return
     end if
     N = input_layer%n_used
-    total_nodes = CalculateTotalNodesGPU( N, K_LEAF_CAPACITY ) !> for GPU we might change
+    total_nodes = CalculateTotalNodes( N, K_LEAF_CAPACITY ) !> for GPU we might change
     call SortBoxesDirect( input_layer%layer_boxes, N )
     allocate( TreeNodes( total_nodes ) )
-    call BuildRTreeGPU( input_layer%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
+    call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
     call FindSingletonsGPU( input_layer%layer_boxes, TreeNodes, RootIndex, is_singleton, interaction_count)
   end function CalculateSingletonCount
   #else
@@ -227,7 +228,7 @@ contains
     integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
     integer(kind=int64) :: number_leaves
     integer(kind=int64) :: i, j, k, interaction_count, N, total_nodes
-    type(RTreeNodeGPU), allocatable:: TreeNodes(:)
+    type(RTreeNode), allocatable:: TreeNodes(:)
     integer(kind=int64) :: RootIndex    
     type(Layer), allocatable :: buffers(:)
     type(Box) :: tempBox, bbox
@@ -246,12 +247,12 @@ contains
     end if
     
     N = input_layer_A%n_used
-    total_nodes = CalculateTotalNodesGPU( N, K_LEAF_CAPACITY ) !> for GPU we might change
+    total_nodes = CalculateTotalNodes( N, K_LEAF_CAPACITY ) !> for GPU we might change
     bbox = mbr_of_array( input_layer_A%layer_boxes, N )
     write(*,*) 'Loaded : ', N, ' BBOX = ', bbox, ' |T| = ', total_nodes
     call SortBoxesDirect( input_layer_A%layer_boxes, N )
     allocate( TreeNodes( total_nodes ) )
-    call BuildRTreeGPU( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
+    call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
     write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(TreeNodes)
     call ComputeInteractionsGPU( TreeNodes, total_nodes, input_layer_A%layer_boxes, N, RootIndex, interaction_count)
     if( interaction_count == 0 ) then

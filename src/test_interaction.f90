@@ -72,7 +72,7 @@ program main
   integer(kind=int64)    :: total_nodes_cpu, total_nodes_gpu
   integer(kind=int64)    :: interaction_count_cpu, interaction_count_gpu
   integer(kind=int64), parameter :: K_LEAF_CAPACITY_GPU = K_LEAF_CAPACITY
-  type(RTreeNodeGPU), allocatable:: TreeNodes(:)
+  type(RTreeNode), allocatable:: TreeNodes(:)
   integer(kind=int64) :: RootIndex
   character(len=256)            :: filenameA, filenameB      
   character(len=256)            :: outFileName   
@@ -178,7 +178,7 @@ program main
   allocate( is_singleton_gpu( N ) )
   boxes => input_layer%layer_boxes  
   is_singleton_gpu = .false.
-  total_nodes_gpu = CalculateTotalNodesGPU( N, K_LEAF_CAPACITY_GPU ) !> for GPU we might change
+  total_nodes_gpu = CalculateTotalNodes( N, K_LEAF_CAPACITY_GPU ) !> for GPU we might change
   bbox = mbr_of_array( boxes, N )
   write(*,'(A,I12,A,4I12,A,I12)') 'Loaded : ', N, ' BBOX = ', bbox, ' |T| = ', total_nodes_gpu
   call StartMarkTime("GPUSort")  
@@ -186,7 +186,7 @@ program main
   call StopMarkTime("GPUSort")
   call StartMarkTime("GPURTree")    
   allocate( TreeNodes( total_nodes_gpu ) )
-  call BuildRTreeGPU( boxes, K_LEAF_CAPACITY_GPU, TreeNodes, RootIndex)
+  call BuildRTree( boxes, K_LEAF_CAPACITY_GPU, TreeNodes, RootIndex)
   write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(TreeNodes)
   call StopMarkTime("GPURTree")  
   call StartMarkTime("GPUInteractions")
@@ -194,7 +194,7 @@ program main
   write(*,*) '|GPU TOTAL INTERACTIONS| = ', interaction_count_gpu
   call StopMarkTime("GPUInteractions")
   call StartMarkTime("GPUSingleton")
-  call FindSingletonsGPU( boxes, TreeNodes, RootIndex, is_singleton_gpu, num_singletons_gpu)
+  call FindSingletonsGPU( N, boxes, total_nodes_gpu, TreeNodes, RootIndex, is_singleton_gpu, num_singletons_gpu)
   write(*,*) '|GPU NUM_SINGLETONS| = ', num_singletons_gpu
   call StopMarkTime("GPUSingleton")
   call StartMarkTime("PNUM")

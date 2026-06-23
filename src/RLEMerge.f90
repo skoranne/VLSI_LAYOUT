@@ -6,6 +6,7 @@ module RLEMergeModule
   use iso_fortran_env, only : int32, int64, real64
   use GeometryModule
   use RTreeBuilderGPU
+  use RTreeBuilder  
   use DataStructuresModule
   use omp_lib
   implicit none
@@ -18,7 +19,7 @@ contains
     type(UnionFind), intent(inout) :: uf        
     type(Box), intent(in) :: sorted_boxes(:)
     integer(kind=int64), intent(in) :: capacity
-    type(RTreeNodeGPU), intent(in) :: tree_nodes(:)
+    type(RTreeNode), intent(in) :: tree_nodes(:)
     integer(kind=int64), intent(in) :: root_index
     real(kind=real64), intent(out) :: overlap_area
     real(kind=real64), intent(out) :: overlap_perimeter

@@ -6,19 +6,14 @@ module RTreeBuilderGPU
   use iso_fortran_env, only: int32, int64, real64
   use omp_lib
   use GeometryModule
+  use RTreeBuilder
   implicit none
   private
 
-  public :: RTreeNodeGPU, ComputeInteractionsGPU, BuildRTreeGPU, CalculateTotalNodesGPU
+  public :: ComputeInteractionsGPU
 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024
 
-  type :: RTreeNodeGPU
-     type(Box) :: Mbr
-     integer(kind=int64) :: NumChildren
-     integer(kind=int64) :: ChildStart
-     logical :: IsLeaf
-  end type RTreeNodeGPU
 
 contains
 
@@ -32,101 +27,13 @@ contains
     !count_interactions = count_interactions + 1
   end subroutine DO_INTERACTION
 
-  pure function CalculateTotalNodesGPU(NumBoxes, Capacity) result(TotalNodes)
-    integer(kind=int64), intent(in) :: NumBoxes, Capacity
-    integer(kind=int64) :: TotalNodes, CurrentLevelNodes
-
-    TotalNodes = 0    
-    if (NumBoxes == 0) return
-
-    CurrentLevelNodes = NumBoxes
-    do while (CurrentLevelNodes > 1)
-       CurrentLevelNodes = (CurrentLevelNodes + Capacity - 1) / Capacity
-       TotalNodes = TotalNodes + CurrentLevelNodes
-    end do
-  end function CalculateTotalNodesGPU
-
-  !> Builds the flat array RTree. Safe to run on CPU host prior to offload.
-  pure subroutine BuildRTreeGPU(SortedBoxes, Capacity, TreeNodes, RootIndex)
-    type(Box), intent(in) :: SortedBoxes(:)
-    integer(kind=int64), intent(in) :: Capacity
-    type(RTreeNodeGPU), intent(inout) :: TreeNodes(:)
-    integer(kind=int64), intent(out) :: RootIndex
-
-    integer(kind=int64) :: NumBoxes, CurrentLevelNodes, PrevLevelNodes
-    integer(kind=int64) :: I, J, CStart, CEnd, NodeIdx
-    integer(kind=int64) :: CurrentLevelStart, PrevLevelStart
-    type(Box) :: AggMbr
-
-    NumBoxes = size(SortedBoxes, kind=int64)
-    if (NumBoxes == 0) return
-
-    ! 1. Build Level 1 (Leaves pointing to SortedBoxes)
-    CurrentLevelNodes = (NumBoxes + Capacity - 1) / Capacity
-    NodeIdx = 1
-
-    do I = 1, CurrentLevelNodes
-       CStart = (I - 1) * Capacity + 1
-       CEnd   = min(I * Capacity, NumBoxes)
-
-       AggMbr = SortedBoxes(CStart)
-       TreeNodes(NodeIdx)%ChildStart = CStart
-       TreeNodes(NodeIdx)%NumChildren = CEnd - CStart + 1
-       TreeNodes(NodeIdx)%IsLeaf = .true.
-
-       do J = CStart, CEnd
-          AggMbr%X1 = min(AggMbr%X1, SortedBoxes(J)%X1)
-          AggMbr%Y1 = min(AggMbr%Y1, SortedBoxes(J)%Y1)
-          AggMbr%X2 = max(AggMbr%X2, SortedBoxes(J)%X2)
-          AggMbr%Y2 = max(AggMbr%Y2, SortedBoxes(J)%Y2)
-       end do
-
-       TreeNodes(NodeIdx)%Mbr = AggMbr
-       NodeIdx = NodeIdx + 1
-    end do
-
-    ! 2. Build Higher Levels (Internal nodes pointing to TreeNodes)
-    PrevLevelStart = 1
-    PrevLevelNodes = CurrentLevelNodes
-
-    do while (PrevLevelNodes > 1)
-       CurrentLevelStart = NodeIdx
-       CurrentLevelNodes = (PrevLevelNodes + Capacity - 1) / Capacity
-
-       do I = 1, CurrentLevelNodes
-          CStart = PrevLevelStart + (I - 1) * Capacity
-          CEnd   = min(PrevLevelStart + I * Capacity - 1, PrevLevelStart + PrevLevelNodes - 1)
-
-          AggMbr = TreeNodes(CStart)%Mbr
-          TreeNodes(NodeIdx)%ChildStart = CStart
-          TreeNodes(NodeIdx)%NumChildren = CEnd - CStart + 1
-          TreeNodes(NodeIdx)%IsLeaf = .false.
-
-          do J = CStart, CEnd
-             AggMbr%X1 = min(AggMbr%X1, TreeNodes(J)%Mbr%X1)
-             AggMbr%Y1 = min(AggMbr%Y1, TreeNodes(J)%Mbr%Y1)
-             AggMbr%X2 = max(AggMbr%X2, TreeNodes(J)%Mbr%X2)
-             AggMbr%Y2 = max(AggMbr%Y2, TreeNodes(J)%Mbr%Y2)
-          end do
-
-          TreeNodes(NodeIdx)%Mbr = AggMbr
-          NodeIdx = NodeIdx + 1
-       end do
-
-       PrevLevelStart = CurrentLevelStart
-       PrevLevelNodes = CurrentLevelNodes
-    end do
-
-    RootIndex = NodeIdx - 1
-  end subroutine BuildRTreeGPU
-
   !> GPU Offloaded All-Query Interaction Generator
   subroutine ComputeInteractionsGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex, KernelCount)
     ! 1. The exact sizes MUST come first
     integer(kind=int64), intent(in) :: NumNodes, NumBoxes
 
     ! 2. Force Explicit-Shape (No colons allowed!)
-    type(RTreeNodeGPU), intent(in) :: TreeNodes(NumNodes)
+    type(RTreeNode), intent(in) :: TreeNodes(NumNodes)
     type(Box), intent(in) :: SortedBoxes(NumBoxes)
 
     integer(kind=int64), intent(in) :: RootIndex
