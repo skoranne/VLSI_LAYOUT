@@ -1,6 +1,7 @@
 module ASCIIPlotModule
   use CommonModule
   use GeometryModule
+  use iso_fortran_env, only: int64
 contains
   subroutine ascii_plot_boxes(boxes)
     type(Box), intent(in) :: boxes(:)
@@ -20,7 +21,7 @@ contains
     character(len=1), allocatable :: canvas(:,:)
     character(len=3) :: label_str
     integer, parameter :: K_MAX_PLOT_SIZE = 150
-    tempBox = mbr_of_array(boxes, size(boxes))
+    tempBox = mbr_of_array(boxes, int(size(boxes), kind=int64))
     min_x = tempBox%x1
     max_x = tempBox%x2
     min_y = tempBox%y1

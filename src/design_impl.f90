@@ -174,22 +174,22 @@ contains
   #endif
 
   #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)      
-  module function CalculateSingletonCount( input_layer_A, is_singleton ) result( interaction_count )
-    type(Layer), intent(inout) :: input_layer_A
+  module function CalculateSingletonCount( input_layer, is_singleton ) result( interaction_count )
+    type(Layer), intent(inout) :: input_layer
     integer(kind=int64) :: interaction_count, N, total_nodes
     type(RTreeNodeGPU), allocatable:: TreeNodes(:)
     integer(kind=int64) :: RootIndex    
     logical, allocatable, intent(out) :: is_singleton(:)
     interaction_count = 0
-    if( input_layer_A%n_used == 0 ) then
+    if( input_layer%n_used == 0 ) then
        return
     end if
-    N = input_layer_A%n_used
+    N = input_layer%n_used
     total_nodes = CalculateTotalNodesGPU( N, K_LEAF_CAPACITY ) !> for GPU we might change
-    call SortBoxesDirect( input_layer_A%layer_boxes, N )
+    call SortBoxesDirect( input_layer%layer_boxes, N )
     allocate( TreeNodes( total_nodes ) )
-    call BuildRTreeGPU( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
-    call FindSingletonsGPU( input_layer_A%layer_boxes, TreeNodes, RootIndex, is_singleton, interaction_count)
+    call BuildRTreeGPU( input_layer%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
+    call FindSingletonsGPU( input_layer%layer_boxes, TreeNodes, RootIndex, is_singleton, interaction_count)
   end function CalculateSingletonCount
   #else
   module function CalculateSingletonCount( input_layer, is_singleton ) result( interaction_count )
