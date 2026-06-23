@@ -34,7 +34,7 @@ From: registry.access.redhat.com/ubi8/ubi:latest
     export LD_LIBRARY_PATH="/opt/libs"
     
     # OpenMP performance & bug fixes
-    export OMP_NUM_THREADS=4
+    export OMP_NUM_THREADS=32
     export KMP_AFFINITY=disabled
     export KMP_DUPLICATE_LIB_OK=TRUE
     export AUTO_NUM_THREADS=1

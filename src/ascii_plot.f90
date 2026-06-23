@@ -19,7 +19,7 @@ contains
     integer(kind=K_COORDINATE_KIND) :: lbl_x, lbl_y
     character(len=1), allocatable :: canvas(:,:)
     character(len=3) :: label_str
-    integer, parameter :: K_MAX_PLOT_SIZE = 30
+    integer, parameter :: K_MAX_PLOT_SIZE = 150
     tempBox = mbr_of_array(boxes, size(boxes))
     min_x = tempBox%x1
     max_x = tempBox%x2

@@ -12,7 +12,8 @@ module GeometryModule
   public :: Box, CheckSortOrder, mbr_of_array, CheckBox, quicksort_boxes, box_scale, str_pack, omt_pack, MBRValid, &
        box_not_interact, box_interact, box_area, box_perimeter, calculate_union_area, get_sort_permutation, &
        calculate_polygon_union_area, PolygonBooleanAND, heal_boxes3, sort_int_array, box_grow, is_square, &
-       calculate_union_area_fast, sort_events, Event, box_area_vectorized, box_grow_directional
+       calculate_union_area_fast, sort_events, Event, box_area_vectorized, box_grow_directional,&
+       ApplyTransform, box_overlap
   ! Enum-like constants for the sorting axis
   integer(kind=int64), parameter :: AXIS_X = 1
   integer(kind=int64), parameter :: AXIS_Y = 2
@@ -108,7 +109,18 @@ contains
        end if
     end if
   end function box_interact
-
+  pure elemental function box_not_overlap(this, other) result(retval)
+    class(Box), intent(in) :: this, other
+    logical :: retval
+    retval = ( ( this%x1 >= other%x2) .or. ( this%y1 >= other%y2) .or. &
+         ( this%x2 <= other%x1) .or. ( this%y2 <= other%y1) )
+  end function box_not_overlap
+  pure function box_overlap(this, other) result(retval)
+    type(Box), intent(in),value :: this, other
+    logical                     :: retval
+    type(Box)              :: tempBox
+    retval = .not. box_not_overlap( this, other )
+  end function box_overlap
 
   ! Type procedure for union of two boxes
   pure function box_union(this, other) result(union_box)
@@ -152,6 +164,16 @@ contains
     this%y2 = (this%y2+ygrow)
     if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID"
   end subroutine box_grow
+  pure elemental subroutine ApplyTransform(this, x, y)
+    class(Box), intent(inout) :: this
+    integer, intent(in) :: x, y
+    if( .not. this%is_valid() ) error stop "INBOX NOT VALID"
+    this%x1 = (this%x1+x)
+    this%x2 = (this%x2+x)
+    this%y1 = (this%y1+y)
+    this%y2 = (this%y2+y)
+    if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID"
+  end subroutine ApplyTransform
   pure elemental subroutine box_grow_directional(this, gvar1, gvar2, gvar3, gvar4)
     class(Box), intent(inout) :: this
     integer(kind=K_COORDINATE_KIND),intent(in) :: gvar1, gvar2, gvar3, gvar4
@@ -165,6 +187,7 @@ contains
 
   ! Type procedure for intersection of two boxes
   pure function box_intersection(this, other) result(intersection_box)
+    !DIR$ ATTRIBUTES FORCEINLINE :: box_intersection
     class(Box), intent(in) :: this, other
     type(Box) :: intersection_box
     ! Find the intersection box

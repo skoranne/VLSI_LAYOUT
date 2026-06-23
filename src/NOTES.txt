@@ -424,3 +424,9 @@ INFO: Writing into BIN: SDT16_6x6_L67_D20_UNMERGED.bin_L67_D20.bin
 INFO: Layer 67/20 -> True Area: 24004890.4274 µm², True Perimeter: 134407767.37 µm
 
 ```
+
+Father's Day 2026 June 21, always going into SQUARE mode
+GPU default (Direct, Morton) FULL TIME:  6736.14 MEM: VM    170104280 RSS:     71762496
+GPU default FULL TIME:  6194.92
+CPU default (OMT/Morton mix) FULL TIME:  7668.68 MEM: VM     69590340 RSS:     62845752
+

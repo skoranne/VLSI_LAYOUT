@@ -10,13 +10,14 @@
 
 module PNumMergeModule
   use iso_fortran_env, only : int32, int64, real64
+  use CommonModule
   use GeometryModule
   use RTreeBuilder
   use DataStructuresModule
   use omp_lib
   implicit none  
   ! Explicitly define what is exposed to the rest of the program
-  public :: EdgeBuffer, init_buffer, push_edge, PerformMerge
+  public :: EdgeBuffer, init_buffer, push_edge, PerformMerge, FindSingletonsCPU, ComputeInteractionsCPU
   type :: EdgeBuffer
      integer(8), allocatable :: pairs(:,:) ! 2 x Capacity
      integer(8) :: count
@@ -77,101 +78,284 @@ contains
        call uf%merge(eb%pairs(1, k), eb%pairs(2, k))
     end do
   end subroutine process_edges
-
   subroutine PerformMerge(uf, sorted_boxes, capacity, tree_nodes, root_index, overlap_area, overlap_perimeter)
-    type(UnionFind), intent(out) :: uf        
-    type(Box), intent(in) :: sorted_boxes(:)
+    type(UnionFind), intent(out) :: uf
+    type(Box), intent(in)        :: sorted_boxes(:)
     integer(kind=int64), intent(in) :: capacity
-    type(RTreeNode), intent(in) :: tree_nodes(:)
+    type(RTreeNode), intent(in)  :: tree_nodes(:)
     integer(kind=int64), intent(in) :: root_index
-    real(kind=real64), intent(out)   :: overlap_area
-    real(kind=real64), intent(out)   :: overlap_perimeter    
-    integer(kind=int64) :: num_boxes
-    integer(kind=int64) :: i
-    integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
-    integer(kind=int64) :: number_leaves
-    integer(kind=int64) :: j, k
+    real(kind=real64), intent(out)  :: overlap_area
+    real(kind=real64), intent(out)  :: overlap_perimeter
+
+    integer(kind=int64) :: num_boxes, i, k
+    integer(kind=int64), parameter :: K_STACK_SIZE = 256
+    integer(kind=int64) :: Stack(K_STACK_SIZE), StackPtr, curr_index, child_idx
+    logical             :: overlapx, overlapy
+    type(RTreeNode)     :: currNode, childNode
+    type(Box)           :: tempBox, boxI, boxK
     type(EdgeBuffer), allocatable :: buffers(:)
-    real(kind=real64),allocatable :: overlap_areas(:)
-    real(kind=real64),allocatable :: overlap_perimeters(:)    
-    type(Box) :: tempBox
+    real(kind=real64), allocatable :: overlap_areas(:), overlap_perimeters(:)
     integer :: nthreads, tid
 
-
     nthreads = omp_get_max_threads()
-    allocate(buffers(nthreads))
-    allocate(overlap_areas(nthreads))
-    allocate(overlap_perimeters(nthreads))    
-    do i=1,nthreads
-       call init_buffer(buffers(i), initial_capacity=int(10000,kind=int64))
+    allocate(buffers(nthreads), overlap_areas(nthreads), overlap_perimeters(nthreads))
+
+    do i = 1, nthreads
+       call init_buffer(buffers(i), initial_capacity=10000_int64)
        overlap_areas(i) = 0.0
        overlap_perimeters(i) = 0.0
     end do
-    overlap_area = 0.0
-    overlap_perimeter = 0.0
-    num_boxes = size( sorted_boxes )
-    call uf%init( num_boxes )    
-    !write(*,*) 'DBG: ', num_boxes, ' ', size(tree_nodes), ' ', uf%arr
-    #ifdef TARGET_CODE
-    !$komp target loop private(leafboxes, number_leaves, i, j, k, tid, tempBox)
-    !$komp target teams distribute parallel do schedule(dynamic) &
-    !$komp   private(leafboxes, number_leaves, i, j, k, tid, tempBox) &
-    !$komp   map(to: sorted_boxes, tree_nodes, capacity, root_index, num_boxes) &
-    !$komp   map(tofrom: buffers, overlap_areas, overlap_perimeter)
-    #endif
-    !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
-    !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid, tempBox)
-    do i=1,num_boxes
-       number_leaves = 0
-       leafboxes = 0
-       tid = omp_get_thread_num()+1
-       call SearchTree( tree_nodes, root_index, sorted_boxes(i), leafboxes, number_leaves )
-       !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
-       if( number_leaves > 0 ) then
-          !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
-          outer: do j=1,number_leaves
-             over_leaves: do k=leafboxes(j),min(leafboxes(j)+capacity-1, num_boxes)
-                !do k=leafboxes(j),leafboxes(j)+capacity-1
-                if( i < k .and. box_interact( sorted_boxes(i), sorted_boxes(k)) ) then
-                   !tempBox = sorted_boxes(i) * sorted_boxes(k)
-                   tempBox%x1 = max( sorted_boxes(i)%x1, sorted_boxes(k)%x1)
-                   tempBox%y1 = max( sorted_boxes(i)%y1, sorted_boxes(k)%y1)
-                   tempBox%x2 = min( sorted_boxes(i)%x2, sorted_boxes(k)%x2)
-                   tempBox%y2 = min( sorted_boxes(i)%y2, sorted_boxes(k)%y2)                   
-                   !$komp critical (console_io)
-                   !write(*,*) 'Index ',i, ' ', sorted_boxes(i), ' interacts with ', k, ' ', sorted_boxes(k), &
-                   !     ' * ', tempBox, box_area( tempBox ), box_perimeter( tempBox )
-                   !$komp end critical (console_io)
-                   call push_edge(buffers(tid), i, k) ! Reallocates if capacity exceeded
-                   if( box_area( tempBox ) > 0.0 ) then
-                      overlap_areas(tid) = overlap_areas(tid) + box_area( tempBox )
-                   else
-                      !> good, we stay in overlap free regime, but now since the boxes
-                      !> are known to interact, we MUST have non-zero perimeter
-                      if( tempBox%x1 == tempBox%x2 .or. tempBox%y1 == tempBox%y2 ) then
-                         !> ok
+
+    num_boxes = size(sorted_boxes, kind=int64)
+    call uf%init(num_boxes)
+
+    !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
+    do i = 1, num_boxes
+       tid = omp_get_thread_num() + 1
+       boxI = sorted_boxes(i)
+
+       ! Inline Root MBR Check
+       overlapx = max(tree_nodes(root_index)%mbr%x1, boxI%x1) <= min(tree_nodes(root_index)%mbr%x2, boxI%x2)
+       overlapy = max(tree_nodes(root_index)%mbr%y1, boxI%y1) <= min(tree_nodes(root_index)%mbr%y2, boxI%y2)
+
+       if (overlapx .and. overlapy) then
+          StackPtr = 1
+          Stack(StackPtr) = root_index
+
+          do while (StackPtr > 0)
+             curr_index = Stack(StackPtr)
+             StackPtr = StackPtr - 1
+             currNode = tree_nodes(curr_index)
+
+             if (currNode%is_leaf) then
+                do k = currNode%child_start, currNode%child_start + currNode%num_children - 1
+                   if (k <= i) cycle
+                   boxK = sorted_boxes(k)
+
+                   ! Inlined box_interact
+                   overlapx = max(boxI%x1, boxK%x1) <= min(boxI%x2, boxK%x2)
+                   overlapy = max(boxI%y1, boxK%y1) <= min(boxI%y2, boxK%y2)
+
+                   if (overlapx .and. overlapy) then
+                      call push_edge(buffers(tid), i, k)
+
+                      ! Calculate intersection box manually
+                      tempBox%x1 = max(boxI%x1, boxK%x1)
+                      tempBox%y1 = max(boxI%y1, boxK%y1)
+                      tempBox%x2 = min(boxI%x2, boxK%x2)
+                      tempBox%y2 = min(boxI%y2, boxK%y2)
+
+                      ! Inlined area/perimeter logic
+                      if (box_area(tempBox) > 0.0) then
+                         overlap_areas(tid) = overlap_areas(tid) + box_area(tempBox)
                       else
-                         !error stop "OVERLAP DETECTED"
+                         overlap_perimeters(tid) = overlap_perimeters(tid) + box_perimeter(tempBox)
                       end if
-                      overlap_perimeters(tid) = overlap_perimeters(tid) + box_perimeter( tempBox )
                    end if
-                end if
-             end do over_leaves
-          end do outer
+                end do
+             else
+                do child_idx = currNode%child_start, currNode%child_start + currNode%num_children - 1
+                   childNode = tree_nodes(child_idx)
+                   overlapx = max(childNode%mbr%x1, boxI%x1) <= min(childNode%mbr%x2, boxI%x2)
+                   overlapy = max(childNode%mbr%y1, boxI%y1) <= min(childNode%mbr%y2, boxI%y2)
+                   if (overlapx .and. overlapy) then
+                      StackPtr = StackPtr + 1
+                      Stack(StackPtr) = child_idx
+                   end if
+                end do
+             end if
+          end do
        end if
     end do
-    !$komp end target teams distribute parallel do
-    ! The global Union-Find array is updated strictly sequentially
+
+    ! Sequential reduction
+    overlap_area = sum(overlap_areas)
+    overlap_perimeter = sum(overlap_perimeters)
+    if (overlap_area > 0.0) overlap_perimeter = 0.0
+
     do tid = 1, nthreads
-       call process_edges( uf, buffers(tid) )
-       overlap_area = overlap_area + overlap_areas(tid)
-       overlap_perimeter = overlap_perimeter + overlap_perimeters(tid)       
+       call process_edges(uf, buffers(tid))
     end do
-    if( overlap_area > 0.0 ) then
-       overlap_perimeter = 0.0
-    end if
     call uf%fullreduce()
   end subroutine PerformMerge
+
+  !> Check for Single computation vs GPU
+  subroutine FindSingletonsCPU(sorted_boxes, tree_nodes, root_index, is_singleton, num_singletons)
+    type(Box), intent(in)             :: sorted_boxes(:)
+    type(RTreeNode), intent(in)       :: tree_nodes(:)
+    integer(kind=int64), intent(in)   :: root_index
+    logical, allocatable, intent(out) :: is_singleton(:)
+    integer(kind=int64), intent(out)  :: num_singletons
+
+    integer(kind=int64) :: num_boxes
+    integer(kind=int64) :: i, j, currnode, childidx
+
+    ! --- Explicit Thread-Local Stack ---
+    integer(kind=int64), parameter :: K_STACK_SIZE = 256
+    integer(kind=int64) :: stack(K_STACK_SIZE)
+    integer(kind=int64) :: stackptr
+
+    ! --- Inlined Math Variables ---
+    type(Box) :: qbox, nodembr, targetbox
+    logical   :: overlapx, overlapy
+
+    num_boxes = size(sorted_boxes, kind=int64)
+
+    ! Allocate the output boolean mask to mirror the boxes array
+    allocate(is_singleton(num_boxes))
+
+    ! Assume all boxes are singletons until proven otherwise
+    is_singleton = .true.
+    num_singletons = 0
+
+    ! Use dynamic scheduling for the CPU to balance dense vs. sparse bounding box regions
+    !$omp parallel do schedule(dynamic) &
+    !$omp private(i, j, currnode, childidx, stack, stackptr, qbox, nodembr, targetbox, overlapx, overlapy)
+    do i = 1, num_boxes
+       qbox = sorted_boxes(i)
+       stackptr = 1
+       stack(stackptr) = root_index
+
+       ! We name the loop so we can break out of it instantly
+       search_tree: do while (stackptr > 0)
+
+          ! Pop current node
+          currnode = stack(stackptr)
+          stackptr = stackptr - 1
+          nodembr = tree_nodes(currnode)%mbr
+
+          ! 1. Internal Node / Root MBR Overlap check (<= includes edge sharing)
+          overlapx = max(nodembr%x1, qbox%x1) <= min(nodembr%x2, qbox%x2)
+          overlapy = max(nodembr%y1, qbox%y1) <= min(nodembr%y2, qbox%y2)
+          if (.not. (overlapx .and. overlapy)) cycle search_tree
+
+          ! 2. Process based on node type
+          if (tree_nodes(currnode)%is_leaf) then
+
+             ! Iterate exactly over the known number of children (No ghost boxes)
+             do j = tree_nodes(currnode)%child_start, tree_nodes(currnode)%child_start + tree_nodes(currnode)%num_children - 1
+
+                ! A box cannot intersect itself
+                if (j == i) cycle 
+
+                targetbox = sorted_boxes(j)
+
+                ! Strict geometry overlap check
+                overlapx = max(targetbox%x1, qbox%x1) <= min(targetbox%x2, qbox%x2)
+                if (overlapx) then
+                   overlapy = max(targetbox%y1, qbox%y1) <= min(targetbox%y2, qbox%y2)
+
+                   if (overlapy) then
+                      ! Interaction found! Mark as false and immediately stop searching.
+                      is_singleton(i) = .false.
+                      exit search_tree 
+                   end if
+                end if
+
+             end do
+
+          else
+
+             ! Internal node: Push exact contiguous children to the stack
+             do j = tree_nodes(currnode)%child_start, tree_nodes(currnode)%child_start + tree_nodes(currnode)%num_children - 1
+                if (stackptr < K_STACK_SIZE) then
+                   stackptr = stackptr + 1
+                   stack(stackptr) = j
+                else
+                   ! Safety catch in case of incredibly deep trees
+                   error stop "ERROR: EXPLICIT STACK OVERFLOW"
+                end if
+             end do
+
+          end if
+       end do search_tree
+    end do
+
+    ! Quickly tally the singletons using Fortran's highly optimized
+    num_singletons = count(is_singleton)
+
+  end subroutine FindSingletonsCPU
+  subroutine ComputeInteractionsCPU( tree_nodes, number_nodes, sorted_boxes, num_boxes, root_index, interaction_count )
+    integer(kind=int64), intent(in) :: number_nodes, num_boxes
+    type(Box), intent(in)           :: sorted_boxes(num_boxes)
+    type(RTreeNode), intent(in)     :: tree_nodes(number_nodes)
+    integer(kind=int64), intent(in) :: root_index
+    integer(kind=int64), intent(out):: interaction_count
+
+    integer(kind=int64) :: i, k
+
+    ! --- Inlined Search Tree Variables ---
+    integer(kind=int64), parameter  :: K_STACK_SIZE = 256
+    integer(kind=int64) :: Stack(K_STACK_SIZE) 
+    integer(kind=int64) :: StackPtr
+    integer(kind=int64) :: curr_index, child_idx
+    logical             :: overlapx, overlapy
+    type(RTreeNode)     :: currNode, childNode
+
+    interaction_count = 0
+
+    !$omp target enter data map(to: tree_nodes(1:number_nodes), sorted_boxes(1:num_boxes))
+
+    ! Using dynamic scheduling to handle work-imbalance in dense regions
+    !$omp parallel do schedule(dynamic) &
+    !$omp private(i, k, Stack, StackPtr, curr_index, child_idx, overlapx, overlapy, currNode, childNode) &
+    !$omp reduction(+:interaction_count)
+    do i = 1, num_boxes
+
+       if( number_nodes == 0 ) cycle
+
+       ! Inline Root MBR Overlap Check
+       overlapx = max(tree_nodes(root_index)%mbr%x1, sorted_boxes(i)%x1) <= min(tree_nodes(root_index)%mbr%x2, sorted_boxes(i)%x2)
+       if (overlapx) then
+          overlapy = max(tree_nodes(root_index)%mbr%y1, sorted_boxes(i)%y1) <= min(tree_nodes(root_index)%mbr%y2, sorted_boxes(i)%y2)
+       else
+          overlapy = .false.
+       end if
+
+       ! Only traverse if the root overlaps
+       if (overlapx .and. overlapy) then
+          StackPtr = 1
+          Stack(StackPtr) = root_index
+
+          do while (StackPtr > 0)
+             curr_index = Stack(StackPtr)
+             StackPtr = StackPtr - 1
+             currNode = tree_nodes(curr_index)
+
+             if( currNode%is_leaf ) then
+                ! Direct interaction check: No leafboxes array needed!
+                do k = currNode%child_start, currNode%child_start + currNode%num_children - 1
+                   ! Ensure we don't double count interactions
+                   if( k <= i ) cycle 
+
+                   ! Inline box_overlap check
+                   overlapx = max(sorted_boxes(i)%x1, sorted_boxes(k)%x1) < min(sorted_boxes(i)%x2, sorted_boxes(k)%x2) !> OVERLAP
+                   if (overlapx) then
+                      overlapy = max(sorted_boxes(i)%y1, sorted_boxes(k)%y1) < min(sorted_boxes(i)%y2, sorted_boxes(k)%y2) !> OVERLAP
+                      if (overlapy) then
+                         interaction_count = interaction_count + 1
+                      end if
+                   end if
+                end do
+             else
+                ! Internal node traversal
+                do child_idx = currNode%child_start, currNode%child_start + currNode%num_children - 1
+                   childNode = tree_nodes(child_idx)
+
+                   overlapx = max( childNode%mbr%x1, sorted_boxes(i)%x1 ) <= min( childNode%mbr%x2, sorted_boxes(i)%x2 )
+                   if (overlapx) then
+                      overlapy = max( childNode%mbr%y1, sorted_boxes(i)%y1 ) <= min( childNode%mbr%y2, sorted_boxes(i)%y2 )
+                      if (overlapy) then
+                         StackPtr = StackPtr + 1
+                         Stack(StackPtr) = child_idx
+                      end if
+                   end if
+                end do
+             end if
+          end do
+       end if
+    end do
+  end subroutine ComputeInteractionsCPU
 
 end module PNumMergeModule
 

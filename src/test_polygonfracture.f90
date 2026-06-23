@@ -13,6 +13,7 @@ program test_fracture
   use DataStructuresModule
   use PNumMergeModule
   use SystemInformationModule
+  use ASCIIPlotModule
   use iso_fortran_env
   implicit none
 
@@ -105,6 +106,9 @@ program test_fracture
      ! Write directly into the string variable using string format '(A, A)'
      ! write(outputName, '(A, A)') trim(fileName), "_output"
      ! print *, trim(outputName)
+  case (5)
+     write(*,*) '5. Print Detailed Information: '
+
   case default                ! Anything else → print usage and quit
      error stop "./PROG.exe <filename> <MAX_LAYER>"
      stop 1
@@ -139,9 +143,9 @@ program test_fracture
      !   write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
      !end do     
      write(*,*) 'Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...'
-     
+
      call scanline_fracture(trackers, output_layer%layer_boxes)
-     
+
      output_layer%n_used = size( output_layer%layer_boxes)
      print *, "Fracturing algorithm finished without memory leaks."
      n_trackers = size(trackers)     
@@ -221,6 +225,8 @@ program test_fracture
      do i = 1, min(input_layer%n_used,10)
         write(*,'(A,I8,A,4I8)') 'Box ', i, ': ', boxes(i)%x1, boxes(i)%y1, boxes(i)%x2, boxes(i)%y2
      end do
+     call ascii_plot_boxes(input_layer%layer_boxes)
+
   case (6,7)
      if( control_parameter == 6 ) then
         write(*,*) '6. Convert input to COMPLEMENT and run Fracture/Contour/Fracture'
@@ -333,7 +339,7 @@ program test_fracture
      print *, "Sorting tokens by X/Y..."
      do i = 1, n_trackers
         write(*,'(4(A,I))') 'Tracker', i, ' -> X:', trackers(i)%X, ' Y:', trackers(i)%Y, ' PolyID:', trackers(i)%polygonNumber
-     end do     
+     end do
      write(*,*) 'Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...'
      call scanline_fracture(trackers, output_layer%layer_boxes)
      output_layer%n_used = size( output_layer%layer_boxes)

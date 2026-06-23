@@ -90,4 +90,6 @@ generate_bin.exe: generate_bin.o $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_interaction.exe:	test_interaction.f90 $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_repetition.exe:	test_repetition.f90 $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 

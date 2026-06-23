@@ -405,6 +405,11 @@ contains
                         if( rhs2_source_name /= 'nothing' ) error stop "AND must use nothing as second layer"
                         write(*,*) 'Found PRIMARY_OPERATOR = AND'
                         call CalculateSingleLayerAND( rhs1_layer, lhs_layer )
+                     case ('COPY')
+                        !> d1:poly COPY nothing
+                        if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"
+                        write(*,*) 'Found PRIMARY_OPERATOR = COPY'
+
                      case ('GRID')
                         !> d1:poly GRID nothing 10 10
                         if( rhs2_source_name /= 'nothing' ) error stop "EXTENT must use nothing as second layer"

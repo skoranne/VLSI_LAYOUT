@@ -102,6 +102,12 @@ module DesignModule
        type(Layer),intent(inout) :: output_layer
        type(Box), intent(in) :: input_box       
      end subroutine AssignFromBox
+
+     module subroutine ConvertLayerToBox( input_layer, output_layer, control_parameter )
+       type(Layer), intent(inout) :: input_layer
+       type(Layer), intent(inout) :: output_layer
+       integer(kind=int64), intent(in) :: control_parameter
+     end subroutine ConvertLayerToBox
      
      module subroutine CalculateGROWLayer( input_layer, output_layer, ivar )
        type(Layer),      intent(in)    :: input_layer         
@@ -114,12 +120,12 @@ module DesignModule
        integer(kind=K_COORDINATE_KIND), intent(in) :: shrink_value
      end subroutine CalculateSHRINKLayer
      module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
-       type(Layer), intent(in) :: input_layer_A
+       type(Layer), intent(inout) :: input_layer_A
        integer(kind=int64) :: interaction_count
      end function CalculateOverlapCount
 
-     module function CalculateSingletonCount( input_layer_A, is_singleton ) result( interaction_count )
-       type(Layer), intent(in) :: input_layer_A
+     module function CalculateSingletonCount( input_layer, is_singleton ) result( interaction_count )
+       type(Layer), intent(inout) :: input_layer
        logical, allocatable, intent(out) :: is_singleton(:)
        integer(kind=int64) :: interaction_count
      end function CalculateSingletonCount
@@ -444,6 +450,7 @@ contains
        error stop "INCONSISTENT BUCKET numbering detected"
     end if
     allocate( current_polygon_boxes( K_POLYGON_INIT_BOX_COUNT ) )
+    #define OLD_WORKING_CODE
     #ifdef OLD_WORKING_CODE
     !write (*,*) 'Now processing non-rects: final_count starts at ', final_count
     do i=starting_segment, size(segments)
@@ -490,7 +497,7 @@ contains
     allocate( current_polygon_boxes( final_count ) )
     current_polygon_boxes(1:final_count) = final_boxes(1:final_count)
     deallocate( final_boxes )
-#endif
+#else
     ! Declare a local variable to help safely calculate insertion points
     ! Start the parallel region
     !$omp parallel default(shared) &
@@ -505,6 +512,7 @@ contains
 
     ! Use dynamic scheduling because heal_boxes likely takes variable time 
     ! depending on the polygon size.
+    write (*,*) 'Now OMP processing non-rects: final_count starts at ', final_count
     !$omp do schedule(dynamic)
     do i = starting_segment, size(segments)
        
@@ -568,7 +576,7 @@ contains
     allocate( current_polygon_boxes( final_count ) )
     current_polygon_boxes(1:final_count) = final_boxes(1:final_count)
     deallocate( final_boxes )
-    
+#endif    
     !deallocate( input_layer%layer_boxes )
     call move_alloc(from=current_polygon_boxes, to=input_layer%layer_boxes )
     do i=1,final_count
@@ -1001,16 +1009,14 @@ contains
     type(Layer), intent(inout) :: output_layer
     integer(kind=int64) :: i
     if( input_layer_A%n_used == 0 ) then
-       call DeleteLayer( output_layer )
+       call ClearLayer( output_layer )
+       return
     end if
-    allocate( output_layer%layer_boxes( input_layer_A%n_used ) )
-    do i=1,input_layer_A%n_used
-       output_layer%layer_boxes(i) = input_layer_A%layer_boxes(i)
-    end do
-    
+    output_layer%layer_boxes = input_layer_A%layer_boxes
+    output_layer%n_used = input_layer_A%n_used
+    output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
+    output_layer%layerState = input_layer_A%layerState
   end subroutine CopyLayer
-
-
   
 end module DesignModule
 

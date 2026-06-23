@@ -12,6 +12,7 @@ submodule (DesignModule) DesignImplModule
   use MortonSortOMT
   use RTreeBuilderGPU
   use GPUMergeModule
+  use PNumMergeModule  
   implicit none
 
 contains
@@ -131,7 +132,7 @@ contains
 
   #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)      
   module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
-    type(Layer), intent(in) :: input_layer_A
+    type(Layer), intent(inout) :: input_layer_A
     integer(kind=int64) :: interaction_count, N, total_nodes
     type(RTreeNodeGPU), allocatable:: TreeNodes(:)
     integer(kind=int64) :: RootIndex    
@@ -152,15 +153,29 @@ contains
   end function CalculateOverlapCount
   #else
   module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
-    type(Layer), intent(in) :: input_layer_A
-    integer(kind=int64) :: interaction_count
-    interaction_count = 1
+    type(Layer), intent(inout) :: input_layer_A
+    integer(kind=int64) :: interaction_count, N, num_squares
+    N = input_layer_A%n_used
+    if( NeedsSorting( input_layer_A ) ) then
+       if( num_squares*1.0_real64 / (N*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+          write(*,*) 'Layer is SQUARE dominated, ', num_squares, ' / ', N
+          call MortonSort( input_layer_A%layer_boxes )
+       else
+          call SortBoxesDirect( input_layer_A%layer_boxes, N )     
+          !call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+       end if
+       input_layer_A%layerState = ior( input_layer_A%layerState, LAYER_STATE_SORT )
+       call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, input_layer_A%tree%tree_nodes, input_layer_A%tree%root_index)
+       input_layer_A%layerState = ior( input_layer_A%layerState, LAYER_STATE_RTREE )
+    end if
+    call ComputeInteractionsCPU( input_layer_A%tree%tree_nodes, size(input_layer_A%tree%tree_nodes), input_layer_A%layer_boxes,N,&
+         input_layer_A%tree%root_index, interaction_count )
   end function CalculateOverlapCount
   #endif
 
   #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)      
   module function CalculateSingletonCount( input_layer_A, is_singleton ) result( interaction_count )
-    type(Layer), intent(in) :: input_layer_A
+    type(Layer), intent(inout) :: input_layer_A
     integer(kind=int64) :: interaction_count, N, total_nodes
     type(RTreeNodeGPU), allocatable:: TreeNodes(:)
     integer(kind=int64) :: RootIndex    
@@ -177,11 +192,28 @@ contains
     call FindSingletonsGPU( input_layer_A%layer_boxes, TreeNodes, RootIndex, is_singleton, interaction_count)
   end function CalculateSingletonCount
   #else
-  module function CalculateSingletonCount( input_layer_A, is_singleton ) result( interaction_count )
-    type(Layer), intent(in) :: input_layer_A
+  module function CalculateSingletonCount( input_layer, is_singleton ) result( interaction_count )
+    type(Layer), intent(inout) :: input_layer
     logical, allocatable, intent(out) :: is_singleton(:)
-    integer(kind=int64) :: interaction_count
+    integer(kind=int64) :: interaction_count, N, num_squares
     interaction_count = 0
+    N = input_layer%n_used
+    if( NeedsSorting( input_layer ) ) then
+       if( num_squares*1.0_real64 / (N*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+          write(*,*) 'Layer is SQUARE dominated, ', num_squares, ' / ', N
+          call MortonSort( input_layer%layer_boxes )
+       else
+          call SortBoxesDirect( input_layer%layer_boxes, N )     
+          !call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+       end if
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
+       call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
+    end if
+    
+    call FindSingletonsCPU( input_layer%layer_boxes, input_layer%tree%tree_nodes, input_layer%tree%root_index,&
+         is_singleton, interaction_count)
+    
   end function CalculateSingletonCount
   #endif
 
@@ -407,5 +439,13 @@ contains
     call CalculateNOT( input_layer_A, temp_layer, output_layer )
   end subroutine CalculateSHRINKLayer  
   
-
+  !> ConvertLayerToBox
+  !>
+  module subroutine ConvertLayerToBox( input_layer, output_layer, control_parameter )
+    type(Layer), intent(inout) :: input_layer
+    type(Layer), intent(inout) :: output_layer
+    integer(kind=int64), intent(in) :: control_parameter
+  end subroutine ConvertLayerToBox
+  
+    
 end submodule DesignImplModule

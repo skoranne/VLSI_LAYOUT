@@ -1,8 +1,8 @@
 # Control file for MAGPARSER
 program square
 systeminfo
-# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
-decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
+# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
 decl output o1 = MW_4x4_output.mag
 decl memory t1 = nothing
 info

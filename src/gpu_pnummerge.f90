@@ -177,7 +177,8 @@ contains
     integer(kind=int64) :: num_boxes, num_nodes
     integer(kind=int64) :: i, j, k, childidx, currnode
     integer(kind=int64) :: stackptr
-    integer(kind=int64) :: stack(64)
+    integer(kind=int64), parameter :: K_STACK_SIZE = 256 !> this is non-trivial, as there is no guard
+    integer(kind=int64) :: stack(K_STACK_SIZE)
 
     type(Box) :: qbox, nodembr, targetbox
     logical :: overlapx, overlapy
@@ -231,13 +232,14 @@ contains
                 if (overlapx .and. overlapy) then
                    ! Interaction found! Mark as false and immediately stop searching.
                    is_singleton(i) = .false.
-                   exit search_tree 
+                   !is_singleton(j) = .false.                   
+                   !exit search_tree 
                 end if
              end do
           else
              do k = 0, tree_nodes(currnode)%NumChildren - 1
                 childidx = tree_nodes(currnode)%ChildStart + k
-                if (stackptr < 64) then
+                if (stackptr < K_STACK_SIZE) then
                    stackptr = stackptr + 1
                    stack(stackptr) = childidx
                 end if
