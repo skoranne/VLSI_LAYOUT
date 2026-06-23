@@ -190,7 +190,7 @@ contains
     call SortBoxesDirect( input_layer%layer_boxes, N )
     allocate( TreeNodes( total_nodes ) )
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
-    call FindSingletonsGPU( input_layer%layer_boxes, TreeNodes, RootIndex, is_singleton, interaction_count)
+    call FindSingletonsGPU( N, input_layer%layer_boxes, total_nodes, TreeNodes, RootIndex, is_singleton, interaction_count)
   end function CalculateSingletonCount
   #else
   module function CalculateSingletonCount( input_layer, is_singleton ) result( interaction_count )
