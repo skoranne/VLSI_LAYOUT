@@ -17,5 +17,7 @@ KLBIN poly_bbox_L2000_D10.bin
 KLBIN met1_grow_L3000_D10.bin
 << poly_retarget >>
 KLBIN poly_retarget_L4000_D10.bin
+<< li1 >>
+KLBIN merger_li1_L5000_D10.bin
 << end >>
 

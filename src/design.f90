@@ -24,7 +24,7 @@ module DesignModule
        PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
        CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
        CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
-       RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox
+       RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer
   
   type :: LayerTree
      integer(kind=int64) :: root_index

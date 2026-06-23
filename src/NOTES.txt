@@ -430,3 +430,55 @@ GPU default (Direct, Morton) FULL TIME:  6736.14 MEM: VM    170104280 RSS:     7
 GPU default FULL TIME:  6194.92
 CPU default (OMT/Morton mix) FULL TIME:  7668.68 MEM: VM     69590340 RSS:     62845752
 
+Right afterwards we found a great optimization for the CPU RTree looking at the code
+for the GPU omp target.
+TOTAL NODES FOR CPU RT =               54978018
+         CPUSortTree   8116.95 CPU seconds.    381.55 REAL seconds. FULL TIME:   381.55 MEM: VM     19530596 RSS:     15048300
+ |CPU TOTAL INTERACTIONS| =              255079360
+     CPUInteractions   1327.37 CPU seconds.     50.93 REAL seconds. FULL TIME:   432.48 MEM: VM     19542884 RSS:     15049232
+ |CPU NUM_SINGLETONS| =               11319424
+        CPUSingleton   1096.88 CPU seconds.     43.82 REAL seconds. FULL TIME:   476.30 MEM: VM     22950760 RSS:     18270692
+CPU OVLP AREA = ****************** CPU OVLP PERIMETER =             0.0000                                                    
+ |Roots| =              114184192 |Rects| =                      0                                                            
+             CPUPNUM   1901.89 CPU seconds.    200.76 REAL seconds. FULL TIME:   677.07 MEM: VM     29998744 RSS:     24939976
+ ===============================GPU MODE =======================================                                              
+ =
+Loaded :    824670208 BBOX =         5520       43357    23944100    29341447 |T| =     54978018                              
+             GPUSort   8643.98 CPU seconds.    337.73 REAL seconds. FULL TIME:  1025.40 MEM: VM     33406620 RSS:     28166088
+ Tree constructed:               54978018  |RT| =     54978018
+            GPURTree      7.85 CPU seconds.      7.92 REAL seconds. FULL TIME:  1033.32 MEM: VM     35765920 RSS:     30313520
+ |GPU TOTAL INTERACTIONS| =              255079360
+     GPUInteractions   1959.62 CPU seconds.     85.23 REAL seconds. FULL TIME:  1118.55 MEM: VM     35765920 RSS:     30313676
+ |GPU NUM_SINGLETONS| =               11319424
+        GPUSingleton   2151.64 CPU seconds.     97.64 REAL seconds. FULL TIME:  1216.19 MEM: VM     35765920 RSS:     30313676
+GPU OVLP AREA =             0.0000 GPU OVLP PERIMETER =             0.0000                                                    
+                PNUM      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:  1216.19 MEM: VM     35765920 RSS:     30313676
+RLE GPU OVLP AREA =             0.0000 RLE GPU OVLP PERIMETER =             0.0000                                            
+             PNUMRLW      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:  1216.19 MEM: VM     35765920 RSS:     30313676
+
+On DGX GPU
+TOTAL NODES FOR CPU RT =                  54978018
+         CPUSortTree     83.30 CPU seconds.     83.30 REAL seconds. FULL TIME:    83.30 MEM: VM    116080132 RSS:     15301268
+ |CPU TOTAL INTERACTIONS| =                 255079360
+     CPUInteractions     98.35 CPU seconds.     98.35 REAL seconds. FULL TIME:   181.65 MEM: VM    118859012 RSS:     15304208
+ |CPU NUM_SINGLETONS| =                  11319424
+        CPUSingleton     77.87 CPU seconds.     77.87 REAL seconds. FULL TIME:   259.53 MEM: VM    118860804 RSS:     18525588
+CPU OVLP AREA = ****************** CPU OVLP PERIMETER =             0.0000
+ |Roots| =                 114184192 |Rects| =                         0
+             CPUPNUM    199.65 CPU seconds.    199.65 REAL seconds. FULL TIME:   459.18 MEM: VM    148464580 RSS:     23833860
+ ===============================GPU MODE ========================================
+Loaded :    824670208 BBOX =         5520       43357    23944100    29341447 |T| =     54978018
+             GPUSort     76.18 CPU seconds.     76.18 REAL seconds. FULL TIME:   540.46 MEM: VM    148464580 RSS:     27077812
+ Tree constructed:                  54978018  |RT| =      54978018
+            GPURTree      0.96 CPU seconds.      0.96 REAL seconds. FULL TIME:   541.41 MEM: VM    148464580 RSS:     29225396
+ |GPU TOTAL INTERACTIONS| =                       457
+     GPUInteractions    193.29 CPU seconds.    193.29 REAL seconds. FULL TIME:   734.70 MEM: VM    151086020 RSS:     29225636
+ |GPU NUM_SINGLETONS| =                 824668294
+        GPUSingleton    140.08 CPU seconds.    140.08 REAL seconds. FULL TIME:   874.78 MEM: VM    154756036 RSS:     29225644
+GPU OVLP AREA =             0.0000 GPU OVLP PERIMETER =             0.0000
+                PNUM      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:   874.78 MEM: VM    154756036 RSS:     29225644
+RLE GPU OVLP AREA =             0.0000 RLE GPU OVLP PERIMETER =             0.0000
+             PNUMRLW      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:   874.78 MEM: VM    154756036 RSS:     29225644
+ CPU |SINGLETON| /= GPU |SINGLETON|
+Warning: ieee_inexact is signaling
+ERROR STOP

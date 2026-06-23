@@ -231,9 +231,13 @@ contains
 
                 if (overlapx .and. overlapy) then
                    ! Interaction found! Mark as false and immediately stop searching.
+                   !$omp atomic write
                    is_singleton(i) = .false.
-                   !is_singleton(j) = .false.                   
-                   !exit search_tree 
+                   ! 2. Safely mark j as not a singleton (This fixes your logic bug)
+                   !$omp atomic write
+                   is_singleton(j) = .false.
+                   ! 3. Immediately stop searching this 'i'
+                   exit search_tree
                 end if
              end do
           else

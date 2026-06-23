@@ -306,7 +306,7 @@ contains
              pos  = index( rest, ' ')
              call hash_get( design_dbs( rhs1_db_index )%ht, trim(rest(1:pos-1)), rhs1_layer_index, ins )
              if( .not. ins ) then
-                write(*,*) 'ERROR: RHS1 layer not found, check spelling or existence of layer in db'
+                write(*,*) 'ERROR: RHS1 layer not found: ',trim(rest(1:pos-1)), ' check spelling or existence of layer in db. Line: ', line_number
                 error stop "ERROR: layer not found"
              end if
              rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
@@ -409,7 +409,7 @@ contains
                         !> d1:poly COPY nothing
                         if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"
                         write(*,*) 'Found PRIMARY_OPERATOR = COPY'
-
+                        call CopyLayer( rhs1_layer, lhs_layer )
                      case ('GRID')
                         !> d1:poly GRID nothing 10 10
                         if( rhs2_source_name /= 'nothing' ) error stop "EXTENT must use nothing as second layer"
