@@ -168,6 +168,89 @@ contains
   ! Purpose : Identifies boxes that share no area or edges with any other box
   subroutine FindSingletonsGPU(num_boxes, sorted_boxes, num_nodes, tree_nodes, root_index, is_singleton, num_singletons)
     integer(kind=int64), intent(in) :: num_boxes, num_nodes  
+    type(Box), intent(in)             :: sorted_boxes(num_boxes)
+    type(RTreeNode), intent(in)    :: tree_nodes(num_nodes)
+    integer(kind=int64), intent(in)   :: root_index
+    logical, allocatable, intent(out) :: is_singleton(:)
+    integer(kind=int64), intent(out)  :: num_singletons
+    integer(kind=int64) :: i, j, currnode, childidx
+    ! Moderate stack perfectly safe for L1/Shared Memory limits
+    integer(kind=int64), parameter :: K_STACK_SIZE = 256
+    integer(kind=int64) :: stack(K_STACK_SIZE)
+    integer(kind=int64) :: stackptr
+    type(Box) :: qbox, nodembr, targetbox
+    ! Notice: All 'logical' variables have been completely removed.
+    allocate(is_singleton(num_boxes))
+    is_singleton = .true.
+    num_singletons = 0
+
+    !$omp target data map(to: tree_nodes(1:num_nodes), sorted_boxes(1:num_boxes)) &
+    !$omp map(tofrom: is_singleton(1:num_boxes))
+
+    !$omp target teams distribute parallel do &
+    !$omp private(i, j, currnode, childidx, stack, stackptr, qbox, nodembr, targetbox)
+    do i = 1, num_boxes
+       qbox = sorted_boxes(i)
+       stackptr = 1
+       stack(stackptr) = root_index
+
+       do while (stackptr > 0)
+          ! Pop current node
+          currnode = stack(stackptr)
+          stackptr = stackptr - 1
+          nodembr = tree_nodes(currnode)%mbr
+
+          ! 1. Evaluate logic DIRECTLY inside the IF to avoid NVFORTRAN scalar logical bugs
+          if (max(nodembr%x1, qbox%x1) <= min(nodembr%x2, qbox%x2)) then
+             if (max(nodembr%y1, qbox%y1) <= min(nodembr%y2, qbox%y2)) then
+                
+                ! 2. Process based on node type
+                if (tree_nodes(currnode)%IsLeaf) then
+
+                   do j = tree_nodes(currnode)%ChildStart, tree_nodes(currnode)%ChildStart + tree_nodes(currnode)%NumChildren - 1
+                      
+                      ! Replace 'cycle' with an active check to maintain strict warp sync
+                      if (j /= i) then
+                         targetbox = sorted_boxes(j)
+                         
+                         ! Direct evaluation for final intersection check
+                         if (max(targetbox%x1, qbox%x1) <= min(targetbox%x2, qbox%x2)) then
+                            if (max(targetbox%y1, qbox%y1) <= min(targetbox%y2, qbox%y2)) then
+                               ! Interaction found!
+                               is_singleton(i) = .false.
+                               
+                               ! Safely kill both loops without using named exits
+                               stackptr = 0 ! Forces the outer while-loop to terminate
+                               exit         ! Escapes the inner do-j loop
+                            end if
+                         end if
+                      end if
+
+                   end do
+
+                else
+                   ! Internal node: Push exact contiguous children to the stack
+                   do j = tree_nodes(currnode)%ChildStart, tree_nodes(currnode)%ChildStart + tree_nodes(currnode)%NumChildren - 1
+                      if (stackptr < K_STACK_SIZE) then
+                         stackptr = stackptr + 1
+                         stack(stackptr) = j
+                      end if
+                   end do
+                end if
+
+             end if
+          end if
+       end do
+    end do
+    !$omp end target data
+
+    ! CPU Tally
+    num_singletons = count(is_singleton)
+
+  end subroutine FindSingletonsGPU
+  #ifdef OLD
+  subroutine FindSingletonsGPU(num_boxes, sorted_boxes, num_nodes, tree_nodes, root_index, is_singleton, num_singletons)
+    integer(kind=int64), intent(in) :: num_boxes, num_nodes  
 
     type(Box), intent(in)             :: sorted_boxes(num_boxes)
     type(RTreeNode), intent(in)    :: tree_nodes(num_nodes) ! Adjusted to your GPU type
@@ -276,7 +359,7 @@ contains
     num_singletons = count(is_singleton)
 
   end subroutine FindSingletonsGPU
-#ifdef OLD
+
   subroutine FindSingletonsGPU(num_boxes, sorted_boxes, num_nodes, tree_nodes, root_index, is_singleton, num_singletons)
     integer(kind=int64), intent(in) :: num_boxes, num_nodes  
     type(Box), intent(in) :: sorted_boxes(num_boxes)
