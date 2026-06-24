@@ -164,6 +164,7 @@ contains
 
   end subroutine PerformMergeGPU
 
+  ! Proven more difficult than estimated
   ! Author  : Sandeep Koranne (C) 2026. (Adapted for GPU Offload)
   ! Purpose : Identifies boxes that share no area or edges with any other box
   subroutine FindSingletonsGPU(num_boxes, sorted_boxes, num_nodes, tree_nodes, root_index, is_singleton, num_singletons)
