@@ -1,3 +1,12 @@
+ MAGPARSER.exe by Sandeep Koranne (C) All rights reserved.
+ Released under MIT License. See the README and LICENSE 
+ https://github.com/skoranne/VLSI_LAYOUT/
+ Release: cd8a871
+ MAGPARSER.exe CONTROL_FILE MAX_LAYERS
+
+The rest of the file is CHRONOLOGICAL and contains interesting notes (for me) on NVIDIA
+OpenMP offloading, and other tidbits. Secondary details are also in my PCP11 repo.
+
 The Julia generated HDF5 is
 GROUP "/" {                                                                                                                   
    DATASET "rectangles" {                                                                                                     
@@ -349,8 +358,29 @@ SMALL SDT_16 (polygon method)
 
 
 ```
+apptainer build MAGPARSER.sif MAGPARSER.def
 apptainer exec --bind /scratch1/ MAGPARSER.sif /opt/CONVERT.exe POLY.bin DIFF.bin z.bin 11
 OMP_NUM_THREADS=4 in the container and we get decent runs
+apptainer exec MAGPARSER.sif /opt/BOOST_XOR_CHECKER.exe
+exec MAGPARSER.sif /opt/CONVERT.exe
+ 0.  Executing Token Tracking Fracture/Scanline Fracturing with Skip List...
+ 1.  BBOX GROW by         1000          1000
+ 2.  Run HORIZONTAL Merge and save result
+ 3.  Check input and save sorted data
+ 4.  Convert input to HDF5
+ 5.  Print Detailed Information: 
+ 6.  Convert input to COMPLEMENT and run Fracture/Contour/Fracture
+ 7.  Fracture/Contour/Fracture
+ 8.  Run HEAL on whole layer
+ 9.  Run COMPLEMENT and analysis
+ 10. Run op = A OR  B
+ 11. Run op = A AND B
+ 12. Run op =   AND A
+ 13. Run op = A NOT A
+ 14. Run op = A XOR B
+ 15. Run op = COMPLEMENT A
+ 16. Run op = SIZE A BY 
+./CONVERT.exe <input-filenameA> <input-filenameB> <output-file> control
 
 ```
 +--------------------------------------------------------------------------------+

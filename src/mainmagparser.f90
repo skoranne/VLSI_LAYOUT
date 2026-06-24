@@ -76,6 +76,7 @@ program mag_parser
 
   select case (narg)
   case (0)                     ! No arguments → use defaults
+     error stop " MAGPARSER.exe CONTROL_FILE MAX_LAYERS"
      filename = default_file
      maxLayers = default_max
 
