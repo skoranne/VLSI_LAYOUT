@@ -24,7 +24,8 @@ module DesignModule
        PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
        CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
        CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
-       RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer
+       RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer,&
+       CalculateFrameNOT
   
   type :: LayerTree
      integer(kind=int64) :: root_index
@@ -65,7 +66,6 @@ module DesignModule
      real(kind=real64)      :: area, perimeter
      character(len=:), allocatable :: fileName
      type(ConjugateLayer) :: paired_layer
-     !type(Repetition)     :: in_place_repetition
   end type Layer
 
   enum, bind(C)                     ! bind(C) makes the values C‑compatible
@@ -114,11 +114,13 @@ module DesignModule
        type(Layer),      intent(inout) :: output_layer
        integer(kind=K_COORDINATE_KIND), intent(in)   :: ivar(4) 
      end subroutine CalculateGROWLayer
+
      module subroutine CalculateSHRINKLayer( input_layer_A, shrink_value, output_layer )
        type(Layer), intent(inout) :: input_layer_A
        type(Layer), intent(inout)   :: output_layer
        integer(kind=K_COORDINATE_KIND), intent(in) :: shrink_value
      end subroutine CalculateSHRINKLayer
+
      module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
        type(Layer), intent(inout) :: input_layer_A
        integer(kind=int64) :: interaction_count
@@ -150,6 +152,11 @@ module DesignModule
        type(Layer),      intent(inout) :: output_layer
      end subroutine CreateEXTENT
 
+     module subroutine CalculateFrameNOT( input_layer_A, input_layer_B, output_layer )
+       type(Layer), intent(inout) :: input_layer_A, input_layer_B
+       type(Layer), intent(inout)   :: output_layer
+     end subroutine CalculateFrameNOT
+     
   end interface
  
 contains
@@ -396,7 +403,7 @@ contains
     real(kind=real64) :: overlap_area, overlap_perimeter
     logical :: dominated_by_squares
     integer(kind=int64) :: my_start
-
+    integer(kind=int64), parameter :: K_MINIMUM_SPAWN = 4096 !> we process anything below this on main thread
 
     dominated_by_squares = .false.
     if( input_layer%n_used == 0 ) return
@@ -450,8 +457,8 @@ contains
        error stop "INCONSISTENT BUCKET numbering detected"
     end if
     allocate( current_polygon_boxes( K_POLYGON_INIT_BOX_COUNT ) )
-    #define OLD_WORKING_CODE
-    #ifdef OLD_WORKING_CODE
+    #define OLD_WORKING_CODE !> OpenMP gave 202.37      135.34 on MW4:poly
+    #ifdef OLD_WORKING_CODE  !> Old code 200.87      152.82, I think not worth the trouble?
     !write (*,*) 'Now processing non-rects: final_count starts at ', final_count
     do i=starting_segment, size(segments)
        !> processing polygon number segments( starting_segment )%start_idx
@@ -508,35 +515,23 @@ contains
     ! We must allocate a baseline size before the loop so the size() check 
     ! inside the loop doesn't trigger a segmentation fault.
     if (allocated(current_polygon_boxes)) deallocate(current_polygon_boxes)
-    allocate(current_polygon_boxes(100)) ! Provide a sensible initial capacity
-
-    ! Use dynamic scheduling because heal_boxes likely takes variable time 
-    ! depending on the polygon size.
-    write (*,*) 'Now OMP processing non-rects: final_count starts at ', final_count
-    !$omp do schedule(dynamic)
+    allocate(current_polygon_boxes(K_MINIMUM_SPAWN*2)) ! Provide a sensible initial capacity
+    #ifdef GUIDED_SCHEDULING
+    !$omp do schedule(guided)
     do i = starting_segment, size(segments)
-       
        !> processing polygon number segments( starting_segment )%start_idx
        polygon_number = input_layer%pnumtable%arr( permutation( segments( i )%start_idx ) )
        box_count = 1 + segments( i )%end_idx - segments( i )%start_idx
-       
+       if( box_count > K_MINIMUM_SPAWN ) cycle
        if( input_layer%pnumtable%arr( permutation( segments( i )%end_idx ) ) /= polygon_number ) then
           error stop "INCONSISTENT polygon numbering detected"
        end if
-
        ! Now safe to call size() because we pre-allocated outside the loop
-       if( box_count > size( current_polygon_boxes ) ) then
-          deallocate( current_polygon_boxes )
-          allocate( current_polygon_boxes( 2*box_count ) )
-       end if
-       
        current_polygon_boxes(1:box_count) = input_layer%layer_boxes( &
             permutation( segments( i )%start_idx:segments( i )%end_idx ) )
-       
        updated_box_count = 0
        call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
        n = size( current_polygon_boxes )
-       
        ! ---------------------------------------------------------
        ! CRITICAL SECTION: Reserve space in the shared output array
        ! ---------------------------------------------------------
@@ -544,25 +539,70 @@ contains
        if( final_count + updated_box_count >= final_capacity ) then
           error stop "FINAL CAPACITY is too low."
        end if
-       
        ! Grab the starting index for this specific thread's data
        my_start = final_count + 1
        ! Update the global tracker for the next thread
        final_count = final_count + updated_box_count
        !$omp end critical (append_to_final)
-
        ! ---------------------------------------------------------
        ! CONCURRENT WRITE: Copy data outside the critical section
        ! ---------------------------------------------------------
        final_boxes(my_start : my_start + updated_box_count - 1) = &
             current_polygon_boxes(1:updated_box_count)
-       
        ! Verification loop
        do j=1, updated_box_count
           tempBox = current_polygon_boxes(j)
           if( .not. tempBox%is_valid() ) error stop "BOX NOT VALID"
        end do
-
+    end do
+    !$omp end do
+    #endif
+    !> we are using a technique known as LOOP FISSION or workload separation
+    ! Use dynamic scheduling because heal_boxes likely takes variable time 
+    ! depending on the polygon size.
+    !write (*,*) 'Now OMP processing non-rects: final_count starts at ', final_count
+    !$omp do schedule(dynamic) !> chunk size of 1
+    do i = starting_segment, size(segments)
+       !> processing polygon number segments( starting_segment )%start_idx
+       polygon_number = input_layer%pnumtable%arr( permutation( segments( i )%start_idx ) )
+       box_count = 1 + segments( i )%end_idx - segments( i )%start_idx
+       !if( box_count <= K_MINIMUM_SPAWN ) cycle 
+       if( input_layer%pnumtable%arr( permutation( segments( i )%end_idx ) ) /= polygon_number ) then
+          error stop "INCONSISTENT polygon numbering detected"
+       end if
+       ! Now safe to call size() because we pre-allocated outside the loop
+       if( box_count > size( current_polygon_boxes ) ) then
+          deallocate( current_polygon_boxes )
+          allocate( current_polygon_boxes( 2*box_count ) )
+       end if
+       current_polygon_boxes(1:box_count) = input_layer%layer_boxes( &
+            permutation( segments( i )%start_idx:segments( i )%end_idx ) )
+       
+       updated_box_count = 0
+       call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
+       n = size( current_polygon_boxes )
+       ! ---------------------------------------------------------
+       ! CRITICAL SECTION: Reserve space in the shared output array
+       ! ---------------------------------------------------------
+       !$omp critical (append_to_final)
+       if( final_count + updated_box_count >= final_capacity ) then
+          error stop "FINAL CAPACITY is too low."
+       end if
+       ! Grab the starting index for this specific thread's data
+       my_start = final_count + 1
+       ! Update the global tracker for the next thread
+       final_count = final_count + updated_box_count
+       !$omp end critical (append_to_final)
+       ! ---------------------------------------------------------
+       ! CONCURRENT WRITE: Copy data outside the critical section
+       ! ---------------------------------------------------------
+       final_boxes(my_start : my_start + updated_box_count - 1) = &
+            current_polygon_boxes(1:updated_box_count)
+       ! Verification loop
+       do j=1, updated_box_count
+          tempBox = current_polygon_boxes(j)
+          if( .not. tempBox%is_valid() ) error stop "BOX NOT VALID"
+       end do
     end do
     !$omp end do
 
@@ -572,7 +612,7 @@ contains
     !$omp end parallel
 
     ! ... Proceed with final allocations as in your original code ...
-    deallocate( current_polygon_boxes )
+    if (allocated(current_polygon_boxes)) deallocate( current_polygon_boxes )
     allocate( current_polygon_boxes( final_count ) )
     current_polygon_boxes(1:final_count) = final_boxes(1:final_count)
     deallocate( final_boxes )
@@ -599,8 +639,10 @@ contains
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
-    call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
-         input_layer%tree%root_index, overlap_area, overlap_perimeter)
+    input_layer%layerState = iand( input_layer%layerState, .not. LAYER_STATE_PNUM )
+    !call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
+    !     input_layer%tree%root_index, overlap_area, overlap_perimeter)
+    !input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )    
     !write(*,*) 'Last pnumtable: ', input_layer%pnumtable%arr
     !write(*,*) '|Layer| = ', size(input_layer%layer_boxes), ' n = ', input_layer%n_used
   end subroutine PerformPolygonUnion
@@ -847,6 +889,7 @@ contains
   end subroutine push_box
 
   subroutine CalculateAND( input_layer_A, input_layer_B, output_layer )
+    character(len=*), parameter :: functionName = "CalculateAND"
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
     type(Layer), intent(inout)   :: output_layer
     integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC
@@ -857,20 +900,21 @@ contains
     type(Box) :: tempBox
     integer :: nthreads, tid, alloc_status
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-
+    integer :: Adone, Bdone
     !> we can create the RTree for A and B if needed
     !> since the SkipList is not re-entrant, we cannot do parallel here (yet)
-    !$komp parallel
-    !$komp single
-    !$komp task
+    !$omp parallel default(shared)
+    !$omp single nowait
+    !$omp task depend(out:Adone)
     call PreprocessLayer( input_layer_A )
-    !$komp end task
-    !$komp task    
+    !$omp end task
+    !$omp task depend(out:Bdone)
     call PreprocessLayer( input_layer_B )
-    !$komp end task
-    !$komp taskwait
-    !$komp end single
-    !$komp end parallel    
+    !$omp end task
+    !$omp end single
+    !$omp end parallel
+    !> automatic wait here
+    !write(*,*) 'PREAMBLE COMPLETE in ', functionName
     nthreads = omp_get_max_threads()
     allocate(buffers(nthreads))
     do i=1,nthreads

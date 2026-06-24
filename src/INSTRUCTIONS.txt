@@ -3,6 +3,12 @@ In modern Fortran we already have types
      integer(kind=K_COORDINATE_KIND) :: x1, y1, x2, y2
    contains
   end type Box
+
+In modern Fortran we already have types
+  type :: Box
+     integer(kind=K_COORDINATE_KIND) :: x1, y1, x2, y2
+   contains
+  end type Box
   type :: Layer
      integer(kind=8)        :: n_used   = 0   ! how many slots are filled
      integer(kind=8)        :: n_alloc  = 0   ! current allocation size
@@ -44,14 +50,7 @@ issues with procedure calls so we have to develop everything
 in one big function or use preprocessor. Use your best
 effort.
 
-given an array of type(Box) with K_COORDINATE_KIND
-x1,y1,x2,y2 which is mostly SQUARES and this array called
-'boxes' is already sorted using Morton order. Devise a
-method and generate idiomatic modern Fortran subroutine to
-remove EXACT duplicates given that array as inout.
-
-subroutine RemoveIdentical(boxes)
-
+      
 
 program my_control
  decl design d1 = FPU.mag

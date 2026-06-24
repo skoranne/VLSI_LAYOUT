@@ -142,7 +142,7 @@ contains
     character(len=:), allocatable :: layerFileName
     character(10)                 :: num_str
     integer(kind=8) :: start_tick, end_tick, clock_rate
-    real(kind=8)    :: elapsed_time
+    real(kind=8)    :: elapsed_time, elapsed_time1, elapsed_time2
     integer(kind=8) :: num_roots, num_rects
     real(kind=real64),allocatable :: overlap_areas(:)
     real(kind=real64),allocatable :: overlap_perimeter(:)
@@ -503,7 +503,7 @@ contains
        if( NeedsSorting( layers(i) ) ) then
           num_squares = count( is_square(boxes) )
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
-          if( .true. .or. num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+          if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
              write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated, ', num_squares, ' / ', size(boxes)
              !number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
              number_expected_interactions = 0
@@ -620,12 +620,15 @@ contains
        layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_PNUM )
        if( overlap_areas(i) > 0.0 ) then
           !> this layer needs HEALING as we have detected overlap
-          !write(*,*) 'PerformUnion as overlap detected.'
+          !write(*,*) 'PerformUnion as overlap detected: ', elapsed_time
           !write(*,'(A,A12,A,F20.2)') 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)          
           !call PerformUnion( layers(i) )
-          call PerformPolygonUnion( layers(i) )
-          call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes,&
-               layers(i)%tree%root_index, overlap_areas(i), overlap_perimeter(i))
+          call PerformPolygonUnion( layers(i) ) !> this performs the Merge so no need to duplicate
+          if( NeedsPNum( layers(i) ) ) then
+             call PerformMerge( layers(i)%pnumtable, layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes,&
+                  layers(i)%tree%root_index, overlap_areas(i), overlap_perimeter(i))
+             layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_PNUM )             
+          end if
           num_roots = layers(i)%pnumtable%count_roots()
           num_rects = count(layers(i)%pnumtable%arr == 0)
           if( overlap_areas(i) > 0.0 ) then
@@ -642,9 +645,11 @@ contains
           layers(i)%layerState = ior( layers(i)%layerState, LAYER_STATE_HEAL )          
        end if
        !write(*,'(A,A8,3(I12),A,I2,A,F12.2,A,F12.2,A)')
+       call system_clock(count=end_tick)       
+       elapsed_time2 = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
        write(*,'(A8,3(I12),I5,F12.2,F12.2)') layerNames(i), &
             num_roots, num_rects , layers(i)%n_used, layers(i)%layerState, &
-            (t2-t1), elapsed_time
+            (t2-t1), elapsed_time2
        !boxes => layers(i)%layer_boxes
        !call ExplainTheTree( layers(i)%layer_boxes, K_LEAF_CAPACITY, layers(i)%tree%tree_nodes, layers(i)%tree%root_index )
        !awk 'NR>76262119 && NR<76401348' log_FPU.txt > m3_FPU_OMT64.txt

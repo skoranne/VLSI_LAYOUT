@@ -8,7 +8,6 @@
 module GPUMergeModule
   use iso_fortran_env, only : int32, int64, real64
   use GeometryModule
-  use RTreeBuilderGPU
   use RTreeBuilder
   use DataStructuresModule
   use omp_lib
@@ -249,6 +248,7 @@ contains
   end subroutine FindSingletonsGPU
 
 end module GPUMergeModule
+
 #ifdef DOCUMENTATION_RESUTLS
 (base) skoranne@spark-bc08:~/GITHUB/VLSI_LAYOUT/src$ ./test_interaction.exe /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW16_DATA/MW64_L67_D20.bin z.bin 1 2 3 4
  Reading 1st filename:

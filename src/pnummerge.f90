@@ -295,7 +295,6 @@ contains
     interaction_count = 0
 
     !$komp target enter data map(to: tree_nodes(1:number_nodes), sorted_boxes(1:num_boxes))
-
     ! Using dynamic scheduling to handle work-imbalance in dense regions
     !$omp parallel do schedule(dynamic) &
     !$omp private(i, k, Stack, StackPtr, curr_index, child_idx, overlapx, overlapy, currNode, childNode) &

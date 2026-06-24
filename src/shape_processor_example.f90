@@ -1,4 +1,4 @@
-!> File    : shape_processor_interface.f90
+!> File    : shape_processor_example.f90
 !> Author  : Sandeep Koranne (C) 2026.
 !> Purpose : Object oriented and functional interface combination for code reuse
 

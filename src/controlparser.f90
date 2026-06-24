@@ -192,7 +192,7 @@ contains
              !write(*,*) 'Output DB handle = ', trim(rest(1:pos-1)), ' db_index = ', db_count !> o1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
-             allocate( design_dbs( db_count )%designName, source = trim(rest(1:pos-1)) )
+             allocate( design_dbs( db_count )%designName, source = trim(adjustl(rest(1:pos-1))) )
              pos = index( rest, ' ' )          
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
@@ -211,7 +211,8 @@ contains
              !write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
-             allocate( design_dbs( db_count )%designName, source = trim(rest(1:pos-1)) )             
+             allocate( design_dbs( db_count )%designName, source = trim(adjustl(rest(1:pos-1))))
+             write(*,*) '=======> Assigning ', db_count, ' to ', design_dbs( db_count )%designName
              pos = index( rest, ' ' )          
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
@@ -225,7 +226,7 @@ contains
              !write(*,*) 'KW = ', trim(rest(1:pos-1)) !> d1
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
-             allocate( design_dbs( db_count )%designName, source = trim(rest(1:pos-1)) )             
+             allocate( design_dbs( db_count )%designName, source = trim(adjustl(rest(1:pos-1))))
              pos = index( rest, ' ' )          
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
@@ -301,6 +302,13 @@ contains
              rest = adjustl(rest(pos+1:))
              pos = index( rest, ':' )
              call hash_get( ht, trim(rest(1:pos-1)), rhs1_db_index, ins )
+             if( .not. ins ) then
+                write(*,*) 'ERROR: RHS1 DB Index not found: ', trim(rest(1:pos-1)), ' line: ', line_number
+                error stop
+             else
+                if(.not. allocated( design_dbs(rhs1_db_index)%designName ) ) error stop
+                write(*,*) 'RHS1 DB index: ', rhs1_db_index, ' for ', trim(rest(1:pos-1)), ' ~ ', trim(design_dbs(rhs1_db_index)%designName)
+             end if
              rest = adjustl(rest(pos+1:))
              pos  = index( rest, ' ')
              call hash_get( design_dbs( rhs1_db_index )%ht, trim(rest(1:pos-1)), rhs1_layer_index, ins )
@@ -311,7 +319,7 @@ contains
              rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
              rest = adjustl(rest(pos+1:))
              !write(*,*) 'RESTD = ', trim(rest)
-             pos  = scan( rest, '+-*%^')
+             pos  = scan( rest, '+-*%^~')
              if( pos /= 0 ) then !> single char operators for brevity
                 !> valid operator found
                 operator_char = rest(pos:pos)
@@ -326,7 +334,7 @@ contains
                 pos  = index( rest, ' ')
                 call hash_get( design_dbs( rhs2_db_index )%ht, trim(rest(1:pos-1)), rhs2_layer_index, ins )
                 if( .not. ins ) then
-                   write(*,*) 'ERROR: RHS2 layer not found, check spelling or existence of layer in db'
+                   write(*,*) 'ERROR: RHS2 layer not found: ',trim(rest(1:pos-1)) ,' check spelling or existence of layer in db: line: ', line_number
                    error stop "ERROR: layer not found"
                 end if
                 rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
@@ -355,10 +363,14 @@ contains
                    call StartMarkTime("NOT")
                    call CalculateNOT( rhs1_layer, rhs2_layer, lhs_layer )
                    write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
-                   call StopMarkTime("NOT")                
+                   call StopMarkTime("NOT")
+                case('~')
+                   call StartMarkTime("FRAMENOT")
+                   call CalculateFrameNOT( rhs1_layer, rhs2_layer, lhs_layer )
+                   write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
+                   call StopMarkTime("FRAMENOT")                
                 case('^')
                 case('%')
-                case('.')
                 end select
              else
                 !> more verbose style eg f1:bbox_poly = d1:poly EXTENT nothing                

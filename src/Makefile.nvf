@@ -92,4 +92,8 @@ test_interaction.exe:	test_interaction.f90 $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_repetition.exe:	test_repetition.f90 $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+BOOST_XOR_CHECKER.exe: boost_xor_checker.cpp
+		       g++ -O3 -funroll-loops -I /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost boost_xor_checker.cpp -o BOOST_XOR_CHECKER.exe
+
+ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe
 

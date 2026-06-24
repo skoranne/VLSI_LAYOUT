@@ -65,8 +65,6 @@ program mag_parser
   character(len=256)            :: arg_string    ! temporary buffer for the 2nd argument
   character(len=*), parameter   :: default_file = "INV.mag"
   integer,          parameter   :: default_max  = 10
-  type(Design)                  :: load_design
-
   write(*,*) 'MAGPARSER.exe by Sandeep Koranne (C) All rights reserved.'
   write(*,*) 'Released under MIT License. See the README and LICENSE '
   write(*,*) 'https://github.com/skoranne/VLSI_LAYOUT/'

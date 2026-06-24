@@ -482,3 +482,22 @@ RLE GPU OVLP AREA =             0.0000 RLE GPU OVLP PERIMETER =             0.00
  CPU |SINGLETON| /= GPU |SINGLETON|
 Warning: ieee_inexact is signaling
 ERROR STOP
+
+After the CUDA Driver update, lots of things broke include the above test
+export OMP_TARGET_OFFLOAD=mandatory
+export NVCOMPILER_ACC_NOTIFY=3
+ml /opt/nvidia/hpc_sdk/modulefiles/nvhpc-hpcx-cuda13/26.1
+| NVIDIA-SMI 580.159.03             Driver Version: 580.159.03     CUDA Version: 13.0     |
+Now it is working well:
+Loaded :    824670208 BBOX =         5520       43357    23944100    29341447 |T| =     54978018
+             GPUSort     67.67 CPU seconds.     67.67 REAL seconds. FULL TIME:   452.25 MEM: VM    145967336 RSS:     28417448
+ Tree constructed:                  54978018  |RT| =      54978018
+            GPURTree      1.13 CPU seconds.      1.13 REAL seconds. FULL TIME:   453.38 MEM: VM    145967336 RSS:     30565032
+ |GPU TOTAL INTERACTIONS| =                 255079360
+     GPUInteractions      9.11 CPU seconds.      9.11 REAL seconds. FULL TIME:   462.48 MEM: VM    148588776 RSS:     30565040
+ |GPU NUM_SINGLETONS| =                  11319424
+        GPUSingleton     37.70 CPU seconds.     37.70 REAL seconds. FULL TIME:   500.19 MEM: VM    152258792 RSS:     30565056
+GPU OVLP AREA =             0.0000 GPU OVLP PERIMETER =             0.0000
+                PNUM      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:   500.19 MEM: VM    152258792 RSS:     30565056
+RLE GPU OVLP AREA =             0.0000 RLE GPU OVLP PERIMETER =             0.0000
+             PNUMRLW      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:   500.19 MEM: VM    152258792 RSS:     30565056
