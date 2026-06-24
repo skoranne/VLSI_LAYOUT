@@ -1,0 +1,26 @@
+# Control file for MAGPARSER
+# klayout -b -r ~/GITHUB/VLSI_LAYOUT/src/boolean_ops.rb -rd file_a=met1_marker.gds -rd layer_a=1/0 -rd file_b=met1_marker2.gds -rd layer_b=1/0 -rd op=XOR -rd out_file=xor.gds 
+program square
+systeminfo
+var temp_folder TEMP
+# decl design d1 = test.mag
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
+# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6.mag
+decl output o1 = foo.mag
+decl memory f1 = nothing
+info
+# exec run f1:diff = d1:pdiff + d1:ndiff
+exec run o1:gate = d1:poly * d1:diff
+exec run o1:source_drain = d1:diff - d1:poly
+exec run f1:poly_box = d1:poly EXTENT nothing
+exec run o1:poly_bbox = d1:poly EXTENT nothing
+exec run o1:poly_grid = d1:poly GRID nothing 10 10
+exec run f1:met1_marker = d1:met1 * d1:mcon
+# exec run f1:met1_marker = d1:mcon * d1:met1
+# exec run f1:met1_marker2 = d1:met1 * d1:mcon
+# exec run o1:met1_marker = d1:mcon * d1:met1
+# exec run o1:met1_marker2 = d1:met1 * d1:mcon
+# exec run f1:poly_box = d1:poly EXTENT d1:diff this is ERROR
+exec run f1:met1_etch = d1:met1 WORMHOLE f1:met1_marker 5 100
+flush
+end 
