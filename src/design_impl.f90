@@ -447,6 +447,29 @@ contains
     type(Layer), intent(inout) :: output_layer
     integer(kind=int64), intent(in) :: control_parameter
   end subroutine ConvertLayerToBox
-  
+
+  !> Trying FRAME based OpenMP optimization for A - B (shown as A ~ B)
+  module subroutine CalculateFrameNOT( input_layer_A, input_layer_B, output_layer )
+    type(Layer), intent(inout) :: input_layer_A, input_layer_B
+    type(Layer), intent(inout)   :: output_layer
+    integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC
+    type(XYTracker), allocatable :: trackers(:)
+    integer(kind=int64) :: number_leaves
+    type(Box) :: bboxA
+    type(Layer) :: temp_layer
+    integer :: nthreads, tid, alloc_status
+    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
+
+    call PreprocessLayer( input_layer_A )
+    call PreprocessLayer( input_layer_B )
+    !> Step 1
+    !write(*,*) 'Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...'
+    bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )  
+    call generate_trackers( input_layer_B%layer_boxes, bboxA, trackers ) !> this does CW ordering of inner contours
+    call scanline_fracture(trackers, temp_layer%layer_boxes)
+    temp_layer%layerState = ior( temp_layer%layerState, LAYER_STATE_HEAL )
+    temp_layer%n_used = size( temp_layer%layer_boxes)    
+    call CalculateAND( input_layer_A, temp_layer, output_layer )
+  end subroutine CalculateFrameNOT
     
 end submodule DesignImplModule
