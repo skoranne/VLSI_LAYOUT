@@ -42,7 +42,8 @@ contains
     integer(kind=int64) :: I, J, K, ChildIdx, CurrNode
 
     ! 3. Stack size of 512 is now massive overkill, which is a good thing.
-    integer(kind=int64) :: Stack(512) 
+    integer(kind=int64), parameter :: K_STACK_SIZE = 64
+    integer(kind=int64) :: Stack(K_STACK_SIZE) 
     integer(kind=int64) :: StackPtr
 
     type(Box) :: QBox, NodeMbr, TargetBox
@@ -123,8 +124,10 @@ contains
                       StackPtr = StackPtr + 1
 
                       ! GPU Guard: Prevent silent death if tree is inexplicably deep
-                      if (StackPtr <= 512) then
+                      if (StackPtr <= K_STACK_SIZE) then
                          Stack(StackPtr) = ChildIdx
+                      else
+
                       end if
                    end if
                 end if

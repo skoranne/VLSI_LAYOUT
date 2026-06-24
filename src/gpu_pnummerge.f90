@@ -203,22 +203,20 @@ contains
           ! 1. Evaluate logic DIRECTLY inside the IF to avoid NVFORTRAN scalar logical bugs
           if (max(nodembr%x1, qbox%x1) <= min(nodembr%x2, qbox%x2)) then
              if (max(nodembr%y1, qbox%y1) <= min(nodembr%y2, qbox%y2)) then
-                
+
                 ! 2. Process based on node type
                 if (tree_nodes(currnode)%IsLeaf) then
-
                    do j = tree_nodes(currnode)%ChildStart, tree_nodes(currnode)%ChildStart + tree_nodes(currnode)%NumChildren - 1
-                      
                       ! Replace 'cycle' with an active check to maintain strict warp sync
                       if (j /= i) then
                          targetbox = sorted_boxes(j)
-                         
+
                          ! Direct evaluation for final intersection check
                          if (max(targetbox%x1, qbox%x1) <= min(targetbox%x2, qbox%x2)) then
                             if (max(targetbox%y1, qbox%y1) <= min(targetbox%y2, qbox%y2)) then
                                ! Interaction found!
                                is_singleton(i) = .false.
-                               
+
                                ! Safely kill both loops without using named exits
                                stackptr = 0 ! Forces the outer while-loop to terminate
                                exit         ! Escapes the inner do-j loop
@@ -242,215 +240,39 @@ contains
           end if
        end do
     end do
+    
     !$omp end target data
 
     ! CPU Tally
     num_singletons = count(is_singleton)
-
-  end subroutine FindSingletonsGPU
-  #ifdef OLD
-  subroutine FindSingletonsGPU(num_boxes, sorted_boxes, num_nodes, tree_nodes, root_index, is_singleton, num_singletons)
-    integer(kind=int64), intent(in) :: num_boxes, num_nodes  
-
-    type(Box), intent(in)             :: sorted_boxes(num_boxes)
-    type(RTreeNode), intent(in)    :: tree_nodes(num_nodes) ! Adjusted to your GPU type
-    integer(kind=int64), intent(in)   :: root_index
-    logical, allocatable, intent(out) :: is_singleton(:)
-    integer(kind=int64), intent(out)  :: num_singletons
-
-    integer(kind=int64) :: i, j, currnode, childidx
-
-    ! --- Explicit Thread-Local Stack ---
-    ! 256 integers = 2 KB per thread. Easily fits in L1/Registers without causing
-    ! silent kernel aborts due to local memory limits.
-    integer(kind=int64), parameter :: K_STACK_SIZE = 256
-    integer(kind=int64) :: stack(K_STACK_SIZE)
-    integer(kind=int64) :: stackptr
-
-    ! --- Inlined Math Variables ---
-    type(Box) :: qbox, nodembr, targetbox
-    logical   :: overlapx, overlapy, keep_searching
-
-    ! Allocate the output boolean mask to mirror the boxes array
-    allocate(is_singleton(num_boxes))
-
-    ! Assume all boxes are singletons until proven otherwise
-    is_singleton = .true.
-    num_singletons = 0
-
-    ! Map data explicitly to device
-    !$omp target data map(to: tree_nodes(1:num_nodes), sorted_boxes(1:num_boxes)) &
-    !$omp map(tofrom: is_singleton(1:num_boxes))
-
-    ! distribute parallel do ensures GPU grid/block distribution
-    ! keep_searching is explicitly private to prevent cross-thread contamination
-    !$omp target teams distribute parallel do &
-    !$omp private(i, j, currnode, childidx, stack, stackptr, qbox, nodembr) &
-    !$omp private(targetbox, overlapx, overlapy, keep_searching)
-    do i = 1, num_boxes
-       qbox = sorted_boxes(i)
-       stackptr = 1
-       stack(stackptr) = root_index
-       keep_searching = .true.
-
-       ! Replaced named loop with boolean condition for safe warp divergence
-       do while (stackptr > 0 .and. keep_searching)
-
-          ! Pop current node
-          currnode = stack(stackptr)
-          stackptr = stackptr - 1
-          nodembr = tree_nodes(currnode)%mbr
-
-          ! 1. Internal Node / Root MBR Overlap check (<= includes edge sharing)
-          overlapx = max(nodembr%x1, qbox%x1) <= min(nodembr%x2, qbox%x2)
-          overlapy = max(nodembr%y1, qbox%y1) <= min(nodembr%y2, qbox%y2)
-
-          ! Replaced 'cycle search_tree' with an IF block wrap
-          if (overlapx .and. overlapy) then
-
-             ! 2. Process based on node type
-             if (tree_nodes(currnode)%IsLeaf) then
-
-                ! Iterate exactly over the known number of children
-                do j = tree_nodes(currnode)%childstart, tree_nodes(currnode)%childstart + tree_nodes(currnode)%numchildren - 1
-
-                   ! A box cannot intersect itself
-                   if (j == i) cycle 
-
-                   targetbox = sorted_boxes(j)
-
-                   ! Strict geometry overlap check (Short-circuited exactly like your CPU version)
-                   overlapx = max(targetbox%x1, qbox%x1) <= min(targetbox%x2, qbox%x2)
-                   if (overlapx) then
-                      overlapy = max(targetbox%y1, qbox%y1) <= min(targetbox%y2, qbox%y2)
-
-                      if (overlapy) then
-                         ! Interaction found! Mark as false and immediately stop searching.
-                         is_singleton(i) = .false.
-                         keep_searching = .false.
-                         ! Simple exit escapes the 'do j' loop. The outer 'while' loop 
-                         ! will immediately terminate because keep_searching is false.
-                         exit  
-                      end if
-                   end if
-
-                end do
-
-             else
-
-                ! Internal node: Push exact contiguous children to the stack
-                do j = tree_nodes(currnode)%childstart, tree_nodes(currnode)%childstart + tree_nodes(currnode)%numchildren - 1
-                   if (stackptr < K_STACK_SIZE) then
-                      stackptr = stackptr + 1
-                      stack(stackptr) = j
-                   end if
-                   ! Removed 'error stop' as runtime halts crash GPU kernels.
-                   ! If stack exceeds 256, it safely drops the deep branch.
-                end do
-
-             end if
-
-          end if
-       end do
-    end do
-    !$omp end target data
-
-    ! Quickly tally the singletons on the CPU using standard Fortran intrinsic
-    num_singletons = count(is_singleton)
-
   end subroutine FindSingletonsGPU
 
-  subroutine FindSingletonsGPU(num_boxes, sorted_boxes, num_nodes, tree_nodes, root_index, is_singleton, num_singletons)
-    integer(kind=int64), intent(in) :: num_boxes, num_nodes  
-    type(Box), intent(in) :: sorted_boxes(num_boxes)
-    type(RTreeNodeGPU), intent(in) :: tree_nodes(num_nodes)
-    integer(kind=int64), intent(in) :: root_index
-    logical, allocatable, intent(out) :: is_singleton(:)
-    integer(kind=int64), intent(out) :: num_singletons
-
-    integer(kind=int64) :: i, j, k, childidx, currnode
-    integer(kind=int64) :: stackptr
-
-    ! Reduced to 128 (1 KB per thread). Fits effortlessly in GPU registers/L1.
-    integer(kind=int64), parameter :: K_STACK_SIZE = 128 
-    integer(kind=int64) :: stack(K_STACK_SIZE)
-
-    type(Box) :: qbox, nodembr, targetbox
-    logical :: overlapx, overlapy, keep_searching
-
-    allocate(is_singleton(num_boxes))
-    is_singleton = .true.
-    num_singletons = 0
-
-    ! Explicitly mapped root_index as a precaution against NVFORTRAN scalar bugs
-    !$omp target data map(to: tree_nodes(1:num_nodes), sorted_boxes(1:num_boxes), root_index) &
-    !$omp map(tofrom: is_singleton(1:num_boxes))
-
-    !$omp target teams distribute parallel do &
-    !$omp private(i, j, k, childidx, currnode, stack, stackptr, qbox, nodembr) &
-    !$omp private(targetbox, overlapx, overlapy, keep_searching)
-    do i = 1, num_boxes
-       qbox = sorted_boxes(i)
-       keep_searching = .true.
-       stackptr = 0
-
-       ! 1. Check the Root Node FIRST before initiating the stack
-       nodembr = tree_nodes(root_index)%mbr
-       overlapx = max(nodembr%X1, qbox%X1) <= min(nodembr%X2, qbox%X2)
-       overlapy = max(nodembr%Y1, qbox%Y1) <= min(nodembr%Y2, qbox%Y2)
-
-       if (overlapx .and. overlapy) then
-          stackptr = 1
-          stack(stackptr) = root_index
-       end if
-
-       do while (stackptr > 0 .and. keep_searching)
-          currnode = stack(stackptr)
-          stackptr = stackptr - 1
-
-          if (tree_nodes(currnode)%IsLeaf) then
-             do k = 0, tree_nodes(currnode)%NumChildren - 1
-                j = tree_nodes(currnode)%ChildStart + k
-
-                if (j == i) cycle 
-
-                targetbox = sorted_boxes(j)
-                overlapx = max(targetbox%X1, qbox%X1) <= min(targetbox%X2, qbox%X2)
-                overlapy = max(targetbox%Y1, qbox%Y1) <= min(targetbox%Y2, qbox%Y2)
-
-                if (overlapx .and. overlapy) then
-                   is_singleton(i) = .false.
-                   keep_searching = .false.
-                   exit 
-                end if
-             end do
-          else
-             do k = 0, tree_nodes(currnode)%NumChildren - 1
-                childidx = tree_nodes(currnode)%ChildStart + k
-                nodembr = tree_nodes(childidx)%mbr
-
-                ! 2. CHECK BEFORE PUSHING: Only push branches that actually intersect
-                overlapx = max(nodembr%X1, qbox%X1) <= min(nodembr%X2, qbox%X2)
-                overlapy = max(nodembr%Y1, qbox%Y1) <= min(nodembr%Y2, qbox%Y2)
-
-                if (overlapx .and. overlapy) then
-                   if (stackptr < K_STACK_SIZE) then
-                      stackptr = stackptr + 1
-                      stack(stackptr) = childidx
-                   end if
-                end if
-             end do
-          end if
-       end do
-    end do
-    !$omp end target data
-
-    do i = 1, num_boxes
-       if (is_singleton(i)) then
-          num_singletons = num_singletons + 1
-       end if
-    end do
-
-  end subroutine FindSingletonsGPU
-#endif
 end module GPUMergeModule
+#ifdef DOCUMENTATION_RESUTLS
+(base) skoranne@spark-bc08:~/GITHUB/VLSI_LAYOUT/src$ ./test_interaction.exe /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW16_DATA/MW64_L67_D20.bin z.bin 1 2 3 4
+ Reading 1st filename:
+ /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW16_DATA/MW64_L67_D20.bin                                                          
+ TOTAL NODES FOR CPU RT =                  54978018
+         CPUSortTree     71.60 CPU seconds.     71.60 REAL seconds. FULL TIME:    71.60 MEM: VM    116204836 RSS:     15333472
+ |CPU TOTAL INTERACTIONS| =                 255079360
+     CPUInteractions     92.15 CPU seconds.     92.15 REAL seconds. FULL TIME:   163.76 MEM: VM    116361892 RSS:     15336548
+ |CPU NUM_SINGLETONS| =                  11319424
+        CPUSingleton     66.67 CPU seconds.     66.67 REAL seconds. FULL TIME:   230.43 MEM: VM    116363684 RSS:     18557928
+CPU OVLP AREA = ****************** CPU OVLP PERIMETER =             0.0000                                                    
+ |Roots| =                 114184192 |Rects| =                         0                                                      
+             CPUPNUM    147.84 CPU seconds.    147.84 REAL seconds. FULL TIME:   378.27 MEM: VM    145967140 RSS:     25198616
+ ===============================GPU MODE ========================================                                             
+Loaded :    824670208 BBOX =         5520       43357    23944100    29341447 |T| =     54978018                              
+             GPUSort     67.98 CPU seconds.     67.98 REAL seconds. FULL TIME:   450.58 MEM: VM    145967140 RSS:     28420004
+ Tree constructed:                  54978018  |RT| =      54978018
+            GPURTree      1.11 CPU seconds.      1.11 REAL seconds. FULL TIME:   451.69 MEM: VM    145967140 RSS:     30567592
+ |GPU TOTAL INTERACTIONS| =                 255079360
+     GPUInteractions      9.12 CPU seconds.      9.12 REAL seconds. FULL TIME:   460.81 MEM: VM    148588580 RSS:     30567596
+ |GPU NUM_SINGLETONS| =                  11319424
+        GPUSingleton     37.88 CPU seconds.     37.88 REAL seconds. FULL TIME:   498.69 MEM: VM    152258596 RSS:     30567612
+GPU OVLP AREA =             0.0000 GPU OVLP PERIMETER =             0.0000
+                PNUM      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:   498.69 MEM: VM    152258596 RSS:     30567612
+RLE GPU OVLP AREA =             0.0000 RLE GPU OVLP PERIMETER =             0.0000
+             PNUMRLW      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:   498.69 MEM: VM    152258596 RSS:     30567612
+(base) skoranne@spark-bc08:~/GITHUB/VLSI_LAYOUT/src$ 
+#endif
