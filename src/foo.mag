@@ -1,0 +1,8 @@
+magic
+tech sky130A
+timestamp 1780872228
+<< gate >>
+KLBIN square_gate_L1000_D20_1.bin
+<< sd >>
+KLBIN square_sd_L2000_D20_1.bin
+<< end >>

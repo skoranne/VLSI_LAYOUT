@@ -8,4 +8,8 @@ decl memory f1 = nothing
 info
 exec run f1:diff = d1:pdiff + d1:ndiff
 exec run o1:gate = d1:poly * f1:diff
+exec run o2:gate = f1:diff * d1:poly
+exec run o1:sd =  f1:diff - d1:poly
+exec run o2:sd = f1:diff ~ d1:poly
+flush
 end 
