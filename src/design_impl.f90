@@ -700,7 +700,7 @@ contains
     integer(kind=int64) :: total_count, i
     integer :: nthreads, tid
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-    integer(kind=int64), parameter :: K_GRID = 16
+    integer, parameter :: K_GRID = 16
     integer :: rows, cols
     type(Layer) :: gridA
     type(Layer) :: grids(K_GRID,K_GRID)
