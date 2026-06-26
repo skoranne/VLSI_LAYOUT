@@ -110,6 +110,8 @@ contains
       call uf%init(num_boxes)
       if( num_boxes == 1 ) then
          uf%arr(1) = 0
+         overlap_area = 0.0_real64
+         overlap_perimeter = 0.0_real64
          return
       end if
       !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
@@ -174,7 +176,7 @@ contains
       ! Sequential reduction
       overlap_area = sum(overlap_areas)
       overlap_perimeter = sum(overlap_perimeters)
-      if (overlap_area > 0.0) overlap_perimeter = 0.0
+      if (abs(overlap_area) > K_SMALL_EPSILON) overlap_perimeter = 0.0
 
       do tid = 1, nthreads
          call process_edges(uf, buffers(tid))

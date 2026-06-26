@@ -187,7 +187,7 @@ contains
 
   ! Type procedure for intersection of two boxes
   pure function box_intersection(this, other) result(intersection_box)
-    !DIR$ ATTRIBUTES FORCEINLINE :: box_intersection
+    !> !DIR$ ATTRIBUTES FORCEINLINE :: box_intersection
     class(Box), intent(in) :: this, other
     type(Box) :: intersection_box
     ! Find the intersection box

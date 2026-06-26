@@ -531,3 +531,16 @@ GPU OVLP AREA =             0.0000 GPU OVLP PERIMETER =             0.0000
                 PNUM      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:   500.19 MEM: VM    152258792 RSS:     30565056
 RLE GPU OVLP AREA =             0.0000 RLE GPU OVLP PERIMETER =             0.0000
              PNUMRLW      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:   500.19 MEM: VM    152258792 RSS:     30565056
+
+OpenMP
+export OMP_MAX_ACTIVE_LEVELS=1
+export OMP_NESTED=FALSE
+export OMP_STACKSIZE=2G
+export KMP_STACKSIZE=2G      # Intel specific
+export KMP_INIT_ATK_STACK=1  # Helps with nested task allocations
+# Allow 2 levels of OpenMP (Outer grid loop + Inner compute loops)
+export OMP_MAX_ACTIVE_LEVELS=2
+
+# Tell OpenMP: "Use 4 threads for the outer grid, and 8 threads for the inner loops"
+# Assuming a 32-core machine (4 * 8 = 32)
+export OMP_NUM_THREADS="4,8"

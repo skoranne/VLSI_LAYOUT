@@ -141,6 +141,8 @@ contains
        print *, "Error: Could not open file."
        stop
     end if
+    call InitPrecision(1000) !> read it from CTR file to override
+    used_precision = GetPrecision()
     line_number = 1
     ! Read line by line
     read_loop: do
@@ -425,12 +427,11 @@ contains
                         !> d1:poly GRID nothing 10 10
                         if( rhs2_source_name /= 'nothing' ) error stop "EXTENT must use nothing as second layer"
                         write(*,*) 'Found PRIMARY_OPERATOR = GRID'
-                        call CreateGRID( rhs1_layer, lhs_layer, 10, 10 )                        
+                        call CreateGRID( rhs1_layer, lhs_layer, 10, 10, 10 ) !> the last argument is OVERLAP
                      case ('GROW') !> lhs = rhs GROW nothing EAST NORTH WEST SOUTH (all positive)
                         if( rhs2_source_name /= 'nothing' ) error stop "GROW must use nothing as second layer"
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
-                        write(*,*) 'Found PRIMARY_OPERATOR = GROW ', rvar(1), ' ', rvar(2), ' ', rvar(3), ' ', rvar(4)
-                        used_precision = GetPrecision()
+                        write(*,*) 'Found PRIMARY_OPERATOR = GROW at PRECISION ', used_precision, ' ', rvar(1), ' ', rvar(2), ' ', rvar(3), ' ', rvar(4)
                         do i=1,4
                            ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
                         end do

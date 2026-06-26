@@ -1,8 +1,20 @@
 # Control file for MAGPARSER
 program square
 systeminfo
-decl design d1 = SEDFXTP1.mag
-decl output o2 = bar.mag
+decl design d1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1.mag
+decl output o1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1_output.mag
+decl memory t1 = nothing
 info
-# decl design d2 = MY_SED.mag
+exec run o1:diff = d1:li1 COPY nothing
+exec run o1:poly = d1:poly COPY nothing
+exec run o1:li1  = d1:li1 COPY nothing
+exec run o1:met1 = d1:met1 COPY nothing
+exec run o1:gate = d1:poly * d1:diff
+exec run t1:ng_poly2 = d1:poly ~ o1:gate
+exec run t1:ng_poly = d1:poly - o1:gate
+exec run o1:sd   = d1:diff - d1:poly
+exec run o1:sd2  = d1:diff ~ d1:poly
+exec run o1:met1_grow = d1:met1 GROW nothing 0.1 0.1 0.1 0.1
+exec run o1:poly_retarget = d1:poly GROW nothing 0.2 0.1 0.2 0.2
+flush
 end 

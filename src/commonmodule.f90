@@ -8,9 +8,10 @@ module CommonModule
    integer(kind=int64), parameter :: K_LEAF_CAPACITY = 16 !> 32 is better than 64
    integer,  parameter            :: K_COORDINATE_KIND = int32
    real(kind=real64), parameter   :: K_SQUARE_DOMINATION_THRESHOLD = 0.8
+   real(kind=real64), parameter   :: K_SMALL_EPSILON = 1.0e-12_real64
    integer(kind=K_COORDINATE_KIND):: PRECISION
    public:: InitPrecision, GetPrecision, K_COORDINATE_KIND, K_LEAF_CAPACITY, K_SQUARE_DOMINATION_THRESHOLD, XYTracker,&
-      TrackerCell
+      TrackerCell, K_SMALL_EPSILON
 
    type :: XYTracker
       integer(kind=K_COORDINATE_KIND) :: X, Y

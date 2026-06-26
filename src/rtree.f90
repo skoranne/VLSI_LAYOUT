@@ -7,7 +7,7 @@ module RTReeBuilder
    use iso_fortran_env, only: int32, int64, real64
    implicit none
    private
-   public:: RTReeNode, CalculateTotalNodes, BuildRTree, SelfTestTheTree, SearchTree, K_MAX_SEARCH_LEAVES
+   public:: RTReeNode, CalculateTotalNodes, BuildRTree, SelfTestTheTree, SearchTree, SearchTreeRecursive, K_MAX_SEARCH_LEAVES
    type :: RTreeNode
       type(Box) :: mbr
       integer(kind=int64) :: ChildStart   ! Index of first child in the flat array
@@ -164,7 +164,7 @@ contains
          !> We have found a leaf
          number_leaves = number_leaves + 1
          if( number_leaves > K_MAX_SEARCH_LEAVES ) then
-            error stop "INCREASE NUMBER SEARCH LEAVES"
+            error stop "ERROR: STR INCREASE NUMBER SEARCH LEAVES"
          end if
          leafboxes( number_leaves ) = tree_nodes(index)%ChildStart
 
@@ -240,7 +240,7 @@ contains
             !> We have found a leaf
             number_leaves = number_leaves + 1
             if( number_leaves > K_MAX_SEARCH_LEAVES ) then
-               error stop "INCREASE NUMBER SEARCH LEAVES"
+               error stop "ERROR: ST INCREASE NUMBER SEARCH LEAVES"
             end if
             leafboxes( number_leaves ) = currNode%ChildStart
          else

@@ -165,11 +165,14 @@ contains
 
       ! Local helpers ----------------------------------------------------
       type(NodePtr)                :: update(MAX_SKIP_LEVEL)   ! predecessor per level
-      type(SkipListNode), pointer :: current   => null()
-      type(SkipListNode), pointer :: target_node => null()
-      type(SkipListNode), pointer :: new_node    => null()
+      type(SkipListNode), pointer :: current
+      type(SkipListNode), pointer :: target_node
+      type(SkipListNode), pointer :: new_node   
       integer                      :: i, lvl
 
+      current     => null()
+      target_node => null()
+      new_node    => null()
       !--------------------------------------------------------------------
       ! 1.  Find the place where y_val would belong (standard skip‑list search)
       !--------------------------------------------------------------------
@@ -769,6 +772,7 @@ contains
       integer(kind=K_COORDINATE_KIND) :: min_x, max_x, min_y, max_y
 
       n = size(boxes)
+      if( n == 0 ) error stop "GENERATE TRACKERS for EMPTY LAYER"
       min_x = bbox%x1
       max_x = bbox%x2
       min_y = bbox%y1

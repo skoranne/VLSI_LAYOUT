@@ -631,7 +631,7 @@ contains
           end if
           num_roots = layers(i)%pnumtable%count_roots()
           num_rects = count(layers(i)%pnumtable%arr == 0)
-          if( overlap_areas(i) > 0.0 ) then
+          if( abs(overlap_areas(i)) > K_SMALL_EPSILON ) then
              write(*,'(A,I3,A8,A8,A,I12,A,I12,A,I2,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
                   ' non-rects ',num_rects , ' rects. STAT ',layers(i)%layerState, &
                   ' |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
@@ -769,6 +769,7 @@ contains
        pos = index( load_design%layers(i)%fileName, ".bin" )
        !write(*,*) 'pos = ', pos, ' len = ', len_trim(load_design%layers(i)%fileName)
        if( pos /= len_trim(load_design%layers(i)%fileName)-3 ) then
+          write(*,*) 'ERROR: File format not supported: ', load_design%layers(i)%fileName
           error stop "DBOUT only supports KLBIN, edit the output MAG file to fix"
        end if
        call WriteKLBin( load_design%layers(i)%fileName, load_design%layers(i)%layer_boxes, load_design%layers(i)%n_used )

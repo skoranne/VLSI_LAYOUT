@@ -17,7 +17,7 @@ module DesignModule
    implicit none
    private
    public :: Design, Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
-      LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, LAYER_STATE_EVERYTHING, &
+      LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, LAYER_STATE_EVERYTHING, LAYER_STATE_FINAL,&
       DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY,&
       NeedsSorting, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
       get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon, &
@@ -25,20 +25,22 @@ module DesignModule
       CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
       CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
       RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer,&
-      CalculateFrameNOT
+      CalculateFrameNOT, FilterLayer, push_box, FinalizeLayer
 
    type :: LayerTree
       integer(kind=int64) :: root_index
       type(RTreeNode), allocatable :: tree_nodes(:)
    end type LayerTree
    enum, bind(C)                     ! bind(C) makes the values C‑compatible
-      enumerator :: LAYER_STATE_NONE  = int(Z'00', kind=c_int)   ! 0b000000
-      enumerator :: LAYER_STATE_HEAL  = int(Z'01', kind=c_int)   ! 0b000001
-      enumerator :: LAYER_STATE_SORT  = int(Z'02', kind=c_int)   ! 0b000010
-      enumerator :: LAYER_STATE_PNUM  = int(Z'04', kind=c_int)   ! 0b000100
-      enumerator :: LAYER_STATE_RTREE = int(Z'08', kind=c_int)   ! 0b001000
-      enumerator :: LAYER_STATE_SLSORT= int(Z'16', kind=c_int)   ! 0b010000
-      enumerator :: LAYER_STATE_EVERYTHING = int(Z'31', kind=c_int)   ! 0b011111
+      enumerator :: LAYER_STATE_NONE  = int(0, kind=c_int)   ! 0b000000
+      enumerator :: LAYER_STATE_HEAL  = int(1, kind=c_int)   ! 0b000001
+      enumerator :: LAYER_STATE_SORT  = int(2, kind=c_int)   ! 0b000010
+      enumerator :: LAYER_STATE_PNUM  = int(4, kind=c_int)   ! 0b000100
+      enumerator :: LAYER_STATE_RTREE = int(8, kind=c_int)   ! 0b001000
+      enumerator :: LAYER_STATE_SLSORT= int(16, kind=c_int)   ! 0b010000
+      enumerator :: LAYER_STATE_FINAL = int(32, kind=c_int)   ! 0b100000            
+      !enumerator :: LAYER_STATE_FINAL = int(Z'32', kind=c_int)   !> partial knowledge can be DANGEROUS: Z -> hexadecimal
+      enumerator :: LAYER_STATE_EVERYTHING = int(63, kind=c_int) 
    end enum
    enum, bind(C)
       enumerator :: CONJUGATE_LAYER_PURPOSE_NONE       = int(Z'00', kind=c_int)   ! 0b000000
@@ -98,11 +100,21 @@ module DesignModule
    end interface assignment(=)
 
    interface
+      module subroutine FinalizeLayer( output_layer )
+         type(Layer),intent(inout) :: output_layer
+      end subroutine FinalizeLayer
+      
       module subroutine AssignFromBox( output_layer, input_box )
          type(Layer),intent(inout) :: output_layer
          type(Box), intent(in) :: input_box
       end subroutine AssignFromBox
 
+      module subroutine FilterLayer( input_layer, input_box, output_layer )
+        type(Layer), intent(in)    :: input_layer
+        type(Layer), intent(inout) :: output_layer
+        type(Box),   intent(in)    :: input_box
+      end subroutine FilterLayer
+      
       module subroutine ConvertLayerToBox( input_layer, output_layer, control_parameter )
          type(Layer), intent(inout) :: input_layer
          type(Layer), intent(inout) :: output_layer
@@ -141,10 +153,11 @@ module DesignModule
          type(Layer), intent(inout) :: output_layer
       end subroutine CalculateSingleLayerAND
 
-      module subroutine CreateGrid( input_layer, output_layer, rows, cols )
+      module subroutine CreateGrid( input_layer, output_layer, rows, cols, GridOverlap )
          type(Layer),      intent(in)    :: input_layer
          type(Layer),      intent(inout) :: output_layer
          integer,          intent(in)    :: rows, cols   ! must be >0
+         integer,     intent(in)    :: GridOverlap
       end subroutine CreateGrid
 
       module subroutine CreateEXTENT( input_layer, output_layer )
@@ -188,7 +201,7 @@ contains
       if( .not. NeedsHealing( input_layer ) ) return !bravo
       call heal_boxes( input_layer%n_used, input_layer%layer_boxes, updated_box_count )
       n = size( input_layer%layer_boxes )
-      write (*,*) 'Heal changed: ', input_layer%n_used, ' ', n
+      !write (*,*) 'Heal changed: ', input_layer%n_used, ' ', n
       do i=1,n
          tempBox = input_layer%layer_boxes(i)
          if( .not. tempBox%is_valid() ) error stop "BOX NOT VALID"
@@ -754,7 +767,7 @@ contains
       end if
 
       if( NeedsSorting( input_layer ) ) then
-         if( env_status /= 0 ) then !> value is set
+         if( env_status /= 0 .and. env_len > 0 .and. ( .not. omp_in_parallel() ) ) then !> value is set or we can use nested
             call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
          else
             dominated_by_squares = .false.
@@ -781,7 +794,7 @@ contains
       if( NeedsPNum( input_layer ) ) then
          call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
             input_layer%tree%root_index, overlap_area, overlap_perimeter)
-         if( overlap_area /= 0 ) then
+         if( abs(overlap_area) > K_SMALL_EPSILON ) then
             !error stop "HEALING failed"
          end if
          input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )

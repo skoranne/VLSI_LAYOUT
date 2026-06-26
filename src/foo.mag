@@ -1,6 +1,10 @@
 magic
 tech sky130A
 timestamp 1780872228
+<< diff >>
+KLBIN square_diff_L100_D10.bin
+<< poly >>
+KLBIN square_poly_L200_D10.bin
 << gate >>
 KLBIN square_gate_L1000_D20_1.bin
 << sd >>

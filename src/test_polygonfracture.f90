@@ -14,6 +14,7 @@ program test_fracture
   use PNumMergeModule
   use SystemInformationModule
   use ASCIIPlotModule
+  use BoostPolygonAPIModule
   use iso_fortran_env
   implicit none
 
@@ -67,7 +68,8 @@ program test_fracture
      write(*,*) '13. Run op = A NOT A'     
      write(*,*) '14. Run op = A XOR B'               
      write(*,*) '15. Run op = COMPLEMENT A'
-     write(*,*) '16. Run op = SIZE A BY '               
+     write(*,*) '16. Run op = SIZE A BY '
+     write(*,*) '17. Run op = BOOST POLYGON MERGE A'
      stop "./CONVERT.exe <input-filenameA> <input-filenameB> <output-file> control"     
   case (2)
      error stop "./CONVERT.exe <input-filename> <output-filename> control"
@@ -375,6 +377,16 @@ program test_fracture
      call StopMarkTime(" AND ")          
      call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      stop
+  case (17)
+     write(*,*)  '17. Run Boost Polygon on whole layer'
+     allocate( output_layer%layer_boxes( input_layer%n_used*2 ) )
+     !call PerformBoostPolygonMerge( input_layer%layer_boxes, input_layer%n_used, output_layer%layer_boxes, output_layer%n_used )
+     call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, output_layer%layer_boxes )
+     output_layer%n_used = size( output_layer%layer_boxes )
+     write(*,*) 'Boost Polygon merged: ', input_layer%n_used, ' to ', output_layer%n_used
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
+     stop
+     
   case default
      write(*,*) 'Print Information: '
      write(*,*) 'Num: ', input_layer%n_used, ' area = ', layer_area

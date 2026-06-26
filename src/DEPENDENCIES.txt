@@ -2,11 +2,13 @@ LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
 	   polygon_fracture.o boxmerge.o kldata.o design_impl.o gpu_morton_sort.o\
-	   systeminfo_gpu.o interaction.o gpu_pnummerge.o RLEMerge.o ascii_plot.o
+	   systeminfo_gpu.o interaction.o gpu_pnummerge.o RLEMerge.o ascii_plot.o\
+	   boost_polygon_apif.o boost_polygon_api.o
 
 systeminfo.o:	commonmodule.o version_mod.o
 hashtable.o:	systeminfo.o
 geometry.o:	hashtable.o
+boost_polygon_apif.o:	boost_polygon_api.o geometry.o
 gpu_morton_sort.o: commonmodule.o geometry.o
 morton.o:	commonmodule.o geometry.o
 rtree.o:	geometry.o
