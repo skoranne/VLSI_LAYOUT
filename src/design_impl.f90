@@ -229,9 +229,7 @@ contains
        end block
     end do
     output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL ) !> otherwise this might merge
-    write(*,*) 'GRID output size = ', output_layer%n_used      
     call PreprocessLayer( output_layer )
-    write(*,*) 'GRID output size = ', output_layer%n_used            
   end subroutine CreateGrid
 
   module subroutine CreateEXTENT( input_layer, output_layer )
@@ -577,20 +575,37 @@ contains
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
     type(Layer), intent(inout)   :: output_layer
     type(TrackerCell), allocatable :: trackersGrid(:,:)
-    integer(kind=int64) :: total_count, i
+    integer(kind=int64) :: total_count, i, number_tree_nodes
     integer :: nthreads, tid
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-    integer(kind=int64), parameter :: K_GRID = 64
+    integer :: K_GRID 
     integer :: rows, cols
     type(Layer) :: gridA
-    type(Layer) :: grids(K_GRID,K_GRID)
-    type(Layer) :: outputGrid(K_GRID, K_GRID)
-    type(Layer) :: templayerGrid(K_GRID, K_GRID)
-    type(Layer) :: AinGrid(K_GRID, K_GRID)
-    type(Layer) :: BinGrid(K_GRID, K_GRID)       !> I dont know if it makes sense to create so many temp layers
+    type(Layer), allocatable :: grids(:,:)
+    type(Layer), allocatable :: outputGrid(:,:)
+    type(Layer), allocatable :: templayerGrid(:,:)
+    type(Layer), allocatable :: AinGrid(:,:)
+    type(Layer), allocatable :: BinGrid(:,:)       !> I dont know if it makes sense to create so many temp layers
     type(Box)   :: bboxA
-    integer(kind=int64) :: start_tick(K_GRID,K_GRID), end_tick(K_GRID,K_GRID), clock_rate
-    real(kind=real64) :: start_time(K_GRID, K_GRID), end_time(K_GRID, K_GRID), elapsed_time(K_GRID,K_GRID)
+    integer(kind=int64), allocatable :: start_tick(:,:), end_tick(:,:)
+    integer(kind=int64) :: clock_rate
+    real(kind=real64), allocatable :: start_time(:,:), end_time(:,:), elapsed_time(:,:)
+
+    number_tree_nodes = CalculateTotalNodes( max( input_layer_A%n_used, input_layer_B%n_used ), K_LEAF_CAPACITY )
+    K_GRID = int( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) )
+    write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
+
+    allocate( grids(K_GRID, K_GRID))
+    allocate( outputGrid( K_GRID, K_GRID))
+    allocate( templayerGrid( K_GRID, K_GRID))
+    allocate(AinGrid(K_GRID, K_GRID))
+    allocate(BinGrid(K_GRID, K_GRID))
+    allocate(start_time(K_GRID,K_GRID))
+    allocate(end_time(K_GRID,K_GRID))
+    allocate(elapsed_time(K_GRID,K_GRID))
+    allocate(start_tick(K_GRID,K_GRID))
+    allocate(end_tick(K_GRID,K_GRID))
+
     call CreateGrid( input_layer_A, gridA, K_GRID, K_GRID,0) !> create overlapping GRID
     !call WriteKLBin("MY_gridA_L10_D10.bin", gridA%layer_boxes, gridA%n_used)
     allocate( trackersGrid(K_GRID,K_GRID) )
