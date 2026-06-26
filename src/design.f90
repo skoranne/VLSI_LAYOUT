@@ -767,6 +767,9 @@ contains
       end if
 
       if( NeedsSorting( input_layer ) ) then
+         #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__) 
+            call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
+         #else
          if( env_status /= 0 .and. env_len > 0 .and. ( .not. omp_in_parallel() ) ) then !> value is set or we can use nested
             call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
          else
@@ -782,6 +785,7 @@ contains
                call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
             end if
          end if
+         #endif
          input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
       end if
       if( NeedsRTree( input_layer ) ) then
