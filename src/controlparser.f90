@@ -365,7 +365,7 @@ contains
                    call StopMarkTime("AND")                
                 case('@')
                    call StartMarkTime("NOT")
-                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_NOT, int( ivar(1), kind=int64) )                   
+                   call CalculateNOT( rhs1_layer, rhs2_layer, lhs_layer )                   
                    call StopMarkTime("NOT")
                 case('~')
                    call StartMarkTime("FRAMENOT")

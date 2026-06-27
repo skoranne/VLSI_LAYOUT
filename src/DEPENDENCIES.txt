@@ -4,7 +4,7 @@ LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
 	   polygon_fracture.o boxmerge.o kldata.o design_impl.o gpu_morton_sort.o\
 	   systeminfo_gpu.o interaction.o gpu_pnummerge.o RLEMerge.o ascii_plot.o\
 	   boost_polygon_apif.o boost_polygon_api.o boxbytestream.o box_compression.o\
-	   snappy_api.o snappy_apif.o
+	   snappy_api.o snappy_apif.o layout_statistics.o
 
 box_compression.o: boxbytestream.o snappy_apif.o
 snappy_apif.o:	   snappy_api.o

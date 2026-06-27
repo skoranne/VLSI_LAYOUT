@@ -11,7 +11,8 @@ exec run o1:diff = f1:diff COPY nothing
 exec run o1:poly = d1:poly COPY nothing
 exec run o1:gate = d1:poly * f1:diff
 exec run o2:gate = f1:diff * d1:poly
-exec run o1:sd =  f1:diff - d1:poly
-exec run o2:sd = f1:diff ~ d1:poly
+exec run o1:sd1 =  f1:diff @ d1:poly
+exec run o1:sd2 = f1:diff ~ d1:poly
+exec run o1:sd3 = f1:diff ! d1:poly
 flush
 end 

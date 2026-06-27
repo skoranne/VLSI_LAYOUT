@@ -7,6 +7,10 @@ KLBIN square_diff_L100_D10.bin
 KLBIN square_poly_L200_D10.bin
 << gate >>
 KLBIN square_gate_L1000_D20_1.bin
-<< sd >>
-KLBIN square_sd_L2000_D20_1.bin
+<< sd1 >>
+KLBIN square_sd1_L2000_D20_1.bin
+<< sd2 >>
+KLBIN square_sd2_L3000_D20_1.bin
+<< sd3 >>
+KLBIN square_sd3_L4000_D20_1.bin
 << end >>

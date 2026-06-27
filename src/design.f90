@@ -502,8 +502,8 @@ contains
          current_polygon_boxes(1:box_count) = input_layer%layer_boxes( &
             permutation( segments( i )%start_idx:segments( i )%end_idx ) )
          updated_box_count = 0
-         call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
-         !call MergeBoxes( box_count, current_polygon_boxes, updated_box_count )
+         !call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
+         call MergeBoxes( box_count, current_polygon_boxes, updated_box_count )
          n = size( current_polygon_boxes )
          if( final_count + updated_box_count >= final_capacity ) then
             !write(*,*) 'FC = ', final_capacity, ' EC = ', final_count + updated_box_count

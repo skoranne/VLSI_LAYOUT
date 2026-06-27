@@ -230,6 +230,7 @@ module SnappyCompressionTest
   use MortonSortModule
   use SnappyCompressionModule
   use CompressionChunkManagerModule
+  use LayoutStatisticsModule
   use iso_fortran_env, only : int32, int64, real64
   use iso_c_binding
   implicit none
@@ -285,10 +286,9 @@ contains
     else
        print *, "Validation RESULT: FAILURE! Corrupted data encountered."
     end if
-
+    call analyze_boxes( original_boxes )
   end subroutine TestSnappyCompression
 end module SnappyCompressionTest
-
 
 program main
   use SnappyCompressionTest
