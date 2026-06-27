@@ -1,8 +1,8 @@
 # Control file for MAGPARSER
 program square
 systeminfo
-decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT1.mag
-# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
+# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT1.mag
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6.mag
 decl output o1 = MW_4x4_output.mag
@@ -13,11 +13,9 @@ exec run o1:sd2  = d1:diff ~ d1:poly
 exec run o1:sd1  = d1:diff @ d1:poly
 flush
 end
-
 exec run o1:gate = d1:poly * d1:diff
 exec run o1:ng_poly2 = d1:poly ~ o1:gate
 exec run o1:ng_poly1 = d1:poly - o1:gate
-
 exec run t1:grow_poly = d1:poly GROW nothing 0.1 0.1 0.1 0.1
 exec run t1:shrink_poly = d1:poly SHRINK nothing 0.1
 exec run o1:met1_grow = d1:met1 GROW nothing 0.1 0.1 0.1 0.1

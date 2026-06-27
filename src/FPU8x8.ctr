@@ -11,10 +11,12 @@ decl memory t1 = nothing
 info
 exec run o1:sd1   = d1:diff - d1:poly
 end
-
 exec run o1:sd2  = d1:diff ~ d1:poly
+flush
+end
 exec run o1:gate = d1:poly * d1:diff
 exec run o1:ng_poly2 = d1:poly ~ o1:gate
+exec run o1:sd2  = d1:diff ~ d1:poly
 exec run o1:ng_poly1 = d1:poly - o1:gate
 exec run t1:grow_poly = d1:poly GROW nothing 0.1 0.1 0.1 0.1
 exec run t1:shrink_poly = d1:poly SHRINK nothing 0.1

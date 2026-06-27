@@ -378,7 +378,7 @@ contains
                 select case (operator_char)
                 case('+')
                    call StartMarkTime("OR")
-                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_OR, 0 )
+                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_OR, 0_int64 )
                    call StopMarkTime("OR")                
                 case('*')
                    call StartMarkTime("AND")
