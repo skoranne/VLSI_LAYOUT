@@ -6,11 +6,9 @@ contains
   subroutine ascii_plot_boxes(boxes)
     type(Box), intent(in) :: boxes(:)
     type(Box) :: tempBox
-    integer(kind=K_COORDINATE_KIND) :: i, b, x, y
+    integer(kind=K_COORDINATE_KIND) :: b, x, y
     integer(kind=K_COORDINATE_KIND) :: min_x, max_x, min_y, max_y
     integer(kind=K_COORDINATE_KIND) :: total_cols, total_rows
-    real    :: scale_x, scale_y
-
     ! Grid Canvas Dimensions (Adjust these to fit your terminal window width/height)
     integer(kind=K_COORDINATE_KIND), parameter :: CANVAS_WIDTH  = 80
     integer(kind=K_COORDINATE_KIND), parameter :: CANVAS_HEIGHT = 40

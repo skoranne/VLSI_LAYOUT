@@ -7,6 +7,8 @@ KLBIN MW_4x4_gate_L1000_D10.bin
 KLBIN MW_4x4_sd1_L2000_D10.bin
 << sd2 >>
 KLBIN MW_4x4_sd2_L3000_D10.bin
+<< sd3 >>
+KLBIN MW_4x4_sd3_L3000_D10.bin
 << ng_poly1 >>
 KLBIN MW_4x4_ng_poly1_L4000_D10.bin
 << ng_poly2 >>

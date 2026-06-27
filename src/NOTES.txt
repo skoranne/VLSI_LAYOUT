@@ -544,3 +544,11 @@ export OMP_MAX_ACTIVE_LEVELS=2
 # Tell OpenMP: "Use 4 threads for the outer grid, and 8 threads for the inner loops"
 # Assuming a 32-core machine (4 * 8 = 32)
 export OMP_NUM_THREADS="4,8"
+
+FRAME 
+ TOTAL COUNT =              873411639                                                                                          │·········
+ |FRAME| =              873411639                                                                                              │·········
+|R1| =    297558464 |R2| =    242858880 |O1| =    873411639                                                                    │·········
+            FRAMENOT  72926.39 CPU seconds.   1807.27 REAL seconds. FULL TIME:  6868.98 MEM: VM     92718004 RSS:     84440288 │·········
+
+

@@ -7,7 +7,8 @@ DEBUG ?= 0
 VERBOSE ?= 0
 PROFILE ?= 0
 BOOST_DIR=/scratch1/skoranne/OSS_EDA_TOOLS/boost/boost
-HDF5_FC=ifx
+export HDF5_FC=mpiifx
+export HDF5_Fortran_COMPILER=mpiifx
 FORTRAN_COMPILER=/scratch1/skoranne/INTELCOMPILERS/bin/h5fc
 #FORTRAN_COMPILER=/scratch1/skoranne/NVCOMPILERS/bin/h5fc
 # Debug flags (commented out, but easily swappable)
@@ -27,7 +28,7 @@ endif
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables ---
 LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
-LDLIBS = -lz -lhdf5_fortran -lhdf5 -lstdc++
+LDLIBS = -lz -lhdf5_fortran -lhdf5 -lstdc++ -lsnappy
 
 # --- Library Definition ---
 LIBRARY = libmagparser.a
@@ -106,7 +107,9 @@ test_repetition.exe:	test_repetition.f90 $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 BOOST_XOR_CHECKER.exe: boost_xor_checker.cpp
 		       g++ -O3 -funroll-loops -I$(BOOST_DIR) boost_xor_checker.cpp -o BOOST_XOR_CHECKER.exe
+snappy_api.o:	       snappy_api.cpp
+		       g++ -O3 -Wall -c snappy_api.cpp 
 boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I$(BOOST_DIR)  boost_polygon_api.cpp -c
        
-ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe
+ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe

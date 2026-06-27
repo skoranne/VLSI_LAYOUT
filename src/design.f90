@@ -11,6 +11,7 @@ module DesignModule
    use PolygonFractureModule
    use MortonSortModule
    use MortonSortOMT
+   use BoostPolygonAPIModule
    use iso_c_binding
    use iso_fortran_env, only : int32, int64, real64
    use omp_lib
@@ -25,7 +26,8 @@ module DesignModule
       CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
       CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
       RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer,&
-      CalculateFrameNOT, FilterLayer, push_box, FinalizeLayer
+      CalculateFrameNOT, CalculateBoostOperation, FilterLayer, push_box, FinalizeLayer,&
+      DeleteDesign
 
    type :: LayerTree
       integer(kind=int64) :: root_index
@@ -170,6 +172,18 @@ module DesignModule
          type(Layer), intent(inout)   :: output_layer
       end subroutine CalculateFrameNOT
 
+      module subroutine CalculateBoostOperation( input_layer_A, input_layer_B, output_layer, control_parameter, control_value )
+         type(Layer), intent(inout) :: input_layer_A, input_layer_B
+         type(Layer), intent(inout)   :: output_layer
+         integer(kind=int64), intent(in) :: control_parameter, control_value
+       end subroutine CalculateBoostOperation
+
+       module subroutine MergeBoxes( input_N, boxes, output_N )
+         integer(kind=int64), intent(in) :: input_N
+         type(Box), allocatable, intent(inout) :: boxes(:)
+         integer(kind=int64), intent(out) :: output_N         
+       end subroutine MergeBoxes
+       
    end interface
 
 contains
@@ -413,9 +427,8 @@ contains
       integer(int64), allocatable :: permutation(:)
       type(BucketBoundary), allocatable :: segments(:)
       integer(int64) :: starting_segment
-      real(kind=real64) :: overlap_area, overlap_perimeter
+      !real(kind=real64) :: overlap_area, overlap_perimeter
       logical :: dominated_by_squares
-      integer(kind=int64) :: my_start
       integer(kind=int64), parameter :: K_MINIMUM_SPAWN = 4096 !> we process anything below this on main thread
 
       dominated_by_squares = .false.
@@ -490,6 +503,7 @@ contains
             permutation( segments( i )%start_idx:segments( i )%end_idx ) )
          updated_box_count = 0
          call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
+         !call MergeBoxes( box_count, current_polygon_boxes, updated_box_count )
          n = size( current_polygon_boxes )
          if( final_count + updated_box_count >= final_capacity ) then
             !write(*,*) 'FC = ', final_capacity, ' EC = ', final_count + updated_box_count
@@ -755,17 +769,36 @@ contains
          input_layer%layerState = 31 !> we set everything
          return
       end if
-
+      #ifdef USE_BOOST_POLYGON
       if( NeedsHealing( input_layer ) ) then
-         !> by the time we come here this should not be needed
-         !$komp critical (heal_boxes_lock) !> work around
-         call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
-         !$komp end critical (heal_boxes_lock)
-         write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
-         input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
-         input_layer%n_used = output_box_count
+         block
+           type(Layer) :: tempLayer
+           !> by the time we come here this should not be needed
+           !$komp critical (heal_boxes_lock) !> work around
+           !call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+           call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, tempLayer%layer_boxes )
+           if( allocated( input_layer%layer_boxes) ) deallocate( input_layer%layer_boxes )
+           call move_alloc( from=tempLayer%layer_boxes, to=input_layer%layer_boxes)
+           input_layer%n_used = tempLayer%n_used
+           !$komp end critical (heal_boxes_lock)
+           !write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
+           input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
+           !input_layer%n_used = output_box_count
+         end block
       end if
-
+      #else
+      if( NeedsHealing( input_layer ) ) then
+         block
+           !> by the time we come here this should not be needed
+           !$komp critical (heal_boxes_lock) !> work around
+           call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+           !$komp end critical (heal_boxes_lock)
+           !write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
+           input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
+           input_layer%n_used = output_box_count
+         end block
+      end if      
+      #endif
       if( NeedsSorting( input_layer ) ) then
          #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__) 
             call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
@@ -808,7 +841,7 @@ contains
    subroutine PreprocessLayerByPolygon( input_layer )
       type(Layer), intent(inout) :: input_layer
       real(kind=real64) :: overlap_area, overlap_perimeter
-      integer(kind=int64) :: output_box_count, num_squares
+      integer(kind=int64) :: num_squares
       logical             :: dominated_by_squares
       if( input_layer%n_used == 0 ) then
          input_layer%layerState = LAYER_STATE_EVERYTHING !> we set everything
@@ -853,7 +886,7 @@ contains
       type(Layer), intent(inout) :: input_layer
       integer            :: env_len, env_status
       call get_environment_variable( 'MAGPARSER_CONTROL_PREPROCESS_LAYER_BY_POLYGON', length=env_len, status=env_status )
-      if( env_status == 0 ) then !> value is not set
+      if( env_status == 0 ) then !> value is set
          call PreprocessLayerByPolygon( input_layer )
       elseif( env_status == 1 ) then !> value is not set
          call PreprocessLayerSL( input_layer )
@@ -918,7 +951,6 @@ contains
       type(Box) :: tempBox
       integer :: nthreads, tid, alloc_status
       integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-      integer :: Adone, Bdone
       !> we can create the RTree for A and B if needed
       !> since the SkipList is not re-entrant, we cannot do parallel here (yet)
       !$komp parallel default(shared)
@@ -1017,12 +1049,9 @@ contains
    subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer )
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout)   :: output_layer
-      integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC
       type(XYTracker), allocatable :: trackers(:)
-      integer(kind=int64) :: number_leaves
       type(Box) :: bboxA
       type(Layer) :: temp_layer
-      integer :: nthreads, tid, alloc_status
       integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
 
       !> we can create the RTree for A and B if needed
@@ -1061,6 +1090,8 @@ contains
    subroutine ClearLayer( input_layer_A )
       type(Layer), intent(inout) :: input_layer_A
       if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
+      if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
+      if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
       input_layer_A%n_used = 0
       input_layer_A%n_alloc = 0
       input_layer_A%layerState = LAYER_STATE_EVERYTHING
@@ -1069,7 +1100,6 @@ contains
    subroutine CopyLayer( input_layer_A, output_layer )
       type(Layer), intent(inout) :: input_layer_A
       type(Layer), intent(inout) :: output_layer
-      integer(kind=int64) :: i
       if( input_layer_A%n_used == 0 ) then
          call ClearLayer( output_layer )
          return
@@ -1080,5 +1110,16 @@ contains
       output_layer%layerState = input_layer_A%layerState
    end subroutine CopyLayer
 
+   subroutine DeleteDesign( input_design )
+     type(Design), intent(inout) :: input_design
+     integer :: i
+     do i=1,size( input_design%layers )
+        call ClearLayer( input_design%layers(i) )
+     end do
+     if( allocated( input_design%layers ) )     deallocate( input_design%layers )
+     if( allocated( input_design%layerNames ) ) deallocate( input_design%layerNames )
+
+   end subroutine DeleteDesign
+   
 end module DesignModule
 

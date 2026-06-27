@@ -14,7 +14,7 @@ contains
   subroutine LoadKLBin(fileName,boxes)
     character(len=*), intent(in)  :: filename
     type(Box), allocatable,intent(out) :: boxes(:)
-    integer(kind=int64) :: file_bytes, total_boxes, i, dot_pos
+    integer(kind=int64) :: file_bytes, total_boxes, i
     integer, parameter  :: BOX_SIZE_BYTES = 16 ! 4 coordinates * 4 bytes
     integer :: file_unit, io_status
     ! 1. Query the filesystem for the total file size in bytes
@@ -72,7 +72,7 @@ contains
           error stop "INVALID BOX"
        end if
     end do
-    write(*,'(A,I12,A)') 'INFO: Writing array of     ', total_boxes, ' boxes.'
+    !write(*,'(A,I12,A)') 'INFO: Writing array of     ', total_boxes, ' boxes.'
     ! 2. Open the file in raw binary stream mode
     open(newunit=file_unit, &
          file=trim(filename), &
@@ -88,7 +88,7 @@ contains
     ! 3. Write the entire array cleanly into the file in one shot
     write(file_unit, iostat=io_status) boxes
     if (io_status == 0) then
-       write(*,'(A,I12,A)') 'INFO: Write successful for ', total_boxes, ' boxes.'
+       !write(*,'(A,I12,A)') 'INFO: Write successful for ', total_boxes, ' boxes.'
     else
        print *, "Error occurred while writing the data array."
     end if

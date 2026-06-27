@@ -75,7 +75,7 @@ contains
           byte = int(more, int8)                       ! final byte
        end if
 
-       if (pos > size(buf, kind=int64)) call enlarge(buf, pos+1024)
+       if (pos > size(buf, kind=int64)) call enlarge(buf, pos+1024*256)
        buf(pos) = byte
        pos = pos + 1
        if (v == 0_int64) exit
@@ -119,18 +119,18 @@ contains
     integer(kind=int64)                           :: newsize
     integer(kind=int8), allocatable                :: tmp(:)
     integer :: istat
-    newsize = max(needed, max(1024_int64, int(size(buf, kind=int64)*1.25), int64))
-    write(*,*) 'Enlarging buffer: ', newsize
+    !newsize = max(needed, max(1024_int64, int(size(buf, kind=int64)*1.25), int64))
+    newsize = max(needed, int(size(buf, kind=int64)*2_int64), int64)
+    write(*,*) 'Enlarging buffer from: ', int(size(buf),kind=int64), ' to: ', newsize
     allocate(tmp(newsize),stat=istat)
     if( istat /= 0 ) then
        write(*,*) 'Allocation failed: ', newsize, ' istat = ', istat
     end if
-    
     if (allocated(buf)) then
        tmp(1:size(buf,kind=int64)) = buf
-       deallocate(buf)
     end if
-    buf = tmp
+    call move_alloc( from=tmp, to=buf)
+    !buf = tmp
   end subroutine enlarge
 
   !=================================================================
@@ -164,7 +164,7 @@ contains
     ! -----------------------------------------------------------------
     !  Allocate a small initial buffer – it will be enlarged automatically.
     ! -----------------------------------------------------------------
-    allocate(stream%data(6*size(boxes,kind=int64)))
+    allocate(stream%data(16*size(boxes,kind=int64)))
     stream%data = 0_int8
     pos = 1_int64
 
@@ -179,6 +179,7 @@ contains
     prev_y2 = 0_K_COORDINATE_KIND
 
     do i = 1_int64, size(boxes, kind=int64)
+       if( mod(i, 1000000) == 0 ) write(*,*) 'Writing ',i, ' / ', size(boxes, kind=int64)
        ! ---- delta ----------------------------------------------------
        u = zz_encode( int(boxes(i)%x1, K_COORDINATE_KIND) - int(prev_x1, K_COORDINATE_KIND) )
        call vlq_put(u, stream%data, pos)

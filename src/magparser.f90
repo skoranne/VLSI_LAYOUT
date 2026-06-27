@@ -142,7 +142,7 @@ contains
     character(len=:), allocatable :: layerFileName
     character(10)                 :: num_str
     integer(kind=8) :: start_tick, end_tick, clock_rate
-    real(kind=8)    :: elapsed_time, elapsed_time1, elapsed_time2
+    real(kind=8)    :: elapsed_time, elapsed_time2
     integer(kind=8) :: num_roots, num_rects
     real(kind=real64),allocatable :: overlap_areas(:)
     real(kind=real64),allocatable :: overlap_perimeter(:)
@@ -150,7 +150,6 @@ contains
     type(Box), allocatable :: extents(:)
     type(Box), pointer            :: DESIGN_EXTENT
     integer(kind=int64)    :: num_squares
-    character(len=255) :: env_val
     integer            :: env_len, env_status
     integer(kind=int64):: number_expected_interactions
     
@@ -421,7 +420,7 @@ contains
                 layers(layer_id)%n_alloc = layers(layer_id)%n_used
                 !write(*,'(A,A8,A30)') 'Input  Request KLBIN: ', layerNames(layer_id), ' => ', section_name                
              else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
-                write(*,'(A,A10,A30)') 'Output Request KLBIN: ', trim(layerNames(layer_id)), ' => ', trim(adjustl(section_name))
+                !write(*,'(A,A10,A30)') 'Output Request KLBIN: ', trim(layerNames(layer_id)), ' => ', trim(adjustl(section_name))
              end if
              allocate( layers(layer_id)%fileName, source= trim(adjustl(section_name)))
              !write(*,*) layers(layer_id)%fileName
@@ -504,7 +503,7 @@ contains
           num_squares = count( is_square(boxes) )
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
           if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
-             write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated, ', num_squares, ' / ', size(boxes)
+             !write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated, ', num_squares, ' / ', size(boxes)
              !number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
              number_expected_interactions = 0
              if( number_expected_interactions > 0 ) then
@@ -715,9 +714,6 @@ contains
     end do
     write (*,*) '+-----------------------------------------------------------------+'    
     write(*,*) ''
-    do i = 1, size(layers)
-       !deallocate( layers(i)%layer_boxes ) !? > this is not expected
-    end do
   end subroutine parseMagicLayoutFile
 
   subroutine ResizeLayer(layers,layer_id, newSize)
@@ -753,13 +749,15 @@ contains
   !> support for writing VLSI Magic format with binary payload of geometry data
   subroutine writeMagicLayoutFile(load_design)
     ! Write Magic VLSI layout files with component sections and rectangle definitions
-    type(Design), intent(in), target :: load_design
-    integer :: i, pos
+    type(Design), intent(inout), target :: load_design
+    integer :: i, pos, deleted_layer_count
     if( load_design%design_direction /= DESIGN_DIRECTION_OUTPUT ) then
        error stop "Non-output DB being written out" !> I may relax this, but not good idea
     end if
-    write(*,*) 'Writing DB: ', load_design%fileName
-    write(*,*) 'Writing: ', size(load_design%layers), ' potential layers.'
+    if( debug_verbosity > 1 ) then
+       write(*,*) 'Writing DB: ', load_design%fileName
+    end if
+    deleted_layer_count = 0
     do i=1,size(load_design%layers)
        if( load_design%layers(i)%n_used == 0 ) cycle
        !> Lets just assume we are writing in KLBIN
@@ -773,6 +771,13 @@ contains
           error stop "DBOUT only supports KLBIN, edit the output MAG file to fix"
        end if
        call WriteKLBin( load_design%layers(i)%fileName, load_design%layers(i)%layer_boxes, load_design%layers(i)%n_used )
+       !> as an memory optimization we are going to delete the layer after a flush
+       !> if this layer is reused later, that will be a problem, so let us deliberately let it crash for now
+       call ClearLayer( load_design%layers(i) )
+       deleted_layer_count = deleted_layer_count + 1
     end do
+    if( debug_verbosity > 1 ) then
+       write(*,*) 'Written and delete : ', deleted_layer_count, ' layers.'
+    end if
   end subroutine writeMagicLayoutFile
 end module MagicVLSILayoutParser

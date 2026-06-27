@@ -3,8 +3,11 @@ LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
 	   polygon_fracture.o boxmerge.o kldata.o design_impl.o gpu_morton_sort.o\
 	   systeminfo_gpu.o interaction.o gpu_pnummerge.o RLEMerge.o ascii_plot.o\
-	   boost_polygon_apif.o boost_polygon_api.o
+	   boost_polygon_apif.o boost_polygon_api.o boxbytestream.o box_compression.o\
+	   snappy_api.o snappy_apif.o
 
+box_compression.o: boxbytestream.o snappy_apif.o
+snappy_apif.o:	   snappy_api.o
 systeminfo.o:	commonmodule.o version_mod.o
 hashtable.o:	systeminfo.o
 geometry.o:	hashtable.o
@@ -20,8 +23,8 @@ datastructures.o:	commonmodule.o
 pnummerge.o:	datastructures.o rtree.o geometry.o gpu_pnummerge.o
 gpu_pnummerge.o:	interaction.o
 polygon_fracture.o:	hdfdata.o
-design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o interaction.o
-design_impl.o:	design.o geometry.o
+design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o interaction.o boost_polygon_apif.o
+design_impl.o:	design.o geometry.o boost_polygon_apif.o
 magparser.o:	polygon_fracture.o design.o morton.o kldata.o
 mainmagparser.o:	magparser.o controlparser.o
 controlparser.o:	design.o

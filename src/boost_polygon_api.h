@@ -27,6 +27,14 @@ void PerformMerge(const struct c_box* input,
                   unsigned long N, 
                   struct c_box* output, 
                   unsigned long* outN);
+void PerformBoostPolygonOperation(const struct c_box* input_A, 
+				  unsigned long AN,
+				  const struct c_box* input_B, 
+				  unsigned long BN,
+				  struct c_box* output, 
+				  unsigned long* outN,
+				  unsigned long control_parameter,
+				  long control_value);
 
 #ifdef __cplusplus
 }

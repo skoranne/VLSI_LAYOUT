@@ -11,10 +11,16 @@ exec run o1:li1  = d1:li1 COPY nothing
 exec run o1:met1 = d1:met1 COPY nothing
 exec run o1:gate = d1:poly * d1:diff
 exec run t1:ng_poly2 = d1:poly ~ o1:gate
-exec run t1:ng_poly = d1:poly - o1:gate
-exec run o1:sd   = d1:diff - d1:poly
 exec run o1:sd2  = d1:diff ~ d1:poly
 exec run o1:met1_grow = d1:met1 GROW nothing 0.1 0.1 0.1 0.1
 exec run o1:poly_retarget = d1:poly GROW nothing 0.2 0.1 0.2 0.2
+exec run t1:poly_grow = d1:poly SIZE nothing 0.01
+exec run t1:poly_shrink = d1:poly SIZE nothing -0.01
+exec run t1:met1_grow = d1:met1 SIZE nothing 0.01
+exec run t1:met1_shrink = d1:met1 SIZE nothing -0.01
+exec run o1:poly_outer_ring = t1:poly_grow ! d1:poly
+exec run o1:poly_inner_ring = d1:poly ! t1:poly_shrink
+exec run o1:met1_outer_ring = t1:met1_grow ! d1:met1
+exec run o1:met1_inner_ring = d1:met1 ! t1:met1_shrink
 flush
 end 

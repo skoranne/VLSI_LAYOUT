@@ -17,7 +17,9 @@ From: registry.access.redhat.com/ubi8/ubi:latest
     /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libsvml.so /opt/libs/libsvml.so
     /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libintlc.so.5 /opt/libs/libintlc.so.5
     /scratch1/skoranne/intel/oneapi/compiler/2025.0/lib/libirng.so /opt/libs/libirng.so
-    
+    /scratch1/skoranne/intel/oneapi/mpi/2021.14/lib/libmpifort.so.12 /opt/libs/libmpifort.so.12
+    /scratch1/skoranne/intel/oneapi/mpi/2021.14/lib/libmpi.so.12 /opt/libs/libmpi.so.12
+ 
     # 2. REMOVED libdl.so.2 completely (The base ubi8 image already has its own working version)
 
     # 3. Copy your executable

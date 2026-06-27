@@ -118,7 +118,7 @@ contains
     integer, intent(in) :: MAX_LAYERS
     integer, parameter  :: K_MAX_DBS = 32 !< will this work
     character(len=256) :: line, keyword, rest
-    integer :: unit, ios, pos, line_number, db_count, parse_status, i
+    integer :: unit, ios, pos, line_number, db_count, i
     integer :: lhs_db_index, rhs1_db_index, rhs2_db_index
     integer :: lhs_layer_index, rhs1_layer_index, rhs2_layer_index    
     type(Design), allocatable, target :: design_dbs(:)
@@ -178,7 +178,7 @@ contains
           if( trim(rest(1:pos-1)) == 'temp_folder' ) then
              rest = adjustl(rest)
              pos = index( rest, ' ' )             
-             write(*,*) 'TEMP_FOLDER = ', trim(rest(1:pos-1))
+             write(*,*) 'USING TEMP_FOLDER = ', trim(rest(1:pos-1))
              TEMPORARY_FOLDER = trim(rest(1:pos-1))
           end if
           cycle read_loop
@@ -214,7 +214,7 @@ contains
              call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
              if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
              allocate( design_dbs( db_count )%designName, source = trim(adjustl(rest(1:pos-1))))
-             write(*,*) '=======> Assigning ', db_count, ' to ', design_dbs( db_count )%designName
+             !write(*,*) '=======> Assigning ', db_count, ' to ', design_dbs( db_count )%designName
              pos = index( rest, ' ' )          
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
@@ -233,7 +233,7 @@ contains
              keyword = adjustl(rest(pos+2:))
              pos = index( keyword, ' ' )
              if( trim(keyword(1:pos)) /= 'nothing' ) error stop "MEMORY DB must have backing store nothing"
-             write(*,*) 'Creating MEMORY db: ', trim(keyword(1:pos))
+             write(*,*) 'Creating MEMORY db: ', trim( design_dbs( db_count )%designName )
              !write(*,*) 'DB file handle = ', trim(keyword(1:pos)), ' assigned DB_COUNT: ', db_count !> file
              !call parseMagicLayoutFile(design_dbs(db_count), trim(keyword(1:pos)), MAX_LAYERS)
              design_dbs(db_count)%design_direction = DESIGN_DIRECTION_MEMORY
@@ -289,8 +289,8 @@ contains
                 lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
                 if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
                 design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
-                write(*,*) 'NEW LHS layer index = ', lhs_layer_index, ' for ', trim(adjustl(rest(1:pos-1))), ' ', &
-                     trim(adjustl(design_dbs( lhs_db_index )%layerNames(lhs_layer_index)))
+                !write(*,*) 'NEW LHS layer index = ', lhs_layer_index, ' for ', trim(adjustl(rest(1:pos-1))), ' ', &
+                !     trim(adjustl(design_dbs( lhs_db_index )%layerNames(lhs_layer_index)))
                 allocate(lhs_layer%fileName, source = trim(TEMPORARY_FOLDER)//trim(adjustl(rest(1:pos-1))))
              end if
              if( lhs_layer_index < 0 ) error stop "DB INDEX layer corruption"
@@ -309,7 +309,7 @@ contains
                 error stop
              else
                 if(.not. allocated( design_dbs(rhs1_db_index)%designName ) ) error stop
-                write(*,*) 'RHS1 DB index: ', rhs1_db_index, ' for ', trim(rest(1:pos-1)), ' ~ ', trim(design_dbs(rhs1_db_index)%designName)
+                !write(*,*) 'RHS1 DB index: ', rhs1_db_index, ' for ', trim(rest(1:pos-1)), ' ~ ', trim(design_dbs(rhs1_db_index)%designName)
              end if
              rest = adjustl(rest(pos+1:))
              pos  = index( rest, ' ')
@@ -320,8 +320,8 @@ contains
              end if
              rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
              rest = adjustl(rest(pos+1:))
-             !write(*,*) 'RESTD = ', trim(rest)
-             pos  = scan( rest, '+-*%^~')
+             !write(*,*) 'RESTD BEFORE CHAR OPERATOR SCAN = ', trim(rest)
+             pos  = scan( rest, '+@*%^~!') !> second time we tripped on this, -0.5 is valid
              if( pos /= 0 ) then !> single char operators for brevity
                 !> valid operator found
                 operator_char = rest(pos:pos)
@@ -341,9 +341,11 @@ contains
                 end if
                 rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
                 pos  = index( rest, ' ')
-                write(*,'(A,I3,A,I3,A,I3,A,I3,A4,I3,A,I3)') 'Getting ready to execute: ', &
-                     lhs_db_index,':',lhs_layer_index, ' = ', &
-                     rhs1_db_index,':',rhs1_layer_index, operator_char, rhs2_db_index,':',rhs2_layer_index
+                if( debug_verbosity > 1 ) then
+                   write(*,'(A,I3,A,I3,A,I3,A,I3,A4,I3,A,I3)') 'Getting ready to execute: ', &
+                        lhs_db_index,':',lhs_layer_index, ' = ', &
+                        rhs1_db_index,':',rhs1_layer_index, operator_char, rhs2_db_index,':',rhs2_layer_index
+                end if
                 write(*,'(A,A3,A,A3,A,A4,A,A3,A4,A3,A,A3)') 'Getting ready to execute: ', &
                      design_dbs(lhs_db_index)%designName,':',&
                      trim(design_dbs(lhs_db_index)%layerNames(lhs_layer_index)), ' = ', &
@@ -353,24 +355,26 @@ contains
                 select case (operator_char)
                 case('+')
                    call StartMarkTime("OR")
-                   call CalculateOR( rhs1_layer, rhs2_layer, lhs_layer )
-                   write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
+                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_OR, 0 )
                    call StopMarkTime("OR")                
                 case('*')
                    call StartMarkTime("AND")
                    call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )
-                   write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used                   
+                   !> since we really cannot predict the output size
+                   !call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_AND, int( ivar(1), kind=int64) )            
                    call StopMarkTime("AND")                
-                case('-')
+                case('@')
                    call StartMarkTime("NOT")
-                   call CalculateNOT( rhs1_layer, rhs2_layer, lhs_layer )
-                   write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
+                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_NOT, int( ivar(1), kind=int64) )                   
                    call StopMarkTime("NOT")
                 case('~')
                    call StartMarkTime("FRAMENOT")
                    call CalculateFrameNOT( rhs1_layer, rhs2_layer, lhs_layer )
-                   write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
-                   call StopMarkTime("FRAMENOT")                
+                   call StopMarkTime("FRAMENOT")
+                case('!')
+                   call StartMarkTime("BOOSTNOT")
+                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_NOT, 0 )
+                   call StopMarkTime("BOOSTNOT")                                   
                 case('^')
                 case('%')
                 end select
@@ -382,7 +386,7 @@ contains
                   character(len=:), allocatable  :: primary_operator, rhs2_source_name
                   integer(kind=int64) :: ios, ivar1, ivar2, ivar3, ivar4, ivar5 !> add more if needed
                   integer(kind=real64):: rvar1, rvar2, rvar3, rvar4, rvar5 !> add more if needed
-                  write(*,*) 'REST HERE: = ', trim(rest), ' ', adjustl(rest)
+                  !write(*,*) 'REST HERE: = ', trim(rest), ' ', adjustl(rest)
                   rest = adjustl(rest)
                   rest = trim(rest)
                   read(rest, *, iostat=ios) buf1, buf2
@@ -408,37 +412,53 @@ contains
                      end if
                      call StartMarkTime(primary_operator)
                      select case (primary_operator)
+                     case('OR2')
+                        call CalculateOR( rhs1_layer, rhs2_layer, lhs_layer )
+                        !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
+                     case('AND2')
+                        call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )
+                        !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
+                     case('NOT')
+                        call CalculateNOT( rhs1_layer, rhs2_layer, lhs_layer )
+                        !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
+                     case('FRAMENOT')
+                        call CalculateFrameNOT( rhs1_layer, rhs2_layer, lhs_layer )
+                        !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case ('EXTENT')
                         !> d1:poly EXTENT nothing
                         if( rhs2_source_name /= 'nothing' ) error stop "EXTENT must use nothing as second layer"
-                        write(*,*) 'Found PRIMARY_OPERATOR = EXTENT'
+                        !write(*,*) 'Found PRIMARY_OPERATOR = EXTENT'
                         call CreateEXTENT( rhs1_layer, lhs_layer )
                      case ('AND')
                         !> d1:poly AND nothing
                         if( rhs2_source_name /= 'nothing' ) error stop "AND must use nothing as second layer"
-                        write(*,*) 'Found PRIMARY_OPERATOR = AND'
+                        !write(*,*) 'Found PRIMARY_OPERATOR = AND'
                         call CalculateSingleLayerAND( rhs1_layer, lhs_layer )
                      case ('COPY')
                         !> d1:poly COPY nothing
                         if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"
-                        write(*,*) 'Found PRIMARY_OPERATOR = COPY'
+                        !write(*,*) 'Found PRIMARY_OPERATOR = COPY'
                         call CopyLayer( rhs1_layer, lhs_layer )
                      case ('GRID')
                         !> d1:poly GRID nothing 10 10
                         if( rhs2_source_name /= 'nothing' ) error stop "EXTENT must use nothing as second layer"
-                        write(*,*) 'Found PRIMARY_OPERATOR = GRID'
+                        !write(*,*) 'Found PRIMARY_OPERATOR = GRID'
                         call CreateGRID( rhs1_layer, lhs_layer, 10, 10, 10 ) !> the last argument is OVERLAP
                      case ('GROW') !> lhs = rhs GROW nothing EAST NORTH WEST SOUTH (all positive)
                         if( rhs2_source_name /= 'nothing' ) error stop "GROW must use nothing as second layer"
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
-                        write(*,*) 'Found PRIMARY_OPERATOR = GROW at PRECISION ', used_precision, ' ', rvar(1), ' ', rvar(2), ' ', rvar(3), ' ', rvar(4)
+                        !write(*,'(A,I8,4(A,F8.2))') 'Found PRIMARY_OPERATOR = GROW at PRECISION ', used_precision, ' ', rvar(1), ' ', rvar(2), ' ', rvar(3), ' ', rvar(4)
                         do i=1,4
                            ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
                         end do
                         call CalculateGROWLayer( rhs1_layer, lhs_layer, ivar(1:4) )
-                     case ('SHRINK')
+                     case ('SIZE')
+                        if( rhs2_source_name /= 'nothing' ) error stop "SIZE must use nothing as second layer"                        
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1)
-                        write(*,*) 'Found PRIMARY_OPERATOR = SHRINK ', rvar(1)
+                        !write(*,*) 'Found PRIMARY_OPERATOR = SIZE ', rvar(1)
+                        ivar(1) = int( rvar(1)*used_precision, kind=int64)
+                        call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_SIZE, int( ivar(1), kind=int64) )
+                        !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case ('WORMHOLE')
                         write(*,*) 'Found PRIMARY_OPERATOR = WORMHOLE'
                         !> d1:met1 WORMHOLE f1:met1_marker 5 100
@@ -481,6 +501,23 @@ contains
              end if
           end do
           call StopMarkTime("dbFlush")          
+          cycle read_loop
+       case ('delete')
+          call StartMarkTime("delete")
+          rest = adjustl( rest ) !> remove leading whitespace
+          pos = index( rest, ' ' )
+          call hash_get( ht, trim(rest(1:pos-1)), lhs_db_index, ins )
+          if( .not. ins ) then
+             write(*,*) 'ERROR: DELETE db-index not found: ', line_number
+             error stop "ERROR: DELETE db-index not found."
+          end if
+          call DeleteDesign( design_dbs( lhs_db_index ) )
+          !> any use of this db after this point in the file is an ERROR
+          call hash_remove( ht, trim(rest(1:pos-1)), ins )
+          if( .not. ins ) then
+             write(*,*) 'INFO: DELETE db-index not removed: ', line_number
+          end if
+          call StopMarkTime("delete")          
           cycle read_loop
        case ('end')
           print *, "--- End of file"

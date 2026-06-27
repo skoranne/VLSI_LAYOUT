@@ -9,11 +9,13 @@ decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8.m
 decl output o1 = FPU_8x8_output.mag
 decl memory t1 = nothing
 info
+exec run o1:sd1   = d1:diff - d1:poly
+end
+
 exec run o1:sd2  = d1:diff ~ d1:poly
 exec run o1:gate = d1:poly * d1:diff
 exec run o1:ng_poly2 = d1:poly ~ o1:gate
 exec run o1:ng_poly1 = d1:poly - o1:gate
-exec run o1:sd1   = d1:diff - d1:poly
 exec run t1:grow_poly = d1:poly GROW nothing 0.1 0.1 0.1 0.1
 exec run t1:shrink_poly = d1:poly SHRINK nothing 0.1
 exec run o1:met1_grow = d1:met1 GROW nothing 0.1 0.1 0.1 0.1

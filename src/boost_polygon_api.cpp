@@ -58,7 +58,7 @@ extern "C" {
     // 3. Extract the merged rectangles
     std::vector<bp::rectangle_data<coord_t>> merged_rects;
     poly_set.get_rectangles(merged_rects);
-
+    poly_set.clear();
     // 4. Write back to the pre-allocated output buffer
     *outN = merged_rects.size();
     for (size_t i = 0; i < merged_rects.size(); ++i) {
@@ -68,5 +68,63 @@ extern "C" {
       output[i].y2 = bp::yh(merged_rects[i]);
     }
   }
+  void PerformBoostPolygonOperation(const struct c_box* input_A, 
+				    unsigned long AN,
+				    const struct c_box* input_B, 
+				    unsigned long BN,
+				    struct c_box* output, 
+				    unsigned long* outN,
+				    unsigned long control_parameter,
+				    long control_value)
+  {
+    using namespace boost::polygon::operators;
+    if ((AN == 0) && (BN == 0)) {
+      *outN = 0;
+      return;
+    }
+    coord_t size_amount = (coord_t) control_value;    
+    Polygon90Set set1, set2;
+    if( AN > 0 ) set1.insert(input_A, input_A + AN);
+    if( BN > 0 ) set2.insert(input_B, input_B + BN);
+    Polygon90Set result;
+    switch( control_parameter ) {
+    case 0:
+      result = set1 ^ set2;
+      break;
+    case 1:
+      result = set1 | set2;
+      break;
+    case 2:
+      result = set1 & set2;
+      break;
+    case 3:
+      result = set1 - set2;
+      break;
+    case 4:
+      result = set1 ;
+      break;
+    case 5:
+      result = set1;
+      boost::polygon::resize(result, size_amount);
+      break;
+    default:
+      *outN = 0;
+      return;
+    }
+    // 3. Extract the merged rectangles
+    std::vector<bp::rectangle_data<coord_t>> merged_rects;
+    result.get_rectangles(merged_rects);
+    result.clear();
+    // 4. Write back to the pre-allocated output buffer
+    *outN = merged_rects.size();
+    for (size_t i = 0; i < merged_rects.size(); ++i) {
+      output[i].x1 = bp::xl(merged_rects[i]);
+      output[i].y1 = bp::yl(merged_rects[i]);
+      output[i].x2 = bp::xh(merged_rects[i]);
+      output[i].y2 = bp::yh(merged_rects[i]);
+    }
+    merged_rects.clear();
+  }
 
+  
 } // extern "C"
