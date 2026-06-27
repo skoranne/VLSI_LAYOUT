@@ -397,11 +397,11 @@ contains
                    call StopMarkTime("FRAMENOT")
                 case('!')
                    call StartMarkTime("BOOSTNOT")
-                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_NOT, 0 )
+                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_NOT, 0_int64 )
                    call StopMarkTime("BOOSTNOT")                                   
                 case('^')
                    call StartMarkTime("BOOSTXOR")
-                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_XOR, 0 )
+                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_XOR, 0_int64 )
                    call StopMarkTime("BOOSTXOR")                                                      
                    !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
                    if( abort_on_xor > 0 .and. lhs_layer%n_used > 0 ) then
