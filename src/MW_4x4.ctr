@@ -10,7 +10,7 @@ decl memory t1 = nothing
 info
 exec run o1:sd3  = d1:diff ! d1:poly
 exec run o1:sd2  = d1:diff ~ d1:poly
-exec run o1:sd1  = d1:diff - d1:poly
+exec run o1:sd1  = d1:diff @ d1:poly
 flush
 end
 

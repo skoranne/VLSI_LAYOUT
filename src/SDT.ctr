@@ -1,4 +1,51 @@
-# Control file for MAGPARSER
-program square
-decl design d1 = MY_SDT6x6.mag
+# Control file for MAGPARSER for SKYWATER 130A process
+# Designed by Sandeep Koranne (C) 1997-
+# VLSI Magic Layout Editor
+program SDT16_6x6
+systeminfo
+var abort_on_xor 1
+var debug_verbosity 0
+# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT1.mag
+# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
+# decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
+decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6.mag
+# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8.mag
+# decl design d1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1.mag
+decl output o1 = SKYWATER130A_output.mag
+decl memory d1 = nothing
+decl memory t1 = nothing
+decl memory t2 = nothing
+info
+exec run d1:poly = d1_input:poly COPY nothing
+exec run d1:diff = d1_input:diff COPY nothing
+exec run d1:met1 = d1_input:met1 COPY nothing
+exec run d1:li1 =  d1_input:li1 COPY nothing
+delete d1_input
+# exec run o1:met1_grow = d1:met1 GROW nothing 0.1 0.1 0.1 0.1
+# exec run o1:poly_retarget = d1:poly GROW nothing 0.2 0.1 0.2 0.2
+# exec run o1:diff = d1:diff COPY nothing
+# exec run o1:poly = d1:poly COPY nothing
+exec run t1:gate = d1:poly * d1:diff
+exec run t1:ng_poly1 = d1:poly ~ t1:gate
+exec run t1:ng_poly2 = d1:poly ! t1:gate
+exec run t1:xor_ng_poly = t1:ng_poly1 ^ t1:ng_poly2
+exec run o1:sd2  = d1:diff ~ d1:poly
+exec run t1:poly_grow = d1:poly SIZE nothing 0.01
+exec run t1:poly_shrink = d1:poly SIZE nothing -0.01
+exec run o1:poly_outer_ring = t1:poly_grow ! d1:poly
+exec run o1:poly_inner_ring = d1:poly ! t1:poly_shrink
+flush
+delete t1
+# All poly/gate temporary layers deleted
+exec run o1:li1  = d1:li1 COPY nothing
+exec run o1:met1 = d1:met1 COPY nothing
+exec run t2:met1_grow = d1:met1 SIZE nothing 0.01
+exec run t2:met1_shrink = d1:met1 SIZE nothing -0.01
+exec run o1:met1_outer_ring = t2:met1_grow ! d1:met1
+exec run o1:met1_inner_ring = d1:met1 ! t2:met1_shrink
+delete t2
+delete d1
+flush
+delete o1
 end 
+

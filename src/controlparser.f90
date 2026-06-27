@@ -128,11 +128,13 @@ contains
     character :: operator_char !> single letter only
     character(len=256) :: TEMPORARY_FOLDER
     character(len=256) :: TEMPORARY_LAYER_PREFIX
+    character(len=256) :: strvar
     real(kind=real64)  :: rvar(16)
     integer(kind=K_COORDINATE_KIND):: ivar(16)
     integer(kind=K_COORDINATE_KIND) :: used_precision
     db_count = 1
-    TEMPORARY_LAYER_PREFIX = "MAG_TEMP_LAYER_"
+    !TEMPORARY_LAYER_PREFIX = "MAG_TEMP_LAYER_"
+    TEMPORARY_LAYER_PREFIX = "$MTL$_"
     call hash_create(ht,K_MAX_DBS)
     allocate( design_dbs( K_MAX_DBS ) )
     ! Open the file
@@ -180,6 +182,27 @@ contains
              pos = index( rest, ' ' )             
              write(*,*) 'USING TEMP_FOLDER = ', trim(rest(1:pos-1))
              TEMPORARY_FOLDER = trim(rest(1:pos-1))
+          else if( trim(rest(1:pos-1)) == 'abort_on_xor' ) then
+             rest = adjustl(rest)
+             pos = index( rest, ' ' )
+             rest = trim( adjustl( rest(pos+1:)))
+             read(rest, *, iostat=ios) abort_on_xor
+             abort_on_xor = 1
+             if( ios /= 0 ) then
+                write(*,*) 'INFO: VAR changing abort_on_xor = ', abort_on_xor
+             else
+                write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
+             end if
+          else if( trim(rest(1:pos-1)) == 'debug_verbosity' ) then             
+             rest = adjustl(rest)
+             pos = index( rest, ' ' )
+             rest = trim( adjustl( rest(pos+1:)))
+             read( rest, *, iostat=ios) debug_verbosity
+             if( ios /= 0 ) then
+                write(*,*) 'INFO: VAR changing debug_verbosity = ', debug_verbosity
+             else
+                write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
+             end if             
           end if
           cycle read_loop
        case ('decl')
@@ -346,7 +369,7 @@ contains
                         lhs_db_index,':',lhs_layer_index, ' = ', &
                         rhs1_db_index,':',rhs1_layer_index, operator_char, rhs2_db_index,':',rhs2_layer_index
                 end if
-                write(*,'(A,A3,A,A3,A,A4,A,A3,A4,A3,A,A3)') 'Getting ready to execute: ', &
+                write(*,'(A,A3,A,A10,A,A4,A,A20,A4,A3,A,A20)') 'Getting ready to execute: ', &
                      design_dbs(lhs_db_index)%designName,':',&
                      trim(design_dbs(lhs_db_index)%layerNames(lhs_layer_index)), ' = ', &
                      design_dbs(rhs1_db_index)%designName,':',trim(design_dbs(rhs1_db_index)%layerNames(rhs1_layer_index)),&
@@ -362,7 +385,8 @@ contains
                    call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )
                    !> since we really cannot predict the output size
                    !call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_AND, int( ivar(1), kind=int64) )            
-                   call StopMarkTime("AND")                
+                   call StopMarkTime("AND")
+                   !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used      
                 case('@')
                    call StartMarkTime("NOT")
                    call CalculateNOT( rhs1_layer, rhs2_layer, lhs_layer )                   
@@ -376,6 +400,14 @@ contains
                    call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_NOT, 0 )
                    call StopMarkTime("BOOSTNOT")                                   
                 case('^')
+                   call StartMarkTime("BOOSTXOR")
+                   call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_XOR, 0 )
+                   call StopMarkTime("BOOSTXOR")                                                      
+                   !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
+                   if( abort_on_xor > 0 .and. lhs_layer%n_used > 0 ) then
+                      write(*,*) 'ERROR: Aborting RUN since abort_on_xor set > 0, and ^ layer has non-zero shapes.'
+                      error stop
+                   end if
                 case('%')
                 end select
              else
@@ -438,7 +470,7 @@ contains
                         !> d1:poly COPY nothing
                         if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"
                         !write(*,*) 'Found PRIMARY_OPERATOR = COPY'
-                        call CopyLayer( rhs1_layer, lhs_layer )
+                        call CopyLayer( lhs_layer, rhs1_layer )
                      case ('GRID')
                         !> d1:poly GRID nothing 10 10
                         if( rhs2_source_name /= 'nothing' ) error stop "EXTENT must use nothing as second layer"

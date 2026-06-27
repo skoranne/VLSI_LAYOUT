@@ -504,8 +504,8 @@ contains
           !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
           if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
              !write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated, ', num_squares, ' / ', size(boxes)
-             !number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
-             number_expected_interactions = 0
+             number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
+             !number_expected_interactions = 0
              if( number_expected_interactions > 0 ) then
                 block
                   integer(kind=int64) :: original_count, thinned_count

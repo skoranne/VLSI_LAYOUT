@@ -13,6 +13,17 @@
 !hash table and subroutines for order statistics.
 !Be thoughtful and document your work in detail. We may extend this code to collect the (X,Y) 
 !translations of a unique box, so keep that in mind.
+! =================================================
+!  BOX ORDER STATISTICS
+!  =================================================
+! Total Boxes (N):              424548608
+! Unique W/H Pairs (K):              2454
+! Distinct Widths (W1):               541
+! Distinct Heights (H1):              251
+!  -------------------------------------------------
+! Min Width:                          170
+! Max Width:                        10120
+! Median Width (approx):              390
 
 module LayoutStatisticsModule
     use CommonModule
@@ -65,18 +76,25 @@ contains
 ! ------------------------------------------------------------------
     ! FIXED: Hash Function (Sign Bit Masking)
     ! ------------------------------------------------------------------
+    ! ------------------------------------------------------------------
+    ! FIXED: Compiler-Agnostic Hash Function 
+    ! ------------------------------------------------------------------
     pure function hash_func(w, h, capacity) result(idx)
         integer(K_COORDINATE_KIND), intent(in) :: w, h, capacity
         integer(K_COORDINATE_KIND) :: idx, hash_val
         
-        ! XOR can flip the 64-bit sign bit to 1, creating a negative number
+        ! Allow the integer multiplication to overflow naturally
         hash_val = ieor(w * PRIME1, h * PRIME2)
         
-        ! Bitwise AND with 0x7FFFFFFFFFFFFFFF clears the sign bit, 
-        ! guaranteeing a positive integer before the modulo operation.
-        hash_val = iand(hash_val, int(Z'7FFFFFFFFFFFFFFF', K_COORDINATE_KIND))
+        ! Fortran's mod(A, P) preserves the sign of A. 
+        ! We compute the mod, and if it's negative, wrap it back to positive.
+        idx = mod(hash_val, capacity)
+        if (idx < 0_K_COORDINATE_KIND) then
+            idx = idx + capacity
+        end if
         
-        idx = mod(hash_val, capacity) + 1
+        ! Map to Fortran's 1-based indexing
+        idx = idx + 1_K_COORDINATE_KIND
     end function hash_func
 
     ! ------------------------------------------------------------------

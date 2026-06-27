@@ -58,7 +58,7 @@ contains
     !> how to guess the output size, A * B could be O(n^2)
     if( control_parameter == K_BOOST_CONTROL_AND ) then
        write(*,*) 'INFO: this is not supported.'
-       guessed_output_size = AN*BN
+       guessed_output_size = 10*max(AN,BN) !> this is insufficient
     else
        guessed_output_size = 4*max(AN,BN)
     end if

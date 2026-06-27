@@ -99,6 +99,7 @@ module DesignModule
    !------------------------------------------------------------------
    interface assignment(=)
       module procedure AssignFromBox
+      module procedure CopyLayer
    end interface assignment(=)
 
    interface
@@ -512,11 +513,13 @@ contains
          final_boxes(final_count+1:final_count+updated_box_count) = current_polygon_boxes(1:updated_box_count)
          final_count = final_count + updated_box_count
          !write (*,*) 'Heal changed: ', box_count, ' ', updated_box_count, ' current count = ', final_count
-         do j=1,updated_box_count
-            tempBox = current_polygon_boxes(j)
-            if( .not. tempBox%is_valid() ) error stop "BOX NOT VALID"
-            !write(*,'(A,I,A,4I)') 'Box ', j, ': ', tempBox%x1, tempBox%y1, tempBox%x2, tempBox%y2
-         end do
+         if( debug_verbosity > 1 ) then         
+            do j=1,updated_box_count
+               tempBox = current_polygon_boxes(j)
+               if( .not. tempBox%is_valid() ) error stop "BOX NOT VALID"
+               !write(*,'(A,I,A,4I)') 'Box ', j, ': ', tempBox%x1, tempBox%y1, tempBox%x2, tempBox%y2
+            end do
+         end if
          !write (*,*) current_polygon_boxes(1:box_count)
          !> do we have enough space in final_boxes ?
          !if (box_count > max_boxes) then
@@ -646,11 +649,13 @@ contains
 #endif
       !deallocate( input_layer%layer_boxes )
       call move_alloc(from=current_polygon_boxes, to=input_layer%layer_boxes )
-      do i=1,final_count
-         tempBox = input_layer%layer_boxes(i)
-         if( .not. tempBox%is_valid() ) error stop "BOX NOT VALID"
-         !write(*,'(A,I,A,4I)') 'Box ', i, ': ', tempBox%x1, tempBox%y1, tempBox%x2, tempBox%y2
-      end do
+      if( debug_verbosity > 1 ) then
+         do i=1,final_count
+            tempBox = input_layer%layer_boxes(i)
+            if( .not. tempBox%is_valid() ) error stop "BOX NOT VALID"
+            !write(*,'(A,I,A,4I)') 'Box ', i, ': ', tempBox%x1, tempBox%y1, tempBox%x2, tempBox%y2
+         end do
+      end if
       if( size(input_layer%layer_boxes) /= final_count ) error stop "INCONSISTENT layer box size."
       input_layer%n_used = final_count
       input_layer%n_alloc = final_count
@@ -658,7 +663,11 @@ contains
       allocate( input_layer%tree%tree_nodes( CalculateTotalNodes( final_count, K_LEAF_CAPACITY ) ) )
       !> the layer could be square dominated, lets look at pre-healed rectangles and decide
       if( dominated_by_squares ) then
+      #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__) 
+         call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
+      #else   
          call MortonSort( input_layer%layer_boxes )
+      #endif
       else
          call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
       end if
@@ -1097,17 +1106,19 @@ contains
       input_layer_A%layerState = LAYER_STATE_EVERYTHING
    end subroutine ClearLayer
 
-   subroutine CopyLayer( input_layer_A, output_layer )
-      type(Layer), intent(inout) :: input_layer_A
-      type(Layer), intent(inout) :: output_layer
-      if( input_layer_A%n_used == 0 ) then
-         call ClearLayer( output_layer )
-         return
-      end if
-      output_layer%layer_boxes = input_layer_A%layer_boxes
-      output_layer%n_used = input_layer_A%n_used
-      output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
-      output_layer%layerState = input_layer_A%layerState
+   subroutine CopyLayer( output_layer, input_layer_A )
+     type(Layer), intent(inout) :: output_layer
+     type(Layer), intent(in) :: input_layer_A     
+     if( input_layer_A%n_used == 0 ) then
+        call ClearLayer( output_layer )
+        return
+     end if
+     output_layer%layer_boxes = input_layer_A%layer_boxes
+     output_layer%n_used = input_layer_A%n_used
+     output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
+     output_layer%layerState = input_layer_A%layerState
+     output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
+     output_layer%tree%root_index = input_layer_A%tree%root_index
    end subroutine CopyLayer
 
    subroutine DeleteDesign( input_design )

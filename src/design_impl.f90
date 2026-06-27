@@ -616,10 +616,11 @@ contains
     allocate( start_tick(K_GRID,K_GRID) )
     allocate( end_tick(K_GRID,K_GRID) )
     allocate( grid_layer_counts(K_GRID, K_GRID, OUTPUT_LAYER_GRID) )
+    call PreprocessLayer( input_layer_A )    
     call CreateGrid( input_layer_A, gridA, K_GRID, K_GRID,0) !> create overlapping GRID
     !call WriteKLBin("MY_gridA_L10_D10.bin", gridA%layer_boxes, gridA%n_used)
     allocate( trackersGrid(K_GRID,K_GRID) )
-    call PreprocessLayer( input_layer_A )
+
     call PreprocessLayer( input_layer_B )
     call system_clock(count_rate=clock_rate)
 
