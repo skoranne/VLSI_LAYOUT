@@ -551,4 +551,11 @@ FRAME
 |R1| =    297558464 |R2| =    242858880 |O1| =    873411639                                                                    │·········
             FRAMENOT  72926.39 CPU seconds.   1807.27 REAL seconds. FULL TIME:  6868.98 MEM: VM     92718004 RSS:     84440288 │·········
 
+Q) Why are we developing this solution when Boost Polygon already has a solution ?
+A) No GPU support and no memory encoding
+Getting ready to execute:  t1:$MTL$_xor_ =   t1:      $MTL$_ng_poly1   ^ t1:      $MTL$_ng_poly2
+terminate called after throwing an instance of 'std::bad_alloc'
+  what():  std::bad_alloc
+forrtl: error (76): Abort trap signal
+
 

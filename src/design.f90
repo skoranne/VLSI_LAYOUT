@@ -40,9 +40,9 @@ module DesignModule
       enumerator :: LAYER_STATE_PNUM  = int(4, kind=c_int)   ! 0b000100
       enumerator :: LAYER_STATE_RTREE = int(8, kind=c_int)   ! 0b001000
       enumerator :: LAYER_STATE_SLSORT= int(16, kind=c_int)   ! 0b010000
-      enumerator :: LAYER_STATE_FINAL = int(32, kind=c_int)   ! 0b100000            
+      enumerator :: LAYER_STATE_FINAL = int(32, kind=c_int)   ! 0b100000
       !enumerator :: LAYER_STATE_FINAL = int(Z'32', kind=c_int)   !> partial knowledge can be DANGEROUS: Z -> hexadecimal
-      enumerator :: LAYER_STATE_EVERYTHING = int(63, kind=c_int) 
+      enumerator :: LAYER_STATE_EVERYTHING = int(63, kind=c_int)
    end enum
    enum, bind(C)
       enumerator :: CONJUGATE_LAYER_PURPOSE_NONE       = int(Z'00', kind=c_int)   ! 0b000000
@@ -106,18 +106,18 @@ module DesignModule
       module subroutine FinalizeLayer( output_layer )
          type(Layer),intent(inout) :: output_layer
       end subroutine FinalizeLayer
-      
+
       module subroutine AssignFromBox( output_layer, input_box )
          type(Layer),intent(inout) :: output_layer
          type(Box), intent(in) :: input_box
       end subroutine AssignFromBox
 
       module subroutine FilterLayer( input_layer, input_box, output_layer )
-        type(Layer), intent(in)    :: input_layer
-        type(Layer), intent(inout) :: output_layer
-        type(Box),   intent(in)    :: input_box
+         type(Layer), intent(in)    :: input_layer
+         type(Layer), intent(inout) :: output_layer
+         type(Box),   intent(in)    :: input_box
       end subroutine FilterLayer
-      
+
       module subroutine ConvertLayerToBox( input_layer, output_layer, control_parameter )
          type(Layer), intent(inout) :: input_layer
          type(Layer), intent(inout) :: output_layer
@@ -177,14 +177,14 @@ module DesignModule
          type(Layer), intent(inout) :: input_layer_A, input_layer_B
          type(Layer), intent(inout)   :: output_layer
          integer(kind=int64), intent(in) :: control_parameter, control_value
-       end subroutine CalculateBoostOperation
+      end subroutine CalculateBoostOperation
 
-       module subroutine MergeBoxes( input_N, boxes, output_N )
+      module subroutine MergeBoxes( input_N, boxes, output_N )
          integer(kind=int64), intent(in) :: input_N
          type(Box), allocatable, intent(inout) :: boxes(:)
-         integer(kind=int64), intent(out) :: output_N         
-       end subroutine MergeBoxes
-       
+         integer(kind=int64), intent(out) :: output_N
+      end subroutine MergeBoxes
+
    end interface
 
 contains
@@ -503,6 +503,10 @@ contains
          current_polygon_boxes(1:box_count) = input_layer%layer_boxes( &
             permutation( segments( i )%start_idx:segments( i )%end_idx ) )
          updated_box_count = 0
+
+         if( box_count > 100000) then
+            write(*,*) 'BOX COUNT ', box_count, ' EXCEEDED'
+         end if
          !call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
          call MergeBoxes( box_count, current_polygon_boxes, updated_box_count )
          n = size( current_polygon_boxes )
@@ -513,7 +517,7 @@ contains
          final_boxes(final_count+1:final_count+updated_box_count) = current_polygon_boxes(1:updated_box_count)
          final_count = final_count + updated_box_count
          !write (*,*) 'Heal changed: ', box_count, ' ', updated_box_count, ' current count = ', final_count
-         if( debug_verbosity > 1 ) then         
+         if( debug_verbosity > 1 ) then
             do j=1,updated_box_count
                tempBox = current_polygon_boxes(j)
                if( .not. tempBox%is_valid() ) error stop "BOX NOT VALID"
@@ -663,11 +667,11 @@ contains
       allocate( input_layer%tree%tree_nodes( CalculateTotalNodes( final_count, K_LEAF_CAPACITY ) ) )
       !> the layer could be square dominated, lets look at pre-healed rectangles and decide
       if( dominated_by_squares ) then
-      #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__) 
+#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
          call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
-      #else   
+#else
          call MortonSort( input_layer%layer_boxes )
-      #endif
+#endif
       else
          call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
       end if
@@ -778,40 +782,40 @@ contains
          input_layer%layerState = 31 !> we set everything
          return
       end if
-      #ifdef USE_BOOST_POLYGON
+#ifdef USE_BOOST_POLYGON
       if( NeedsHealing( input_layer ) ) then
          block
-           type(Layer) :: tempLayer
-           !> by the time we come here this should not be needed
-           !$komp critical (heal_boxes_lock) !> work around
-           !call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
-           call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, tempLayer%layer_boxes )
-           if( allocated( input_layer%layer_boxes) ) deallocate( input_layer%layer_boxes )
-           call move_alloc( from=tempLayer%layer_boxes, to=input_layer%layer_boxes)
-           input_layer%n_used = tempLayer%n_used
-           !$komp end critical (heal_boxes_lock)
-           !write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
-           input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
-           !input_layer%n_used = output_box_count
+            type(Layer) :: tempLayer
+            !> by the time we come here this should not be needed
+            !$komp critical (heal_boxes_lock) !> work around
+            !call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+            call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, tempLayer%layer_boxes )
+            if( allocated( input_layer%layer_boxes) ) deallocate( input_layer%layer_boxes )
+            call move_alloc( from=tempLayer%layer_boxes, to=input_layer%layer_boxes)
+            input_layer%n_used = tempLayer%n_used
+            !$komp end critical (heal_boxes_lock)
+            !write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
+            input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
+            !input_layer%n_used = output_box_count
          end block
       end if
-      #else
+#else
       if( NeedsHealing( input_layer ) ) then
          block
-           !> by the time we come here this should not be needed
-           !$komp critical (heal_boxes_lock) !> work around
-           call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
-           !$komp end critical (heal_boxes_lock)
-           !write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
-           input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
-           input_layer%n_used = output_box_count
+            !> by the time we come here this should not be needed
+            !$komp critical (heal_boxes_lock) !> work around
+            call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+            !$komp end critical (heal_boxes_lock)
+            !write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
+            input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
+            input_layer%n_used = output_box_count
          end block
-      end if      
-      #endif
+      end if
+#endif
       if( NeedsSorting( input_layer ) ) then
-         #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__) 
-            call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
-         #else
+#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+         call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
+#else
          if( env_status /= 0 .and. env_len > 0 .and. ( .not. omp_in_parallel() ) ) then !> value is set or we can use nested
             call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
          else
@@ -827,7 +831,7 @@ contains
                call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
             end if
          end if
-         #endif
+#endif
          input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
       end if
       if( NeedsRTree( input_layer ) ) then
@@ -1107,30 +1111,30 @@ contains
    end subroutine ClearLayer
 
    subroutine CopyLayer( output_layer, input_layer_A )
-     type(Layer), intent(inout) :: output_layer
-     type(Layer), intent(in) :: input_layer_A     
-     if( input_layer_A%n_used == 0 ) then
-        call ClearLayer( output_layer )
-        return
-     end if
-     output_layer%layer_boxes = input_layer_A%layer_boxes
-     output_layer%n_used = input_layer_A%n_used
-     output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
-     output_layer%layerState = input_layer_A%layerState
-     output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
-     output_layer%tree%root_index = input_layer_A%tree%root_index
+      type(Layer), intent(inout) :: output_layer
+      type(Layer), intent(in) :: input_layer_A
+      if( input_layer_A%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
+      end if
+      output_layer%layer_boxes = input_layer_A%layer_boxes
+      output_layer%n_used = input_layer_A%n_used
+      output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
+      output_layer%layerState = input_layer_A%layerState
+      output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
+      output_layer%tree%root_index = input_layer_A%tree%root_index
    end subroutine CopyLayer
 
    subroutine DeleteDesign( input_design )
-     type(Design), intent(inout) :: input_design
-     integer :: i
-     do i=1,size( input_design%layers )
-        call ClearLayer( input_design%layers(i) )
-     end do
-     if( allocated( input_design%layers ) )     deallocate( input_design%layers )
-     if( allocated( input_design%layerNames ) ) deallocate( input_design%layerNames )
+      type(Design), intent(inout) :: input_design
+      integer :: i
+      do i=1,size( input_design%layers )
+         call ClearLayer( input_design%layers(i) )
+      end do
+      if( allocated( input_design%layers ) )     deallocate( input_design%layers )
+      if( allocated( input_design%layerNames ) ) deallocate( input_design%layerNames )
 
    end subroutine DeleteDesign
-   
+
 end module DesignModule
 
