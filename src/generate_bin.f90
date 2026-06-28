@@ -231,13 +231,15 @@ module SnappyCompressionTest
   use SnappyCompressionModule
   use CompressionChunkManagerModule
   use LayoutStatisticsModule
-  use iso_fortran_env, only : int32, int64, real64
+  use BoxCodecModule
+  use iso_fortran_env, only : int8, int32, int64, real64
   use iso_c_binding
   implicit none
 contains
-  subroutine TestSnappyCompression()
+  subroutine TestSnappyCompression(fileName)
     !use HDFDataModule
     implicit none
+    character(*), intent(in) :: fileName
     type(CompressedChunks) :: chunk_manager
     type(Box),allocatable :: original_boxes(:)
     type(Box) :: bbox
@@ -250,8 +252,12 @@ contains
     real(kind=8), parameter :: BYTES_PER_GB  = 1000000000.0_8
     real(kind=8), parameter :: BYTES_PER_GIB = 1073741824.0_8
     real(kind=real64) :: size_in_gb, total_bytes
+    type(BoxCodec) :: codec_state
+    integer(int8), allocatable :: out_stream(:)
+    integer(int64) :: bytes_written
+    
     pos = 1_int64
-    call LoadKLBin("b.bin", original_boxes)
+    call LoadKLBin(fileName, original_boxes)
     num_boxes = size( original_boxes, kind=int64 )
     total_bytes = num_boxes * 16_8
     size_in_gb = total_bytes/BYTES_PER_GIB
@@ -287,10 +293,27 @@ contains
        print *, "Validation RESULT: FAILURE! Corrupted data encountered."
     end if
     call analyze_boxes( original_boxes )
+    !> try this byte stream compression as well
+    call CompressBoxesUsingCodec(original_boxes, codec_state, out_stream, bytes_written)
   end subroutine TestSnappyCompression
 end module SnappyCompressionTest
 
 program main
   use SnappyCompressionTest
-  call TestSnappyCompression()
+  implicit none
+  integer :: narg, iostat
+  character(len=256)            :: filenameA, filenameB      
+  narg = command_argument_count()  
+  select case (narg)
+  case (0)
+     error stop "./GEN_BIN BIN-FILE"
+  case (1)
+     call get_command_argument(1, filenameA, status=iostat)   ! allocates automatically
+     if (iostat /= 0) then
+        write (*,*) "ERROR: 1st argument must be a filename."
+        stop 2
+     end if
+     write (*,*) 'Reading 1st filename: ', trim(filenameA)
+     call TestSnappyCompression( trim(filenameA) )
+  end select
 end program main

@@ -188,7 +188,7 @@ contains
              rest = trim( adjustl( rest(pos+1:)))
              read(rest, *, iostat=ios) abort_on_xor
              abort_on_xor = 1
-             if( ios /= 0 ) then
+             if( ios == 0 ) then
                 write(*,*) 'INFO: VAR changing abort_on_xor = ', abort_on_xor
              else
                 write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
@@ -198,7 +198,7 @@ contains
              pos = index( rest, ' ' )
              rest = trim( adjustl( rest(pos+1:)))
              read( rest, *, iostat=ios) debug_verbosity
-             if( ios /= 0 ) then
+             if( ios == 0 ) then
                 write(*,*) 'INFO: VAR changing debug_verbosity = ', debug_verbosity
              else
                 write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number

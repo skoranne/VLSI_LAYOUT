@@ -68,6 +68,32 @@ extern "C" {
       output[i].y2 = bp::yh(merged_rects[i]);
     }
   }
+  const coord_t K_MAXIMUM_WIDTH = 10000;
+  const coord_t K_MAXIMUM_HEIGHT = 10000;
+  typedef bp::rectangle_data<coord_t> Rectangle;
+  void subdivide_rectangles(const std::vector<Rectangle>& input_rects, 
+			    std::vector<Rectangle>& output_rects) {
+    
+    for (const auto& rect : input_rects) {
+      coord_t x_min = bp::xl(rect);
+      coord_t y_min = bp::yl(rect);
+      coord_t x_max = bp::xh(rect);
+      coord_t y_max = bp::yh(rect);
+
+      // Tile the rectangle along the X and Y axes
+      for (coord_t x = x_min; x < x_max; x += K_MAXIMUM_WIDTH) {
+	coord_t current_x_max = std::min(x + K_MAXIMUM_WIDTH, x_max);
+            
+	for (coord_t y = y_min; y < y_max; y += K_MAXIMUM_HEIGHT) {
+	  coord_t current_y_max = std::min(y + K_MAXIMUM_HEIGHT, y_max);
+                
+	  // Construct the bounded chunk safely using Boost's API
+	  Rectangle chunk(x, y, current_x_max, current_y_max);
+	  output_rects.push_back(chunk);
+	}
+      }
+    }
+  }
   void PerformBoostPolygonOperation(const struct c_box* input_A, 
 				    unsigned long AN,
 				    const struct c_box* input_B, 
@@ -112,9 +138,12 @@ extern "C" {
       return;
     }
     // 3. Extract the merged rectangles
-    std::vector<bp::rectangle_data<coord_t>> merged_rects;
-    result.get_rectangles(merged_rects);
+    std::vector<bp::rectangle_data<coord_t>> merged_rects_pre_sd;
+    result.get_rectangles(merged_rects_pre_sd);
     result.clear();
+    std::vector<bp::rectangle_data<coord_t>> merged_rects;    
+    subdivide_rectangles( merged_rects_pre_sd, merged_rects );
+    merged_rects_pre_sd.clear();
     // 4. Write back to the pre-allocated output buffer
     *outN = merged_rects.size();
     for (size_t i = 0; i < merged_rects.size(); ++i) {

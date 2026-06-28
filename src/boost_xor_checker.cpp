@@ -38,6 +38,32 @@ bool read_rectangles_binary(const std::string& filename, std::vector<Rectangle>&
   }
   return true;
 }
+const coord_t K_MAXIMUM_WIDTH = 10000;
+const coord_t K_MAXIMUM_HEIGHT = 10000;
+typedef bp::rectangle_data<coord_t> Rectangle;
+void subdivide_rectangles(const std::vector<Rectangle>& input_rects, 
+			  std::vector<Rectangle>& output_rects) {
+    
+  for (const auto& rect : input_rects) {
+    coord_t x_min = bp::xl(rect);
+    coord_t y_min = bp::yl(rect);
+    coord_t x_max = bp::xh(rect);
+    coord_t y_max = bp::yh(rect);
+
+    // Tile the rectangle along the X and Y axes
+    for (coord_t x = x_min; x < x_max; x += K_MAXIMUM_WIDTH) {
+      coord_t current_x_max = std::min(x + K_MAXIMUM_WIDTH, x_max);
+            
+      for (coord_t y = y_min; y < y_max; y += K_MAXIMUM_HEIGHT) {
+	coord_t current_y_max = std::min(y + K_MAXIMUM_HEIGHT, y_max);
+                
+	// Construct the bounded chunk safely using Boost's API
+	Rectangle chunk(x, y, current_x_max, current_y_max);
+	output_rects.push_back(chunk);
+      }
+    }
+  }
+}
 
 int main(int argc, char* argv[]) {
   using namespace boost::polygon::operators;
@@ -94,10 +120,14 @@ int main(int argc, char* argv[]) {
     std::cerr << "ERROR: invalid control parameter.\n";
   }
 
-  // 4. Extract the result directly into rectangles
-  // FIX 2: get_rectangles() invokes clean() and form_rectangles() internally
-  std::vector<Rectangle> output_rects;
-  result.get_rectangles(output_rects);
+  // 3. Extract the merged rectangles
+  std::vector<bp::rectangle_data<coord_t>> merged_rects_pre_sd;
+  result.get_rectangles(merged_rects_pre_sd);
+  result.clear();
+  std::vector<bp::rectangle_data<coord_t>> output_rects;    
+  subdivide_rectangles( merged_rects_pre_sd, output_rects );
+  merged_rects_pre_sd.clear();
+  
 
   // 5. Write the resulting rectangles to the output file in binary format
   std::ofstream out_file(outfile, std::ios::binary);
