@@ -454,7 +454,7 @@ contains
     end do
 
   end subroutine insertion_sort_boxes
-  recursive subroutine quicksort_boxes_STR(arr, left, right, axis)
+  recursive subroutine quicksort_boxes_STR_old(arr, left, right, axis)
     type(Box), intent(inout), dimension(:) :: arr
     integer(kind=int64), intent(in) :: left, right, axis
     integer, parameter :: K_SMALL_THRESHOLD = 64 !> 16 was worse than 32
@@ -520,6 +520,78 @@ contains
           j = j - 1
        end if
     end do
+
+    ! Recursive calls
+    if (left < j)  call quicksort_boxes_STR_old(arr, left, j, axis)
+    if (i < right) call quicksort_boxes_STR_old(arr, i, right, axis)
+
+  end subroutine quicksort_boxes_STR_old
+
+  recursive subroutine quicksort_boxes_STR(arr, left, right, axis)
+    type(Box), intent(inout), dimension(:) :: arr
+    integer(kind=int64), intent(in) :: left, right, axis
+    
+    integer, parameter :: K_SMALL_THRESHOLD = 64
+    integer(kind=int64) :: i, j
+    integer(K_COORDINATE_KIND) :: pivot_sum ! Replaced Real with pure Integer
+    type(Box) :: temp
+
+    if (right - left <= K_SMALL_THRESHOLD) then
+       if (left < right) call insertion_sort_boxes(arr, left, right, axis)
+       return
+    end if
+    
+    i = left
+    j = right
+
+    ! =======================================================
+    ! HOIST THE AXIS BRANCH OUTSIDE THE LOOPS entirely
+    ! =======================================================
+    if (axis == AXIS_X) then
+       ! Use integer addition instead of floating point centers
+       pivot_sum = arr((left + right) / 2)%x1 + arr((left + right) / 2)%x2
+
+       do while (i <= j)
+          ! No calculations needed, just inline integer checks
+          do while (arr(i)%x1 + arr(i)%x2 < pivot_sum)
+             i = i + 1
+          end do
+
+          do while (arr(j)%x1 + arr(j)%x2 > pivot_sum)
+             j = j - 1
+          end do
+
+          if (i <= j) then
+             temp = arr(i)
+             arr(i) = arr(j)
+             arr(j) = temp
+             i = i + 1
+             j = j - 1
+          end if
+       end do
+
+    else ! AXIS_Y
+       ! Exact same logic, but for Y
+       pivot_sum = arr((left + right) / 2)%y1 + arr((left + right) / 2)%y2
+
+       do while (i <= j)
+          do while (arr(i)%y1 + arr(i)%y2 < pivot_sum)
+             i = i + 1
+          end do
+
+          do while (arr(j)%y1 + arr(j)%y2 > pivot_sum)
+             j = j - 1
+          end do
+
+          if (i <= j) then
+             temp = arr(i)
+             arr(i) = arr(j)
+             arr(j) = temp
+             i = i + 1
+             j = j - 1
+          end if
+       end do
+    end if
 
     ! Recursive calls
     if (left < j)  call quicksort_boxes_STR(arr, left, j, axis)

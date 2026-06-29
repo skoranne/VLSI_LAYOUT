@@ -259,7 +259,7 @@ contains
       real(kind=real64) :: size_in_gb, total_bytes
       type(BoxCodec) :: codec_state
       integer(int8), allocatable :: out_stream(:)
-      integer(int64) :: bytes_written
+      integer(int64) :: bytes_written, snappy_bytes_total
       type(CompressedStream) :: snappy_stream
       pos = 1_int64
       call LoadKLBin(fileName, original_boxes)
@@ -268,12 +268,12 @@ contains
       size_in_gb = total_bytes/BYTES_PER_GIB
       bbox = mbr_of_array( original_boxes, num_boxes )
       write(*,*) 'Loaded : ', num_boxes, ' BBOX = ', bbox, ' ', size_in_gb, ' Gb of data'
-      write(*,'(4I12)') original_boxes(1:10)
+      write(*,'(4I12)') original_boxes(1:5)
       !call quicksort_boxes( arr, 1, size(arr) )
       call MortonSort( original_boxes )
       !call omt_pack( original_boxes , K_LEAF_CAPACITY )
       write(*,*) 'Sorting complete: '
-      write(*,'(4I12)') original_boxes(1:10)
+      write(*,'(4I12)') original_boxes(1:5)
       call compress_to_chunks( original_boxes, chunk_manager )
       write(*,*) 'Compressed to ', chunk_manager%num_chunks, ' chunks, total_size = ', sum( chunk_manager%chunks(:)%compressed_size )
       !compressed_stream = compress_box_array(original_boxes)
@@ -302,9 +302,20 @@ contains
       !> try this byte stream compression as well
       !>call CompressBoxesUsingCodec(original_boxes, codec_state, out_stream, bytes_written)
       !>write(*,*) 'Codec wrote: ', bytes_written
-      call CompressBoxesToSnappyStream( restored_boxes, snappy_stream)
-      write(*,*) 'Snappy Stream ', size(snappy_stream%chunks)
-      call DecompressStreamToBoxes( snappy_stream, decompressed_boxes)
+      call CompressBoxesUsingCodec( original_boxes, codec_state, out_stream, bytes_written)
+      write(*,*) 'Codec wrote: ', bytes_written
+      allocate( decompressed_boxes( size( original_boxes ) ) )
+      call DecompressBoxesUsingCodec( out_stream, bytes_written, size(original_boxes), decompressed_boxes, codec_state )
+
+      deallocate( decompressed_boxes )
+      call CompressBoxesToSnappyStream( original_boxes, snappy_stream)
+      
+      snappy_bytes_total = 0
+      do i = 1, size(snappy_stream%chunks)
+         snappy_bytes_total = snappy_bytes_total + snappy_stream%chunks(i)%compressed_size
+      end do
+      write(*,*) 'Snappy Stream ', size(snappy_stream%chunks), ' chunks, ', snappy_bytes_total
+      call DecompressSnappyStreamToBoxes( snappy_stream, decompressed_boxes)
       if( num_boxes /= snappy_stream%total_boxes) error stop "ERROR: Stream decomp failed."
       match = .true.
       do i = 1, num_boxes

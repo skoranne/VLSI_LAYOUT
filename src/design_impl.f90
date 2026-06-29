@@ -279,6 +279,7 @@ contains
     integer(kind=int64) :: interaction_count, N, num_squares
     N = input_layer_A%n_used
     if( NeedsSorting( input_layer_A ) ) then
+       num_squares = count( is_square(input_layer_A%layer_boxes) )
        if( num_squares*1.0_real64 / (N*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
           write(*,*) 'Layer is SQUARE dominated, ', num_squares, ' / ', N
           call MortonSort( input_layer_A%layer_boxes )
