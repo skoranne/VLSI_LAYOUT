@@ -526,11 +526,109 @@ contains
     if (i < right) call quicksort_boxes_STR_old(arr, i, right, axis)
 
   end subroutine quicksort_boxes_STR_old
+  !> Fantastic observation that we only need selection not sorting
+  subroutine quickselect_boxes_STR(arr, left_in, right_in, k, axis)
+    type(Box), intent(inout), dimension(:) :: arr
+    integer(kind=int64), intent(in) :: left_in, right_in
+    integer(kind=int64), intent(in) :: k     ! The target index (split_idx)
+    integer(kind=int64), intent(in) :: axis  ! AXIS_X or AXIS_Y
 
+    integer(kind=int64) :: left, right, i, j
+    integer(K_COORDINATE_KIND) :: pivot_sum
+    type(Box) :: temp
+
+    ! Initialize working boundaries
+    left = left_in
+    right = right_in
+
+    ! =======================================================
+    ! HOIST THE AXIS BRANCH
+    ! =======================================================
+    if (axis == AXIS_X) then
+
+       do while (left < right)
+          ! Choose the middle element as the pivot to avoid worst-case $O(N^2)$ on sorted data
+          pivot_sum = arr((left + right) / 2_int64)%x1 + arr((left + right) / 2_int64)%x2
+          i = left
+          j = right
+
+          ! Hoare Partitioning Scheme
+          do while (i <= j)
+             do while (arr(i)%x1 + arr(i)%x2 < pivot_sum)
+                i = i + 1_int64
+             end do
+
+             do while (arr(j)%x1 + arr(j)%x2 > pivot_sum)
+                j = j - 1_int64
+             end do
+
+             if (i <= j) then
+                ! Swap elements
+                temp = arr(i)
+                arr(i) = arr(j)
+                arr(j) = temp
+                i = i + 1_int64
+                j = j - 1_int64
+             end if
+          end do
+
+          ! The array is now partitioned around the pivot.
+          ! Elements [left ... j] are <= pivot
+          ! Elements [i ... right] are >= pivot
+
+          ! Narrow the search window to ONLY the half containing 'k'
+          if (k <= j) then
+             right = j
+          else if (k >= i) then
+             left = i
+          else
+             ! k is exactly in the middle between j and i.
+             ! The array is perfectly partitioned around k. We are done.
+             exit
+          end if
+       end do
+
+    else ! AXIS_Y
+
+       do while (left < right)
+          pivot_sum = arr((left + right) / 2_int64)%y1 + arr((left + right) / 2_int64)%y2
+          i = left
+          j = right
+
+          do while (i <= j)
+             do while (arr(i)%y1 + arr(i)%y2 < pivot_sum)
+                i = i + 1_int64
+             end do
+
+             do while (arr(j)%y1 + arr(j)%y2 > pivot_sum)
+                j = j - 1_int64
+             end do
+
+             if (i <= j) then
+                temp = arr(i)
+                arr(i) = arr(j)
+                arr(j) = temp
+                i = i + 1_int64
+                j = j - 1_int64
+             end if
+          end do
+
+          if (k <= j) then
+             right = j
+          else if (k >= i) then
+             left = i
+          else
+             exit
+          end if
+       end do
+
+    end if
+
+  end subroutine quickselect_boxes_STR
   recursive subroutine quicksort_boxes_STR(arr, left, right, axis)
     type(Box), intent(inout), dimension(:) :: arr
     integer(kind=int64), intent(in) :: left, right, axis
-    
+
     integer, parameter :: K_SMALL_THRESHOLD = 64
     integer(kind=int64) :: i, j
     integer(K_COORDINATE_KIND) :: pivot_sum ! Replaced Real with pure Integer
@@ -540,7 +638,7 @@ contains
        if (left < right) call insertion_sort_boxes(arr, left, right, axis)
        return
     end if
-    
+
     i = left
     j = right
 
@@ -618,8 +716,8 @@ contains
 
     deallocate(workspace)
   end subroutine omt_pack
-
-
+  !#define OLD_WORKING_OMT
+  #ifdef OLD_WORKING_OMT
   ! Recursive Top-Down Partitioning
   recursive subroutine omt_pack_recursive(arr, start_idx, end_idx, node_capacity, workspace)
     type(Box), intent(inout), dimension(:) :: arr
@@ -681,8 +779,101 @@ contains
        call omt_pack_recursive(arr, split_idx + 1, end_idx, node_capacity, workspace)
     end if
   end subroutine omt_pack_recursive
+#else
+  recursive subroutine omt_pack_recursive(arr, start_idx, end_idx, node_capacity, workspace)
+    type(Box), intent(inout), dimension(:) :: arr
+    integer(kind=int64), intent(in) :: start_idx, end_idx, node_capacity
+    type(Box), intent(inout), dimension(:) :: workspace
 
+    integer, parameter :: MIN_TASK_SIZE = 32768
+    integer(kind=int64) :: n, num_leaves, left_leaves, split_idx
+    real :: overlap_x, area_x, overlap_y, area_y
 
+    n = end_idx - start_idx + 1_int64
+    if (n <= node_capacity) return
+
+    num_leaves = ceiling(real(n) / real(node_capacity))
+    left_leaves = num_leaves / 2
+    split_idx = start_idx + left_leaves * node_capacity - 1_int64
+
+    ! =================================================================
+    ! 1. PRE-TASK STATE ISOLATION (Fixes Data Race)
+    ! Copy 'arr' to 'workspace' safely BEFORE any tasks start mutating
+    ! =================================================================
+    workspace(start_idx:end_idx) = arr(start_idx:end_idx)
+
+    if (n >= MIN_TASK_SIZE) then
+       
+       ! -----------------------------------------------------
+       ! TASK 1: Evaluate X (Operates strictly on 'workspace')
+       ! -----------------------------------------------------
+       !$omp task shared(workspace, overlap_x, area_x) &
+       !$omp firstprivate(start_idx, end_idx, split_idx) default(none)
+       
+       call quickselect_boxes_STR(workspace, start_idx, end_idx, split_idx, AXIS_X)
+       call evaluate_split(workspace, start_idx, split_idx, end_idx, overlap_x, area_x)
+       
+       !$omp end task
+
+       ! -----------------------------------------------------
+       ! TASK 2: Evaluate Y (Operates strictly on 'arr')
+       ! -----------------------------------------------------
+       !$omp task shared(arr, overlap_y, area_y) &
+       !$omp firstprivate(start_idx, end_idx, split_idx) default(none)
+       
+       call quickselect_boxes_STR(arr, start_idx, end_idx, split_idx, AXIS_Y)
+       call evaluate_split(arr, start_idx, split_idx, end_idx, overlap_y, area_y)
+       
+       !$omp end task
+
+       ! Wait for both axes to finish partitioning
+       !$omp taskwait
+
+    else
+       ! =================================================================
+       ! Serial fallback for small leaf arrays (Fixes State Destruction)
+       ! =================================================================
+       
+       ! 1. Evaluate X strictly on 'workspace'
+       call quickselect_boxes_STR(workspace, start_idx, end_idx, split_idx, AXIS_X)
+       call evaluate_split(workspace, start_idx, split_idx, end_idx, overlap_x, area_x)
+       
+       ! 2. Evaluate Y strictly on 'arr'
+       call quickselect_boxes_STR(arr, start_idx, end_idx, split_idx, AXIS_Y)
+       call evaluate_split(arr, start_idx, split_idx, end_idx, overlap_y, area_y)
+       
+    end if
+
+    ! =================================================================
+    ! 3. Choose the best axis 
+    ! =================================================================
+    if ((overlap_x < overlap_y) .or. (overlap_x == overlap_y .and. area_x < area_y)) then
+       ! X was better: copy the winning X-partitioned data back into arr
+       arr(start_idx:end_idx) = workspace(start_idx:end_idx)
+    end if
+    ! If Y was better, arr is already partitioned by Y, so we do nothing.
+
+    ! =================================================================
+    ! 4. Recursively process partitions
+    ! =================================================================
+    if (split_idx - start_idx + 1_int64 >= MIN_TASK_SIZE) then
+       !$omp task shared(arr, workspace) firstprivate(start_idx, split_idx, node_capacity) default(none)
+       call omt_pack_recursive(arr, start_idx, split_idx, node_capacity, workspace)
+       !$omp end task
+    else
+       call omt_pack_recursive(arr, start_idx, split_idx, node_capacity, workspace)
+    end if
+
+    if (end_idx - split_idx >= MIN_TASK_SIZE) then
+       !$omp task shared(arr, workspace) firstprivate(split_idx, end_idx, node_capacity) default(none)
+       call omt_pack_recursive(arr, split_idx + 1_int64, end_idx, node_capacity, workspace)
+       !$omp end task
+    else
+       call omt_pack_recursive(arr, split_idx + 1_int64, end_idx, node_capacity, workspace)
+    end if
+
+  end subroutine omt_pack_recursive
+  #endif
   ! Helper Subroutine: Computes the cost (Overlap and Area) of a proposed split
   subroutine evaluate_split(arr, start_idx, split_idx, end_idx, overlap, total_area)
     type(Box), intent(in), dimension(:) :: arr
