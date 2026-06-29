@@ -212,9 +212,16 @@ contains
     integer(int64) :: res, temp
 
     temp = int(val, int64)
+    ! If temp is negative, it maps to (temp * -2) - 1
+    ! If temp is positive, it maps to (temp * 2)
+    if (temp < 0_int64) then
+       res = (abs(temp) * 2_int64) - 1_int64
+    else
+       res = temp * 2_int64
+    end if
     ! shiftl: Logical left shift
     ! shifta: Arithmetic right shift (copies the sign bit across all 64 bits)
-    res = ieor(shiftl(temp, 1), shifta(temp, 63))
+    !res = ieor(shiftl(temp, 1), shifta(temp, 63))
   end function zigzag_encode
 
   pure function zigzag_decode(val) result(res)
