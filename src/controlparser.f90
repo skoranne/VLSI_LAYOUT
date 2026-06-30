@@ -312,7 +312,9 @@ contains
              lhs_layer_index = -1
              call hash_get( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
              if( ins .and. design_dbs( lhs_db_index )%design_direction == DESIGN_DIRECTION_MEMORY ) then
-                write(*,*) 'MEMORY LEAK: Reusing LHS Layer name: ', trim(rest(1:pos-1)), ' index: ', lhs_layer_index
+                if( trim(rest(1:pos-1)) /= 'nothing' ) then
+                   write(*,*) 'MEMORY LEAK: Reusing LHS Layer name: ', trim(rest(1:pos-1)), ' index: ', lhs_layer_index
+                end if
              end if
              if( ins .and. design_dbs( lhs_db_index )%design_direction == DESIGN_DIRECTION_OUTPUT ) then
                 !> normal situation, we have a layer handle and output file

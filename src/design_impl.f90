@@ -890,6 +890,7 @@ contains
     type(Layer), intent(inout)   :: output_layer
     integer(kind=int64), intent(in) :: control_parameter, control_value
     type(Layer) :: tempLayer
+    allocate( tempLayer%layer_boxes(1) )
     !> this function does the allocation
     if( control_parameter == K_BOOST_CONTROL_SIZE ) then
        call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&

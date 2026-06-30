@@ -7,8 +7,8 @@ var abort_on_xor 1
 var abort_on_assert_zero 2
 var debug_verbosity 0
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT1.mag
-decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
-# decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
+# decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
+decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
 # decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6.mag
 # decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8.mag
 # decl design d1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1.mag
@@ -30,6 +30,7 @@ exec run o1:li1  = d1:li1 COPY nothing
 exec run o1:met1 = d1:met1 COPY nothing
 flush
 delete o1
+flush
 exec run t1:gate = d1:poly * d1:diff
 exec run t1:ng_poly1 = d1:poly ~ t1:gate
 exec run t1:ng_poly2 = d1:poly ! t1:gate

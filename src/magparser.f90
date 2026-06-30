@@ -771,6 +771,7 @@ contains
          write(*,*) 'Writing DB: ', load_design%fileName
       end if
       deleted_layer_count = 0
+      if( .not. allocated( load_design%layers ) ) return !> we have already flushed this db
       do i=1,size(load_design%layers)
          if( load_design%layers(i)%n_used == 0 ) cycle
          !> Lets just assume we are writing in KLBIN
