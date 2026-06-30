@@ -27,7 +27,7 @@ module DesignModule
       CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
       RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer,&
       CalculateFrameNOT, CalculateBoostOperation, FilterLayer, push_box, FinalizeLayer,&
-      DeleteDesign
+      DeleteDesign, SaveLayerToSnap, RestoreSnapToLayer, BuildTree
 
    type :: LayerTree
       integer(kind=int64) :: root_index
@@ -103,6 +103,20 @@ module DesignModule
    end interface assignment(=)
 
    interface
+      module subroutine BuildTree( input_layer )
+        type(Layer), intent(inout) :: input_layer
+      end subroutine BuildTree
+      
+      module subroutine SaveLayerToSnap( input_layer, snap_filename )
+        type(Layer), intent(inout)  :: input_layer
+        character(*), intent(in)    :: snap_filename      
+      end subroutine SaveLayerToSnap
+      
+      module subroutine RestoreSnapToLayer( input_layer, snap_filename )
+        type(Layer), intent(inout) :: input_layer
+        character(*), intent(in)   :: snap_filename      
+      end subroutine RestoreSnapToLayer
+      
       module subroutine FinalizeLayer( output_layer )
          type(Layer),intent(inout) :: output_layer
       end subroutine FinalizeLayer
@@ -507,8 +521,8 @@ contains
          if( box_count > 100000) then
             write(*,*) 'BOX COUNT ', box_count, ' EXCEEDED'
          end if
-         !call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
-         call MergeBoxes( box_count, current_polygon_boxes, updated_box_count )
+         call heal_boxes( box_count, current_polygon_boxes, updated_box_count )
+         !call MergeBoxes( box_count, current_polygon_boxes, updated_box_count )
          n = size( current_polygon_boxes )
          if( final_count + updated_box_count >= final_capacity ) then
             !write(*,*) 'FC = ', final_capacity, ' EC = ', final_count + updated_box_count
@@ -788,8 +802,8 @@ contains
             type(Layer) :: tempLayer
             !> by the time we come here this should not be needed
             !$komp critical (heal_boxes_lock) !> work around
-            !call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
-            call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, tempLayer%layer_boxes )
+            call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+            !call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, tempLayer%layer_boxes )
             if( allocated( input_layer%layer_boxes) ) deallocate( input_layer%layer_boxes )
             call move_alloc( from=tempLayer%layer_boxes, to=input_layer%layer_boxes)
             input_layer%n_used = tempLayer%n_used
@@ -813,6 +827,10 @@ contains
       end if
 #endif
       if( NeedsSorting( input_layer ) ) then
+         call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+         input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
+      end if
+      if( .false. ) then
 #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
          call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
 #else

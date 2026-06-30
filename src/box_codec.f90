@@ -70,6 +70,129 @@
 ! same as before. Since INFOBYTE as 5 bits remaining, use
 ! these bits to incorporate these two optimizations.
 ! Generate idiomatic modern Fortran for this task.
+module CompressionChunkManagerModule
+   use CommonModule
+   use GeometryModule
+   use SnappyCompressionModule
+   use iso_c_binding, only: c_char
+   use iso_fortran_env, only : int32, int64, real64
+   !use snappy_mod, only: Box, compress_box_array, decompress_box_array
+   implicit none
+
+   ! ---------------------------------------------------------
+   ! Hardware/R-Tree Tuning Constants
+   ! ---------------------------------------------------------
+   integer(kind=int64), parameter :: LEAVES_PER_CHUNK = 4096_int64
+   integer(kind=int64), parameter :: BOXES_PER_CHUNK  = K_LEAF_CAPACITY * LEAVES_PER_CHUNK
+
+   ! ---------------------------------------------------------
+   ! 1. The Individual Chunk Data Structure
+   ! ---------------------------------------------------------
+   type :: Chunk
+      integer(kind=int64) :: num_boxes          ! Exact number of boxes in this chunk
+      integer(kind=int64) :: compressed_size    ! Size of the byte array
+      character(kind=c_char), allocatable :: data(:) ! The Snappy compressed bytes
+   end type Chunk
+
+   ! ---------------------------------------------------------
+   ! 2. The Master 'CompressedChunks' Structure
+   ! ---------------------------------------------------------
+   type :: CompressedChunks
+      integer(kind=int64) :: total_boxes
+      integer(kind=int64) :: num_chunks
+      type(Chunk), allocatable :: chunks(:)
+   end type CompressedChunks
+
+   ! ---------------------------------------------------------
+   ! Interfaces to match your required API
+   ! ---------------------------------------------------------
+   interface compress
+      module procedure compress_to_chunks
+   end interface compress
+
+   interface decompress
+      module procedure decompress_from_chunks
+   end interface decompress
+
+contains
+
+   ! ---------------------------------------------------------
+   ! COMPRESS: Takes a massive Box array and populates 'cchunk'
+   ! ---------------------------------------------------------
+   subroutine compress_to_chunks(boxes, cchunk)
+      ! Note: contiguous allows us to safely slice and pass to Snappy
+      type(Box), intent(in), target, contiguous :: boxes(:)
+      type(CompressedChunks), intent(inout) :: cchunk
+      integer(kind=int64) :: current_start, current_end, i
+      cchunk%total_boxes = size(boxes, kind=8)
+      ! Integer math trick to calculate the exact number of chunks needed
+      ! (Equivalent to ceiling(total_boxes / BOXES_PER_CHUNK))
+      cchunk%num_chunks = (cchunk%total_boxes + BOXES_PER_CHUNK - 1_int64) / BOXES_PER_CHUNK
+      allocate(cchunk%chunks(cchunk%num_chunks))
+      current_start = 1_int64
+      !$omp parallel do default(none) &
+      !$omp shared(cchunk, boxes) &
+      !$omp private(i, current_start, current_end)
+      do i = 1_int64, cchunk%num_chunks
+         ! Ensure the last chunk doesn't overrun the array bounds
+         current_start = (i - 1_int64) * BOXES_PER_CHUNK + 1_int64
+         current_end = min(current_start + BOXES_PER_CHUNK - 1_int64, cchunk%total_boxes)
+         cchunk%chunks(i)%num_boxes = current_end - current_start + 1_int64
+         ! Pass just the slice into your snappy_mod
+         cchunk%chunks(i)%data = compress_box_array(boxes(current_start:current_end))
+         cchunk%chunks(i)%compressed_size = size(cchunk%chunks(i)%data, kind=int64)
+      end do
+      !$omp end parallel do
+   end subroutine compress_to_chunks
+
+   ! ---------------------------------------------------------
+   ! DECOMPRESS: Takes 'cchunk' and restores the allocatable Box array
+   ! ---------------------------------------------------------
+   subroutine decompress_from_chunks(cchunk, boxes)
+      type(CompressedChunks), intent(in) :: cchunk
+      type(Box), allocatable, intent(out) :: boxes(:)
+
+      integer(kind=int64) :: current_start, current_end, i
+      type(Box), allocatable :: temp_boxes(:)
+
+      ! 1. Allocate the master Fortran array to exactly the right size
+      allocate(boxes(cchunk%total_boxes))
+
+      ! 2. Open parallel region.
+      ! 'temp_boxes' is made private so each thread gets its own unallocated array.
+      !$omp parallel default(none) &
+      !$omp shared(cchunk, boxes) &
+      !$omp private(i, current_start, current_end, temp_boxes)
+
+      ! Allocate the thread-local temporary buffer ONCE per thread
+      ! (Assuming BOXES_PER_CHUNK is a module parameter)
+      allocate(temp_boxes(BOXES_PER_CHUNK))
+
+      ! 3. Distribute the loop iterations among threads
+      !$omp do
+      do i = 1_int64, cchunk%num_chunks
+         current_start = ((i - 1_int64) * BOXES_PER_CHUNK) + 1_int64
+         current_end = current_start + cchunk%chunks(i)%num_boxes - 1_int64
+
+         if ((current_end - current_start + 1_int64) /= cchunk%chunks(i)%num_boxes) then
+            print *, "CRITICAL MISMATCH at chunk ", i
+         end if
+
+         ! Decompress just this specific chunk into the thread's private array
+         call decompress_box_array(cchunk%chunks(i)%data, temp_boxes)
+
+         ! Copy the uncompressed data directly into its place in the master array
+         boxes(current_start:current_end) = temp_boxes(1:cchunk%chunks(i)%num_boxes)
+      end do
+      !$omp end do
+
+      ! Clean up the thread-local buffer before the thread exits
+      deallocate(temp_boxes)
+
+      !$omp end parallel
+   end subroutine decompress_from_chunks
+end module CompressionChunkManagerModule
+
 module BoxCodecModule
   use CommonModule
   use GeometryModule
@@ -124,7 +247,7 @@ contains
     class(BoxCodec), intent(inout) :: this
     integer, intent(in), optional :: capacity
     integer :: cap
-    integer, parameter :: K_WH_CAPACITY = 16
+    integer, parameter :: K_WH_CAPACITY = 1024 !> we expand, so this only impacts memory re-alloc
     cap = K_WH_CAPACITY
     if (present(capacity)) cap = capacity
 

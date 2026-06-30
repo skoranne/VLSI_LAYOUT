@@ -2,7 +2,9 @@ magic
 tech sky130A
 timestamp 1780872228
 << gate >>
-KLBIN square_gate_L1000_D20_2.bin
+SNAP square_gate_L1000_D20_2.snap
 << sd >>
-KLBIN square_sd_L2000_D20_2.bin
+SNAP square_sd_L2000_D20_2.snap
+<< poly >>
+SNAP square_poly_L3000_D20_2.snap
 << end >>

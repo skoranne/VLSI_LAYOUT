@@ -15,9 +15,11 @@ module CommonModule
    integer(kind=K_COORDINATE_KIND):: PRECISION
    integer                        :: debug_verbosity = 0
    integer                        :: abort_on_xor = 0
+   integer                        :: abort_on_assert_zero = 0   
    public:: InitPrecision, GetPrecision, K_COORDINATE_KIND, K_LEAF_CAPACITY, K_SQUARE_DOMINATION_THRESHOLD, XYTracker,&
         TrackerCell, K_SMALL_EPSILON, K_BOOST_CONTROL_XOR, K_BOOST_CONTROL_OR, K_BOOST_CONTROL_AND,&
-        K_BOOST_CONTROL_NOT, K_BOOST_CONTROL_MERGE, K_BOOST_CONTROL_SIZE, debug_verbosity, abort_on_xor
+        K_BOOST_CONTROL_NOT, K_BOOST_CONTROL_MERGE, K_BOOST_CONTROL_SIZE, debug_verbosity, abort_on_xor,&
+        abort_on_assert_zero
 
    type :: XYTracker
       integer(kind=K_COORDINATE_KIND) :: X, Y

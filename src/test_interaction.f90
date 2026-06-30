@@ -134,8 +134,11 @@ program main
      write(*,*) 'Layer is SQUARE dominated, ', num_squares, ' / ', size(boxes)
      call MortonSort( input_layer%layer_boxes )
   else
-     call SortBoxesDirect( boxes, N )     
-     !call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+     if( control_parameter(1) == 1 ) then
+        call SortBoxesDirect( boxes, N )
+     else
+        call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+     end if
   end if
   
   input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
@@ -178,6 +181,7 @@ program main
   allocate( is_singleton_gpu( N ) )
   boxes => input_layer%layer_boxes  
   is_singleton_gpu = .false.
+  #ifdef NO_COMMON_TREE_APPROACH
   total_nodes_gpu = CalculateTotalNodes( N, K_LEAF_CAPACITY_GPU ) !> for GPU we might change
   bbox = mbr_of_array( boxes, N )
   write(*,'(A,I12,A,4I12,A,I12)') 'Loaded : ', N, ' BBOX = ', bbox, ' |T| = ', total_nodes_gpu
@@ -188,13 +192,16 @@ program main
   allocate( TreeNodes( total_nodes_gpu ) )
   call BuildRTree( boxes, K_LEAF_CAPACITY_GPU, TreeNodes, RootIndex)
   write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(TreeNodes)
-  call StopMarkTime("GPURTree")  
+  call StopMarkTime("GPURTree")
+  
   call StartMarkTime("GPUInteractions")
   call ComputeInteractionsGPU( TreeNodes, total_nodes_gpu, boxes, N, RootIndex, interaction_count_gpu)
+  #endif
+  call ComputeInteractionsGPU( input_layer%tree%tree_nodes, total_nodes_cpu, boxes, N, input_layer%tree%root_index, interaction_count_gpu)
   write(*,*) '|GPU TOTAL INTERACTIONS| = ', interaction_count_gpu
   call StopMarkTime("GPUInteractions")
   call StartMarkTime("GPUSingleton")
-  call FindSingletonsGPU( N, boxes, total_nodes_gpu, TreeNodes, RootIndex, is_singleton_gpu, num_singletons_gpu)
+  call FindSingletonsGPU( N, boxes, total_nodes_cpu, input_layer%tree%tree_nodes, input_layer%tree%root_index, is_singleton_gpu, num_singletons_gpu)
   write(*,*) '|GPU NUM_SINGLETONS| = ', num_singletons_gpu
   call StopMarkTime("GPUSingleton")
   call StartMarkTime("PNUM")

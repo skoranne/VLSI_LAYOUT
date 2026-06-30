@@ -111,5 +111,8 @@ snappy_api.o:	       snappy_api.cpp
 		       g++ -O3 -Wall -c snappy_api.cpp 
 boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I$(BOOST_DIR)  boost_polygon_api.cpp -c
+MAGVIEWER.exe:	magviewer.f90
+		ifx -c -O3 -fpp glf90w.F90
+		ifx -O3 -g -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o -L ./lib/ifx -lglfw -lGL -o MAGVIEWER.exe
        
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe

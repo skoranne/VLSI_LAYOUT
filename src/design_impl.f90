@@ -268,7 +268,8 @@ contains
     end if
     N = input_layer_A%n_used
     total_nodes = CalculateTotalNodes( N, K_LEAF_CAPACITY ) !> for GPU we might change
-    call SortBoxesDirect( input_layer_A%layer_boxes, N )
+    call omt_pack( input_layer_A%layer_boxes , K_LEAF_CAPACITY )
+    !call SortBoxesDirect( input_layer_A%layer_boxes, N )
     allocate( TreeNodes( total_nodes ) )
     call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
     call ComputeInteractionsGPU( TreeNodes, total_nodes, input_layer_A%layer_boxes, N, RootIndex, interaction_count)
@@ -284,8 +285,8 @@ contains
           write(*,*) 'Layer is SQUARE dominated, ', num_squares, ' / ', N
           call MortonSort( input_layer_A%layer_boxes )
        else
-          call SortBoxesDirect( input_layer_A%layer_boxes, N )
-          !call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+          !call SortBoxesDirect( input_layer_A%layer_boxes, N )
+          call omt_pack( input_layer_A%layer_boxes , K_LEAF_CAPACITY )
        end if
        input_layer_A%layerState = ior( input_layer_A%layerState, LAYER_STATE_SORT )
        call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, input_layer_A%tree%tree_nodes, input_layer_A%tree%root_index)
@@ -310,7 +311,8 @@ contains
     end if
     N = input_layer%n_used
     total_nodes = CalculateTotalNodes( N, K_LEAF_CAPACITY ) !> for GPU we might change
-    call SortBoxesDirect( input_layer%layer_boxes, N )
+    !call SortBoxesDirect( input_layer%layer_boxes, N )
+    call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
     allocate( TreeNodes( total_nodes ) )
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
     call FindSingletonsGPU( N, input_layer%layer_boxes, total_nodes, TreeNodes, RootIndex, is_singleton, interaction_count)
@@ -327,8 +329,8 @@ contains
           write(*,*) 'Layer is SQUARE dominated, ', num_squares, ' / ', N
           call MortonSort( input_layer%layer_boxes )
        else
-          call SortBoxesDirect( input_layer%layer_boxes, N )
-          !call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+          !call SortBoxesDirect( input_layer%layer_boxes, N )
+          call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
        end if
        input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
        call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
@@ -340,10 +342,6 @@ contains
 
   end function CalculateSingletonCount
 #endif
-
-
-
-
   module subroutine CalculateSingleLayerAND( input_layer_A, output_layer )
     type(Layer), intent(inout) :: input_layer_A
     type(Layer), intent(inout) :: output_layer
@@ -372,7 +370,8 @@ contains
     total_nodes = CalculateTotalNodes( N, K_LEAF_CAPACITY ) !> for GPU we might change
     bbox = mbr_of_array( input_layer_A%layer_boxes, N )
     write(*,*) 'Loaded : ', N, ' BBOX = ', bbox, ' |T| = ', total_nodes
-    call SortBoxesDirect( input_layer_A%layer_boxes, N )
+    call omt_pack( input_layer_A%layer_boxes , K_LEAF_CAPACITY )
+    !call SortBoxesDirect( input_layer_A%layer_boxes, N )
     allocate( TreeNodes( total_nodes ) )
     call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
     write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(TreeNodes)

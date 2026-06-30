@@ -431,7 +431,20 @@ contains
                !   write(*,'(A,I,A,4I)') 'Box ', j, ': ', boxes(j)%x1, boxes(j)%y1, boxes(j)%x2, boxes(j)%y2
                !end do
             end if
-
+            if (line(1:4) == 'SNAP' .and. found_section) then
+               !write (*,*) line
+               call hash_get( ht, trim(section_name), layer_id, ok )
+               ! Parse rectangle coordinates
+               section_name = trim(line(6:len_trim(line))) !>>> ROOKIE <<<
+               if( load_design%design_direction == DESIGN_DIRECTION_INPUT ) then
+                  call RestoreSnapToLayer( layers(layer_id), section_name )
+                  layers(layer_id)%n_alloc = layers(layer_id)%n_used
+                  !write(*,'(A,A8,A30)') 'Input  Request SNAP: ', layerNames(layer_id), ' => ', section_name
+               else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
+                  !write(*,'(A,A10,A30)') 'Output Request SNAP: ', trim(layerNames(layer_id)), ' => ', trim(adjustl(section_name))
+               end if
+               allocate( layers(layer_id)%fileName, source= trim(adjustl(section_name)))
+            end if
             ! Parse label definitions
             if (line(1:5) == 'rlabel' .and. found_section) then
                ! Parse label information
@@ -504,8 +517,8 @@ contains
             !write(*,*) 'Layer ', layerNames(i), ' is SQUARE dominated. ', num_squares
             if( num_squares*1.0_real64 / (layers(i)%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
                !write(*,*) 'Layer ', trim(layerNames(i)), ' is SQUARE dominated, ', num_squares, ' / ', size(boxes)
-               number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
-               !number_expected_interactions = 0
+               !number_expected_interactions = CalculateOverlapCount( layers(i) ) !> this will sort on the GPU
+               number_expected_interactions = 0
                if( number_expected_interactions > 10000 ) then
                   block
                      integer(kind=int64) :: original_count, thinned_count
@@ -763,6 +776,14 @@ contains
          !> Lets just assume we are writing in KLBIN
          if(.not. allocated( load_design%layers(i)%fileName ) ) then
             error stop "ERROR: layer backing store name not allocated"
+         end if
+         pos = index( load_design%layers(i)%fileName, ".snap" )
+         !write(*,*) 'IS_SNAP ',pos,' ',load_design%layers(i)%fileName
+         if( pos == len_trim(load_design%layers(i)%fileName)-4 ) then
+            call SaveLayerToSnap( load_design%layers(i), load_design%layers(i)%fileName )
+            call ClearLayer( load_design%layers(i) )
+            deleted_layer_count = deleted_layer_count + 1
+            cycle
          end if
          pos = index( load_design%layers(i)%fileName, ".bin" )
          !write(*,*) 'pos = ', pos, ' len = ', len_trim(load_design%layers(i)%fileName)

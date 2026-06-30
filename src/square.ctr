@@ -1,16 +1,21 @@
 # Control file for MAGPARSER
 program square
 systeminfo
+var abort_on_assert_zero 1
 decl design d1 = INV.mag
 decl output o1 = foo.mag
 decl output o2 = bar.mag
 decl memory f1 = nothing
+decl memory t1 = nothing
 info
 exec run f1:diff = d1:pdiff + d1:ndiff
+exec run t1:nothing = f1:diff ASSERT_ZERO nothing
 exec run o1:diff = f1:diff COPY nothing
 exec run o1:poly = d1:poly COPY nothing
 exec run o1:gate = d1:poly * f1:diff
 exec run o2:gate = f1:diff * d1:poly
+exec run t1:nothing = o2:gate ASSERT_ZERO nothing
+exec run o2:poly = d1:poly COPY nothing
 exec run o1:sd1 =  f1:diff @ d1:poly
 exec run o1:sd2 = f1:diff ~ d1:poly
 exec run o1:sd3 = f1:diff ! d1:poly

@@ -193,6 +193,17 @@ contains
              else
                 write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
              end if
+          else if( trim(rest(1:pos-1)) == 'abort_on_assert_zero' ) then
+             rest = adjustl(rest)
+             pos = index( rest, ' ' )
+             rest = trim( adjustl( rest(pos+1:)))
+             read(rest, *, iostat=ios) abort_on_xor
+             abort_on_xor = 1
+             if( ios == 0 ) then
+                write(*,*) 'INFO: VAR changing abort_on_assert_zero = ', abort_on_assert_zero
+             else
+                write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
+             end if             
           else if( trim(rest(1:pos-1)) == 'debug_verbosity' ) then             
              rest = adjustl(rest)
              pos = index( rest, ' ' )
@@ -328,7 +339,7 @@ contains
              pos = index( rest, ':' )
              call hash_get( ht, trim(rest(1:pos-1)), rhs1_db_index, ins )
              if( .not. ins ) then
-                write(*,*) 'ERROR: RHS1 DB Index not found: ', trim(rest(1:pos-1)), ' line: ', line_number
+                write(*,*) 'ERROR: RHS1 DB Index not found: ', trim(rest(1:pos-1)), ' line: ', line_number-1
                 error stop
              else
                 if(.not. allocated( design_dbs(rhs1_db_index)%designName ) ) error stop
@@ -336,9 +347,10 @@ contains
              end if
              rest = adjustl(rest(pos+1:))
              pos  = index( rest, ' ')
+             
              call hash_get( design_dbs( rhs1_db_index )%ht, trim(rest(1:pos-1)), rhs1_layer_index, ins )
              if( .not. ins ) then
-                write(*,*) 'ERROR: RHS1 layer not found: ',trim(rest(1:pos-1)), ' check spelling or existence of layer in db. Line: ', line_number
+                write(*,*) 'ERROR: RHS1 layer not found: ',trim(rest(1:pos-1)), ' check spelling or existence of layer in db. Line: ', line_number-1
                 error stop "ERROR: layer not found"
              end if
              rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
@@ -352,14 +364,14 @@ contains
                 pos = index( rest, ':' )
                 call hash_get( ht, trim(rest(1:pos-1)), rhs2_db_index, ins )
                 if( .not. ins ) then
-                   write(*,*) 'ERROR RHS2 DB Indes for db: ', trim(rest(1:pos-1)), ' not located on line ', line_number
+                   write(*,*) 'ERROR RHS2 DB Indes for db: ', trim(rest(1:pos-1)), ' not located on line ', line_number-1
                    error stop "RHS2 DB INDEX not located"
                 end if
                 rest = adjustl(rest(pos+1:))
                 pos  = index( rest, ' ')
                 call hash_get( design_dbs( rhs2_db_index )%ht, trim(rest(1:pos-1)), rhs2_layer_index, ins )
                 if( .not. ins ) then
-                   write(*,*) 'ERROR: RHS2 layer not found: ',trim(rest(1:pos-1)) ,' check spelling or existence of layer in db: line: ', line_number
+                   write(*,*) 'ERROR: RHS2 layer not found: ',trim(rest(1:pos-1)) ,' check spelling or existence of layer in db: line: ', line_number-1
                    error stop "ERROR: layer not found"
                 end if
                 rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
@@ -379,7 +391,8 @@ contains
                 case('+')
                    call StartMarkTime("OR")
                    call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_OR, 0_int64 )
-                   call StopMarkTime("OR")                
+                   call StopMarkTime("OR")
+                   !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used            
                 case('*')
                    call StartMarkTime("AND")
                    call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )
@@ -447,6 +460,13 @@ contains
                      case('OR2')
                         call CalculateOR( rhs1_layer, rhs2_layer, lhs_layer )
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
+                     case('ASSERT_ZERO')
+                        !> for now we have to do t1:nothing = ASSERT_ZERO t1:check_and nothing
+                        if( rhs2_source_name /= 'nothing' ) error stop "ASSERT_ZERO must use nothing as second layer"
+                        if( rhs1_layer%n_used > 0 ) then
+                           write(*,'(A,I5,A)') '************ ASSERT_ZERO fail on layer. Line: ', line_number-1, ' **********************'
+                           if( abort_on_assert_zero > 1 ) error stop "ERROR: ASSERT_ZERO variable > 1"
+                        end if
                      case('AND2')
                         call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
@@ -495,12 +515,12 @@ contains
                         write(*,*) 'Found PRIMARY_OPERATOR = WORMHOLE'
                         !> d1:met1 WORMHOLE f1:met1_marker 5 100
                      case default
-                        write(*,*) 'UNKNOWN primary_operator: ', primary_operator, ' on line: ', line_number
+                        write(*,*) 'UNKNOWN primary_operator: ', primary_operator, ' on line: ', line_number-1
                         error stop "SYNTAX ERROR on TEXT based operator"
                      end select
                      call StopMarkTime(primary_operator)
                   else
-                     write(*,*) 'SYNTAX ERROR on line: ', line_number
+                     write(*,*) 'SYNTAX ERROR on line: ', line_number-1
                      error stop "SYNTAX ERROR on TEXT based operator"
                   end if
                 end block
@@ -521,7 +541,7 @@ contains
              design_dbs(db_count)%design_direction = DESIGN_DIRECTION_INPUT
              db_count = db_count + 1
           else
-             write(*,*) 'Syntax ERROR: line: ', line_number
+             write(*,*) 'Syntax ERROR: line: ', line_number-1
              error stop "Syntax ERROR."
           end if
           cycle read_loop
@@ -540,14 +560,14 @@ contains
           pos = index( rest, ' ' )
           call hash_get( ht, trim(rest(1:pos-1)), lhs_db_index, ins )
           if( .not. ins ) then
-             write(*,*) 'ERROR: DELETE db-index not found: ', line_number
+             write(*,*) 'ERROR: DELETE db-index not found: ', line_number-1
              error stop "ERROR: DELETE db-index not found."
           end if
           call DeleteDesign( design_dbs( lhs_db_index ) )
           !> any use of this db after this point in the file is an ERROR
           call hash_remove( ht, trim(rest(1:pos-1)), ins )
           if( .not. ins ) then
-             write(*,*) 'INFO: DELETE db-index not removed: ', line_number
+             write(*,*) 'INFO: DELETE db-index not removed: ', line_number-1
           end if
           call StopMarkTime("delete")          
           cycle read_loop
