@@ -107,9 +107,10 @@ module DesignModule
         type(Layer), intent(inout) :: input_layer
       end subroutine BuildTree
       
-      module subroutine SaveLayerToSnap( input_layer, snap_filename )
+      module subroutine SaveLayerToSnap( input_layer, snap_filename, method_to_use )
         type(Layer), intent(inout)  :: input_layer
-        character(*), intent(in)    :: snap_filename      
+        character(*), intent(in)    :: snap_filename
+        integer, intent(in)         :: method_to_use
       end subroutine SaveLayerToSnap
       
       module subroutine RestoreSnapToLayer( input_layer, snap_filename )

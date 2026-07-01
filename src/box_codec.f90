@@ -202,8 +202,8 @@ module BoxCodecModule
   private
   public ::  BoxCodec, CompressBoxesUsingCodec, DecompressBoxesUsingCodec
   public :: CompressedChunk, CompressedStream
-  public :: CompressBoxesToSnappyStream, DecompressSnappyStreamToBoxes
-
+  public :: CompressBoxesToStream, DecompressStreamToBoxes
+  public :: COMPRESSION_METHOD_NONE, COMPRESSION_METHOD_SNAPPY, COMPRESSION_METHOD_ZLIB, COMPRESSION_METHOD_ZSTD
   type :: BoxCodec
      integer(K_COORDINATE_KIND), allocatable :: unique_w(:)
      integer(K_COORDINATE_KIND), allocatable :: unique_h(:)
@@ -224,7 +224,12 @@ module BoxCodecModule
   ! Adjust this based on your L2/L3 cache sizes.
   ! 65536 boxes * 32 bytes = ~2MB uncompressed per chunk.
   integer(int64), parameter :: BOXES_PER_CHUNK = 65536_int64
-
+  enum, bind(C)
+     enumerator :: COMPRESSION_METHOD_NONE   = 0 !> this is simple BIN
+     enumerator :: COMPRESSION_METHOD_SNAPPY = 1
+     enumerator :: COMPRESSION_METHOD_ZLIB   = 2
+     enumerator :: COMPRESSION_METHOD_ZSTD   = 3
+  end enum
   type :: CompressedChunk
      integer(int64) :: num_boxes
      integer(int64) :: raw_byte_size
@@ -236,6 +241,7 @@ module BoxCodecModule
      integer(int64) :: total_boxes
      integer(int64) :: num_chunks
      type(CompressedChunk), allocatable :: chunks(:)
+     integer :: compression_method
   end type CompressedStream
 
 contains
@@ -656,76 +662,15 @@ contains
     bytes_written = bytes_written - 1_int64 
   end subroutine CompressBoxesUsingCodec
   ! ==================================================================
-  ! ZERO-ALLOCATION SNAPPY WRAPPERS
-  ! ==================================================================
-
-  subroutine snappy_compress_buffer(input, in_len, output, out_len, actual_len)
-    use iso_c_binding, only: c_size_t, c_loc, c_char, c_ptr, c_f_pointer
-    implicit none
-
-    integer(int8), intent(in), target    :: input(:)
-    integer(int64), intent(in)           :: in_len
-    integer(int8), intent(inout), target :: output(:)  ! Pre-allocated thread buffer
-    integer(int64), intent(in)           :: out_len    ! Total capacity of output
-    integer(int64), intent(out)          :: actual_len ! Bytes actually written
-
-    integer(c_size_t) :: c_in_len, c_out_len
-    character(kind=c_char), pointer :: char_output(:)
-
-    c_in_len = int(in_len, c_size_t)
-    c_out_len = int(out_len, c_size_t)
-
-    ! Zero-copy type map from int8 to c_char array
-    call c_f_pointer(c_loc(output), char_output, [c_out_len])
-
-    ! Call C function directly. c_loc(input) provides the required c_ptr
-    call c_compress_bytes(c_loc(input), c_in_len, char_output, c_out_len)
-
-    actual_len = int(c_out_len, int64)
-  end subroutine snappy_compress_buffer
-
-
-  subroutine snappy_uncompress_buffer(input, in_len, output, out_len, status)
-    use iso_c_binding, only: c_size_t, c_loc, c_char, c_ptr, c_f_pointer, c_bool
-    implicit none
-
-    integer(int8), intent(in), target    :: input(:)
-    integer(int64), intent(in)           :: in_len
-    integer(int8), intent(inout), target :: output(:)  ! Pre-allocated thread buffer
-    integer(int64), intent(in)           :: out_len    ! Expected uncompressed size
-    integer :: status
-
-    integer(c_size_t) :: c_in_len
-    character(kind=c_char), pointer :: char_input(:)
-    logical(c_bool) :: success
-
-    c_in_len = int(in_len, c_size_t)
-    ! Zero-copy type map from int8 to c_char array
-    call c_f_pointer(c_loc(input), char_input, [c_in_len])
-
-    ! Call C function directly. c_loc(output) provides the required c_ptr
-    success = c_uncompress_bytes(char_input, c_in_len, c_loc(output))
-    !if (size(output, kind=int64) < expected_output_length) then
-    !   print *, "CRITICAL: Allocated output buffer is too small!"
-    !   stop 1
-    !end if
-
-    if (success) then
-       status = 0
-    else
-       status = 2 ! Corruption
-    end if
-  end subroutine snappy_uncompress_buffer
-  ! ==================================================================
   ! PARALLEL COMPRESSION PIPELINE
   ! ==================================================================
-  subroutine CompressBoxesToSnappyStream(boxes, stream)
+  subroutine CompressBoxesToStream(boxes, stream, method_to_use)
     use iso_c_binding, only: c_size_t
     ! Assumes 'c_max_compressed_length' is accessible via your interface block
 
     type(Box), intent(in), target, contiguous :: boxes(:)
     type(CompressedStream), intent(inout) :: stream
-
+    integer, intent(in) :: method_to_use
     integer(int64) :: i, current_start, current_end
 
     ! Buffer Capacity Math
@@ -747,10 +692,11 @@ contains
     max_raw_bytes = BOXES_PER_CHUNK * 40_int64
     c_max_raw = int(max_raw_bytes, c_size_t)
     max_comp_bytes = int(c_max_compressed_length(c_max_raw), int64)
-
+    stream%compression_method = method_to_use
+    write(*,*) 'COMPRESSION METHOD TO USE: ', method_to_use
     !$omp parallel default(none) &
-    !$omp shared(stream, boxes, max_raw_bytes, max_comp_bytes) &
-    !$omp private(i, current_start, current_end, local_codec, &
+    !$omp shared(stream, boxes, max_raw_bytes, max_comp_bytes,method_to_use) &
+    !$omp private(i, current_start, current_end, local_codec,&
     !$omp         thread_raw_buf, thread_comp_buf, actual_raw_len, actual_comp_len)
 
     ! 1. Allocate thread-local buffers ONCE per thread
@@ -779,9 +725,19 @@ contains
        stream%chunks(i)%raw_byte_size = actual_raw_len
 
        ! 3. Compress raw bytes directly into the pre-allocated snappy buffer
-       call snappy_compress_buffer(thread_raw_buf, actual_raw_len, &
-            thread_comp_buf, max_comp_bytes, actual_comp_len)
-
+       select case(method_to_use)
+          case(COMPRESSION_METHOD_SNAPPY)
+             call snappy_compress_buffer(thread_raw_buf, actual_raw_len, &
+                  thread_comp_buf, max_comp_bytes, actual_comp_len)
+          case(COMPRESSION_METHOD_ZLIB)
+             call zlib_compress_buffer(thread_raw_buf, actual_raw_len, &
+                  thread_comp_buf, max_comp_bytes, actual_comp_len)
+          case(COMPRESSION_METHOD_ZSTD)
+             call zstd_compress_buffer(thread_raw_buf, actual_raw_len, &
+                  thread_comp_buf, max_comp_bytes, actual_comp_len)
+          case default
+             error stop "ERROR: Unknown compression method requested."             
+          end select
        stream%chunks(i)%compressed_size = actual_comp_len
 
        ! 4. The ONLY allocation in the loop:
@@ -802,12 +758,12 @@ contains
     if (allocated(local_codec%unique_h)) deallocate(local_codec%unique_h)
 
     !$omp end parallel
-  end subroutine CompressBoxesToSnappyStream
+  end subroutine CompressBoxesToStream
 
   ! ==================================================================
   ! PARALLEL DECOMPRESSION PIPELINE
   ! ==================================================================
-  subroutine DecompressSnappyStreamToBoxes(stream, boxes)
+  subroutine DecompressStreamToBoxes(stream, boxes)
     type(CompressedStream), intent(in) :: stream
     type(Box), allocatable, intent(out) :: boxes(:)
 
@@ -817,10 +773,10 @@ contains
     integer(int8), allocatable :: uncompressed_bytes(:)
     type(Box), allocatable :: temp_boxes(:)
     integer :: status
-
+    integer :: compression_method
     ! ADDED: The thread-local codec state
     type(BoxCodec) :: local_codec 
-
+    compression_method = stream%compression_method
     allocate(boxes(stream%total_boxes))
 
     ! ---------------------------------------------------------
@@ -836,7 +792,7 @@ contains
     end do
 
     !$omp parallel default(none) &
-    !$omp shared(stream, boxes, max_raw_size) &
+    !$omp shared(stream, boxes, max_raw_size,compression_method) &
     !$omp private(i, current_start, current_end, uncompressed_bytes, temp_boxes, status, local_codec)
     ! Note: local_codec MUST be in the private() list above ^
 
@@ -856,18 +812,50 @@ contains
 
        ! 1. Step 1 Decompression: Snappy to Raw Bytes
        ! We pass a SLICE of the pre-allocated buffer matching the exact expected size
-       call snappy_uncompress_buffer( &
-            stream%chunks(i)%data, &
-            stream%chunks(i)%compressed_size, &
-            uncompressed_bytes(1 : stream%chunks(i)%raw_byte_size), & 
-            stream%chunks(i)%raw_byte_size, &
-            status &
-            )
+       select case( compression_method )
+          case(COMPRESSION_METHOD_SNAPPY)
+             call snappy_uncompress_buffer( &
+                  stream%chunks(i)%data, &
+                  stream%chunks(i)%compressed_size, &
+                  uncompressed_bytes(1 : stream%chunks(i)%raw_byte_size), & 
+                  stream%chunks(i)%raw_byte_size, &
+                  status &
+                  )
 
-       if (status /= 0) then
-          print *, "CRITICAL ERROR: Snappy decompression failed at chunk ", i
-          stop 1
-       end if
+             if (status /= 0) then
+                print *, "CRITICAL ERROR: Snappy decompression failed at chunk ", i
+                stop 1
+             end if
+          case(COMPRESSION_METHOD_ZLIB)
+             call zlib_uncompress_buffer( &
+                  stream%chunks(i)%data, &
+                  stream%chunks(i)%compressed_size, &
+                  uncompressed_bytes(1 : stream%chunks(i)%raw_byte_size), & 
+                  stream%chunks(i)%raw_byte_size, &
+                  status &
+                  )
+
+             if (status /= 0) then
+                print *, "CRITICAL ERROR: ZLIB decompression failed at chunk ", i
+                stop 1
+             end if
+          case(COMPRESSION_METHOD_ZSTD)
+             call zstd_uncompress_buffer( &
+                  stream%chunks(i)%data, &
+                  stream%chunks(i)%compressed_size, &
+                  uncompressed_bytes(1 : stream%chunks(i)%raw_byte_size), & 
+                  stream%chunks(i)%raw_byte_size, &
+                  status &
+                  )
+
+             if (status /= 0) then
+                print *, "CRITICAL ERROR: ZSTD decompression failed at chunk ", i
+                stop 1
+             end if
+          case default
+             error stop "ERROR: Unknown decompression method requested."             
+          end select
+          
 
        ! 2. Step 2 Decompression: Bytes to Geometry
        ! ADDED: Passing local_codec as the 5th argument
@@ -897,7 +885,7 @@ contains
 
     !$omp end parallel
 
-  end subroutine DecompressSnappyStreamToBoxes
+  end subroutine DecompressStreamToBoxes
 
 end module BoxCodecModule
 

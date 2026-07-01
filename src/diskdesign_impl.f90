@@ -14,6 +14,8 @@ submodule (DesignModule) DiskDesignImplModule
   use KLDataModule
   use BoostPolygonAPIModule
   use SerializationModule
+  use KLDataModule
+  use BoxCodecModule
   implicit none
 
 contains
@@ -28,15 +30,23 @@ contains
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
   end subroutine BuildTree
     
-  module subroutine SaveLayerToSnap( input_layer, snap_filename )
+  module subroutine SaveLayerToSnap( input_layer, snap_filename, method_to_use )
     type(Layer), intent(inout) :: input_layer
     character(*), intent(in)   :: snap_filename
+    integer, intent(in)        :: method_to_use
     type(CompressedStream)     :: snappy_stream
     if( NeedsSorting( input_layer ) ) call omt_pack( input_layer%layer_boxes, K_LEAF_CAPACITY )
     if( NeedsRTree( input_layer ) ) then
        call BuildTree( input_layer )
     end if
-    call CompressBoxesToSnappyStream( input_layer%layer_boxes, snappy_stream)    
+    if( method_to_use == COMPRESSION_METHOD_SNAPPY .or. method_to_use == COMPRESSION_METHOD_ZLIB &
+         .or. method_to_use == COMPRESSION_METHOD_ZSTD ) then
+       !> ok
+    else
+       write(*,*) 'ERROR: unknown compression method: ', method_to_use, ' requested.'
+       error stop
+    end if
+    call CompressBoxesToStream( input_layer%layer_boxes, snappy_stream, method_to_use )
     call SaveCompressedStreamToDisk( snap_filename, snappy_stream )
   end subroutine SaveLayerToSnap
 
@@ -44,8 +54,15 @@ contains
     type(Layer), intent(inout) :: input_layer
     character(*), intent(in)   :: snap_filename
     type(CompressedStream)     :: snappy_stream
+    integer                    :: pos
+    pos = index( snap_filename, ".bin" )
+    if( pos /= 0 ) then !> we are going to assume this is a non-compressed binary file
+       call LoadKLBin( snap_filename, input_layer%layer_boxes)
+       input_layer%n_used  = size(input_layer%layer_boxes)
+       return
+    end if
     call RestoreCompressedStreamFromDisk( snap_filename, snappy_stream )
-    call DecompressSnappyStreamToBoxes( snappy_stream, input_layer%layer_boxes )
+    call DecompressStreamToBoxes( snappy_stream, input_layer%layer_boxes )
     input_layer%n_used = size( input_layer%layer_boxes )
     if( input_layer%n_used /= snappy_stream%total_boxes) then
        write(*,*) 'ERROR: SNAP restoration failed for file: ', snap_filename

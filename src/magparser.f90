@@ -781,7 +781,7 @@ contains
          pos = index( load_design%layers(i)%fileName, ".snap" )
          !write(*,*) 'IS_SNAP ',pos,' ',load_design%layers(i)%fileName
          if( pos == len_trim(load_design%layers(i)%fileName)-4 ) then
-            call SaveLayerToSnap( load_design%layers(i), load_design%layers(i)%fileName )
+            call SaveLayerToSnap( load_design%layers(i), load_design%layers(i)%fileName, K_COMPRESSION_METHOD_TO_USE )
             call ClearLayer( load_design%layers(i) )
             deleted_layer_count = deleted_layer_count + 1
             cycle

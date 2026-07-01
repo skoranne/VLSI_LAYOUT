@@ -114,6 +114,7 @@ module SnappyCompressionTest
   use SnappyCompressionModule
   use CompressionChunkManagerModule
   use LayoutStatisticsModule
+  use SerializationModule
   use BoxCodecModule
   use iso_fortran_env, only : int8, int32, int64, real64
   use iso_c_binding
@@ -203,14 +204,14 @@ contains
     end if
     deallocate( decompressed_boxes )
 
-    !> Snappy compression
-    call CompressBoxesToSnappyStream( original_boxes, snappy_stream)
+    !> compression
+    call CompressBoxesToStream( original_boxes, snappy_stream, 1) !> since this SNAPPY test
     snappy_bytes_total = 0
     do i = 1, size(snappy_stream%chunks)
        snappy_bytes_total = snappy_bytes_total + snappy_stream%chunks(i)%compressed_size
     end do
-    write(*,*) 'Snappy Stream ', size(snappy_stream%chunks), ' chunks, ', snappy_bytes_total
-    call DecompressSnappyStreamToBoxes( snappy_stream, decompressed_boxes)
+    write(*,*) 'Stream ', size(snappy_stream%chunks), ' chunks, ', snappy_bytes_total
+    call DecompressStreamToBoxes( snappy_stream, decompressed_boxes)
     if( num_boxes /= snappy_stream%total_boxes) error stop "ERROR: Stream decomp failed."
     match = .true.
     do i = 1, num_boxes
@@ -257,7 +258,7 @@ contains
     call MortonSort( original_boxes ) !> otherwise SNAP wont match
     num_boxes = size( original_boxes, kind=int64 )
     call RestoreCompressedStreamFromDisk( snapfilename, snappy_stream )
-    call DecompressSnappyStreamToBoxes( snappy_stream, decompressed_boxes)
+    call DecompressStreamToBoxes( snappy_stream, decompressed_boxes)
     if( num_boxes /= snappy_stream%total_boxes) error stop "ERROR: Stream decomp failed."
     match = .true.
     do i = 1, num_boxes

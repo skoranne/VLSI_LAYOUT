@@ -28,7 +28,7 @@ endif
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables ---
 LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
-LDLIBS = -lz -lhdf5_fortran -lhdf5 -lstdc++ -lsnappy
+LDLIBS = -lz -lhdf5_fortran -lhdf5 -lstdc++ -lsnappy -lzstd
 
 # --- Library Definition ---
 LIBRARY = libmagparser.a
@@ -113,6 +113,6 @@ boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I$(BOOST_DIR)  boost_polygon_api.cpp -c
 MAGVIEWER.exe:	magviewer.f90
 		ifx -c -O3 -fpp glf90w.F90
-		ifx -O3 -g -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o -L ./lib/ifx -lglfw -lGL -o MAGVIEWER.exe
+		ifx -O3 -g -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o -L ./lib/ifx -lglfw -lGL -o MAGVIEWER.exe -lz -lsnappy -lzstd
        
-ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe
+ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe MAGVIEWER.exe

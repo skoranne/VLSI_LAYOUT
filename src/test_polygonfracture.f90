@@ -27,7 +27,7 @@ program test_fracture
   real(kind=real64) :: overlap_area, overlap_perimeter
   integer(kind=int64), allocatable :: permutation(:)
   !type(BucketBoundary), allocatable :: segments(:)
-  integer(kind=int64) :: i,j,n, num_roots, num_rects, polygon_number, box_count, updated_box_count, n_trackers
+  integer(kind=int64) :: i,j, num_roots, num_rects, polygon_number, box_count, updated_box_count, n_trackers
   type(Box), allocatable :: current_polygon_boxes(:)
   integer(kind=int64) :: starting_segment
   type(Polygon), allocatable :: contours(:)
@@ -39,7 +39,7 @@ program test_fracture
   type(XYTracker), allocatable :: trackers(:)
   character(len=256)            :: filenameA, filenameB      
   character(len=256)            :: outFileName   
-  integer                       :: control_parameter
+  integer                       :: control_parameter, control_variable
   integer                       :: narg          ! # of arguments on the command line
   integer                       :: iostat        ! I/O status for reading the integer argument
   character(len=256)            :: arg_string    ! temporary buffer for the 2nd argument
@@ -70,11 +70,12 @@ program test_fracture
      write(*,*) '15. Run op = COMPLEMENT A'
      write(*,*) '16. Run op = SIZE A BY '
      write(*,*) '17. Run op = BOOST POLYGON MERGE A'
+     write(*,*) '18. Convert input to SNA{P,Z,}'
      stop "./CONVERT.exe <input-filenameA> <input-filenameB> <output-file> control"     
   case (2)
      error stop "./CONVERT.exe <input-filename> <output-filename> control"
 
-  case (4)                     ! Two arguments: <fileA> <fileB> <outFile> <control>
+  case (5)                     ! Two arguments: <fileA> <fileB> <outFile> <control>
      ! ---- first argument: file name ---------------------------------
      call get_command_argument(1, filenameA, status=iostat)   ! allocates automatically
      if (iostat /= 0) then
@@ -101,27 +102,35 @@ program test_fracture
      end if
      read (arg_string, *, iostat=iostat) control_parameter
      if (iostat /= 0 .or. control_parameter < 0) then
-        write (*,*) "ERROR: CONTROL must be a non‑negative integer."
+        write (*,*) "ERROR: CONTROL PARAMETER must be a non‑negative integer."
         stop 3
      end if
+     call get_command_argument(5, arg_string, status=iostat)
+     if (iostat /= 0) then
+        write (*,*) "ERROR: 5th argument must be an integer."
+        stop 2
+     end if
+     read (arg_string, *, iostat=iostat) control_variable
+     if (iostat /= 0 .or. control_parameter < 0) then
+        write (*,*) "ERROR: CONTROL VARIABLE must be a non‑negative integer."
+        stop 3
+     end if
+     
      ! C equivalent: sprintf(outputName, "%s%s", trim(fileName), "_output");
      ! Write directly into the string variable using string format '(A, A)'
      ! write(outputName, '(A, A)') trim(fileName), "_output"
      ! print *, trim(outputName)
-  case (5)
-     write(*,*) '5. Print Detailed Information: '
-
   case default                ! Anything else → print usage and quit
-     error stop "./PROG.exe <filename> <MAX_LAYER>"
+     error stop "./CONVERT.exe <filename> <MAX_LAYER>"
      stop 1
   end select
 
   print *, "--- Initializing Polygon Fracturing Test ---"
-  call LoadKLBin(filenameA,input_layer%layer_boxes)
-  call LoadKLBin(filenameB,input_layerB%layer_boxes)  
+  !call LoadKLBin(filenameA,input_layer%layer_boxes)
+  !call LoadKLBin(filenameB,input_layerB%layer_boxes)
+  call RestoreSnapToLayer( input_layer, filenameA )
+  call RestoreSnapToLayer( input_layerB, filenameB )  
   boxes => input_layer%layer_boxes
-  input_layer%n_used  = size(boxes)
-  input_layerB%n_used = size( input_layerB%layer_boxes )
   bbox = mbr_of_array( boxes, input_layer%n_used )
   bboxB= mbr_of_array( input_layerB%layer_boxes, input_layerB%n_used )  
   select case(control_parameter)
@@ -386,7 +395,10 @@ program test_fracture
      write(*,*) 'Boost Polygon merged: ', input_layer%n_used, ' to ', output_layer%n_used
      call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      stop
-     
+  case (18)
+     write(*,*) '18. Convert input to SNA{P,G,Z}'
+     call SaveLayerToSnap( input_layer, outFileName, control_variable )
+     stop
   case default
      write(*,*) 'Print Information: '
      write(*,*) 'Num: ', input_layer%n_used, ' area = ', layer_area

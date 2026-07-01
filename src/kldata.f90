@@ -38,7 +38,7 @@ contains
          action='read', &
          iostat=io_status)
     if (io_status /= 0) then
-       print *, "Error: Could not open the binary file."
+       print *, "Error: Could not open the binary file: ", trim(filename)
        stop
     end if
     ! 5. Read the entire file cleanly into your allocated array in one shot

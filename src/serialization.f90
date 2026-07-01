@@ -20,7 +20,7 @@ contains
     if (ios /= 0) stop "Error opening file for writing."
 
     ! 1. Write the Stream metadata
-    write(iunit) in_stream%total_boxes, in_stream%num_chunks
+    write(iunit) in_stream%total_boxes, in_stream%num_chunks, in_stream%compression_method
 
     ! 2. Loop through chunks and write them
     do i = 1, in_stream%num_chunks
@@ -43,8 +43,8 @@ contains
     if (ios /= 0) stop "Error opening file for reading."
 
     ! 1. Read the Stream metadata
-    read(iunit) out_stream%total_boxes, out_stream%num_chunks
-
+    read(iunit) out_stream%total_boxes, out_stream%num_chunks, out_stream%compression_method
+    write(*,'(A,I12,A,I8,A,I1)') '|N| = ', out_stream%total_boxes, ' |C| = ', out_stream%num_chunks, ' |M| =', out_stream%compression_method
     ! 2. Allocate the chunks array
     allocate(out_stream%chunks(out_stream%num_chunks))
 

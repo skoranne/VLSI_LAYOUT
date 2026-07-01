@@ -11,7 +11,7 @@ box_compression.o: boxbytestream.o snappy_apif.o
 box_codec.o:	   snappy_apif.o
 snappy_apif.o:	   snappy_api.o
 serialization.o:   box_codec.o
-diskdesign_impl.o: serialization.o
+diskdesign_impl.o: serialization.o box_codec.o snappy_apif.o
 systeminfo.o:	commonmodule.o version_mod.o
 hashtable.o:	systeminfo.o
 geometry.o:	hashtable.o
