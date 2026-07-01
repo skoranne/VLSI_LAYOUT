@@ -18,7 +18,7 @@ FCFLAGS = -cuda -O3 -Mpreprocess -mp=gpu -fopenmp -Minfo=accel,mp
 # --- Linker Variables ---
 #LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
 LDFLAGS = -L/scratch1/skoranne/NVCOMPILERS/lib/
-LDLIBS = -lz -lstdc++ -lsnappy
+LDLIBS = -lz -lstdc++ -lsnappy -lzstd
 #LDLIBS = -lz -lhdf5_fortran -lhdf5
 # --- Library Definition ---
 LIBRARY = libmagparser.a
