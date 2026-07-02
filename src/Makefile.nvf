@@ -13,7 +13,11 @@ FORTRAN_COMPILER =nvfortran
 #FCFLAGS = -g -O0 -check bounds -check all -traceback -warn all -qopenmp -qopt-report=3
 #FCFLAGS = -O3 -parallel -qopenmp -qopt-report=3
 GIT_HASH := $(shell git rev-parse --short HEAD)
-FCFLAGS = -cuda -O3 -Mpreprocess -mp=gpu -fopenmp -Minfo=accel,mp
+ifeq ($(DEBUG),1)
+   FCFLAGS = -cuda -O0 -Mbounds -g -traceback -Mchkptr -O0  -Mpreprocess -mp=gpu -fopenmp -Minfo=accel,mp
+else
+   FCFLAGS = -cuda -O3 -Mpreprocess -mp=gpu -fopenmp -Minfo=accel,mp
+endif
 #FCFLAGS = -g -O3 -Mpreprocess -Minfo=accel -fopenmp -mp=gpu
 # --- Linker Variables ---
 #LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
