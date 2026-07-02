@@ -55,6 +55,7 @@ exec run t1:ring_intersection = t1:poly_outer_ring * t1:poly_inner_ring
 exec run t1:nothing = t1:ring_intersection ASSERT_ZERO t1:nothing
 flush
 delete t1
+decl memory t1 = nothing
 exec init t1:nothing
 exec init t2:nothing
 # All poly/gate temporary layers deleted
