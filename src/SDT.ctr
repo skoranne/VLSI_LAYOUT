@@ -3,12 +3,14 @@
 # VLSI Magic Layout Editor
 program SDT16_6x6
 systeminfo
+var temp_folder RUN_09/
+var temporary_layers 2
 var abort_on_xor 1
 var abort_on_assert_zero 2
 var debug_verbosity 0
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT1.mag
-decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
-# decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
+# decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
+decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
 # decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6.mag
 # decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8.mag
 # decl design d1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1.mag
@@ -17,6 +19,7 @@ decl memory d1 = nothing
 decl memory t1 = nothing
 decl memory t2 = nothing
 info
+exec init t1:nothing
 exec run d1:poly = d1_input:poly COPY nothing
 exec run d1:diff = d1_input:diff COPY nothing
 exec run d1:met1 = d1_input:met1 COPY nothing
@@ -40,27 +43,27 @@ exec run t1:sd2  = d1:diff ~ d1:poly
 exec run t1:check_sd = t1:sd1 ^ t1:sd2
 exec run t1:check_and1 = t1:sd1 * d1:poly
 exec run t1:nothing = t1:check_and1 ASSERT_ZERO nothing
-exec run t1:poly_grow = d1:poly SIZE nothing 0.01
+exec run t1:poly_grow = d1:poly SIZE t1:nothing 0.01
 exec run t1:self_poly = t1:poly_grow * d1:poly
 exec run t1:self_poly_xor = t1:self_poly ^ d1:poly
-exec run t1:poly_shrink = d1:poly SIZE nothing -0.01
+exec run t1:poly_shrink = d1:poly SIZE t1:nothing -0.01
 exec run t1:self_poly_shrink = d1:poly * t1:poly_shrink
 exec run t1:self_poly_shrink_xor = t1:self_poly_shrink ^ t1:poly_shrink
 exec run t1:poly_outer_ring = t1:poly_grow ! d1:poly
 exec run t1:poly_inner_ring = d1:poly ! t1:poly_shrink
 exec run t1:ring_intersection = t1:poly_outer_ring * t1:poly_inner_ring
-exec run t1:nothing = t1:ring_intersection ASSERT_ZERO nothing
+exec run t1:nothing = t1:ring_intersection ASSERT_ZERO t1:nothing
 flush
 delete t1
 # All poly/gate temporary layers deleted
-# exec run o1:li1  = d1:li1 COPY nothing
-# exec run o1:met1 = d1:met1 COPY nothing
-exec run t2:met1_grow = d1:met1 SIZE nothing 0.01
-exec run t2:met1_shrink = d1:met1 SIZE nothing -0.01
+# exec run o1:li1  = d1:li1 COPY t1:nothing
+# exec run o1:met1 = d1:met1 COPY t1:nothing
+exec run t2:met1_grow = d1:met1 SIZE t1:nothing 0.01
+exec run t2:met1_shrink = d1:met1 SIZE t1:nothing -0.01
 exec run t2:met1_outer_ring = t2:met1_grow ! d1:met1
 exec run t2:met1_inner_ring = d1:met1 ! t2:met1_shrink
 exec run t2:m1_ring_intersection = t2:met1_outer_ring * t2:met1_inner_ring
-exec run t2:nothing = t2:m1_ring_intersection ASSERT_ZERO nothing
+exec run t2:nothing = t2:m1_ring_intersection ASSERT_ZERO t1:nothing
 delete t2
 delete d1
 flush

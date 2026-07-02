@@ -157,32 +157,32 @@ contains
   pure elemental subroutine box_grow(this, xgrow, ygrow)
     class(Box), intent(inout) :: this
     integer, intent(in) :: xgrow, ygrow
-    if( .not. this%is_valid() ) error stop "INBOX NOT VALID"
+    if( .not. this%is_valid() ) error stop "INBOX NOT VALID1"
     this%x1 = (this%x1-xgrow)
     this%x2 = (this%x2+xgrow)
     this%y1 = (this%y1-ygrow)
     this%y2 = (this%y2+ygrow)
-    if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID"
+    if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID2"
   end subroutine box_grow
   pure elemental subroutine ApplyTransform(this, x, y)
     class(Box), intent(inout) :: this
     integer, intent(in) :: x, y
-    if( .not. this%is_valid() ) error stop "INBOX NOT VALID"
+    if( .not. this%is_valid() ) error stop "INBOX NOT VALID3"
     this%x1 = (this%x1+x)
     this%x2 = (this%x2+x)
     this%y1 = (this%y1+y)
     this%y2 = (this%y2+y)
-    if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID"
+    if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID4"
   end subroutine ApplyTransform
   pure elemental subroutine box_grow_directional(this, gvar1, gvar2, gvar3, gvar4)
     class(Box), intent(inout) :: this
     integer(kind=K_COORDINATE_KIND),intent(in) :: gvar1, gvar2, gvar3, gvar4
-    if( .not. this%is_valid() ) error stop "INBOX NOT VALID"
+    if( .not. this%is_valid() ) error stop "INBOX NOT VALID5"
     this%x1 = (this%x1-gvar3)
     this%x2 = (this%x2+gvar1)
     this%y1 = (this%y1-gvar4)
     this%y2 = (this%y2+gvar2)
-    if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID"
+    if( .not. this%is_valid() ) error stop "OUTBOX NOT VALID6"
   end subroutine box_grow_directional
 
   ! Type procedure for intersection of two boxes

@@ -5,7 +5,7 @@ LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
 	   systeminfo_gpu.o interaction.o gpu_pnummerge.o RLEMerge.o ascii_plot.o\
 	   boost_polygon_apif.o boost_polygon_api.o boxbytestream.o box_compression.o\
 	   snappy_api.o snappy_apif.o layout_statistics.o box_codec.o serialization.o\
-	   diskdesign_impl.o
+	   diskdesign_impl.o gridlayer.o utilities.o
 
 box_compression.o: boxbytestream.o snappy_apif.o
 box_codec.o:	   snappy_apif.o
@@ -19,6 +19,7 @@ boost_polygon_apif.o:	boost_polygon_api.o geometry.o
 gpu_morton_sort.o: commonmodule.o geometry.o
 morton.o:	commonmodule.o geometry.o
 rtree.o:	geometry.o
+gridlayer.o:	design_impl.o
 boxmerge.o:	geometry.o
 contour.o:	geometry.o polygon_fracture.o
 hdfdata.o:	geometry.o
@@ -29,7 +30,8 @@ gpu_pnummerge.o:	interaction.o
 polygon_fracture.o:	hdfdata.o
 design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o interaction.o boost_polygon_apif.o
 design_impl.o:	design.o geometry.o boost_polygon_apif.o diskdesign_impl.o
-magparser.o:	polygon_fracture.o design.o morton.o kldata.o
+diskdesign_impl.o:	 utilities.o
+magparser.o:	polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
 mainmagparser.o:	magparser.o controlparser.o
 controlparser.o:	design.o
 systeminfo_gpu.o:	systeminfo.o

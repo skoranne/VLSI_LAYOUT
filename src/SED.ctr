@@ -1,10 +1,13 @@
 # Control file for MAGPARSER
 program square
 systeminfo
+var temp_folder RUN_09/
+var temporary_layers 2
 decl design d1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1.mag
 decl output o1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1_output.mag
 decl memory t1 = nothing
 info
+exec init t1:nothing
 exec run o1:diff = d1:li1 COPY nothing
 exec run o1:poly = d1:poly COPY nothing
 exec run o1:li1  = d1:li1 COPY nothing
@@ -14,10 +17,10 @@ exec run t1:ng_poly2 = d1:poly ~ o1:gate
 exec run o1:sd2  = d1:diff ~ d1:poly
 exec run o1:met1_grow = d1:met1 GROW nothing 0.1 0.1 0.1 0.1
 exec run o1:poly_retarget = d1:poly GROW nothing 0.2 0.1 0.2 0.2
-exec run t1:poly_grow = d1:poly SIZE nothing 0.01
-exec run t1:poly_shrink = d1:poly SIZE nothing -0.01
-exec run t1:met1_grow = d1:met1 SIZE nothing 0.01
-exec run t1:met1_shrink = d1:met1 SIZE nothing -0.01
+exec run t1:poly_grow = d1:poly SIZE t1:nothing 0.01
+exec run t1:poly_shrink = d1:poly SIZE t1:nothing -0.01
+exec run t1:met1_grow = d1:met1 SIZE t1:nothing 0.01
+exec run t1:met1_shrink = d1:met1 SIZE t1:nothing -0.01
 exec run o1:poly_outer_ring = t1:poly_grow ! d1:poly
 exec run o1:poly_inner_ring = d1:poly ! t1:poly_shrink
 exec run o1:met1_outer_ring = t1:met1_grow ! d1:met1

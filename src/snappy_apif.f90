@@ -304,7 +304,7 @@ contains
     integer(int64), intent(out)          :: actual_len ! Bytes actually written
 
     integer(c_size_t) :: c_in_len, c_out_len, z_result
-    integer(c_int), parameter :: comp_level = 3 ! Standard default compression level
+    integer(c_int), parameter :: comp_level = 20 ! Standard default compression level
 
     c_in_len = int(in_len, c_size_t)
     c_out_len = int(out_len, c_size_t)

@@ -106,3 +106,19 @@ pure subroutine GetLayerFromDBName( full_name, design_hash_table, design_dbs )
   call hash_get( design_dbs(db_index)%ht, layerName, layer_index, ins )
 end subroutine GetLayerFromDBName
 
+Using m4 macro processor we want to run it on this TEXT file
+# Control file for MAGPARSER
+program square
+systeminfo
+var temp_folder RUN_09/
+var abort_on_assert_zero 1
+var temporary_layers 2
+decl design d1 = INV.mag
+decl output o1 = foo.mag
+decl output o2 = bar.mag
+decl memory f1 = nothing
+decl memory t1 = nothing
+info
+for_loop(poly 
+flush
+end 

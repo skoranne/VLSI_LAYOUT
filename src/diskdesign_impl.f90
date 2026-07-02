@@ -16,20 +16,36 @@ submodule (DesignModule) DiskDesignImplModule
   use SerializationModule
   use KLDataModule
   use BoxCodecModule
+  use Utilities
   implicit none
+
+  !> Disk based OOC (out of code) loading system
 
 contains
   module subroutine BuildTree( input_layer )
     type(Layer), intent(inout)  :: input_layer
-    integer(kind=int64)         :: total_nodes
+    integer(kind=int64)         :: total_nodes, num_squares
+    logical                     :: dominated_by_squares
+    dominated_by_squares = .false.
     if( .not. NeedsRTree( input_layer ) ) return
+    if( NeedsSorting( input_layer ) ) then
+       num_squares = count( is_square( input_layer%layer_boxes ) )
+       if( num_squares*1.0_real64 / (input_layer%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+          dominated_by_squares = .true.
+       end if
+       if( dominated_by_squares ) then
+          call MortonSort( input_layer%layer_boxes )
+       else
+          call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+       end if
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
+    end if
     total_nodes = CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY )
-    call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
   end subroutine BuildTree
-    
+
   module subroutine SaveLayerToSnap( input_layer, snap_filename, method_to_use )
     type(Layer), intent(inout) :: input_layer
     character(*), intent(in)   :: snap_filename
@@ -51,14 +67,20 @@ contains
   end subroutine SaveLayerToSnap
 
   module subroutine RestoreSnapToLayer( input_layer, snap_filename )
-    type(Layer), intent(inout) :: input_layer
+    class(Layer), intent(inout) :: input_layer
     character(*), intent(in)   :: snap_filename
     type(CompressedStream)     :: snappy_stream
-    integer                    :: pos
+    integer                    :: pos, iunit, ios
     pos = index( snap_filename, ".bin" )
     if( pos /= 0 ) then !> we are going to assume this is a non-compressed binary file
        call LoadKLBin( snap_filename, input_layer%layer_boxes)
        input_layer%n_used  = size(input_layer%layer_boxes)
+       return
+    end if
+    !> for memory based layers we need an optimization that NO-FILE => EMPTY LAYER
+    open(newunit=iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
+    if (ios /= 0) then
+       call ClearLayer( input_layer )
        return
     end if
     call RestoreCompressedStreamFromDisk( snap_filename, snappy_stream )
@@ -72,5 +94,25 @@ contains
     call BuildTree( input_layer )
   end subroutine RestoreSnapToLayer
 
+  module subroutine RestoreSnapToDLayer( input_layer, snap_filename )
+    class(Layer), allocatable, intent(inout) :: input_layer
+    character(*), intent(in)   :: snap_filename
+    type(CompressedStream)     :: snappy_stream
+    integer                    :: pos, ios
+
+    if( allocated( input_layer ) ) deallocate( input_layer )
+    allocate( DiskLayer :: input_layer )
+    !> otherwise use something like this
+    select type (D => input_layer)
+    type is (DiskLayer)
+       open(newunit = D%iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
+       if (ios /= 0) then
+          write(*,*) 'ERROR: Unable to open file: ', snap_filename, ' for reading.'
+          stop "Error opening file for reading."
+       end if
+       call PrintFileUnitInformation( D%iunit )
+    end select
+  end subroutine RestoreSnapToDLayer
+  
 end submodule DiskDesignImplModule
 

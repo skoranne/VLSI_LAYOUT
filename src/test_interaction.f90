@@ -15,6 +15,7 @@ module Test
   use PNumMergeModule
   use GPUMergeModule
   use DatastructuresModule
+  use SerializationModule
   !use RLEMergeModule
   use iso_fortran_env, only: int32, int64, real64
   use omp_lib
@@ -69,13 +70,10 @@ program main
   type(Box)              :: bbox
   type(Layer),target     :: input_layer
   integer(kind=int64)    :: N
-  integer(kind=int64)    :: total_nodes_cpu, total_nodes_gpu
+  integer(kind=int64)    :: total_nodes
   integer(kind=int64)    :: interaction_count_cpu, interaction_count_gpu
   integer(kind=int64), parameter :: K_LEAF_CAPACITY_GPU = K_LEAF_CAPACITY
-  type(RTreeNode), allocatable:: TreeNodes(:)
-  integer(kind=int64) :: RootIndex
-  character(len=256)            :: filenameA, filenameB      
-  character(len=256)            :: outFileName   
+  character(len=256)            :: filenameA
   integer                       :: control_parameter(4)
   integer                       :: iostat, file_unit
   integer                :: narg, i, j
@@ -98,14 +96,9 @@ program main
      stop 2
   end if
   write (*,*) 'Reading 1st filename: ', trim(filenameA)
-  call get_command_argument(2, outFileName, status=iostat)   ! allocates automatically
-  if (iostat /= 0) then
-     write (*,*) "ERROR: 3rd argument must be a filename."
-     stop 2
-  end if
-  ! ---- third argument: integer (max number of layers) ----------
+  ! ---- 2nd argument: integer (max number of layers) ----------
   do i=1,4
-     call get_command_argument(2+i, arg_string, status=iostat)
+     call get_command_argument(1+i, arg_string, status=iostat)
      if (iostat /= 0) then
         write (*,*) "ERROR: 4th argument must be an integer."
         stop 2
@@ -118,42 +111,42 @@ program main
   end do
 
   max_edges = 10000
-  call LoadKLBin(filenameA, input_layer%layer_boxes)
+  !call LoadKLBin(filenameA, input_layer%layer_boxes)
+  call RestoreSnapToLayer( input_layer, filenameA )
   boxes => input_layer%layer_boxes
-  N = size( boxes )
-  input_layer%n_used = N
+  N = input_layer%n_used
+  if( N /= size( input_layer%layer_boxes ) ) error stop "ERROR: File load problem."
   call InitSystem()
   !> CPU based runs first
   if( size(input_layer%layer_boxes) == 0 ) error stop "INPUT_LAYER size has become 0"
-  call StartMarkTime("CPUSortTree")
-  total_nodes_cpu = CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY )
-  write(*,*) 'TOTAL NODES FOR CPU RT = ', total_nodes_cpu
-  allocate( input_layer%tree%tree_nodes( total_nodes_cpu ) )
-  num_squares = count( is_square(boxes) )
-  if( .false. .and. num_squares*1.0_real64 / (N*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
-     write(*,*) 'Layer is SQUARE dominated, ', num_squares, ' / ', size(boxes)
-     call MortonSort( input_layer%layer_boxes )
-  else
-     if( control_parameter(1) == 1 ) then
-        call SortBoxesDirect( boxes, N )
+  call StartMarkTime("CPUSortTree")  
+  if( NeedsSorting( input_layer ) ) then
+     num_squares = count( is_square(boxes) )
+     if( num_squares*1.0_real64 / (N*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+        write(*,*) 'Layer is SQUARE dominated, ', num_squares, ' / ', size(boxes)
+        call MortonSort( input_layer%layer_boxes )
      else
-        call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+        if( control_parameter(1) == 1 ) then
+           call SortBoxesDirect( boxes, N )
+        else
+           call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+        end if
      end if
+     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )     
   end if
-  
-  input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
-  call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
-  input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
+  if( NeedsRTree( input_layer ) ) then
+     call BuildTree( input_layer )
+     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )     
+  end if
   call StopMarkTime("CPUSortTree")
+  total_nodes = size( input_layer%tree%tree_nodes )
   call StartMarkTime("CPUInteractions")
-  !>   ComputeInteractionsCPU( tree_nodes, sorted_boxes, root_index, interaction_count )
-  call ComputeInteractionsCPU( input_layer%tree%tree_nodes, total_nodes_cpu, input_layer%layer_boxes,N,&
+  call ComputeInteractionsCPU( input_layer%tree%tree_nodes, total_nodes, input_layer%layer_boxes,N,&
        input_layer%tree%root_index, interaction_count_cpu )
   write(*,*) '|CPU TOTAL INTERACTIONS| = ', interaction_count_cpu
   call StopMarkTime("CPUInteractions")
   call StartMarkTime("CPUSingletons")  
   allocate( is_singleton_cpu( N ) )  
-  !>   FindSingletonsCPU(sorted_boxes, tree_nodes, root_index, is_singleton, num_singletons)
   call FindSingletonsCPU( input_layer%layer_boxes, input_layer%tree%tree_nodes, input_layer%tree%root_index,&
        is_singleton_cpu, num_singletons_cpu)
   write(*,*) '|CPU NUM_SINGLETONS| = ', num_singletons_cpu
@@ -166,9 +159,7 @@ program main
        input_layer%tree%root_index, overlap_area_cpu, overlap_perimeter_cpu)
   write(*,'(A,F18.4,A,F18.4)') 'CPU OVLP AREA = ', overlap_area_cpu, ' CPU OVLP PERIMETER = ', overlap_perimeter_cpu  
   input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )
-  
   call input_layer%pnumtable%expand_roots()
-  
   num_roots = input_layer%pnumtable%count_roots()
   num_rects = count(input_layer%pnumtable%arr == 0)
   if( num_rects == input_layer%n_used ) then
@@ -181,27 +172,11 @@ program main
   allocate( is_singleton_gpu( N ) )
   boxes => input_layer%layer_boxes  
   is_singleton_gpu = .false.
-  #ifdef NO_COMMON_TREE_APPROACH
-  total_nodes_gpu = CalculateTotalNodes( N, K_LEAF_CAPACITY_GPU ) !> for GPU we might change
-  bbox = mbr_of_array( boxes, N )
-  write(*,'(A,I12,A,4I12,A,I12)') 'Loaded : ', N, ' BBOX = ', bbox, ' |T| = ', total_nodes_gpu
-  call StartMarkTime("GPUSort")  
-  call SortBoxesDirect( boxes, N )
-  call StopMarkTime("GPUSort")
-  call StartMarkTime("GPURTree")    
-  allocate( TreeNodes( total_nodes_gpu ) )
-  call BuildRTree( boxes, K_LEAF_CAPACITY_GPU, TreeNodes, RootIndex)
-  write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(TreeNodes)
-  call StopMarkTime("GPURTree")
-  
-  call StartMarkTime("GPUInteractions")
-  call ComputeInteractionsGPU( TreeNodes, total_nodes_gpu, boxes, N, RootIndex, interaction_count_gpu)
-  #endif
-  call ComputeInteractionsGPU( input_layer%tree%tree_nodes, total_nodes_cpu, boxes, N, input_layer%tree%root_index, interaction_count_gpu)
+  call ComputeInteractionsGPU( input_layer%tree%tree_nodes, total_nodes, boxes, N, input_layer%tree%root_index, interaction_count_gpu)
   write(*,*) '|GPU TOTAL INTERACTIONS| = ', interaction_count_gpu
   call StopMarkTime("GPUInteractions")
   call StartMarkTime("GPUSingleton")
-  call FindSingletonsGPU( N, boxes, total_nodes_cpu, input_layer%tree%tree_nodes, input_layer%tree%root_index, is_singleton_gpu, num_singletons_gpu)
+  call FindSingletonsGPU( N, boxes, total_nodes, input_layer%tree%tree_nodes, input_layer%tree%root_index, is_singleton_gpu, num_singletons_gpu)
   write(*,*) '|GPU NUM_SINGLETONS| = ', num_singletons_gpu
   call StopMarkTime("GPUSingleton")
   call StartMarkTime("PNUM")

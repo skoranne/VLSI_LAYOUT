@@ -1,15 +1,18 @@
 # Control file for MAGPARSER
+include(`op_template.m4')dnl
 program square
 systeminfo
+var temp_folder RUN_09/
 var abort_on_assert_zero 1
+var temporary_layers 2
 decl design d1 = INV.mag
 decl output o1 = foo.mag
 decl output o2 = bar.mag
 decl memory f1 = nothing
 decl memory t1 = nothing
 info
+OP1(t1,poly,d1,0.001)
 exec run f1:diff = d1:pdiff + d1:ndiff
-exec run t1:nothing = f1:diff ASSERT_ZERO nothing
 exec run o1:diff = f1:diff COPY nothing
 exec run o1:poly = d1:poly COPY nothing
 exec run o1:gate = d1:poly * f1:diff

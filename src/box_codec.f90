@@ -693,7 +693,7 @@ contains
     c_max_raw = int(max_raw_bytes, c_size_t)
     max_comp_bytes = int(c_max_compressed_length(c_max_raw), int64)
     stream%compression_method = method_to_use
-    write(*,*) 'COMPRESSION METHOD TO USE: ', method_to_use
+    !write(*,*) 'COMPRESSION METHOD TO USE: ', method_to_use
     !$omp parallel default(none) &
     !$omp shared(stream, boxes, max_raw_bytes, max_comp_bytes,method_to_use) &
     !$omp private(i, current_start, current_end, local_codec,&

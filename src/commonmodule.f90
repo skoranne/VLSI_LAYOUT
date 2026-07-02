@@ -12,15 +12,18 @@ module CommonModule
    integer(kind=int64), parameter :: K_BOOST_CONTROL_XOR = 0, K_BOOST_CONTROL_OR = 1, &
                                      K_BOOST_CONTROL_AND = 2, K_BOOST_CONTROL_NOT = 3,&
                                      K_BOOST_CONTROL_MERGE = 4, K_BOOST_CONTROL_SIZE = 5
+   integer, parameter             :: K_TEMPORARY_LAYER_MEMORY = 1, K_TEMPORARY_LAYER_DISK = 2
    integer(kind=K_COORDINATE_KIND):: PRECISION
    integer                        :: debug_verbosity = 0
    integer                        :: abort_on_xor = 0
    integer                        :: abort_on_assert_zero = 0
+   integer                        :: temporary_layers = K_TEMPORARY_LAYER_MEMORY
    integer                        :: K_COMPRESSION_METHOD_TO_USE = 1 !> ZLIB
    public:: InitPrecision, GetPrecision, K_COORDINATE_KIND, K_LEAF_CAPACITY, K_SQUARE_DOMINATION_THRESHOLD, XYTracker,&
         TrackerCell, K_SMALL_EPSILON, K_BOOST_CONTROL_XOR, K_BOOST_CONTROL_OR, K_BOOST_CONTROL_AND,&
         K_BOOST_CONTROL_NOT, K_BOOST_CONTROL_MERGE, K_BOOST_CONTROL_SIZE, debug_verbosity, abort_on_xor,&
-        abort_on_assert_zero, K_COMPRESSION_METHOD_TO_USE
+        abort_on_assert_zero, temporary_layers, K_COMPRESSION_METHOD_TO_USE, K_TEMPORARY_LAYER_MEMORY, &
+        K_TEMPORARY_LAYER_DISK
 
    type :: XYTracker
       integer(kind=K_COORDINATE_KIND) :: X, Y

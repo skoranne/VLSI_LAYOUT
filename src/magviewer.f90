@@ -371,6 +371,144 @@ contains
     end do
 
   end subroutine SearchTreeBoxesRecursive
+  !> Recursively searches the Macro R-Tree using OpenMP Tasks
+  recursive subroutine SearchTreeForChunks(tree_nodes, index, qbox, layer_boxes, n_used, hit_chunks, num_hits, max_hits)
+    type(RTreeNode), intent(in)        :: tree_nodes(:)
+    integer(kind=int64), intent(in)    :: index
+    type(Box), intent(in)              :: qbox
+    type(Box), intent(in)              :: layer_boxes(:)
+    integer(kind=int64), intent(in)    :: n_used
+    integer(kind=int64), intent(inout) :: hit_chunks(:)
+    integer, intent(inout)             :: num_hits
+    integer, intent(in)                :: max_hits
+
+    integer(kind=int64) :: child_idx, k, leaf_end
+    logical             :: overlapx, overlapy
+    type(RTreeNode)     :: childNode
+
+    if (size(tree_nodes) == 0 .or. num_hits >= max_hits) return
+
+    overlapx = max(tree_nodes(index)%mbr%x1, qbox%x1) <= min(tree_nodes(index)%mbr%x2, qbox%x2)
+    if (overlapx) then
+       overlapy = max(tree_nodes(index)%mbr%y1, qbox%y1) <= min(tree_nodes(index)%mbr%y2, qbox%y2)
+    else
+       overlapy = .false.
+    end if
+    if (.not. (overlapx .and. overlapy)) return
+
+    ! Leaf Node: Safely append hits
+    if (tree_nodes(index)%IsLeaf) then
+       leaf_end = min(tree_nodes(index)%ChildStart + K_LEAF_CAPACITY - 1, n_used)
+
+       !$omp critical (chunk_append)
+       do k = tree_nodes(index)%ChildStart, leaf_end
+          if (num_hits >= max_hits) exit
+          overlapx = max(layer_boxes(k)%x1, qbox%x1) <= min(layer_boxes(k)%x2, qbox%x2)
+          if (overlapx) then
+             overlapy = max(layer_boxes(k)%y1, qbox%y1) <= min(layer_boxes(k)%y2, qbox%y2)
+             if (overlapy) then
+                num_hits = num_hits + 1
+                hit_chunks(num_hits) = k
+             end if
+          end if
+       end do
+       !$omp end critical (chunk_append)
+       return
+    end if
+
+    ! Internal Node: Spawn an OpenMP task for each child
+    do child_idx = tree_nodes(index)%ChildStart, tree_nodes(index)%ChildStart + tree_nodes(index)%NumChildren - 1
+       childNode = tree_nodes(child_idx)
+       overlapx = max(childNode%mbr%x1, qbox%x1) <= min(childNode%mbr%x2, qbox%x2)
+       if (overlapx) then
+          overlapy = max(childNode%mbr%y1, qbox%y1) <= min(childNode%mbr%y2, qbox%y2)
+          if (overlapy) then
+             !$omp task shared(hit_chunks, num_hits, tree_nodes, layer_boxes) firstprivate(child_idx, qbox)
+             call SearchTreeForChunks(tree_nodes, child_idx, qbox, layer_boxes, n_used, &
+                  hit_chunks, num_hits, max_hits)
+             !$omp end task
+          end if
+       end if
+    end do
+    !$omp taskwait
+
+  end subroutine SearchTreeForChunks
+  !> Parallel expansion of requested chunks into the vertex buffer
+  #ifdef MAYBE_USE_THIS
+  subroutine PerformLODCoordinateFilling(input_layer, snappy_stream, current_view, visible_boxes, num_visible)
+    type(Layer), intent(in)               :: input_layer
+    type(CompressedStream), intent(in)    :: snappy_stream
+    type(Box), intent(in)                 :: current_view
+    type(Box), intent(inout)              :: visible_boxes(:)
+    integer, intent(out)                  :: num_visible
+
+    integer(kind=int64), allocatable :: hit_chunks(:)
+    integer :: num_hits, max_capacity
+    integer(kind=int64) :: i, k, chunk_id, local_count, space_left
+    type(Box), allocatable :: temp_boxes(:)
+    logical :: overlapx, overlapy
+
+    max_capacity = size(visible_boxes)
+    num_visible = 0
+    num_hits = 0
+
+    allocate(hit_chunks(min(10000_int64, snappy_stream%num_chunks)))
+
+    ! Boot up the OpenMP Task pool for the tree traversal
+    !$omp parallel
+    !$omp single
+    call SearchTreeForChunks(input_layer%tree%tree_nodes, input_layer%tree%root_index, &
+         current_view, input_layer%layer_boxes, input_layer%n_used, &
+         hit_chunks, num_hits, size(hit_chunks))
+    !$omp end single
+    !$omp end parallel
+
+    if (num_hits > 0) then
+       ! Parallelize chunk decompression and culling
+       !$omp parallel do private(chunk_id, temp_boxes, local_count, k, overlapx, overlapy, space_left) &
+       !$omp shared(num_visible, visible_boxes, max_capacity, hit_chunks) schedule(dynamic)
+       do i = 1, num_hits
+
+          ! Early exit if the buffer was filled by other threads
+          if (num_visible >= max_capacity) cycle
+
+          chunk_id = hit_chunks(i)
+          allocate(temp_boxes(snappy_stream%chunks(chunk_id)%num_boxes))
+          call DecompressSingleChunk(snappy_stream%chunks(chunk_id), snappy_stream%compression_method, temp_boxes)
+
+          ! Filter and Pack IN-PLACE locally to avoid locking the shared buffer
+          local_count = 0
+          do k = 1, size(temp_boxes)
+             overlapx = max(temp_boxes(k)%x1, current_view%x1) <= min(temp_boxes(k)%x2, current_view%x2)
+             if (overlapx) then
+                overlapy = max(temp_boxes(k)%y1, current_view%y1) <= min(temp_boxes(k)%y2, current_view%y2)
+                if (overlapy) then
+                   local_count = local_count + 1
+                   temp_boxes(local_count) = temp_boxes(k)
+                end if
+             end if
+          end do
+
+          ! Lock briefly to push the entire local batch to the global OpenGL buffer
+          if (local_count > 0) then
+             !$omp critical (vbo_append)
+             space_left = max_capacity - num_visible
+             if (space_left > 0) then
+                local_count = min(local_count, space_left)
+                visible_boxes(num_visible + 1 : num_visible + local_count) = temp_boxes(1 : local_count)
+                num_visible = num_visible + local_count
+             end if
+             !$omp end critical
+          end if
+
+          deallocate(temp_boxes)
+       end do
+       !$omp end parallel do
+    end if
+
+    deallocate(hit_chunks)
+  end subroutine PerformLODCoordinateFilling
+  #endif
   subroutine PerformBoxFilling(input_layer, current_view, visible_mbrs, vertex_buffer, num_visible)
     type(Layer), intent(in)               :: input_layer
     type(Box), intent(in)                 :: current_view

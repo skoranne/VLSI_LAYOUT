@@ -17,17 +17,17 @@ module DesignModule
    use omp_lib
    implicit none
    private
-   public :: Design, Layer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
+   public :: Design, LayerWrapper, Layer, GridLayer, DiskLayer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
       LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, LAYER_STATE_EVERYTHING, LAYER_STATE_FINAL,&
       DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY,&
-      NeedsSorting, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
+      NeedsSorting, NeedsRTree, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
       get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon, &
       PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
       CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
       CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
       RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer,&
       CalculateFrameNOT, CalculateBoostOperation, FilterLayer, push_box, FinalizeLayer,&
-      DeleteDesign, SaveLayerToSnap, RestoreSnapToLayer, BuildTree
+      DeleteDesign, SaveLayerToSnap, RestoreSnapToLayer, RestoreSnapToDLayer, BuildTree, PerformOperation
 
    type :: LayerTree
       integer(kind=int64) :: root_index
@@ -71,6 +71,20 @@ module DesignModule
       character(len=:), allocatable :: fileName
       type(ConjugateLayer) :: paired_layer
    end type Layer
+   type, extends(Layer) :: GridLayer
+      integer(kind=int64)          :: rows = 0
+      integer(kind=int64)          :: cols = 0
+      type(Layer), allocatable     :: sub_layers(:,:)
+    contains
+      procedure :: populate => populate_grid_from_layer
+   end type GridLayer
+   !> it is not clear if a DiskLayer should ALWAYS be a GridLayer
+   type, extends(Layer) :: DiskLayer
+      integer                      :: iunit
+      type(GridLayer)              :: glayer
+    contains
+      procedure :: populate => populate_glayer_from_unit
+   end type DiskLayer
 
    enum, bind(C)                     ! bind(C) makes the values C‑compatible
       enumerator :: DESIGN_DIRECTION_INPUT  =   int(Z'00', kind=c_int)
@@ -78,8 +92,12 @@ module DesignModule
       enumerator :: DESIGN_DIRECTION_MEMORY =   int(Z'02', kind=c_int)
    end enum
 
+   type :: LayerWrapper
+      class(Layer), allocatable :: item
+   end type LayerWrapper
+   
    type :: Design
-      type(Layer), allocatable :: layers(:)
+      class(LayerWrapper), allocatable :: layers(:)
       type(hash_type) :: ht
       character(len=1024), dimension(:), allocatable :: layerNames(:)
       type(Box)              :: DESIGN_EXTENT
@@ -103,6 +121,23 @@ module DesignModule
    end interface assignment(=)
 
    interface
+      module subroutine populate_grid_from_layer(this, base_layer, n_rows, n_cols, layout_bounds)
+        class(GridLayer), intent(inout) :: this
+        type(Layer),      intent(in)    :: base_layer
+        integer(kind=int64), intent(in) :: n_rows, n_cols
+        type(Box),        intent(in)    :: layout_bounds
+      end subroutine populate_grid_from_layer
+
+      module subroutine populate_glayer_from_unit(this, base_layer)
+        class(DiskLayer), intent(inout) :: this
+        class(GridLayer), intent(inout) :: base_layer
+      end subroutine populate_glayer_from_unit
+      
+      module subroutine PerformOperation( gA, gB, gO, opcode )
+        class(Layer), intent(inout) :: gA, gB, gO
+        integer                        :: opcode
+      end subroutine PerformOperation
+      
       module subroutine BuildTree( input_layer )
         type(Layer), intent(inout) :: input_layer
       end subroutine BuildTree
@@ -114,9 +149,14 @@ module DesignModule
       end subroutine SaveLayerToSnap
       
       module subroutine RestoreSnapToLayer( input_layer, snap_filename )
-        type(Layer), intent(inout) :: input_layer
+        class(Layer), intent(inout) :: input_layer
         character(*), intent(in)   :: snap_filename      
       end subroutine RestoreSnapToLayer
+      
+      module subroutine RestoreSnapToDLayer( input_layer, snap_filename )
+        class(Layer), allocatable, intent(inout) :: input_layer
+        character(*), intent(in)    :: snap_filename      
+      end subroutine RestoreSnapToDLayer
       
       module subroutine FinalizeLayer( output_layer )
          type(Layer),intent(inout) :: output_layer
@@ -1147,8 +1187,13 @@ contains
    subroutine DeleteDesign( input_design )
       type(Design), intent(inout) :: input_design
       integer :: i
-      do i=1,size( input_design%layers )
-         call ClearLayer( input_design%layers(i) )
+      do i=1,hash_nitems( input_design%ht )
+         select type( resolved_layer => input_design%layers(i)%item )
+         class is (Layer)
+            call ClearLayer( resolved_layer )
+         class default
+            error stop "ERROR: not supported yet."
+         end select
       end do
       if( allocated( input_design%layers ) )     deallocate( input_design%layers )
       if( allocated( input_design%layerNames ) ) deallocate( input_design%layerNames )
