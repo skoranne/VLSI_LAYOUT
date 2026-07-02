@@ -1,11 +1,11 @@
 ################################################################################
 # File   : Makefile.nvf
 # Author : Sandeep Koranne (Refactored)
+# ml /opt/nvidia/hpc_sdk/modulefiles/nvhpc-hpcx-cuda13/26.1
 ################################################################################
 
 # --- Compiler & Flags ---
 HDF5_FC=nvfortran
-#FORTRAN_COMPILER = /scratch1/skoranne/INTELCOMPILERS/bin/h5fc
 FORTRAN_COMPILER =nvfortran
 # Debug flags (commented out, but easily swappable)
 # FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3 -xHost 
@@ -16,7 +16,7 @@ GIT_HASH := $(shell git rev-parse --short HEAD)
 ifeq ($(DEBUG),1)
    FCFLAGS = -cuda -O0 -Mbounds -g -traceback -Mchkptr -O0  -Mpreprocess -mp=gpu -fopenmp -Minfo=accel,mp
 else
-   FCFLAGS = -cuda -O3 -Mpreprocess -mp=gpu -fopenmp -Minfo=accel,mp
+   FCFLAGS = -cuda -O3 -g -fno-strict-aliasing -Mpreprocess -mp=gpu -fopenmp -Minfo=accel,mp
 endif
 #FCFLAGS = -g -O3 -Mpreprocess -Minfo=accel -fopenmp -mp=gpu
 # --- Linker Variables ---
@@ -29,6 +29,8 @@ LIBRARY = libmagparser.a
 
 include DEPENDENCIES.txt
 #skiplist_module.o
+box_codec.o:	box_codec.f90
+	nvfortran -Mpreprocess -c -O1 -g -cuda box_codec.f90
 
 # Create a list of all object files that will be compiled
 ALL_OBJS = $(LIB_OBJS) mainmagparser.o test_contour.o

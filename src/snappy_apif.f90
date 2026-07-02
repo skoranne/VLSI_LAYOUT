@@ -68,10 +68,10 @@ module SnappyCompressionModule
 
      ! Equivalent to: int uncompress(Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen);
      function zlib_uncompress(dest, dest_len, source, source_len) bind(C, name="uncompress")
-       import :: c_ptr, c_long, c_int
+       import :: c_ptr, c_long, c_int, c_size_t
        ! CRITICAL FIX: Passed by value as c_ptr
        type(c_ptr), value :: dest
-       integer(c_long), intent(inout) :: dest_len
+       integer(c_size_t), intent(inout) :: dest_len
        type(c_ptr), value :: source
        integer(c_long), value :: source_len
        integer(c_int) :: zlib_uncompress
