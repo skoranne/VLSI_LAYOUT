@@ -82,7 +82,7 @@ contains
     ! ----------------------------------------------------------------
     ! Finally fetch the Layer object.
     ! ----------------------------------------------------------------
-    input_layer = design_dbs(db_index)%layers(layer_index)%item
+    input_layer = design_dbs(db_index)%layers(layer_index)
 
   end subroutine GetLayerFromDBName
   !=================================================================
@@ -325,9 +325,13 @@ contains
              if( .not. ins ) then
                 write(*,*) 'ERROR: Unable to INIT layer: ', trim(rest(1:pos-1)), ' at index: ', lhs_layer_index
              end if
-             allocate( Layer :: design_dbs( lhs_db_index )%layers( lhs_layer_index )%item )
-             allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index )%item%fileName, source = 'MTL_NOTHING')
-             call ClearLayer( design_dbs( lhs_db_index )%layers( lhs_layer_index )%item )
+             if( allocated( design_dbs( lhs_db_index )%layers( lhs_layer_index ) ) ) then
+                !write(*,*) 'ERROR: Unable to INIT layer: ', trim(rest(1:pos-1)), ' at index: ', lhs_layer_index
+             else
+                allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index ) )
+             end if
+             allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName, source = 'MTL_NOTHING')
+             call ClearLayer( design_dbs( lhs_db_index )%layers( lhs_layer_index ) )
              cycle
           end if
           if( trim(rest(1:pos-1)) == 'run' ) then
@@ -359,21 +363,22 @@ contains
                 call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
                 if( .not. ins ) error stop "DB HASH TABLE CORRUPTED"
                 !> we have to decide temporary layer format
-                if( .not. allocated( design_dbs( lhs_db_index )%layers(lhs_layer_index)%item ) ) then
+                if( .not. allocated( design_dbs( lhs_db_index )%layers(lhs_layer_index) ) ) then
                    !write(*,*) 'INFO: Using memory based layers'
                    select case( temporary_layers )
                    case(K_TEMPORARY_LAYER_MEMORY)
-                      allocate( Layer :: design_dbs( lhs_db_index )%layers(lhs_layer_index)%item )
+                      allocate( Layer :: design_dbs( lhs_db_index )%layers(lhs_layer_index) )
                    case(K_TEMPORARY_LAYER_DISK)
                       !write(*,*) 'INFO: Using disk based layers: TEMP_FOLDER: ', trim(adjustl(TEMPORARY_FOLDER))//design_dbs( lhs_db_index )%designName
-                      allocate( DiskLayer :: design_dbs( lhs_db_index )%layers(lhs_layer_index)%item )
+                      allocate( Layer :: design_dbs( lhs_db_index )%layers(lhs_layer_index) )
+                      !allocate( DiskLayer :: design_dbs( lhs_db_index )%layers(lhs_layer_index)%item )
                    end select
                 end if
-                select type( resolved_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)%item )
+                select type( resolved_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index) )
                 !class is (DiskLayer)
                 !   error stop
                 class is (Layer)
-                   lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)%item
+                   lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
                    if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
                    design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
                    !write(*,*) 'NEW LHS layer index = ', lhs_layer_index, ' for ', trim(adjustl(rest(1:pos-1))), ' ', &
@@ -385,7 +390,7 @@ contains
              end if
              if( lhs_layer_index < 0 ) error stop "DB INDEX layer corruption"
              !write(*,*) 'LHS index = ', lhs_layer_index
-             lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)%item
+             lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
              if(.not. allocated( lhs_layer%fileName ) ) then
                 error stop "ERROR: Each layer must have a backing-store/name by now"
              end if
@@ -409,7 +414,7 @@ contains
                 write(*,*) 'ERROR: RHS1 layer not found: ',trim(rest(1:pos-1)), ' check spelling or existence of layer in db. Line: ', line_number-1
                 error stop "ERROR: layer not found"
              end if
-             rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )%item
+             rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
              rest = adjustl(rest(pos+1:))
              !write(*,*) 'RESTD BEFORE CHAR OPERATOR SCAN = ', trim(rest)
              pos  = scan( rest, '+@*%^~!') !> second time we tripped on this, -0.5 is valid
@@ -430,7 +435,7 @@ contains
                    write(*,*) 'ERROR: RHS2 layer not found: ',trim(rest(1:pos-1)) ,' check spelling or existence of layer in db: line: ', line_number-1
                    error stop "ERROR: layer not found"
                 end if
-                rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )%item
+                rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
                 pos  = index( rest, ' ')
                 if( debug_verbosity > 1 ) then
                    write(*,'(A,I3,A,I3,A,I3,A,I3,A4,I3,A,I3)') 'Getting ready to execute: ', &
@@ -499,7 +504,7 @@ contains
                      rhs2_source_name = trim( adjustl( buf2 ) )
                      if( .not. associated( rhs1_layer ) ) error stop "RHS1 layer not associated"
                      if( .not. associated( lhs_layer ) )  error stop "LHS  layer not associated"                     
-                     if( rhs2_source_name /= 'nothing' ) then
+                     if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) then
                         pos = index( rhs2_source_name, ':' )
                         !write(*,*) 'RESTG = ', trim(rhs2_source_name(1:pos-1))
                         call hash_get( ht, trim(rhs2_source_name(1:pos-1)), rhs2_db_index, ins )
@@ -511,7 +516,7 @@ contains
                            write(*,*) 'ERROR: TEXT RHS2 ', rhs2_source_name, ' layer not found.', ' ', trim(rest(1:pos-1))
                            error stop "ERROR"
                         end if
-                        rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )%item
+                        rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
                      else
                         nullify( rhs2_layer )
                      end if
@@ -529,7 +534,7 @@ contains
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case('ASSERT_ZERO')
                         !> for now we have to do t1:nothing = ASSERT_ZERO t1:check_and nothing
-                        !if( rhs2_source_name /= 'nothing' ) error stop "ASSERT_ZERO must use nothing as second layer"
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) error stop "ASSERT_ZERO must use nothing as second layer"
                         if( rhs1_layer%n_used > 0 ) then
                            write(*,'(A,I5,A)') '************ ASSERT_ZERO fail on layer. Line: ', line_number-1, ' **********************'
                            if( abort_on_assert_zero > 1 ) error stop "ERROR: ASSERT_ZERO variable > 1"
@@ -545,7 +550,7 @@ contains
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case ('EXTENT')
                         !> d1:poly EXTENT nothing
-                        !if( rhs2_source_name /= 'nothing' ) error stop "EXTENT must use nothing as second layer"
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing') error stop "EXTENT must use nothing as second layer"
                         !write(*,*) 'Found PRIMARY_OPERATOR = EXTENT'
                         call CreateEXTENT( rhs1_layer, lhs_layer )
                      case ('AND')
@@ -563,7 +568,7 @@ contains
                         !write(*,*) 'Found PRIMARY_OPERATOR = GRID'
                         call CreateGRID( rhs1_layer, lhs_layer, 10, 10, 10 ) !> the last argument is OVERLAP
                      case ('GROW') !> lhs = rhs GROW nothing EAST NORTH WEST SOUTH (all positive)
-                        !if( rhs2_source_name /= 'nothing' ) error stop "GROW must use nothing as second layer"
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) error stop "GROW must use nothing as second layer"
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
                         !write(*,'(A,I8,4(A,F8.2))') 'Found PRIMARY_OPERATOR = GROW at PRECISION ', used_precision, ' ', rvar(1), ' ', rvar(2), ' ', rvar(3), ' ', rvar(4)
                         do i=1,4
@@ -571,7 +576,7 @@ contains
                         end do
                         call CalculateGROWLayer( rhs1_layer, lhs_layer, ivar(1:4) )
                      case ('SIZE')
-                        !if( rhs2_source_name /= 'nothing' ) error stop "SIZE must use nothing as second layer"                        
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) error stop "SIZE must use nothing as second layer"
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1)
                         !write(*,*) 'Found PRIMARY_OPERATOR = SIZE ', rvar(1)
                         ivar(1) = int( rvar(1)*used_precision, kind=int64)
@@ -823,7 +828,7 @@ contains
              return
           end if
 
-          result = dbs(db_index)%layers(layer_index)%item
+          result = dbs(db_index)%layers(layer_index)
        else
           ! No ':' → must be a numeric constant.
           call extract_number( str, i, token )

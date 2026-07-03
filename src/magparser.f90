@@ -112,7 +112,7 @@ contains
     integer, intent(in) :: MAX_LAYERS
     type(hash_type), pointer :: ht
     character(len=1024), dimension(:), pointer :: layerNames(:)
-    class(LayerWrapper), pointer :: layers(:)
+    type(Layer), pointer :: layers(:)
     type(Box), pointer :: boxes(:)
     type(Box)          :: tempBox
     integer :: box_count = 0
@@ -131,17 +131,12 @@ contains
     integer :: BSCALE = 1
     integer, parameter :: INIT_ALLOC = 4
     ! to support compressed files
-    type(c_ptr) :: gz_file
-    integer(c_int) :: status
-    type(c_ptr) :: res_ptr
     real        :: t1, t2
     !> fileName processing logic for HDF5
     integer :: dot_pos
     ! Deferred-length allocatable strings (Modern Fortran feature)
     ! These automatically resize to fit the data assigned to them.
     character(len=:), allocatable :: prefix
-    character(len=:), allocatable :: layerFileName
-    character(10)                 :: num_str
     integer(kind=8) :: start_tick, end_tick, clock_rate
     real(kind=8)    :: elapsed_time, elapsed_time2
     integer(kind=8) :: num_roots, num_rects
@@ -150,9 +145,7 @@ contains
     real(kind=real64)             :: area_by_union
     type(Box), allocatable :: extents(:)
     type(Box), pointer            :: DESIGN_EXTENT
-    integer(kind=int64)    :: num_squares
     integer            :: env_len, env_status
-    integer(kind=int64):: number_expected_interactions
     integer            :: NUM_LAYERS
     ! 1. Get the number of ticks per second
     fileName = load_design%fileName
@@ -178,11 +171,11 @@ contains
     layerNames => load_design%layerNames
     layers => load_design%layers
     DESIGN_EXTENT => load_design%DESIGN_EXTENT
-    !do i = 1, MAX_LAYERS
-    !   !allocate(layers(i)%layer_boxes(INIT_ALLOC))
-    !   layers(i)%item%n_used  = 0
-    !   layers(i)%item%n_alloc = 0
-    !end do
+    do i = 1, MAX_LAYERS
+       allocate(layers(i)%layer_boxes(INIT_ALLOC))
+       layers(i)%n_used  = 0
+       layers(i)%n_alloc = 4
+    end do
     do i = 1, MAX_LAYERS
        call extents(i)%reset_to_infinity()
     end do
@@ -235,65 +228,50 @@ contains
           !write (*,*) line
           ! Parse rectangle coordinates
           read(line, *, iostat=i) dummy, x1, y1, x2, y2
-          if( .not. allocated( layers(current_layer_id)%item ) ) then
-             allocate( Layer :: layers(current_layer_id)%item )
-             layers(current_layer_id)%item%n_used = 0
-             layers(current_layer_id)%item%n_alloc = 0
-          end if
-          select type( resolved_layer => layers(current_layer_id)%item )
-          class is (Layer)
-             tempBox%x1 = x1
-             tempBox%y1 = y1
-             tempBox%x2 = x2
-             tempBox%y2 = y2
-             call addBoxToLayer( resolved_layer, tempBox )
-          class default
-             error stop "ERROR: not supported."
-          end select
+          associate( resolved_layer => layers(current_layer_id) )
+            tempBox%x1 = x1
+            tempBox%y1 = y1
+            tempBox%x2 = x2
+            tempBox%y2 = y2
+            call addBoxToLayer( resolved_layer, tempBox )
+          end associate
        end if
        !> INSPECT, ALLOCATE, RESOLVE, LOAD
        if (line(1:5) == 'KLBIN' .and. found_section) then
           !write (*,*) line
           call hash_get( ht, trim(section_name), layer_id, ok )            
           !if( allocated( layers(layer_id)%item ) ) deallocate( layers(layer_id)%item )
-          allocate( Layer :: layers(layer_id)%item )
-          select type( resolved_layer => layers(layer_id)%item )
-          class is (Layer)
-             ! Parse rectangle coordinates
-             section_name = trim(line(7:len_trim(line)))
-             if( load_design%design_direction == DESIGN_DIRECTION_INPUT ) then
-                if( allocated( resolved_layer%layer_boxes ) ) deallocate( resolved_layer%layer_boxes )
-                call LoadKLBin( section_name, resolved_layer%layer_boxes )
-                resolved_layer%n_used = size( resolved_layer%layer_boxes )
-                resolved_layer%n_alloc = resolved_layer%n_used
-                !write(*,'(A,A8,A30)') 'Input  Request KLBIN: ', layerNames(layer_id), ' => ', section_name
-             else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
-                !write(*,'(A,A10,A30)') 'Output Request KLBIN: ', trim(layerNames(layer_id)), ' => ', trim(adjustl(section_name))
-             end if
-             allocate( resolved_layer%fileName, source= trim(adjustl(section_name)))
-          class default
-             error stop "ERROR: Type conversion error"
-          end select
+          !allocate( Layer :: layers(layer_id) )
+          associate( resolved_layer => layers(layer_id) )
+            ! Parse rectangle coordinates
+            section_name = trim(line(7:len_trim(line)))
+            if( load_design%design_direction == DESIGN_DIRECTION_INPUT ) then
+               if( allocated( resolved_layer%layer_boxes ) ) deallocate( resolved_layer%layer_boxes )
+               !call LoadKLBin( section_name, resolved_layer%layer_boxes )
+               call RestoreSnapToLayer( resolved_layer, section_name )
+               !resolved_layer%n_used = size( resolved_layer%layer_boxes )
+               !resolved_layer%n_alloc = resolved_layer%n_used
+               !write(*,'(A,A8,A30)') 'Input  Request KLBIN: ', layerNames(layer_id), ' => ', section_name
+            else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
+               !write(*,'(A,A10,A30)') 'Output Request KLBIN: ', trim(layerNames(layer_id)), ' => ', trim(adjustl(section_name))
+            end if
+            allocate( resolved_layer%fileName, source= trim(adjustl(section_name)))
+          end associate
        end if
-       if (line(1:4) == 'SNAP' .and. found_section) then
+       if ( line(1:4) == 'SNAP' .and. found_section) then
           !write (*,*) line
           call hash_get( ht, trim(section_name), layer_id, ok )
-          !if( allocated( layers(layer_id)%item ) ) deallocate( layers(layer_id)%item )
-          allocate( Layer :: layers(layer_id)%item )
-          select type( resolved_layer => layers(layer_id)%item )
-          class is (Layer)
-             section_name = trim(line(6:len_trim(line))) !>>> ROOKIE <<<
-             if( load_design%design_direction == DESIGN_DIRECTION_INPUT ) then
-                call RestoreSnapToLayer( resolved_layer, section_name )
-                resolved_layer%n_alloc = resolved_layer%n_used
-                !write(*,'(A,A8,A30)') 'Input  Request SNAP: ', layerNames(layer_id), ' => ', section_name
-             else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
-                !write(*,'(A,A10,A30)') 'Output Request SNAP: ', trim(layerNames(layer_id)), ' => ', trim(adjustl(section_name))
-             end if
-             allocate( resolved_layer%fileName, source= trim(adjustl(section_name)))
-          class default
-             error stop "ERROR: not supported yet."
-          end select
+          associate( resolved_layer => layers(layer_id) )
+            section_name = trim(line(6:len_trim(line))) !>>> ROOKIE <<<
+            if( load_design%design_direction == DESIGN_DIRECTION_INPUT ) then
+               call RestoreSnapToLayer( resolved_layer, section_name )
+               resolved_layer%n_alloc = resolved_layer%n_used
+               !write(*,'(A,A8,A30)') 'Input  Request SNAP: ', layerNames(layer_id), ' => ', section_name
+            else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
+               !write(*,'(A,A10,A30)') 'Output Request SNAP: ', trim(layerNames(layer_id)), ' => ', trim(adjustl(section_name))
+            end if
+            allocate( resolved_layer%fileName, source= trim(adjustl(section_name)))
+          end associate
        end if
        if (line(1:5) == 'DSNAP' .and. found_section) then
           !write (*,*) line
@@ -301,13 +279,13 @@ contains
           ! Parse rectangle coordinates
           section_name = trim(line(7:len_trim(line)))
           if( load_design%design_direction == DESIGN_DIRECTION_INPUT ) then
-             call RestoreSnapToDLayer( load_design%layers(layer_id)%item, section_name )
-             layers(layer_id)%item%n_alloc = layers(layer_id)%item%n_used
+             call RestoreSnapToDLayer( load_design%layers(layer_id), section_name )
+             layers(layer_id)%n_alloc = layers(layer_id)%n_used
              !write(*,'(A,A8,A30)') 'Input  Request SNAP: ', layerNames(layer_id), ' => ', section_name
           else if( load_design%design_direction == DESIGN_DIRECTION_OUTPUT ) then
              !write(*,'(A,A10,A30)') 'Output Request SNAP: ', trim(layerNames(layer_id)), ' => ', trim(adjustl(section_name))
           end if
-          allocate( layers(layer_id)%item%fileName, source= trim(adjustl(section_name)))
+          allocate( layers(layer_id)%fileName, source= trim(adjustl(section_name)))
        end if
 
        ! Parse label definitions
@@ -336,12 +314,9 @@ contains
     call cpu_time(t1)
     call system_clock(count=start_tick)
     do i = 1, NUM_LAYERS
-       select type( resolved_layer => layers(i)%item )
-       class is (Layer)
-          call BuildTree( resolved_layer )
-       class default
-          error stop "ERROR: Not supported yet"
-       end select
+       associate( resolved_layer => layers(i) )
+         call BuildTree( resolved_layer )
+       end associate
     end do
     call cpu_time(t2)
     call system_clock(count=end_tick)
@@ -356,25 +331,22 @@ contains
     write(*,'(A8,A12,A30)') 'Layer','Total','RTree CPU and REAL time'
     write (*,*) '+--------------------------------------------------+'
     tree_check_loop: do i = 1, NUM_LAYERS
-       select type( resolved_layer => layers(i)%item )
-       class is (Layer)
-          if( resolved_layer%n_used == 0 ) cycle
-          call system_clock(count=start_tick)
-          call cpu_time(t1)
-          env_status = 1
-          call get_environment_variable( 'MAGPARSER_CONTROL_SELFTEST_TREE', length=env_len, status=env_status )
-          if( env_status == 0 ) then
-             write(*,*) 'ENV MAGPARSER_CONTROL_SELFTEST_TREE is ON'
-             call SelfTestTheTree( resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes, resolved_layer%tree%root_index )
-          end if
-          call cpu_time(t2)
-          call system_clock(count=end_tick)
-          elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
-          write(*,'(A8,I12,F12.2,F12.2)') layerNames(i), resolved_layer%n_used, &
-               (t2-t1), elapsed_time
-       class default
-          error stop "ERROR: Not supported yet"
-       end select
+       associate( resolved_layer => layers(i) )
+         if( resolved_layer%n_used == 0 ) cycle
+         call system_clock(count=start_tick)
+         call cpu_time(t1)
+         env_status = 1
+         call get_environment_variable( 'MAGPARSER_CONTROL_SELFTEST_TREE', length=env_len, status=env_status )
+         if( env_status == 0 ) then
+            write(*,*) 'ENV MAGPARSER_CONTROL_SELFTEST_TREE is ON'
+            call SelfTestTheTree( resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes, resolved_layer%tree%root_index )
+         end if
+         call cpu_time(t2)
+         call system_clock(count=end_tick)
+         elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
+         write(*,'(A8,I12,F12.2,F12.2)') layerNames(i), resolved_layer%n_used, &
+              (t2-t1), elapsed_time
+       end associate
     end do tree_check_loop
     write (*,*) '+--------------------------------------------------+'
     call StopMarkTime("TreeCheckLoop")
@@ -384,87 +356,83 @@ contains
     write (*,*) '+-----------------------------------------------------------------------------+'
     !> Polygon Number loop, this loop is parallelized inside over each polygon/box
     pnum_loop: do i = 1, NUM_LAYERS
-       select type( resolved_layer => layers(i)%item )
-       class is (Layer)
-          if( resolved_layer%n_used == 0 ) cycle
-          ! 2. Record the start tick
-          call system_clock(count=start_tick)
-          call cpu_time(t1)
-          call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes,&
-               resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
-          call cpu_time(t2)
-          call system_clock(count=end_tick)
-          elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
-          num_roots = resolved_layer%pnumtable%count_roots()
-          num_rects = count(resolved_layer%pnumtable%arr == 0)
-          resolved_layer%layerState = ior( resolved_layer%layerState, LAYER_STATE_PNUM )
-          if( overlap_areas(i) > 0.0 ) then
-             !> this layer needs HEALING as we have detected overlap
-             !write(*,*) 'PerformUnion as overlap detected: ', elapsed_time
-             !write(*,'(A,A12,A,F20.2)') 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)
-             !call PerformUnion( layers(i) )
-             call PerformPolygonUnion( resolved_layer ) !> this performs the Merge so no need to duplicate
-             if( NeedsPNum( resolved_layer ) ) then
-                call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes,&
-                     resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
-                resolved_layer%layerState = ior( resolved_layer%layerState, LAYER_STATE_PNUM )
-             end if
-             num_roots = resolved_layer%pnumtable%count_roots()
-             num_rects = count(resolved_layer%pnumtable%arr == 0)
-             if( abs(overlap_areas(i)) > K_SMALL_EPSILON ) then
-                write(*,'(A,I3,A8,A8,A,I12,A,I12,A,I2,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
-                     ' non-rects ',num_rects , ' rects. STAT ',resolved_layer%layerState, &
-                     ' |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
-                write(*,*) 'OVLP AREA = ', overlap_areas(i)
-                resolved_layer%layerState = iand( resolved_layer%layerState, NOT(LAYER_STATE_HEAL ) )
-                error stop 'UNION failed.'
-             else
-                resolved_layer%layerState = ior( resolved_layer%layerState, LAYER_STATE_HEAL )
-             end if
-          else
-             resolved_layer%layerState = ior( resolved_layer%layerState, LAYER_STATE_HEAL )
-          end if
-          call system_clock(count=end_tick)
-          elapsed_time2 = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
-          write(*,'(A8,3(I12),I5,F12.2,F12.2)') layerNames(i), &
-               num_roots, num_rects , resolved_layer%n_used, resolved_layer%layerState, &
-               (t2-t1), elapsed_time2
-       class default
-          error stop "ERROR: Not supported yet"
-       end select
+       associate( resolved_layer => layers(i) )
+         if( resolved_layer%n_used == 0 ) cycle
+         ! 2. Record the start tick
+         call system_clock(count=start_tick)
+         call cpu_time(t1)
+         call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes,&
+              resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
+         call cpu_time(t2)
+         call system_clock(count=end_tick)
+         elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
+         num_roots = resolved_layer%pnumtable%count_roots()
+         num_rects = count(resolved_layer%pnumtable%arr == 0)
+         resolved_layer%layerState = ior( resolved_layer%layerState, LAYER_STATE_PNUM )
+         if( overlap_areas(i) > 0.0 ) then
+            !> this layer needs HEALING as we have detected overlap
+            write(*,*) 'PerformUnion as overlap detected: ', elapsed_time
+            write(*,'(A,A12,A,F20.2)') 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)
+            !call PerformUnion( layers(i) )
+            call PerformPolygonUnion( resolved_layer ) !> this performs the Merge so no need to duplicate
+            if( NeedsPNum( resolved_layer ) ) then
+               call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes,&
+                    resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
+               resolved_layer%layerState = ior( resolved_layer%layerState, LAYER_STATE_PNUM )
+            end if
+            num_roots = resolved_layer%pnumtable%count_roots()
+            num_rects = count(resolved_layer%pnumtable%arr == 0)
+            if( abs(overlap_areas(i)) > K_SMALL_EPSILON ) then
+               write(*,'(A,I3,A8,A8,A,I12,A,I12,A,I2,A,F12.2,A,F12.2,A)') 'Layer: ', i, ' ', layerNames(i), ' has ', num_roots, &
+                    ' non-rects ',num_rects , ' rects. STAT ',resolved_layer%layerState, &
+                    ' |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
+               write(*,*) 'OVLP AREA = ', overlap_areas(i)
+               resolved_layer%layerState = iand( resolved_layer%layerState, NOT(LAYER_STATE_HEAL ) )
+               error stop 'UNION failed.'
+            else
+               resolved_layer%layerState = ior( resolved_layer%layerState, LAYER_STATE_HEAL )
+            end if
+         else
+            resolved_layer%layerState = ior( resolved_layer%layerState, LAYER_STATE_HEAL )
+         end if
+         call system_clock(count=end_tick)
+         elapsed_time2 = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
+         write(*,'(A8,3(I12),I5,F12.2,F12.2)') layerNames(i), &
+              num_roots, num_rects , resolved_layer%n_used, resolved_layer%layerState, &
+              (t2-t1), elapsed_time2
+       end associate
     end do pnum_loop
     write (*,*) '+-----------------------------------------------------------------------------+'
     call StopMarkTime("PNumLoop")
-
+    
     call StartMarkTime("ExtentLoop")
     do i = 1,NUM_LAYERS
-       select type( resolved_layer => layers(i)%item )
-       class is (Layer)
-          if( resolved_layer%n_used == 0 ) then
-             cycle
-          end if
-          extents(i) = mbr_of_array( resolved_layer%layer_boxes, resolved_layer%n_used )
-          DESIGN_EXTENT = DESIGN_EXTENT + extents(i)
-          resolved_layer%area = 0.0
-          if( .not. NeedsHealing( resolved_layer ) ) then
-             do j = 1, resolved_layer%n_used
-                resolved_layer%area = resolved_layer%area + box_area( resolved_layer%layer_boxes(j) )
-                resolved_layer%perimeter = resolved_layer%perimeter + box_perimeter( resolved_layer%layer_boxes(j) )
-             end do
-             area_by_union = calculate_union_area_by_polygon( resolved_layer )
-             if( resolved_layer%area /= area_by_union ) then
-                write(*,*) 'Layer ',i, 'Layer State ', resolved_layer%layerState
-                write(*,*) 'Union Area by SCANLINE: ', area_by_union, ' OVLP: ', resolved_layer%area
-                error stop
-             end if
-             resolved_layer%perimeter = resolved_layer%perimeter - overlap_perimeter(i)
-             if( resolved_layer%perimeter < 0.0 ) error stop "INCONSISTENT PERIMETER detected."
-          else
-             resolved_layer%area = calculate_union_area_by_polygon( resolved_layer )
-          end if
-       class default
-          error stop "ERROR: Not supported yet"
-       end select
+       associate( resolved_layer => layers(i) )
+         if( resolved_layer%n_used == 0 ) then
+            write(*,*) 'Layer: ', layerNames(i), ' is EMPTY'
+            cycle
+         end if
+         extents(i) = mbr_of_array( resolved_layer%layer_boxes, resolved_layer%n_used )
+         if( .not. extents(i)%is_valid() ) error stop "ERROR: Layer EXTENT not valid, but layer not empty"
+         DESIGN_EXTENT = DESIGN_EXTENT + extents(i)
+         resolved_layer%area = 0.0
+         if( .not. NeedsHealing( resolved_layer ) ) then
+            do j = 1, resolved_layer%n_used
+               resolved_layer%area = resolved_layer%area + box_area( resolved_layer%layer_boxes(j) )
+               resolved_layer%perimeter = resolved_layer%perimeter + box_perimeter( resolved_layer%layer_boxes(j) )
+            end do
+            area_by_union = calculate_union_area_by_polygon( resolved_layer )
+            if( resolved_layer%area /= area_by_union ) then
+               write(*,*) 'Layer ',i, 'Layer State ', resolved_layer%layerState
+               write(*,*) 'Union Area by SCANLINE: ', area_by_union, ' OVLP: ', resolved_layer%area
+               error stop
+            end if
+            resolved_layer%perimeter = resolved_layer%perimeter - overlap_perimeter(i)
+            if( resolved_layer%perimeter < 0.0 ) error stop "INCONSISTENT PERIMETER detected."
+         else
+            resolved_layer%area = calculate_union_area_by_polygon( resolved_layer )
+         end if
+       end associate
     end do
     if( .not. DESIGN_EXTENT%is_valid() ) then
        error stop 'Design EXTENT is not valid'
@@ -475,14 +443,16 @@ contains
     write (*,*) '+                Layer Areas and Perimeters                       +'
     write (*,*) '+-----------------------------------------------------------------+'
     do i = 1, NUM_LAYERS
-       select type( resolved_layer => layers(i)%item )
-       class is (Layer)
-          if( extents(i)%is_valid() ) then
-             write(*,'(A1,A12,F18.8,A1,F18.8)') ' ',layerNames(i), resolved_layer%area*1e-6, ' ', resolved_layer%perimeter*1e-6
-          end if
-       class default
-          error stop "ERROR: Not supported yet"
-       end select
+       associate( resolved_layer => layers(i) )
+         if( extents(i)%is_valid() ) then
+            write(*,'(A1,A12,F18.8,A1,F18.8)') ' ',layerNames(i), resolved_layer%area*1e-6, ' ', resolved_layer%perimeter*1e-6
+         else if( resolved_layer%n_used > 0 ) then
+            write(*,*) 'ERROR: This is not expected: ', resolved_layer%n_used, ' ', extents(i)
+            error stop
+         else
+            write(*,*) 'Layer: ', layerNames(i), ' is EMPTY'
+         end if
+       end associate
     end do
     write (*,*) '+-----------------------------------------------------------------+'
     write(*,*) ''
@@ -538,42 +508,39 @@ contains
     deleted_layer_count = 0
     if( .not. allocated( load_design%layers ) ) return !> we have already flushed this db
     do i=1,hash_nitems( load_design%ht)
-       select type( resolved_layer => load_design%layers(i)%item )
-       class is (Layer)
-          if( resolved_layer%n_used == 0 ) cycle
-          !> Lets just assume we are writing in KLBIN
-          if(.not. allocated( resolved_layer%fileName ) ) then
-             error stop "ERROR: layer backing store name not allocated"
-          end if
-          if( load_design%design_direction == DESIGN_DIRECTION_MEMORY ) then
-             !> we are not going to check syntax
-             call SaveLayerToSnap( resolved_layer, resolved_layer%fileName, K_COMPRESSION_METHOD_TO_USE )
-             call ClearLayer( resolved_layer )
-             deleted_layer_count = deleted_layer_count + 1
-             cycle
-          end if
-          pos = index( resolved_layer%fileName, ".snap" )
-          !write(*,*) 'IS_SNAP ',pos,' ',load_design%layers(i)%fileName
-          if( pos == len_trim(resolved_layer%fileName)-4 ) then
-             call SaveLayerToSnap( resolved_layer, resolved_layer%fileName, K_COMPRESSION_METHOD_TO_USE )
-             call ClearLayer( resolved_layer )
-             deleted_layer_count = deleted_layer_count + 1
-             cycle
-          end if
-          pos = index( resolved_layer%fileName, ".bin" )
-          !write(*,*) 'pos = ', pos, ' len = ', len_trim(load_design%layers(i)%fileName)
-          if( pos /= len_trim(resolved_layer%fileName)-3 ) then
-             write(*,*) 'ERROR: File format not supported: ', resolved_layer%fileName
-             error stop "DBOUT only supports KLBIN, edit the output MAG file to fix"
-          end if
-          call WriteKLBin( resolved_layer%fileName, resolved_layer%layer_boxes, resolved_layer%n_used )
-          !> as an memory optimization we are going to delete the layer after a flush
-          !> if this layer is reused later, that will be a problem, so let us deliberately let it crash for now
-          call ClearLayer( resolved_layer )
-          deleted_layer_count = deleted_layer_count + 1
-       class default
-          error stop "ERROR: Not supported yet"
-       end select
+       associate( resolved_layer => load_design%layers(i) )
+         if( resolved_layer%n_used == 0 ) cycle
+         !> Lets just assume we are writing in KLBIN
+         if(.not. allocated( resolved_layer%fileName ) ) then
+            error stop "ERROR: layer backing store name not allocated"
+         end if
+         if( load_design%design_direction == DESIGN_DIRECTION_MEMORY ) then
+            !> we are not going to check syntax
+            call SaveLayerToSnap( resolved_layer, resolved_layer%fileName, K_COMPRESSION_METHOD_TO_USE )
+            call ClearLayer( resolved_layer )
+            deleted_layer_count = deleted_layer_count + 1
+            cycle
+         end if
+         pos = index( resolved_layer%fileName, ".snap" )
+         !write(*,*) 'IS_SNAP ',pos,' ',load_design%layers(i)%fileName
+         if( pos == len_trim(resolved_layer%fileName)-4 ) then
+            call SaveLayerToSnap( resolved_layer, resolved_layer%fileName, K_COMPRESSION_METHOD_TO_USE )
+            call ClearLayer( resolved_layer )
+            deleted_layer_count = deleted_layer_count + 1
+            cycle
+         end if
+         pos = index( resolved_layer%fileName, ".bin" )
+         !write(*,*) 'pos = ', pos, ' len = ', len_trim(load_design%layers(i)%fileName)
+         if( pos /= len_trim(resolved_layer%fileName)-3 ) then
+            write(*,*) 'ERROR: File format not supported: ', resolved_layer%fileName
+            error stop "DBOUT only supports KLBIN, edit the output MAG file to fix"
+         end if
+         call WriteKLBin( resolved_layer%fileName, resolved_layer%layer_boxes, resolved_layer%n_used )
+         !> as an memory optimization we are going to delete the layer after a flush
+         !> if this layer is reused later, that will be a problem, so let us deliberately let it crash for now
+         call ClearLayer( resolved_layer )
+         deleted_layer_count = deleted_layer_count + 1
+       end associate
     end do
     if( debug_verbosity > 1 ) then
        write(*,*) 'Written and delete : ', deleted_layer_count, ' layers.'

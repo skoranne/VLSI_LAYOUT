@@ -8,6 +8,12 @@ decl output o1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1_ou
 decl memory t1 = nothing
 info
 exec init t1:nothing
+exec run t1:poly = d1:poly COPY t1:nothing
+exec run t1:poly_grow = d1:poly GROW t1:nothing 0.1 0.1 0.1 0.1
+exec run t1:poly_shrink = d1:poly SIZE t1:nothing 0.01
+flush
+end
+
 exec run o1:diff = d1:li1 COPY nothing
 exec run o1:poly = d1:poly COPY nothing
 exec run o1:li1  = d1:li1 COPY nothing

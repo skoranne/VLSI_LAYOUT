@@ -71,16 +71,21 @@ contains
     character(*), intent(in)   :: snap_filename
     type(CompressedStream)     :: snappy_stream
     integer                    :: pos, iunit, ios
+    !> for memory based layers we need an optimization that NO-FILE => EMPTY LAYER
+    if( temporary_layers > 1 ) then
+       open(newunit=iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
+       if (ios /= 0) then
+          close(iunit)
+          call ClearLayer( input_layer )
+          return
+       end if
+       close(iunit)
+    end if
     pos = index( snap_filename, ".bin" )
     if( pos /= 0 ) then !> we are going to assume this is a non-compressed binary file
        call LoadKLBin( snap_filename, input_layer%layer_boxes)
        input_layer%n_used  = size(input_layer%layer_boxes)
-       return
-    end if
-    !> for memory based layers we need an optimization that NO-FILE => EMPTY LAYER
-    open(newunit=iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
-    if (ios /= 0) then
-       call ClearLayer( input_layer )
+       call BuildTree( input_layer )
        return
     end if
     call RestoreCompressedStreamFromDisk( snap_filename, snappy_stream )
@@ -95,23 +100,17 @@ contains
   end subroutine RestoreSnapToLayer
 
   module subroutine RestoreSnapToDLayer( input_layer, snap_filename )
-    class(Layer), allocatable, intent(inout) :: input_layer
+    type(Layer), intent(inout) :: input_layer
     character(*), intent(in)   :: snap_filename
     type(CompressedStream)     :: snappy_stream
     integer                    :: pos, ios
 
-    if( allocated( input_layer ) ) deallocate( input_layer )
-    allocate( DiskLayer :: input_layer )
-    !> otherwise use something like this
-    select type (D => input_layer)
-    type is (DiskLayer)
-       open(newunit = D%iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
-       if (ios /= 0) then
-          write(*,*) 'ERROR: Unable to open file: ', snap_filename, ' for reading.'
-          stop "Error opening file for reading."
-       end if
-       call PrintFileUnitInformation( D%iunit )
-    end select
+    open(newunit = input_layer%iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
+    if (ios /= 0) then
+       write(*,*) 'ERROR: Unable to open file: ', snap_filename, ' for reading.'
+       stop "Error opening file for reading."
+    end if
+    call PrintFileUnitInformation( input_layer%iunit )
   end subroutine RestoreSnapToDLayer
   
 end submodule DiskDesignImplModule

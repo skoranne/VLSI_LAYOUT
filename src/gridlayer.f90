@@ -72,12 +72,12 @@ contains
     error stop "ERROR: Not implemented yet"
   end subroutine PerformOperation
 
-  module subroutine populate_glayer_from_unit(this, base_layer)
+  module subroutine populate_gridlayer_from_unit(this, base_layer)
     character(len=*), parameter :: functionName = "PerformOperation"    
-    class(DiskLayer), intent(inout) :: this
-    class(GridLayer), intent(inout) :: base_layer
+    type(Layer), intent(inout) :: this
+    type(GridLayer), intent(inout) :: base_layer
     call AnalyzeUnit(this%iunit)
-  end subroutine populate_glayer_from_unit
+  end subroutine populate_gridlayer_from_unit
 
 
   

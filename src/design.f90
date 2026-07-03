@@ -17,7 +17,7 @@ module DesignModule
    use omp_lib
    implicit none
    private
-   public :: Design, LayerWrapper, Layer, GridLayer, DiskLayer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
+   public :: Design, LayerWrapper, Layer, GridLayer, LAYER_STATE_NONE, LAYER_STATE_HEAL, &
       LAYER_STATE_SORT, LAYER_STATE_PNUM, LAYER_STATE_RTREE, LAYER_STATE_EVERYTHING, LAYER_STATE_FINAL,&
       DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY,&
       NeedsSorting, NeedsRTree, NeedsPNum, NeedsHealing, PerformUnion, PerformPolygonUnion, BucketBoundary, &
@@ -64,12 +64,13 @@ module DesignModule
       integer(kind=8)        :: n_used   = 0   ! how many slots are filled
       integer(kind=8)        :: n_alloc  = 0   ! current allocation size
       type(Box), allocatable :: layer_boxes(:)
-      integer(kind=c_int)        :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
+      integer(kind=c_int)    :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
       type(LayerTree)        :: tree
       type(UnionFind)        :: pnumtable
       real(kind=real64)      :: area, perimeter
       character(len=:), allocatable :: fileName
-      type(ConjugateLayer) :: paired_layer
+      type(ConjugateLayer)   :: paired_layer
+      integer                :: iunit
    end type Layer
    type, extends(Layer) :: GridLayer
       integer(kind=int64)          :: rows = 0
@@ -78,13 +79,6 @@ module DesignModule
     contains
       procedure :: populate => populate_grid_from_layer
    end type GridLayer
-   !> it is not clear if a DiskLayer should ALWAYS be a GridLayer
-   type, extends(Layer) :: DiskLayer
-      integer                      :: iunit
-      type(GridLayer)              :: glayer
-    contains
-      procedure :: populate => populate_glayer_from_unit
-   end type DiskLayer
 
    enum, bind(C)                     ! bind(C) makes the values C‑compatible
       enumerator :: DESIGN_DIRECTION_INPUT  =   int(Z'00', kind=c_int)
@@ -97,7 +91,7 @@ module DesignModule
    end type LayerWrapper
    
    type :: Design
-      class(LayerWrapper), allocatable :: layers(:)
+      class(Layer), allocatable :: layers(:)
       type(hash_type) :: ht
       character(len=1024), dimension(:), allocatable :: layerNames(:)
       type(Box)              :: DESIGN_EXTENT
@@ -127,11 +121,12 @@ module DesignModule
         integer(kind=int64), intent(in) :: n_rows, n_cols
         type(Box),        intent(in)    :: layout_bounds
       end subroutine populate_grid_from_layer
-
-      module subroutine populate_glayer_from_unit(this, base_layer)
-        class(DiskLayer), intent(inout) :: this
-        class(GridLayer), intent(inout) :: base_layer
-      end subroutine populate_glayer_from_unit
+      
+      module subroutine populate_gridlayer_from_unit(this, base_layer)
+        character(len=*), parameter :: functionName = "PerformOperation"    
+        type(Layer), intent(inout) :: this
+        type(GridLayer), intent(inout) :: base_layer
+      end subroutine populate_gridlayer_from_unit
       
       module subroutine PerformOperation( gA, gB, gO, opcode )
         class(Layer), intent(inout) :: gA, gB, gO
@@ -154,7 +149,7 @@ module DesignModule
       end subroutine RestoreSnapToLayer
       
       module subroutine RestoreSnapToDLayer( input_layer, snap_filename )
-        class(Layer), allocatable, intent(inout) :: input_layer
+        type(Layer), intent(inout) :: input_layer
         character(*), intent(in)    :: snap_filename      
       end subroutine RestoreSnapToDLayer
       
@@ -1188,12 +1183,9 @@ contains
       type(Design), intent(inout) :: input_design
       integer :: i
       do i=1,hash_nitems( input_design%ht )
-         select type( resolved_layer => input_design%layers(i)%item )
-         class is (Layer)
-            call ClearLayer( resolved_layer )
-         class default
-            error stop "ERROR: not supported yet."
-         end select
+         associate( resolved_layer => input_design%layers(i) )
+           call ClearLayer( resolved_layer )
+         end associate
       end do
       if( allocated( input_design%layers ) )     deallocate( input_design%layers )
       if( allocated( input_design%layerNames ) ) deallocate( input_design%layerNames )

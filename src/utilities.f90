@@ -14,11 +14,6 @@ contains
     character(len=30) :: file_access, file_form, file_action
     character(len=10) :: read_perm, write_perm
     character(len=1024)  :: filename
-    ! 1. Create a dummy file to inspect
-    open(unit=10, file=filename, status='replace', action='write')
-    write(10, *) 'Fortran INQUIRE test data.'
-    close(10)
-
     ! 2. Inquire about the file by its name
     inquire(unit=iunit,&
          name=filename, &
