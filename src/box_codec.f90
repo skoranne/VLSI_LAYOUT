@@ -697,7 +697,7 @@ contains
     !$omp parallel default(none) &
     !$omp shared(stream, boxes, max_raw_bytes, max_comp_bytes,method_to_use) &
     !$omp private(i, current_start, current_end, local_codec,&
-    !$omp         thread_raw_buf, thread_comp_buf, actual_raw_len, actual_comp_len)
+    !$omp         thread_raw_buf, thread_comp_buf, actual_raw_len, actual_comp_len)    
 
     ! 1. Allocate thread-local buffers ONCE per thread
     allocate(thread_raw_buf(max_raw_bytes))

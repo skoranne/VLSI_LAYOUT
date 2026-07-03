@@ -33,12 +33,20 @@ contains
        if( num_squares*1.0_real64 / (input_layer%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
           dominated_by_squares = .true.
        end if
-       if( dominated_by_squares ) then
-          call MortonSort( input_layer%layer_boxes )
+       if( dominated_by_squares ) then       
+#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+         call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
+#else
+         call MortonSort( input_layer%layer_boxes )
+#endif
        else
-          call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
-       end if
-       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
+#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+         call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
+#else
+         call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+#endif         
+      end if
+      input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     end if
     total_nodes = CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY )
     allocate( input_layer%tree%tree_nodes( total_nodes ) )

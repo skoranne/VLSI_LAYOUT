@@ -45,15 +45,45 @@ contains
       ! EOF - 8, read the table location, jump there, read the table,
       ! and then instantly seek to any chunk.
       write(iunit) current_file_pos
+      flush(iunit)
       close(iunit)
+      !call execute_command_line("sync")
    end subroutine SaveCompressedStreamToDisk
 
    subroutine RestoreCompressedStreamFromDisk(fileName, out_stream)
       character(len=*), intent(in) :: fileName
       type(CompressedStream), intent(out) :: out_stream
-      integer :: iunit, ios, i
+      integer :: iunit, ios, i, attempt
+      character(len=256) :: error_msg
+      logical :: is_open
+      integer :: ghost_unit
 
-      open(newunit=iunit, file=fileName, status='old', access='stream', form='unformatted', iostat=ios)
+      ! 1. Interrogate the compiler's internal registry
+      inquire(file=trim(fileName), opened=is_open, number=ghost_unit)
+
+      ! 2. If the compiler claims it's open, forcefully terminate the connection
+      if (is_open) then
+         print *, "WARNING: nvfortran RTL reports file is still open on unit ", ghost_unit
+         print *, "Executing forced purge of unit ", ghost_unit, "..."
+         close(ghost_unit)
+      end if
+      ! Attempt to open the file up to 5 times
+      do attempt = 1, 5
+         open(newunit=iunit, file=trim(fileName), status='old', access='stream', &
+              iomsg=error_msg,form='unformatted', action='read',iostat=ios)         
+         if (ios == 0) exit ! Success, break the loop
+         ! If it failed, ask the OS to pause for a fraction of a second
+         call execute_command_line("sleep 0.5")
+      end do
+      if (ios /= 0) then
+        print *, "=================================================="
+        print *, "CRITICAL I/O FAILURE"
+        print *, "File: ", trim(fileName)
+        print *, "IOSTAT Code: ", ios
+        print *, "System Message: ", trim(error_msg)
+        print *, "=================================================="
+        stop 1
+      end if
       if (ios /= 0) then
          write(*,*) 'ERROR: cannot open file: ', fileName, ' for reading.'
          stop "Error opening file for reading."
