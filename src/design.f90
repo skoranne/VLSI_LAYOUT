@@ -91,7 +91,7 @@ module DesignModule
    end type LayerWrapper
    
    type :: Design
-      class(Layer), allocatable :: layers(:)
+      type(Layer), allocatable :: layers(:)
       type(hash_type) :: ht
       character(len=1024), dimension(:), allocatable :: layerNames(:)
       type(Box)              :: DESIGN_EXTENT

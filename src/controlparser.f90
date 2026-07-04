@@ -325,11 +325,13 @@ contains
              if( .not. ins ) then
                 write(*,*) 'ERROR: Unable to INIT layer: ', trim(rest(1:pos-1)), ' at index: ', lhs_layer_index
              end if
+             #ifdef NVF_DOES_NOT_LIKE
              if( allocated( design_dbs( lhs_db_index )%layers( lhs_layer_index ) ) ) then
                 !write(*,*) 'ERROR: Unable to INIT layer: ', trim(rest(1:pos-1)), ' at index: ', lhs_layer_index
              else
                 allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index ) )
              end if
+             #endif
              allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName, source = 'MTL_NOTHING')
              call ClearLayer( design_dbs( lhs_db_index )%layers( lhs_layer_index ) )
              cycle
@@ -363,6 +365,7 @@ contains
                 call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
                 if( .not. ins ) error stop "DB HASH TABLE CORRUPTED"
                 !> we have to decide temporary layer format
+                #ifdef NVF_DOES_NOT_LIKE
                 if( .not. allocated( design_dbs( lhs_db_index )%layers(lhs_layer_index) ) ) then
                    !write(*,*) 'INFO: Using memory based layers'
                    select case( temporary_layers )
@@ -374,19 +377,15 @@ contains
                       !allocate( DiskLayer :: design_dbs( lhs_db_index )%layers(lhs_layer_index)%item )
                    end select
                 end if
-                select type( resolved_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index) )
-                !class is (DiskLayer)
-                !   error stop
-                class is (Layer)
+                #endif
+                associate ( resolved_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index) )
                    lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
                    if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
                    design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
                    !write(*,*) 'NEW LHS layer index = ', lhs_layer_index, ' for ', trim(adjustl(rest(1:pos-1))), ' ', &
                    !     trim(adjustl(design_dbs( lhs_db_index )%layerNames(lhs_layer_index)))
                    allocate(resolved_layer%fileName, source = trim(TEMPORARY_FOLDER)//trim(design_dbs( lhs_db_index )%designName)//'_'//trim(design_dbs( lhs_db_index )%layerNames(lhs_layer_index)))
-                class default
-                   error stop "ERROR: not supported yet."
-                end select
+                end associate
              end if
              if( lhs_layer_index < 0 ) error stop "DB INDEX layer corruption"
              !write(*,*) 'LHS index = ', lhs_layer_index
