@@ -27,7 +27,9 @@ contains
     integer(kind=int64)         :: total_nodes, num_squares
     logical                     :: dominated_by_squares
     dominated_by_squares = .false.
-    if( .not. NeedsRTree( input_layer ) ) return
+    if( .not. NeedsRTree( input_layer ) ) then
+       return
+    end if
     if( NeedsSorting( input_layer ) ) then
        num_squares = count( is_square( input_layer%layer_boxes ) )
        if( num_squares*1.0_real64 / (input_layer%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
@@ -55,14 +57,18 @@ contains
   end subroutine BuildTree
 
   module subroutine SaveLayerToSnap( input_layer, snap_filename, method_to_use )
-    type(Layer), intent(inout) :: input_layer
+    type(Layer), intent(inout), target :: input_layer
     character(*), intent(in)   :: snap_filename
     integer, intent(in)        :: method_to_use
     type(CompressedStream)     :: snappy_stream
-    if( NeedsSorting( input_layer ) ) call omt_pack( input_layer%layer_boxes, K_LEAF_CAPACITY )
     if( NeedsRTree( input_layer ) ) then
-       call BuildTree( input_layer )
+       !> make sure its TREE is empty
+       if( allocated( input_layer%tree%tree_nodes ) ) error stop "ERROR: INCONSISTENT LAYER STATE during SAVE"
     end if
+    call BuildTree( input_layer ) !> does sorting
+    snappy_stream%layer_properties = ior( snappy_stream%layer_properties, input_layer%layerState )
+    snappy_stream%layer_properties = iand( snappy_stream%layer_properties, .not. LAYER_STATE_RTREE ) !> no point in saving
+    if( .not. NeedsPNum( input_layer ) ) snappy_stream%arr => input_layer%pnumtable%arr
     if( method_to_use == COMPRESSION_METHOD_SNAPPY .or. method_to_use == COMPRESSION_METHOD_ZLIB &
          .or. method_to_use == COMPRESSION_METHOD_ZSTD ) then
        !> ok
@@ -103,7 +109,7 @@ contains
        write(*,*) 'ERROR: SNAP restoration failed for file: ', snap_filename
        error stop "ERROR: SNAP RESTORATION FAILED"
     end if
-    input_layer%layerState = LAYER_STATE_SORT
+    input_layer%layerState = iand( snappy_stream%layer_properties, LAYER_STATE_EVERYTHING )
     call BuildTree( input_layer )
   end subroutine RestoreSnapToLayer
 

@@ -378,7 +378,7 @@ contains
                    end select
                 end if
                 #endif
-                associate ( resolved_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index) )
+                associate( resolved_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index) )
                    lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
                    if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
                    design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))

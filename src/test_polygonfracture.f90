@@ -128,8 +128,18 @@ program test_fracture
   print *, "--- Initializing Polygon Fracturing Test ---"
   !call LoadKLBin(filenameA,input_layer%layer_boxes)
   !call LoadKLBin(filenameB,input_layerB%layer_boxes)
+  temporary_layers = 2 !> empty file is EMPTY layer
+  debug_verbosity = 3  !> since we want to test
+  !$omp parallel default(shared)
+  !$omp single nowait
+  !$omp task
   call RestoreSnapToLayer( input_layer, filenameA )
-  call RestoreSnapToLayer( input_layerB, filenameB )  
+  !$omp end task
+  !$omp task
+  call RestoreSnapToLayer( input_layerB, filenameB )
+  !$omp end task
+  !$omp end single
+  !$omp end parallel
   boxes => input_layer%layer_boxes
   bbox = mbr_of_array( boxes, input_layer%n_used )
   bboxB= mbr_of_array( input_layerB%layer_boxes, input_layerB%n_used )  
@@ -384,6 +394,24 @@ program test_fracture
      call StartMarkTime(" AND ")     
      call CalculateAND( input_layer, input_layerB, output_layer )
      call StopMarkTime(" AND ")          
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
+     stop
+  case(12)
+     call StartMarkTime(" SAND ")     
+     call CalculateSingleLayerAND( input_layer, output_layer )
+     call StopMarkTime(" SAND ")          
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
+     stop     
+  case(13)
+     call StartMarkTime(" NOT ")     
+     call CalculateNOT( input_layer, input_layerB, output_layer )
+     call StopMarkTime(" NOT ")          
+     call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
+     stop
+  case(14)
+     call StartMarkTime(" XOR ")     
+     call CalculateXOR( input_layer, input_layerB, output_layer )
+     call StopMarkTime(" XOR ")          
      call WriteKLBin(outFileName, output_layer%layer_boxes, output_layer%n_used)
      stop
   case (17)

@@ -281,8 +281,8 @@ contains
   ! ============================================================================
   pure recursive subroutine quicksort_trackers(arr, left, right)
     type(XYTracker), intent(inout) :: arr(:)
-    integer, intent(in) :: left, right
-    integer :: i, j, n
+    integer(kind=int64), intent(in) :: left, right
+    integer(kind=int64) :: i, j, n
     type(XYTracker) :: pivot, temp
 
     if (left >= right) return
@@ -319,8 +319,8 @@ contains
 
   pure subroutine insertion_sort_trackers(arr, left, right)
     type(XYTracker), intent(inout) :: arr(:)
-    integer, intent(in) :: left, right
-    integer :: i, j
+    integer(kind=int64), intent(in) :: left, right
+    integer(kind=int64) :: i, j
     type(XYTracker) :: key
 
     do i = left + 1, right
@@ -340,10 +340,10 @@ contains
 
   pure recursive subroutine sort_trackers(arr)
     type(XYTracker), intent(inout) :: arr(:)
-    integer :: n
-    if (size(arr) <= 1) return
+    integer(kind=int64) :: n
+    if (size(arr) <= 1_int64) return
     n = size(arr)
-    call quicksort_trackers(arr, 1, n)
+    call quicksort_trackers(arr, 1_int64, n)
   end subroutine sort_trackers
 
   pure function is_less_than(a, b) result(less)

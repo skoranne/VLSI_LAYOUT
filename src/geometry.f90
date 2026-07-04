@@ -27,9 +27,11 @@ module GeometryModule
      procedure, pass :: box_union
      procedure, pass :: box_intersection
      procedure, pass :: box_equal
+     procedure, pass :: box_not_equal     
      generic :: operator(+) => box_union
      generic :: operator(*) => box_intersection
      generic :: operator(==) => box_equal
+     generic :: operator(/=) => box_not_equal     
   end type Box
   type :: AugmentedBox
      type(Box) :: mbr
@@ -85,6 +87,11 @@ contains
     is_eq = ( ( this%x1 == other%x1) .and. ( this%y1 == other%y1) .and. &
          ( this%x2 == other%x2) .and. ( this%y2 == other%y2) )
   end function box_equal
+  pure elemental function box_not_equal(this, other) result(is_eq)
+    class(Box), intent(in) :: this, other
+    logical :: is_eq
+    is_eq = .not. box_equal( this, other )
+  end function box_not_equal  
   !> Topological functions
   pure elemental function box_not_interact(this, other) result(retval)
     class(Box), intent(in) :: this, other

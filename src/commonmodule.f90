@@ -19,11 +19,13 @@ module CommonModule
   integer                        :: abort_on_assert_zero = 0
   integer                        :: temporary_layers = K_TEMPORARY_LAYER_MEMORY
   integer                        :: K_COMPRESSION_METHOD_TO_USE = 1 !> ZLIB
+  integer                        :: CODEC_VERSION = 1
+  integer(kind=int64), parameter  :: K_FRAME_THRESHOLD = 1024 !> does not make sense to send this to FRAME logic   
   public:: InitPrecision, GetPrecision, K_COORDINATE_KIND, K_LEAF_CAPACITY, K_SQUARE_DOMINATION_THRESHOLD, XYTracker,&
        TrackerCell, K_SMALL_EPSILON, K_BOOST_CONTROL_XOR, K_BOOST_CONTROL_OR, K_BOOST_CONTROL_AND,&
        K_BOOST_CONTROL_NOT, K_BOOST_CONTROL_MERGE, K_BOOST_CONTROL_SIZE, debug_verbosity, abort_on_xor,&
        abort_on_assert_zero, temporary_layers, K_COMPRESSION_METHOD_TO_USE, K_TEMPORARY_LAYER_MEMORY, &
-       K_TEMPORARY_LAYER_DISK, beep
+       K_TEMPORARY_LAYER_DISK, beep, CODEC_VERSION, K_FRAME_THRESHOLD
 
   type :: XYTracker
      integer(kind=K_COORDINATE_KIND) :: X, Y

@@ -18,6 +18,7 @@ submodule (DesignModule) DesignImplModule
   use BoostPolygonAPIModule
   implicit none
 
+
 contains
 
   module subroutine FinalizeLayer( output_layer )
@@ -581,7 +582,7 @@ contains
   end subroutine ConvertLayerToBox
 
   !> Trying FRAME based OpenMP optimization for A - B (shown as A ~ B)
-  module subroutine CalculateFrameNOT( input_layer_A, input_layer_B, output_layer )
+  subroutine CalculateFrameNOTExplicit( input_layer_A, input_layer_B, output_layer )
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
     type(Layer), intent(inout)   :: output_layer
     type(TrackerCell), allocatable :: trackersGrid(:,:)
@@ -727,8 +728,8 @@ contains
     output_layer%n_used = total_count
     output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )    !> correct by construction in each GRID
     call PreprocessLayer( output_layer )
-    !write(*,*) '|FRAME| = ', output_layer%n_used
-  end subroutine CalculateFrameNOT
+    if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
+  end subroutine CalculateFrameNOTExplicit
 
   ! Convert this function to use OpenMP task with dependencies;
   ! use rows, cols as indices for the dependencies between tiles
@@ -882,7 +883,7 @@ contains
     output_layer%n_used = total_count
     output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )    !> correct by construction in each GRID
     call PreprocessLayer( output_layer )
-    write(*,*) '|FRAME| = ', output_layer%n_used
+    if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
   end subroutine CalculateFrameNOTTask
 
   module subroutine CalculateBoostOperation( input_layer_A, input_layer_B, output_layer, control_parameter, control_value )
@@ -895,11 +896,14 @@ contains
     if( control_parameter == K_BOOST_CONTROL_SIZE ) then
        call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&
             K_BOOST_CONTROL_SIZE, control_value )
+    else if( control_parameter == K_BOOST_CONTROL_MERGE ) then
+       call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&
+            K_BOOST_CONTROL_MERGE, control_value )
     else
        call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, input_layer_B%layer_boxes, output_layer%layer_boxes,&
             control_parameter, control_value )
     end if
-    
+    if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )    
     output_layer%layerState = LAYER_STATE_HEAL
     output_layer%n_used = size( output_layer%layer_boxes )
     call PreprocessLayer( output_layer )
@@ -915,4 +919,355 @@ contains
     call move_alloc( from=tempLayer, to=boxes )
   end subroutine MergeBoxes
 
+  subroutine CalculateExplicitXOR( input_layer_A, input_layer_B, output_layer )
+    type(Layer), intent(inout) :: input_layer_A, input_layer_B
+    type(Layer), intent(inout) :: output_layer
+    type(Layer)                :: AnotB, BnotA
+    !$omp parallel default(shared)
+    !$omp single nowait
+    !$omp task
+    call PreprocessLayer( input_layer_A )
+    !$omp end task
+    !$omp task    
+    call PreprocessLayer( input_layer_B )
+    !$omp end task
+    !$omp end single
+    !$omp end parallel    
+
+    AnotB%layerState = LAYER_STATE_EVERYTHING
+    BnotA%layerState = LAYER_STATE_EVERYTHING
+    !$omp parallel default(shared)
+    !$omp single nowait
+    !$omp task        
+    call CalculateFrameNOT( input_layer_A, input_layer_B, AnotB )
+    !$omp end task
+    !$omp task        
+    call CalculateFrameNOT( input_layer_B, input_layer_A, BnotA )
+    !$omp end task
+    !$omp end single
+    !$omp end parallel        
+    call CalculateOR( AnotB, BnotA, output_layer )
+  end subroutine CalculateExplicitXOR
+
+  module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, functype, control_opcode, control_parameter )
+    type(Layer), intent(inout) :: input_layer_A, input_layer_B
+    type(Layer), intent(inout)   :: output_layer
+    type(CGFunction) :: functype
+    integer(kind=int64), intent(in) :: control_opcode, control_parameter
+    integer(kind=int64) :: total_count, i, number_tree_nodes
+    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
+    integer :: K_GRID 
+    integer :: rows, cols
+    type(Layer) :: gridA
+    type(Layer), allocatable :: grids(:,:)
+    type(Layer), allocatable, target :: outputGrid(:,:)
+    type(Layer), allocatable, target :: AinGrid(:,:)
+    type(Layer), allocatable, target :: BinGrid(:,:)       !> I dont know if it makes sense to create so many temp layers
+    type(Box)   :: bboxA
+    integer(kind=int64), allocatable :: start_tick(:,:), end_tick(:,:)
+    integer(kind=int64) :: clock_rate
+    real(kind=real64), allocatable :: start_time(:,:), end_time(:,:), elapsed_time(:,:)
+    integer(kind=int64), allocatable :: grid_layer_counts(:,:,:)
+    integer,parameter :: A_IN_GRID=1, B_IN_GRID=2, TRACKER_GRID=3, TEMP_LAYER_GRID=4, OUTPUT_LAYER_GRID=5 
+    number_tree_nodes = CalculateTotalNodes( max( input_layer_A%n_used, input_layer_B%n_used ), K_LEAF_CAPACITY )
+    K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
+    !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
+
+    allocate( grids(K_GRID, K_GRID) )
+    allocate( outputGrid( K_GRID, K_GRID) )
+    allocate( AinGrid(K_GRID, K_GRID) )
+    allocate( BinGrid(K_GRID, K_GRID) )
+    allocate( start_time(K_GRID,K_GRID) )
+    allocate( end_time(K_GRID,K_GRID) )
+    allocate( elapsed_time(K_GRID,K_GRID) )
+    allocate( start_tick(K_GRID,K_GRID) )
+    allocate( end_tick(K_GRID,K_GRID) )
+    allocate( grid_layer_counts(K_GRID, K_GRID, OUTPUT_LAYER_GRID) )
+    !call PreprocessLayer( input_layer_A )    
+    call CreateGrid( input_layer_A, gridA, K_GRID, K_GRID,0) !> create overlapping GRID
+
+    !call PreprocessLayer( input_layer_B )
+    call system_clock(count_rate=clock_rate)
+
+    if( debug_verbosity > 1 ) then
+       bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
+       write(*,*) 'BBOX OF A = ', bboxA
+       write(*,*) '|A| = ', input_layer_A%n_used, ' ', input_layer_A%layerState       
+       write(*,*) '|B| = ', input_layer_B%n_used, ' ', input_layer_B%layerState
+       write(*,'(A85)') '+----------------------------------------------------------------------------------+'
+       write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
+       write(*,'(A85)') '+----------------------------------------------------------------------------------+'
+    end if
+    
+    do rows = 1, K_GRID
+       do cols = 1, K_GRID
+          block
+            type(CGArgument2) :: local_arg
+            call system_clock(count=start_tick(rows,cols))           
+            call cpu_time(start_time(rows,cols))
+            grids(rows,cols) = gridA%layer_boxes( (rows-1)*K_GRID+cols ) !> this does Layer = Box
+            !> it is possible that AinGrid or BinGrid is empty, then we have to see what to do
+            !> thats why we generate AinGrid asap
+            call ClearLayer( AinGrid( rows, cols ) )
+            AinGrid(rows,cols)%layerState = LAYER_STATE_EVERYTHING !> we dont any processing
+            call FilterLayer( input_layer_A, grids(rows,cols)%layer_boxes(1), AinGrid(rows, cols) )          
+            grid_layer_counts(rows,cols,A_IN_GRID) = AinGrid(rows,cols)%n_used
+            call ClearLayer( BinGrid( rows, cols ) )
+            call FilterLayer( input_layer_B, grids(rows,cols)%layer_boxes(1), BinGrid(rows, cols) )
+            grid_layer_counts(rows,cols,B_IN_GRID) = BinGrid(rows,cols)%n_used          
+            !write(*,*) '|G| = ', grids(rows,cols)%n_used, ' ', grids(rows,cols)%layerState, ' ', grids(rows,cols)%layer_boxes(1)
+            call ClearLayer( outputGrid(rows,cols) )
+            outputGrid(rows,cols)%layerState = LAYER_STATE_EVERYTHING
+            local_arg%A => AinGrid(rows,cols)
+            local_arg%B => BinGrid(rows,cols)            
+            local_arg%C => outputGrid(rows,cols)
+            local_arg%control_opcode = control_opcode
+            local_arg%control_parameter = control_parameter
+            call functype%main_compute( local_arg )
+            grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID) = outputGrid(rows,cols)%n_used
+            call cpu_time(end_time(rows,cols))
+            call system_clock(count=end_tick(rows,cols))
+            elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / real(clock_rate, kind=real64)
+            if( debug_verbosity > 1 ) then
+               write(*,'(A,I3,A,I3,A,I12,A,I12,A,I12,A,I12,A,I12,A,F10.3,A)') '|',rows,'|',cols,'|',&
+                    grid_layer_counts(rows,cols,A_IN_GRID),'|',&
+                    grid_layer_counts(rows,cols,B_IN_GRID),'|',&
+                    grid_layer_counts(rows,cols,TRACKER_GRID),'|',&
+                    grid_layer_counts(rows,cols,TEMP_LAYER_GRID),'|',grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID),&
+                    '|',elapsed_time(rows,cols), '|'
+            end if
+            if( allocated( AinGrid(rows,cols)%layer_boxes )) call ClearLayer( AinGrid( rows, cols ) )
+          end block
+       end do
+    end do
+    if( debug_verbosity > 1 ) then    
+       write(*,'(A85)') '+-----------------------------------------------------------------------------------+'
+    end if
+    total_count = 0
+    do rows = 1, K_GRID
+       do cols = 1, K_GRID
+          total_count = total_count + outputGrid(rows,cols)%n_used
+       end do
+    end do
+    !write(*,*) 'TOTAL COUNT = ', total_count
+
+    deallocate( grids )
+    deallocate( AinGrid )
+    deallocate( BinGrid )
+    deallocate( start_time )
+    deallocate( end_time )
+    deallocate( elapsed_time )
+    deallocate( start_tick )
+    deallocate( end_tick )
+    
+    if( allocated( output_layer%layer_boxes )) deallocate( output_layer%layer_boxes )
+    allocate( output_layer%layer_boxes( total_count ) )
+    total_count = 0
+    do rows = 1, K_GRID
+       do cols = 1, K_GRID
+          do i = 1, outputGrid(rows,cols)%n_used
+             output_layer%layer_boxes( total_count + i ) =  outputGrid(rows,cols)%layer_boxes(i)
+          end do
+          total_count = total_count + outputGrid(rows,cols)%n_used
+       end do
+    end do
+    deallocate( outputGrid )    
+    output_layer%n_used = total_count
+    output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )    !> correct by construction in each GRID
+    call PreprocessLayer( output_layer )
+    if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
+  end subroutine CalculateFrameFunction2
+
+  subroutine BoostMainCompute1(ad)
+    class(*), intent(inout) :: ad
+    type(Layer)             :: tempLayer
+    select type (arg_data => ad)
+    type is (CGArgument1)
+       call CalculateBoostOperation( arg_data%A, tempLayer, arg_data%C, arg_data%control_opcode, arg_data%control_parameter )
+    class default
+       error stop "ERROR: Not supported yet."
+    end select
+  end subroutine BoostMainCompute1
+  
+  subroutine BoostMainCompute2(ad)
+    class(*), intent(inout) :: ad
+    select type (arg_data => ad)
+    type is (CGArgument2)
+       call CalculateBoostOperation( arg_data%A, arg_data%B, arg_data%C, arg_data%control_opcode, arg_data%control_parameter )
+    class default
+       error stop "ERROR: Not supported yet."
+    end select
+  end subroutine BoostMainCompute2
+
+  module subroutine CalculateFrameNOT( input_layer_A, input_layer_B, output_layer )
+    type(Layer), intent(inout) :: input_layer_A, input_layer_B
+    type(Layer), intent(inout) :: output_layer
+    type(CGFunction)           :: local_functiontype
+    local_functiontype%preamble => null()
+    local_functiontype%main_compute => BoostMainCompute2
+    local_functiontype%postamble => null()    
+    
+    call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, local_functiontype, K_BOOST_CONTROL_NOT, 0 )
+    if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )    
+    output_layer%layerState = LAYER_STATE_HEAL
+    call PreprocessLayer( output_layer )
+  end subroutine CalculateFrameNOT
+
+  module subroutine CalculateXOR( input_layer_A, input_layer_B, output_layer )
+    type(Layer), intent(inout) :: input_layer_A, input_layer_B
+    type(Layer), intent(inout) :: output_layer
+    type(CGFunction)           :: local_functiontype
+    local_functiontype%preamble => null()
+    local_functiontype%main_compute => BoostMainCompute2
+    local_functiontype%postamble => null()    
+    
+    call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, local_functiontype, K_BOOST_CONTROL_XOR, 0 )
+    output_layer%layerState = LAYER_STATE_HEAL
+    call PreprocessLayer( output_layer )
+  end subroutine CalculateXOR
+
+  !> Single layer FRAME function wrapper
+  module subroutine CalculateFrameFunction1( input_layer_A, output_layer, functype, control_opcode, control_parameter )
+    type(Layer), intent(inout) :: input_layer_A
+    type(Layer), intent(inout)   :: output_layer
+    type(CGFunction) :: functype
+    integer(kind=int64), intent(in) :: control_opcode, control_parameter
+    integer(kind=int64) :: total_count, i, number_tree_nodes
+    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
+    integer :: K_GRID 
+    integer :: rows, cols
+    type(Layer) :: gridA
+    type(Layer), allocatable :: grids(:,:)
+    type(Layer), allocatable, target :: outputGrid(:,:)
+    type(Layer), allocatable, target :: AinGrid(:,:)
+    !type(Layer), allocatable :: BinGrid(:,:)       !> I dont know if it makes sense to create so many temp layers
+    type(Box)   :: bboxA
+    integer(kind=int64), allocatable :: start_tick(:,:), end_tick(:,:)
+    integer(kind=int64) :: clock_rate
+    real(kind=real64), allocatable :: start_time(:,:), end_time(:,:), elapsed_time(:,:)
+    integer(kind=int64), allocatable :: grid_layer_counts(:,:,:)
+    integer,parameter :: A_IN_GRID=1, B_IN_GRID=2, TRACKER_GRID=3, TEMP_LAYER_GRID=4, OUTPUT_LAYER_GRID=5 
+    number_tree_nodes = CalculateTotalNodes( input_layer_A%n_used, K_LEAF_CAPACITY )
+    K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
+    !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
+
+    allocate( grids(K_GRID, K_GRID) )
+    allocate( outputGrid( K_GRID, K_GRID) )
+    allocate( AinGrid(K_GRID, K_GRID) )
+    allocate( start_time(K_GRID,K_GRID) )
+    allocate( end_time(K_GRID,K_GRID) )
+    allocate( elapsed_time(K_GRID,K_GRID) )
+    allocate( start_tick(K_GRID,K_GRID) )
+    allocate( end_tick(K_GRID,K_GRID) )
+    allocate( grid_layer_counts(K_GRID, K_GRID, OUTPUT_LAYER_GRID) )
+    call CreateGrid( input_layer_A, gridA, K_GRID, K_GRID,0) !> create overlapping GRID
+
+    call system_clock(count_rate=clock_rate)
+
+    bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
+    if( debug_verbosity > 1 ) then
+       write(*,*) 'BBOX OF A = ', bboxA
+       write(*,*) '|A| = ', input_layer_A%n_used, ' ', input_layer_A%layerState
+       write(*,'(A85)') '+----------------------------------------------------------------------------------+'
+       write(*,'(A,A3,A,A3,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|', ' A AND COMP B', '|', ' REAL TIME', '|'
+       write(*,'(A85)') '+----------------------------------------------------------------------------------+'
+    end if
+    
+    do rows = 1, K_GRID
+       do cols = 1, K_GRID
+          block
+            type(CGArgument1) :: local_arg
+            call system_clock(count=start_tick(rows,cols))           
+            call cpu_time(start_time(rows,cols))
+            grids(rows,cols) = gridA%layer_boxes( (rows-1)*K_GRID+cols ) !> this does Layer = Box
+            !> it is possible that AinGrid or BinGrid is empty, then we have to see what to do
+            !> thats why we generate AinGrid asap
+            call ClearLayer( AinGrid( rows, cols ) )
+            call FilterLayer( input_layer_A, grids(rows,cols)%layer_boxes(1), AinGrid(rows, cols) )          
+            if( AinGrid(rows,cols)%n_used == 0 ) then
+               cycle
+            end if
+            AinGrid(rows,cols)%layerState = LAYER_STATE_PNUM !> we dont any pnum processing
+            call PreprocessLayer( AinGrid(rows,cols) )    
+            grid_layer_counts(rows,cols,A_IN_GRID) = AinGrid(rows,cols)%n_used
+            grid_layer_counts(rows,cols,B_IN_GRID) = 0
+            !write(*,*) '|G| = ', grids(rows,cols)%n_used, ' ', grids(rows,cols)%layerState, ' ', grids(rows,cols)%layer_boxes(1)
+            call ClearLayer( outputGrid(rows,cols) )
+            outputGrid%layerState = LAYER_STATE_EVERYTHING
+            local_arg%A => AinGrid(rows,cols)
+            local_arg%C => outputGrid(rows,cols)
+            local_arg%control_opcode = control_opcode
+            local_arg%control_parameter = control_parameter
+            call functype%main_compute( local_arg )
+            grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID) = outputGrid(rows,cols)%n_used
+            call cpu_time(end_time(rows,cols))
+            call system_clock(count=end_tick(rows,cols))
+            elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / real(clock_rate, kind=real64)
+            if( debug_verbosity > 1 ) then
+               write(*,'(A,I3,A,I3,A,I12,A,I12,A,F10.3,A)') '|',rows,'|',cols,'|',&
+                    grid_layer_counts(rows,cols,A_IN_GRID),'|',&
+                    grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID),&
+                    '|',elapsed_time(rows,cols), '|'
+            end if
+            if( allocated( AinGrid(rows,cols)%layer_boxes )) call ClearLayer( AinGrid( rows, cols ) )
+          end block
+       end do
+    end do
+    if( debug_verbosity > 1 ) then    
+       write(*,'(A85)') '+-----------------------------------------------------------------------------------+'
+    end if
+    total_count = 0
+    do rows = 1, K_GRID
+       do cols = 1, K_GRID
+          total_count = total_count + outputGrid(rows,cols)%n_used
+       end do
+    end do
+    !write(*,*) 'TOTAL COUNT = ', total_count
+
+    deallocate( grids )
+    deallocate( AinGrid )
+    deallocate( start_time )
+    deallocate( end_time )
+    deallocate( elapsed_time )
+    deallocate( start_tick )
+    deallocate( end_tick )
+    
+    if( allocated( output_layer%layer_boxes )) deallocate( output_layer%layer_boxes )
+    allocate( output_layer%layer_boxes( total_count ) )
+    total_count = 0
+    do rows = 1, K_GRID
+       do cols = 1, K_GRID
+          do i = 1, outputGrid(rows,cols)%n_used
+             output_layer%layer_boxes( total_count + i ) =  outputGrid(rows,cols)%layer_boxes(i)
+          end do
+          total_count = total_count + outputGrid(rows,cols)%n_used
+       end do
+    end do
+    deallocate( outputGrid )    
+    output_layer%n_used = total_count
+    output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )    !> correct by construction in each GRID
+    call PreprocessLayer( output_layer )
+    if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
+  end subroutine CalculateFrameFunction1
+
+  module subroutine MergeHealLayer( input_layer )
+    type(Layer), intent( inout ) :: input_layer
+    type(Layer)                  :: tempLayer
+    type(CGFunction)             :: local_functiontype
+    integer(kind=int64)          :: output_box_count
+    if( input_layer%n_used < K_FRAME_THRESHOLD ) then
+       call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+       input_layer%n_used = output_box_count
+       input_layer%n_alloc = output_box_count
+       return
+    end if
+    local_functiontype%preamble => null()
+    local_functiontype%main_compute => BoostMainCompute1
+    local_functiontype%postamble => null()    
+    call CalculateFrameFunction1( input_layer, tempLayer, local_functiontype, K_BOOST_CONTROL_MERGE, 0 )
+    call swap_layer( input_layer, tempLayer )
+    !> any time you move down from RTree state you have to delete the tree
+    if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )
+    input_layer%layerState = LAYER_STATE_HEAL
+  end subroutine MergeHealLayer
 end submodule DesignImplModule

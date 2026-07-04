@@ -14,7 +14,7 @@ module DrawUsingOpenGL
   use iso_fortran_env, only: int32, int64, real64, c_funloc
   use iso_c_binding
   implicit none
-  integer, parameter :: K_MAX_OPENGL_CAPACITY = 50000
+  integer, parameter :: K_MAX_OPENGL_CAPACITY = 500000
   interface
      ! --- OpenGL Core Functions ---
      subroutine glClear(mask) bind(C, name="glClear")
@@ -1174,7 +1174,7 @@ contains
                 call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
                 ! 2. Set color with transparency (alpha)
                 if( tree_mode ) then
-                   call glColor3f(0.8_c_float, 0.3_c_float, 0.3_c_float) ! Coral Red
+                   call glColor4f(0.8_c_float, 0.3_c_float, 0.3_c_float,1.0_c_float) ! Coral Red
                 else
                    call glColor4f(input_layers(idx)%color(1), &
                         input_layers(idx)%color(2), &

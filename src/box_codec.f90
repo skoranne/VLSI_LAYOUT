@@ -73,8 +73,9 @@
 module CompressionChunkManagerModule
    use CommonModule
    use GeometryModule
+   use DesignModule
    use SnappyCompressionModule
-   use iso_c_binding, only: c_char
+   use iso_c_binding, only: c_char, c_int
    use iso_fortran_env, only : int32, int64, real64
    !use snappy_mod, only: Box, compress_box_array, decompress_box_array
    implicit none
@@ -231,17 +232,19 @@ module BoxCodecModule
      enumerator :: COMPRESSION_METHOD_ZSTD   = 3
   end enum
   type :: CompressedChunk
-     integer(int64) :: num_boxes
-     integer(int64) :: raw_byte_size
-     integer(int64) :: compressed_size
+     integer(int64) :: num_boxes = 0
+     integer(int64) :: raw_byte_size = 0
+     integer(int64) :: compressed_size = 0
      integer(int8), allocatable :: data(:)
   end type CompressedChunk
 
   type :: CompressedStream
-     integer(int64) :: total_boxes
-     integer(int64) :: num_chunks
+     integer(int64) :: total_boxes = 0
+     integer(int64) :: num_chunks = 0
      type(CompressedChunk), allocatable :: chunks(:)
-     integer :: compression_method
+     integer :: compression_method = 1
+     integer(kind=c_int) :: layer_properties = 0
+     integer(kind=int64), pointer :: arr(:) => null()
   end type CompressedStream
 
 contains

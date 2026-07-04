@@ -25,7 +25,7 @@ contour.o:	geometry.o polygon_fracture.o
 hdfdata.o:	geometry.o
 kldata.o:	geometry.o
 datastructures.o:	commonmodule.o
-pnummerge.o:	datastructures.o rtree.o geometry.o gpu_pnummerge.o
+pnummerge.o:	datastructures.o rtree.o geometry.o gpu_pnummerge.o utilities.o
 gpu_pnummerge.o:	interaction.o
 polygon_fracture.o:	hdfdata.o
 design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o interaction.o boost_polygon_apif.o
@@ -35,6 +35,6 @@ magparser.o:	polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
 mainmagparser.o:	magparser.o controlparser.o
 controlparser.o:	design.o
 systeminfo_gpu.o:	systeminfo.o
-interaction.o:	gpu_morton_sort.o
+interaction.o:	gpu_morton_sort.o utilities.o
 RLEMerge.o:	gpu_morton_sort.o interaction.o
 

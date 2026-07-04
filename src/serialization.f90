@@ -5,6 +5,7 @@
 module SerializationModule
    use CommonModule
    use GeometryModule
+   use DesignModule
    use BoxCodecModule
    use iso_fortran_env
    implicit none
@@ -25,8 +26,10 @@ contains
       if (ios /= 0) stop "Error opening file for writing."
 
       ! 1. Write the Stream metadata
+      write(iunit) CODEC_VERSION
+      write(iunit) in_stream%layer_properties
       write(iunit) in_stream%total_boxes, in_stream%num_chunks, in_stream%compression_method
-
+      if( associated( in_stream%arr ) ) write(iunit) in_stream%arr
       ! 2. Loop through chunks and write them
       do i = 1, in_stream%num_chunks
          inquire(unit=iunit, pos=current_file_pos)
@@ -57,7 +60,7 @@ contains
       character(len=256) :: error_msg
       logical :: is_open
       integer :: ghost_unit
-
+      integer :: file_codec_version
       ! 1. Interrogate the compiler's internal registry
       inquire(file=trim(fileName), opened=is_open, number=ghost_unit)
 
@@ -90,8 +93,16 @@ contains
       end if
 
       ! 1. Read the Stream metadata
+      read(iunit) file_codec_version
+      read(iunit) out_stream%layer_properties
       read(iunit) out_stream%total_boxes, out_stream%num_chunks, out_stream%compression_method
-      !write(*,'(A,I12,A,I8,A,I1)') '|N| = ', out_stream%total_boxes, ' |C| = ', out_stream%num_chunks, ' |M| =', out_stream%compression_method
+      if( iand( out_stream%layer_properties, LAYER_STATE_PNUM ) /= 0 ) then
+         allocate( out_stream%arr( out_stream%total_boxes ) )
+         read(iunit) out_stream%arr
+      end if
+      write(*,'(A,I3,A,I8,A,I14,A,I18,A,I1)') '|V| = ', file_codec_version, &
+           '|L| = ', out_stream%layer_properties,&
+           '|N| = ', out_stream%total_boxes, ' |C| = ', out_stream%num_chunks, ' |M| =', out_stream%compression_method
       ! 2. Allocate the chunks array
       allocate(out_stream%chunks(out_stream%num_chunks))
 
