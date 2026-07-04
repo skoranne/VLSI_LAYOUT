@@ -19,6 +19,7 @@ module RTreeBuilderGPU
 
 
 contains
+  #ifdef WORK_IN_PROGRESS
   subroutine PerformMergeGPU_OMP(sorted_boxes, tree_nodes, root_index, max_expected_edges, &
        overlap_area, overlap_perimeter, area_overlap_roots)
     ! ... (Standard intent(in) declarations) ...
@@ -188,7 +189,7 @@ contains
     end if
 
   end subroutine PerformMergeGPU_OMP
-
+  #endif
 #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)    
   !$omp declare target
 #endif
