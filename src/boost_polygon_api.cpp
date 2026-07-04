@@ -68,8 +68,8 @@ extern "C" {
       output[i].y2 = bp::yh(merged_rects[i]);
     }
   }
-  const coord_t K_MAXIMUM_WIDTH = 10000;
-  const coord_t K_MAXIMUM_HEIGHT = 10000;
+  const coord_t K_MAXIMUM_WIDTH  = 100000;
+  const coord_t K_MAXIMUM_HEIGHT = 100000;
   typedef bp::rectangle_data<coord_t> Rectangle;
   void subdivide_rectangles(const std::vector<Rectangle>& input_rects, 
 			    std::vector<Rectangle>& output_rects) {

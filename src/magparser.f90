@@ -363,10 +363,9 @@ contains
            ! 2. Record the start tick
            call system_clock(count=start_tick)
            call cpu_time(t1)
-           call MergeHealLayer( resolved_layer )
            call BuildTree( resolved_layer )
-           call PerformMergeWithOverlapDetection( resolved_layer%pnumtable, resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes,&
-                resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i), area_overlap_roots)
+           call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes,&
+                resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
            call cpu_time(t2)
            call system_clock(count=end_tick)
            elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
@@ -378,8 +377,10 @@ contains
               !write(*,*) 'PerformUnion as overlap detected on ', size(area_overlap_roots), ' roots ', elapsed_time
               !write(*,'(A,A12,A,F20.2)') 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)
               !call PerformUnion( layers(i) )
-              call PerformPolygonUnion( resolved_layer, area_overlap_roots ) !> this performs the Merge so no need to duplicate
-              if( allocated( area_overlap_roots ) ) deallocate( area_overlap_roots )
+              call MergeHealLayer( resolved_layer )
+              if( NeedsRTree( resolved_layer ) ) call BuildTree( resolved_layer )
+              !call PerformPolygonUnion( resolved_layer, area_overlap_roots ) !> this performs the Merge so no need to duplicate
+              !if( allocated( area_overlap_roots ) ) deallocate( area_overlap_roots )
               if( NeedsPNum( resolved_layer ) ) then
                  call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes,&
                       resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
@@ -415,7 +416,7 @@ contains
     do i = 1,NUM_LAYERS
        associate( resolved_layer => layers(i) )
          if( resolved_layer%n_used == 0 ) then
-            write(*,*) 'Layer: ', layerNames(i), ' is EMPTY'
+            !write(*,*) 'Layer: ', layerNames(i), ' is EMPTY'
             cycle
          end if
          extents(i) = mbr_of_array( resolved_layer%layer_boxes, resolved_layer%n_used )
@@ -456,7 +457,7 @@ contains
             write(*,*) 'ERROR: This is not expected: ', resolved_layer%n_used, ' ', extents(i)
             error stop
          else
-            write(*,*) 'Layer: ', layerNames(i), ' is EMPTY'
+            !write(*,*) 'Layer: ', layerNames(i), ' is EMPTY'
          end if
        end associate
     end do
@@ -509,7 +510,7 @@ contains
        end if
     end if
     if( debug_verbosity > 1 ) then
-       write(*,*) 'Writing DB: ', load_design%fileName
+       if( load_design%design_direction /= DESIGN_DIRECTION_MEMORY ) write(*,*) 'Writing DB: ', load_design%fileName
     end if
     deleted_layer_count = 0
     if( .not. allocated( load_design%layers ) ) return !> we have already flushed this db

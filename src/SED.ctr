@@ -3,14 +3,15 @@ program square
 systeminfo
 var temp_folder RUN_09/
 var temporary_layers 2
+var debug_verbosity 3
 decl design d1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1.mag
-decl output o1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1_output.mag
+decl output o1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/SEDFXTP1_DATA/SEDFXTP1_output2.mag
 decl memory t1 = nothing
 info
 exec init t1:nothing
-exec run t1:poly = d1:poly COPY t1:nothing
-exec run t1:poly_grow = d1:poly GROW t1:nothing 0.1 0.1 0.1 0.1
-exec run t1:poly_shrink = d1:poly SIZE t1:nothing 0.01
+exec run o1:poly = d1:poly COPY t1:nothing
+exec run o1:poly_grow = d1:poly GROW t1:nothing 0.01 0.01 0.01 0.01
+exec run o1:poly_shrink = d1:poly SIZE t1:nothing -0.01
 flush
 end
 

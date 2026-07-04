@@ -925,17 +925,18 @@ contains
        input_layer%layerState = 31 !> we set everything
        return
     end if
+!#define USE_BOOST_POLYGON
 #ifdef USE_BOOST_POLYGON
     if( NeedsHealing( input_layer ) ) then
        block
          type(Layer) :: tempLayer
          !> by the time we come here this should not be needed
          !$komp critical (heal_boxes_lock) !> work around
-         call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
-         !call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, tempLayer%layer_boxes )
+         !call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+         call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, tempLayer%layer_boxes )
          if( allocated( input_layer%layer_boxes) ) deallocate( input_layer%layer_boxes )
          call move_alloc( from=tempLayer%layer_boxes, to=input_layer%layer_boxes)
-         input_layer%n_used = tempLayer%n_used
+         input_layer%n_used = size( input_layer%layer_boxes )
          !$komp end critical (heal_boxes_lock)
          !write(*,*) 'Healing from: ', input_layer%n_used, ' to ', output_box_count
          input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else

@@ -313,6 +313,7 @@ contains
        overlap_perimeter = 0.0_real64
        return
     end if
+    if( root_index == 0 ) error stop "ERROR: No PNUM proceessing without RTRee"
     !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
     do i = 1, num_boxes
        tid = omp_get_thread_num() + 1

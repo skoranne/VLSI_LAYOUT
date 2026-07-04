@@ -181,7 +181,7 @@ contains
              rest = adjustl(rest)
              pos = index( rest, ' ' )
              rest = trim( adjustl( rest(pos+1:)))             
-             write(*,*) 'USING TEMP_FOLDER = ', trim(rest(1:pos-1))
+             write(*,*) 'USING TEMP_FOLDER = ', trim(rest)
              TEMPORARY_FOLDER = trim(rest(1:pos-1))
           else if( trim(rest(1:pos-1)) == 'abort_on_xor' ) then
              rest = adjustl(rest)
@@ -325,13 +325,6 @@ contains
              if( .not. ins ) then
                 write(*,*) 'ERROR: Unable to INIT layer: ', trim(rest(1:pos-1)), ' at index: ', lhs_layer_index
              end if
-             #ifdef NVF_DOES_NOT_LIKE
-             if( allocated( design_dbs( lhs_db_index )%layers( lhs_layer_index ) ) ) then
-                !write(*,*) 'ERROR: Unable to INIT layer: ', trim(rest(1:pos-1)), ' at index: ', lhs_layer_index
-             else
-                allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index ) )
-             end if
-             #endif
              allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName, source = 'MTL_NOTHING')
              call ClearLayer( design_dbs( lhs_db_index )%layers( lhs_layer_index ) )
              cycle
@@ -496,23 +489,23 @@ contains
                   !write(*,*) 'REST HERE: = ', trim(rest), ' ', adjustl(rest)
                   rest = adjustl(rest)
                   rest = trim(rest)
-                  read(rest, *, iostat=ios) buf1, buf2
+                  read(rest, *, iostat=ios) buf1, buf2 !> now rest is at the COMMAND options
                   if( ios == 0 ) then
                      !> we got z = x OP y
                      primary_operator = trim( adjustl( buf1 ) )
                      rhs2_source_name = trim( adjustl( buf2 ) )
                      if( .not. associated( rhs1_layer ) ) error stop "RHS1 layer not associated"
                      if( .not. associated( lhs_layer ) )  error stop "LHS  layer not associated"                     
-                     if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) then
+                     if( rhs2_source_name /= 'nothing' ) then
                         pos = index( rhs2_source_name, ':' )
                         !write(*,*) 'RESTG = ', trim(rhs2_source_name(1:pos-1))
                         call hash_get( ht, trim(rhs2_source_name(1:pos-1)), rhs2_db_index, ins )
                         if( .not. ins ) error stop "TEXT OPERATOR RHS2 DB INDEX not located"
-                        rest = adjustl(trim(rhs2_source_name(1+pos:)))
-                        pos  = index( rest, ' ')
-                        call hash_get( design_dbs( rhs2_db_index )%ht, trim(rest(1:pos-1)), rhs2_layer_index, ins )
+                        buf2 = adjustl(trim(rhs2_source_name(1+pos:)))
+                        pos  = index( buf2, ' ')
+                        call hash_get( design_dbs( rhs2_db_index )%ht, trim(buf2(1:pos-1)), rhs2_layer_index, ins )
                         if( .not. ins ) then
-                           write(*,*) 'ERROR: TEXT RHS2 ', rhs2_source_name, ' layer not found.', ' ', trim(rest(1:pos-1))
+                           write(*,*) 'ERROR: TEXT RHS2 ', rhs2_source_name, ' layer not found.', ' ', trim(buf2(1:pos-1))
                            error stop "ERROR"
                         end if
                         rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
@@ -568,6 +561,7 @@ contains
                         call CreateGRID( rhs1_layer, lhs_layer, 10, 10, 10 ) !> the last argument is OVERLAP
                      case ('GROW') !> lhs = rhs GROW nothing EAST NORTH WEST SOUTH (all positive)
                         if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) error stop "GROW must use nothing as second layer"
+                        !write(*,*) 'RESTJUST before: ', rest
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
                         !write(*,'(A,I8,4(A,F8.2))') 'Found PRIMARY_OPERATOR = GROW at PRECISION ', used_precision, ' ', rvar(1), ' ', rvar(2), ' ', rvar(3), ' ', rvar(4)
                         do i=1,4

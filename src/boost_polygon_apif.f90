@@ -46,15 +46,16 @@ contains
     type(Box), dimension(:), allocatable, intent(out) :: merged_boxes
     integer(c_long), intent(in) :: control_parameter, control_value
     integer(c_long) :: AN, BN, outN, guessed_output_size
+    integer :: alloc_status
     type(Box), dimension(:), allocatable :: temp_output
-
+    type(Box) :: bboxA
     AN = size(input_boxes_A, kind=c_long)
     BN = size(input_boxes_B, kind=c_long)
     if ( (AN == 0) .and. (BN  == 0 ) ) then
        allocate(merged_boxes(0))
        return
     end if
-
+    bboxA = mbr_of_array( input_boxes_A, AN )
     !> how to guess the output size, A * B could be O(n^2)
     if( control_parameter == K_BOOST_CONTROL_AND ) then
        write(*,*) 'INFO: this is not supported.'
@@ -62,8 +63,16 @@ contains
     else
        guessed_output_size = 4*max(AN,BN)
     end if
+    !> we have a problem here since due to INTRODUCED fracturing we can create
+    !> unbounded (as a function of AN/BN) number of output boxes
+    !> K_MAXIMUM_WIDTH is set to 100,000
+    guessed_output_size = guessed_output_size*(1+(bboxA%x2-bboxA%x1)/100000)
     !write(*,*) 'Performing BOOST operation: ', control_parameter, ' on ', AN, ' ', BN, ' guessed: ', guessed_output_size    
-    allocate( temp_output( guessed_output_size) ) !> this could be optimistic, use 2*N    
+    allocate( temp_output( guessed_output_size), stat=alloc_status ) !> this could be optimistic, use 2*N
+    if( alloc_status /= 0 ) then
+       write(*,*) 'ERROR: Requested memory: ', guessed_output_size, ' from ', AN, ' ', BN
+       error stop "ERROR: MEMORY ALLOCATION FAILED: "
+    end if
     ! Call the C/C++ backend
     call PerformBoostPolygonOperation(input_boxes_A, AN, input_boxes_B, BN, temp_output, outN, control_parameter, control_value)
     ! Allocate final output to exact size and copy

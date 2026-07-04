@@ -1,5 +1,5 @@
 # Control file for MAGPARSER
-include(`op_template.m4')dnl
+include(`/home/skoranne/GITHUB/VLSI_LAYOUT/src/op_template.m4')dnl
 program square
 systeminfo
 var temp_folder mkTempFolder
