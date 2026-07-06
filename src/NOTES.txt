@@ -564,3 +564,13 @@ A) The affected file box_codec.f90 needs to be compiled in -O1 -g
 Q) How to convert .bin to SNA{P,G,Z}
 ../bin/CONVERT.exe /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT_L67_D20.bin z.bin /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT_L67_D20.snaz 18 3
 
+GPU Event sorting
+ Reading FILE: SED_poly_outer_ring_L1000_D300.bin
+ Loaded     355796880  rects.
+    GPU Sort Tracker     70.13 CPU seconds.     70.13 REAL seconds. FULL TIME:    74.96 MEM: VM     88944820 RSS:     23464612
+DGX CPU Sort Tracker     70.13 CPU seconds.     70.13 REAL seconds. FULL TIME:    74.96 MEM: VM     88944820 RSS:     23464612
+XeonCPU Sort Tracker    144.45 CPU seconds.    144.76 REAL seconds. FULL TIME:   150.38 MEM: VM    125479104 RSS:     23234480
+
+nsys profile --trace=cuda,nvtx,osrt --stats=true -o my_sort_profile ./benchmark
+
+

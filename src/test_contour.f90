@@ -39,7 +39,7 @@ contains
          trackers(idx + 4) = XYTracker(X = max_x, Y = max_y, polygonNumber = 1)
       end do
       call StartMarkTime("CPU Sort Tracker")
-      !call sort_trackers( trackers ) !> sort_trackers took 57.35 seconds for POLY
+      !call sort_trackers( trackers ) !> sort_trackers took 57.35 seconds for POLY, F90 took 70s
       call sort_event_trackers( trackers ) 
       call StopMarkTime("CPU Sort Tracker")      
     end associate
