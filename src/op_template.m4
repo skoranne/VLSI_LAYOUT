@@ -20,5 +20,3 @@ exec run $1:$3_ring_and1  = $1:$3_outer_ring * $2:$3
 exec run $1:$3_ring_intersection  = $1:$3_outer_ring * $1:$3_inner_ring
 exec run $1:nothing = $1:$3_ring_and1 ASSERT_ZERO $1:nothing
 exec run $1:nothing = $1:$3_ring_intersection ASSERT_ZERO $1:nothing')dnl
-
-

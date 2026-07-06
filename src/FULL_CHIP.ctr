@@ -1,0 +1,15 @@
+# Control file for MAGPARSER
+include(`/home/skoranne/GITHUB/VLSI_LAYOUT/src/op_template.m4')dnl
+program square
+systeminfo
+var temp_folder mkTempFolder
+var abort_on_assert_zero 1
+var temporary_layers 2
+decl design d1 = FULL_CHIP.mag
+decl memory t1 = nothing
+info
+exec init t1:nothing
+RUN_LOOP(`OP1',`t1',`d1',`li1',`0.001')dnl
+exec run t1:x1 = d1:li1 ^ d1:li1m
+flush
+end 
