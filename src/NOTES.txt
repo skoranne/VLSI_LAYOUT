@@ -568,6 +568,7 @@ DeviceMergeSortMergeKernel: ~1.56 seconds
 DeviceMergeSortPartitionKernel: ~1.22 seconds
 DeviceMergeSortBlockSortKernel: ~0.07 seconds
 Total GPU Compute Time = ~2.85 seconds
+RADIX GPU Sort Tracker  2.41 CPU seconds. 2.41 REAL seconds. FULL TIME:     4.80 MEM: VM     55390756 RSS:     13723500 
 
 
 GPU Event sorting
