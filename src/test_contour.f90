@@ -38,12 +38,6 @@ contains
          trackers(idx + 3) = XYTracker(X = max_x, Y = min_y, polygonNumber = -1)
          trackers(idx + 4) = XYTracker(X = max_x, Y = max_y, polygonNumber = 1)
       end do
-<<<<<<< Updated upstream
-      call StartMarkTime("CPU Sort Tracker")
-      !call sort_trackers( trackers ) !> sort_trackers took 57.35 seconds for POLY, F90 took 70s
-      call sort_event_trackers( trackers ) 
-      call StopMarkTime("CPU Sort Tracker")      
-=======
       call StartMarkTime("GPU Sort Tracker")
       #if defined(_CUDA)
       call sort_event_trackers( trackers )
@@ -52,7 +46,6 @@ contains
       #endif
       write(*,*) 'Tracker(1) = ', trackers(1)
       call StopMarkTime("GPU Sort Tracker")      
->>>>>>> Stashed changes
     end associate
   end subroutine AnalyzeTrackers
   subroutine TestTrackerAnalysis( filenameA )

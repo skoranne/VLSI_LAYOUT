@@ -914,7 +914,6 @@ contains
       if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
       output_layer%layerState = LAYER_STATE_HEAL
       output_layer%n_used = size( output_layer%layer_boxes )
-      call BuildTree( output_layer )
    end subroutine CalculateBoostOperation
 
    module subroutine MergeBoxes( input_N, boxes, output_N )

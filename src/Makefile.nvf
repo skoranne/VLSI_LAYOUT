@@ -104,5 +104,8 @@ boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost boost_polygon_api.cpp -c
 event_sorter.o:	       event_sorter.cu
 		       nvcc -arch=sm_121 -DUSE_GPU -O3 -c event_sorter.cu
-ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe
+gpu_morton.o:   gpu_morton.cu
+		       nvcc -arch=sm_121 -DUSE_GPU -O3 -c gpu_morton.cu
+ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe test_contour.exe
+
 

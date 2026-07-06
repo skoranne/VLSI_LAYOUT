@@ -5,6 +5,7 @@
 module MortonSortOMT
    use CommonModule
    use GeometryModule
+   use iso_c_binding
    use iso_fortran_env, only: int32, int64, real64
    use omp_lib
    implicit none
