@@ -40,7 +40,7 @@ extern "C"
     }
 
     // Direct Host Sort: Sorts boxes in-place using std::sort
-    void cpp_sort_boxes_direct(Box *boxes, int64_t n)
+    void thrust_sort_boxes_direct(Box *boxes, int64_t n)
     {
         if (n <= 1)
             return;
@@ -67,7 +67,7 @@ extern "C"
     }
 
     // Indirect Host Sort: Sorts a 1-based index array
-    void cpp_sort_boxes_indirect(Box *boxes, int64_t *indices, int64_t n)
+    void thrust_sort_boxes_indirect(Box *boxes, int64_t *indices, int64_t n)
     {
         if (n <= 1)
             return;
