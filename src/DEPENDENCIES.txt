@@ -5,7 +5,7 @@ LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
 	   systeminfo_gpu.o interaction.o gpu_pnummerge.o RLEMerge.o ascii_plot.o\
 	   boost_polygon_apif.o boost_polygon_api.o boxbytestream.o box_compression.o\
 	   snappy_api.o snappy_apif.o layout_statistics.o box_codec.o serialization.o\
-	   diskdesign_impl.o gridlayer.o utilities.o
+	   diskdesign_impl.o gridlayer.o utilities.o event_sorter_apif.o event_sorter.o
 
 box_compression.o: boxbytestream.o snappy_apif.o
 box_codec.o:	   snappy_apif.o
@@ -37,4 +37,5 @@ controlparser.o:	design.o
 systeminfo_gpu.o:	systeminfo.o
 interaction.o:	gpu_morton_sort.o utilities.o
 RLEMerge.o:	gpu_morton_sort.o interaction.o
+event_sorter_apif.o:		  event_sorter.o polygon_fracture.o
 

@@ -18,8 +18,6 @@ module PolygonFractureModule
 
   ! --- Public Exports ---
   public :: XYTracker
-  !public: SkipList, SkipListNode, NodePtr
-  !public :: init_skiplist, update_active_edges, find_bounding_edges, destroy_skiplist, calculate_union_area_sl
   public :: sort_trackers, scanline_fracture, generate_trackers, heal_boxes
   public :: K_COORDINATE_KIND
 

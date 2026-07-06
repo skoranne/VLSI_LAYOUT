@@ -61,6 +61,8 @@ contains
       logical :: is_open
       integer :: ghost_unit
       integer :: file_codec_version
+      integer(kind=int64) :: filesize
+
       ! 1. Interrogate the compiler's internal registry
       inquire(file=trim(fileName), opened=is_open, number=ghost_unit)
 
@@ -91,8 +93,14 @@ contains
          write(*,*) 'ERROR: cannot open file: ', fileName, ' for reading.'
          stop "Error opening file for reading."
       end if
-
+      filesize = 0      
+      inquire(unit=iunit,size=filesize)
       ! 1. Read the Stream metadata
+      if( filesize == 0 ) then
+         out_stream%total_boxes = 0
+         out_stream%num_chunks = 0
+         return
+      end if
       read(iunit) file_codec_version
       read(iunit) out_stream%layer_properties
       read(iunit) out_stream%total_boxes, out_stream%num_chunks, out_stream%compression_method

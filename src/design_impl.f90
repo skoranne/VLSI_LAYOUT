@@ -545,6 +545,9 @@ contains
     !write(*,*) 'GROW : ', ivar
     call box_grow_directional(output_layer%layer_boxes, ivar(1), ivar(2), ivar(3), ivar(4) )
     !write(*,*) 'OUTPUT_STATE = ', output_layer%layerState
+    output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_SORT ) !> optimization
+    call BuildTree( output_layer ) !> this can be built from the input_layer, see above
+    call MergeHealLayer( output_layer )
     call PreprocessLayer( output_layer )
   end subroutine CalculateGROWLayer
 

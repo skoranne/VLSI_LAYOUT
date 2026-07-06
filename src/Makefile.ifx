@@ -111,6 +111,8 @@ snappy_api.o:	       snappy_api.cpp
 		       g++ -O3 -Wall -c snappy_api.cpp 
 boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I$(BOOST_DIR)  boost_polygon_api.cpp -c
+event_sorter.o:	       event_sorter.cu
+		       g++ -x c++ -O3 -c event_sorter.cu
 MAGVIEWER.exe:	magviewer.f90 $(LIBRARY)
 		ifx -c -O3 -fpp glf90w.F90
 		ifx $(FCFLAGS) -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o -L ./lib/ifx -lglfw -lGL -o MAGVIEWER.exe -lz -lsnappy -lzstd -lstdc++
