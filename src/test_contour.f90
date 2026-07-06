@@ -38,10 +38,21 @@ contains
          trackers(idx + 3) = XYTracker(X = max_x, Y = min_y, polygonNumber = -1)
          trackers(idx + 4) = XYTracker(X = max_x, Y = max_y, polygonNumber = 1)
       end do
+<<<<<<< Updated upstream
       call StartMarkTime("CPU Sort Tracker")
       !call sort_trackers( trackers ) !> sort_trackers took 57.35 seconds for POLY, F90 took 70s
       call sort_event_trackers( trackers ) 
       call StopMarkTime("CPU Sort Tracker")      
+=======
+      call StartMarkTime("GPU Sort Tracker")
+      #if defined(_CUDA)
+      call sort_event_trackers( trackers )
+      #else
+      call sort_trackers( trackers ) !> sort_trackers took 57.35 seconds for POLY
+      #endif
+      write(*,*) 'Tracker(1) = ', trackers(1)
+      call StopMarkTime("GPU Sort Tracker")      
+>>>>>>> Stashed changes
     end associate
   end subroutine AnalyzeTrackers
   subroutine TestTrackerAnalysis( filenameA )
@@ -66,9 +77,9 @@ contains
        !write(*,*) boxes(i)
        if( .not. boxes(i)%is_valid() ) error stop "INVALID BOX in input"
     end do
-    call BuildTree( input_layer )
+    !call BuildTree( input_layer )
 
-    call AnalyzeTrackers( boxes, size(boxes ) )
+    call AnalyzeTrackers( boxes, int(size(boxes ),kind=int64) )
     return
     call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
          input_layer%tree%root_index, overlap_area, overlap_perimeter)
