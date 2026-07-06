@@ -564,13 +564,35 @@ A) The affected file box_codec.f90 needs to be compiled in -O1 -g
 Q) How to convert .bin to SNA{P,G,Z}
 ../bin/CONVERT.exe /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT_L67_D20.bin z.bin /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT_L67_D20.snaz 18 3
 
+DeviceMergeSortMergeKernel: ~1.56 seconds
+DeviceMergeSortPartitionKernel: ~1.22 seconds
+DeviceMergeSortBlockSortKernel: ~0.07 seconds
+Total GPU Compute Time = ~2.85 seconds
+
+
 GPU Event sorting
  Reading FILE: SED_poly_outer_ring_L1000_D300.bin
  Loaded     355796880  rects.
     GPU Sort Tracker     70.13 CPU seconds.     70.13 REAL seconds. FULL TIME:    74.96 MEM: VM     88944820 RSS:     23464612
 DGX CPU Sort Tracker     70.13 CPU seconds.     70.13 REAL seconds. FULL TIME:    74.96 MEM: VM     88944820 RSS:     23464612
 XeonCPU Sort Tracker    144.45 CPU seconds.    144.76 REAL seconds. FULL TIME:   150.38 MEM: VM    125479104 RSS:     23234480
+F90XCPU Sort Tracker    200.27 CPU seconds.    200.77 REAL seconds. FULL TIME:   209.93 MEM: VM    125479100 RSS:     23235136
+
+On our favorite 100M PI test
+ Reading FILE:
+ /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8_FLAT_L67_D20_LIMI                                              
+ T_MERGED.snaz
+|V| =   1|L| =        2|N| =      314159232 |C| =               4794 |M| =3                                                   
+ Loaded    314159232  rects.
+XeonC++  CPU Sort Tracker    141.52 CPU seconds.    141.86 REAL seconds. FULL TIME:   149.33 MEM: VM    123822956 RSS:     20618828
+XeonF90  CPU Sort Tracker    172.22 CPU seconds.    172.63 REAL seconds. FULL TIME:   179.67 MEM: VM    123829092 RSS:     20617692
+Radix sort on XEON
+        CPU Sort Tracker    132.30 CPU seconds.    132.57 REAL seconds. FULL TIME:   137.86 MEM: VM    123812712 RSS:     20621444
+
 
 nsys profile --trace=cuda,nvtx,osrt --stats=true -o my_sort_profile ./benchmark
+Thrus GPU Sort Tracker      6.50 CPU seconds.      6.50 REAL seconds. FULL TIME:    10.61 MEM: VM     43098784 RSS:     21672964 
+Radix GPU Sort Tracker      5.96 CPU seconds.      5.96 REAL seconds. FULL TIME:    10.61 MEM: VM     53060308 RSS:     21673804
+    
 
 
