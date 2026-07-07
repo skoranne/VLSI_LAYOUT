@@ -58,7 +58,7 @@ contains
     bboxA = mbr_of_array( input_boxes_A, AN )
     !> how to guess the output size, A * B could be O(n^2)
     if( control_parameter == K_BOOST_CONTROL_AND ) then
-       write(*,*) 'INFO: this is not supported.'
+       !write(*,*) 'INFO: this is not supported.'
        guessed_output_size = 10*max(AN,BN) !> this is insufficient
     else
        guessed_output_size = 4*max(AN,BN)
@@ -66,7 +66,7 @@ contains
     !> we have a problem here since due to INTRODUCED fracturing we can create
     !> unbounded (as a function of AN/BN) number of output boxes
     !> K_MAXIMUM_WIDTH is set to 100,000
-    guessed_output_size = guessed_output_size*(1+(bboxA%x2-bboxA%x1)/100000)
+    !guessed_output_size = guessed_output_size*(1+(bboxA%x2-bboxA%x1)/100000)
     !write(*,*) 'Performing BOOST operation: ', control_parameter, ' on ', AN, ' ', BN, ' guessed: ', guessed_output_size    
     allocate( temp_output( guessed_output_size), stat=alloc_status ) !> this could be optimistic, use 2*N
     if( alloc_status /= 0 ) then

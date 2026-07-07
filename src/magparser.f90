@@ -376,8 +376,15 @@ contains
               !> this layer needs HEALING as we have detected overlap
               !write(*,*) 'PerformUnion as overlap detected on ', size(area_overlap_roots), ' roots ', elapsed_time
               !write(*,'(A,A12,A,F20.2)') 'OVERLAP AREAS for layer: ', layerNames(i), ' = ', overlap_areas(i)
-              !call PerformUnion( layers(i) )
-              call MergeHealLayer( resolved_layer )
+              !call PerformUnion( layers(i) )              
+              if( CertifyHealing( resolved_layer ) ) then
+                 write(*,*) 'GPU Status = TRUE'
+                 error stop "ERROR: INCORRECT GPU solution detected"
+              else
+                 !write(*,*) 'GPU calculated MERGE Status = FALSE'
+                 call MergeHealLayer( resolved_layer )                 
+              end if
+
               if( NeedsRTree( resolved_layer ) ) call BuildTree( resolved_layer )
               !call PerformPolygonUnion( resolved_layer, area_overlap_roots ) !> this performs the Merge so no need to duplicate
               !if( allocated( area_overlap_roots ) ) deallocate( area_overlap_roots )
@@ -519,10 +526,12 @@ contains
          if( resolved_layer%n_used == 0 ) cycle
          !> Lets just assume we are writing in KLBIN
          if(.not. allocated( resolved_layer%fileName ) ) then
+            write(*,*) 'Layer id: ', i, ' not assigned backing store.'
             error stop "ERROR: layer backing store name not allocated"
          end if
          if( load_design%design_direction == DESIGN_DIRECTION_MEMORY ) then
             !> we are not going to check syntax
+            write(*,*) 'INFO: Writing layer to FILE: ', resolved_layer%fileName
             call SaveLayerToSnap( resolved_layer, resolved_layer%fileName, K_COMPRESSION_METHOD_TO_USE )
             call ClearLayer( resolved_layer )
             deleted_layer_count = deleted_layer_count + 1

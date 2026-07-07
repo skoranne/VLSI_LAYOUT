@@ -22,9 +22,11 @@ contains
 
       allocate(chunk_offsets(in_stream%num_chunks))
 
-      open(newunit=iunit, file=fileName, status='replace', access='stream',form='unformatted', iostat=ios)
-      if (ios /= 0) stop "Error opening file for writing."
-
+      open(newunit=iunit, file=trim(fileName), status='replace', access='stream',form='unformatted', iostat=ios)
+      if (ios /= 0) then
+         write(*,*) 'ERROR: Cannot write into FILE: ', trim(fileName), ' check permissions.'
+         stop "Error opening file for writing."
+      end if
       ! 1. Write the Stream metadata
       write(iunit) CODEC_VERSION
       write(iunit) in_stream%layer_properties

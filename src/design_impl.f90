@@ -21,6 +21,29 @@ submodule (DesignModule) DesignImplModule
 
 contains
 
+  module function CertifyHealing( input_layer ) result(retval)
+    type(Layer), intent( in ) :: input_layer
+    logical                   :: retval
+    integer(kind=int64)       :: interaction_count_gpu
+    if( input_layer%n_used < 2 ) then
+       retval = .true.
+       return
+    end if
+    if( iand( input_layer%layerState, LAYER_STATE_HEAL ) /= 0 ) then
+       retval = .true.
+       return
+    end if
+    if( NeedsRTree( input_layer ) ) then
+       retval = .false.
+       return
+    end if
+    interaction_count_gpu = 0
+    call ComputeInteractionsGPU( input_layer%tree%tree_nodes,size(input_layer%tree%tree_nodes,kind=int64),&
+         input_layer%layer_boxes, input_layer%n_used, input_layer%tree%root_index, interaction_count_gpu)
+    
+    retval = interaction_count_gpu == 0
+  end function CertifyHealing
+  
    module subroutine FinalizeLayer( output_layer )
       type(Layer),intent(inout) :: output_layer
       type(Box), allocatable    :: tempBoxes(:)
@@ -1142,6 +1165,19 @@ contains
       call PreprocessLayer( output_layer )
    end subroutine CalculateXOR
 
+   module subroutine CalculateFrameAND( input_layer_A, input_layer_B, output_layer )
+      type(Layer), intent(inout) :: input_layer_A, input_layer_B
+      type(Layer), intent(inout) :: output_layer
+      type(CGFunction)           :: local_functiontype
+      local_functiontype%preamble => null()
+      local_functiontype%main_compute => BoostMainCompute2
+      local_functiontype%postamble => null()
+
+      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, local_functiontype, K_BOOST_CONTROL_AND, 0_int64 )
+      output_layer%layerState = LAYER_STATE_HEAL
+      call PreprocessLayer( output_layer )
+    end subroutine CalculateFrameAND
+   
    !> Single layer FRAME function wrapper
    module subroutine CalculateFrameFunction1( input_layer_A, output_layer, functype, control_opcode, control_parameter )
       type(Layer), intent(inout) :: input_layer_A
@@ -1273,6 +1309,8 @@ contains
       type(Layer)                  :: tempLayer
       type(CGFunction)             :: local_functiontype
       integer(kind=int64)          :: output_box_count
+      !if( CertifyHealing( input_layer ) ) return
+      !write(*,*) 'INFO: Even GPU says, merge is needed.'
       if( input_layer%n_used < K_FRAME_THRESHOLD ) then
          call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
          input_layer%n_used = output_box_count
@@ -1285,7 +1323,7 @@ contains
       local_functiontype%main_compute => BoostMainCompute1
       local_functiontype%postamble => null()
       call CalculateFrameFunction1( input_layer, tempLayer, local_functiontype, K_BOOST_CONTROL_MERGE, 0_int64 )
-      call swap_layer( input_layer, tempLayer )
+      call swap_layer( input_layer, tempLayer, .false. ) !> do NOT swap filenames
       !> any time you move down from RTree state you have to delete the tree
       if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )
       input_layer%layerState = LAYER_STATE_HEAL

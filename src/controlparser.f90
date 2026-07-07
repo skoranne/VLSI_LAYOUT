@@ -182,7 +182,7 @@ contains
              pos = index( rest, ' ' )
              rest = trim( adjustl( rest(pos+1:)))             
              write(*,*) 'USING TEMP_FOLDER = ', trim(rest)
-             TEMPORARY_FOLDER = trim(rest(1:pos-1))
+             TEMPORARY_FOLDER = trim(rest)
           else if( trim(rest(1:pos-1)) == 'abort_on_xor' ) then
              rest = adjustl(rest)
              pos = index( rest, ' ' )
@@ -358,26 +358,14 @@ contains
                 call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
                 if( .not. ins ) error stop "DB HASH TABLE CORRUPTED"
                 !> we have to decide temporary layer format
-                #ifdef NVF_DOES_NOT_LIKE
-                if( .not. allocated( design_dbs( lhs_db_index )%layers(lhs_layer_index) ) ) then
-                   !write(*,*) 'INFO: Using memory based layers'
-                   select case( temporary_layers )
-                   case(K_TEMPORARY_LAYER_MEMORY)
-                      allocate( Layer :: design_dbs( lhs_db_index )%layers(lhs_layer_index) )
-                   case(K_TEMPORARY_LAYER_DISK)
-                      !write(*,*) 'INFO: Using disk based layers: TEMP_FOLDER: ', trim(adjustl(TEMPORARY_FOLDER))//design_dbs( lhs_db_index )%designName
-                      allocate( Layer :: design_dbs( lhs_db_index )%layers(lhs_layer_index) )
-                      !allocate( DiskLayer :: design_dbs( lhs_db_index )%layers(lhs_layer_index)%item )
-                   end select
-                end if
-                #endif
                 associate( resolved_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index) )
-                   lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
-                   if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
-                   design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
-                   !write(*,*) 'NEW LHS layer index = ', lhs_layer_index, ' for ', trim(adjustl(rest(1:pos-1))), ' ', &
-                   !     trim(adjustl(design_dbs( lhs_db_index )%layerNames(lhs_layer_index)))
-                   allocate(resolved_layer%fileName, source = trim(TEMPORARY_FOLDER)//trim(design_dbs( lhs_db_index )%designName)//'_'//trim(design_dbs( lhs_db_index )%layerNames(lhs_layer_index)))
+                  lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
+                  if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
+                  design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
+                  lhs_layer%fileName = trim(TEMPORARY_FOLDER)//trim(design_dbs( lhs_db_index )%designName)//'_'//trim(design_dbs( lhs_db_index )%layerNames(lhs_layer_index))
+                  !write(*,*) 'NEW LHS layer index = ', lhs_layer_index, ' for ', trim(adjustl(rest(1:pos-1))), ' ', &
+                  !     trim(adjustl(design_dbs( lhs_db_index )%layerNames(lhs_layer_index))), ' FILENAME: ',&
+                  !     resolved_layer%fileName
                 end associate
              end if
              if( lhs_layer_index < 0 ) error stop "DB INDEX layer corruption"
@@ -532,7 +520,7 @@ contains
                            if( abort_on_assert_zero > 1 ) error stop "ERROR: ASSERT_ZERO variable > 1"
                         end if
                      case('AND2')
-                        call CalculateAND( rhs1_layer, rhs2_layer, lhs_layer )
+                        call CalculateFrameAND( rhs1_layer, rhs2_layer, lhs_layer )
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case('NOT')
                         call CalculateNOT( rhs1_layer, rhs2_layer, lhs_layer )
@@ -550,6 +538,10 @@ contains
                         !if( rhs2_source_name /= 'nothing' ) error stop "AND must use nothing as second layer"
                         !write(*,*) 'Found PRIMARY_OPERATOR = AND'
                         call CalculateSingleLayerAND( rhs1_layer, lhs_layer )
+                     case ('XOR')
+                        !> d1:poly XOR d2:poly
+                        !write(*,*) 'Found PRIMARY_OPERATOR = XOR'
+                        call CalculateXOR(rhs1_layer, rhs2_layer, lhs_layer )                        
                      case ('COPY')
                         !> d1:poly COPY nothing
                         !if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"

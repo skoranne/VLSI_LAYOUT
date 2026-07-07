@@ -13,13 +13,13 @@ module RTreeBuilderGPU
   implicit none
   private
 
-  public :: ComputeInteractionsGPU
+  public :: ComputeInteractionsGPU, CertifyHealingGPU
 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024
 
 
 contains
-  #ifdef WORK_IN_PROGRESS
+#ifdef WORK_IN_PROGRESS
   subroutine PerformMergeGPU_OMP(sorted_boxes, tree_nodes, root_index, max_expected_edges, &
        overlap_area, overlap_perimeter, area_overlap_roots)
     ! ... (Standard intent(in) declarations) ...
@@ -189,7 +189,7 @@ contains
     end if
 
   end subroutine PerformMergeGPU_OMP
-  #endif
+#endif
 #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)    
   !$omp declare target
 #endif
@@ -312,4 +312,146 @@ contains
 
   end subroutine ComputeInteractionsGPU
 
+  !> GPU Offloaded All-Query Interaction Generator (With Fast Abort)
+  logical function CertifyHealingGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex) result(IsValid)
+    ! 1. The exact sizes MUST come first
+    integer(kind=int64), intent(in) :: NumNodes, NumBoxes
+
+    ! 2. Force Explicit-Shape (No colons allowed!)
+    type(RTreeNode), intent(in) :: TreeNodes(NumNodes)
+    type(Box), intent(in) :: SortedBoxes(NumBoxes)
+
+    integer(kind=int64), intent(in) :: RootIndex
+    integer(kind=int64) :: I, J, K, ChildIdx, CurrNode
+
+    ! 3. Stack size of 64 is safe for R-Trees up to 2^64 elements
+    integer(kind=int64), parameter :: K_STACK_SIZE = 16
+    integer(kind=int64) :: Stack(K_STACK_SIZE) 
+    integer(kind=int64) :: StackPtr
+
+    type(Box) :: QBox, NodeMbr, TargetBox
+    logical :: OverlapX, OverlapY
+    integer(kind=K_COORDINATE_KIND) :: InterX1, InterX2, InterY1, InterY2
+    integer(kind=K_COORDINATE_KIND) :: Width, Height
+    ! GPU-safe global flag for short-circuiting across all threads
+    integer :: GlobalAbortFlag
+
+    GlobalAbortFlag = 0
+    IsValid = .true.
+
+    ! Map the explicit bounds and the abort flag
+    !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
+    !$omp target data map(tofrom: GlobalAbortFlag)
+
+    ! Launch kernel
+    !$omp target teams distribute parallel do &
+    !$omp private(I, J, K, ChildIdx, CurrNode, Stack, StackPtr, &
+    !$omp         InterX1, InterX2, InterY1, InterY2, Width, Height,&
+    !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY)
+    do I = 1, NumBoxes
+       ! =======================================================
+       ! FAST ABORT: If another thread found an overlap, do nothing
+       ! =======================================================
+       if (GlobalAbortFlag == 1) cycle
+
+       QBox = SortedBoxes(I)
+
+       ! Pre-Check the Root Node
+       NodeMbr = TreeNodes(RootIndex)%Mbr
+       OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2) !> SKORANNE: was <= 
+       if (OverlapX) then
+          OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2) !> SKORANNE: was <=
+       else
+          OverlapY = .false.
+       end if
+
+       if (.not. (OverlapX .and. OverlapY)) cycle
+
+       ! Initialize static stack
+       StackPtr = 1
+       Stack(StackPtr) = RootIndex
+
+       ! Iterative Depth-First Search (Check Abort Flag here too!)
+       do while (StackPtr > 0 .and. GlobalAbortFlag == 0)
+          CurrNode = Stack(StackPtr)
+          StackPtr = StackPtr - 1
+
+          if (TreeNodes(CurrNode)%IsLeaf) then
+             ! Leaf Node: Check exact geometry intersections
+             do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+                J = TreeNodes(CurrNode)%ChildStart + K
+
+                if (J <= I) cycle                
+                TargetBox = SortedBoxes(J)
+
+                ! =======================================================
+                ! FINITE AREA CHECK: Strict inequality (<) guarantees 
+                ! there is a physical area overlap. If boxes merely touch 
+                ! edges, max == min, and (<) evaluates to .false.
+                ! =======================================================
+                OverlapX = max(TargetBox%X1, QBox%X1) <= min(TargetBox%X2, QBox%X2) 
+                if (OverlapX) then
+                   OverlapY = max(TargetBox%Y1, QBox%Y1) <= min(TargetBox%Y2, QBox%Y2) 
+
+                   if (OverlapY) then
+                      InterX1 = max(TargetBox%X1, QBox%X1)
+                      InterY1 = max(TargetBox%Y1, QBox%Y1)
+
+                      ! Min of the ends
+                      InterX2 = min(TargetBox%X2, QBox%X2)
+                      InterY2 = min(TargetBox%Y2, QBox%Y2)
+
+                      ! 2. Calculate dimensions of the intersection
+                      ! For inclusive coordinates, Width is (End - Start + 1)
+                      Width  = InterX2 - InterX1 
+                      Height = InterY2 - InterY1 
+
+                      ! 3. Check for finite area
+                      ! Area is finite only if Width > 0 AND Height > 0.
+                      ! If either is <= 0, the boxes are either separated or touch only at edges/corners.
+                      if (Width > 0 .and. Height > 0) then
+                         ! Fatal overlap detected
+                         !$omp atomic write
+                         GlobalAbortFlag = 1
+
+                         ! Kill the local stack to break this thread's traversal
+                         StackPtr = 0
+                      end if
+                   end if
+                end if
+             end do
+          else
+             ! Internal Node traversal: MUST use (<=) because boxes 
+             ! are allowed to touch internal bounding volumes.
+             do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+                ChildIdx = TreeNodes(CurrNode)%ChildStart + K
+                NodeMbr = TreeNodes(ChildIdx)%Mbr
+
+                OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2)
+                if (OverlapX) then
+                   OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
+
+                   if (OverlapY) then
+                      StackPtr = StackPtr + 1
+                      if (StackPtr <= K_STACK_SIZE) then
+                         Stack(StackPtr) = ChildIdx
+                      else
+                         !$omp atomic write
+                         GlobalAbortFlag = 1
+                         ! Kill the local stack to break this thread's traversal
+                         StackPtr = 0
+                      end if
+                   end if
+                end if
+             end do
+          end if
+       end do
+    end do
+    !$omp end target data
+    !$omp target exit data map(release:  TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
+
+    ! If the abort flag was triggered on the GPU, return false
+    if (GlobalAbortFlag == 1) IsValid = .false.
+
+  end function CertifyHealingGPU
 end module RTreeBuilderGPU

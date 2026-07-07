@@ -28,7 +28,7 @@ module DesignModule
        RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer,&
        CalculateFrameNOT, CalculateBoostOperation, FilterLayer, push_box, FinalizeLayer,&
        DeleteDesign, SaveLayerToSnap, RestoreSnapToLayer, RestoreSnapToDLayer, BuildTree, PerformOperation,&
-       CalculateXOR, MergeHealLayer, swap_layer
+       CalculateXOR, CalculateFrameAND, MergeHealLayer, swap_layer, CertifyHealing
 
   type :: LayerTree
      integer(kind=int64) :: root_index
@@ -152,6 +152,11 @@ module DesignModule
   end interface
 
   interface
+
+     module function CertifyHealing( input_layer ) result(retval)
+       type(Layer), intent( in )    :: input_layer
+       logical                      :: retval
+     end function CertifyHealing
      
      module subroutine MergeHealLayer( input_layer )
        type(Layer), intent( inout ) :: input_layer
@@ -284,6 +289,11 @@ module DesignModule
        type(Layer), intent(inout) :: output_layer
      end subroutine CalculateXOR
 
+     module subroutine CalculateFrameAND( input_layer_A, input_layer_B, output_layer )
+       type(Layer), intent(inout) :: input_layer_A, input_layer_B
+       type(Layer), intent(inout) :: output_layer
+     end subroutine CalculateFrameAND
+     
      module subroutine CalculateBoostOperation( input_layer_A, input_layer_B, output_layer, control_parameter, control_value )
        type(Layer), intent(inout) :: input_layer_A, input_layer_B
        type(Layer), intent(inout)   :: output_layer
@@ -314,11 +324,18 @@ contains
     logical :: retval
     retval = iand(input_layer%layerState, LAYER_STATE_RTREE ) == 0
   end function NeedsRTree
+
   pure function NeedsHealing(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
     retval = iand(input_layer%layerState, LAYER_STATE_HEAL ) == 0
+    !if( .not. retval ) return !> layer is already in HEAL state
+    !retval = CertifyHealing( input_layer )
+    !if( .not. retval ) return !> GPU concurs
+    !> GPU says layer does not need healing
+    !input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_HEAL )
   end function NeedsHealing
+
   subroutine PerformUnion( input_layer )
     type(Layer), intent(inout) :: input_layer
     integer(kind=int64) :: i,n, updated_box_count
@@ -1268,6 +1285,7 @@ contains
   subroutine CopyLayer( output_layer, input_layer_A )
     type(Layer), intent(inout) :: output_layer
     type(Layer), intent(in) :: input_layer_A
+    character(len=*), parameter :: K_COPY_PREFIX = "MTL_COPY_"
     if( input_layer_A%n_used == 0 ) then
        call ClearLayer( output_layer )
        return
@@ -1278,6 +1296,7 @@ contains
     output_layer%layerState = input_layer_A%layerState
     output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
     output_layer%tree%root_index = input_layer_A%tree%root_index
+    if(allocated(input_layer_A%fileName)) output_layer%fileName = K_COPY_PREFIX//input_layer_A%fileName
   end subroutine CopyLayer
 
   subroutine DeleteDesign( input_design )
@@ -1292,14 +1311,14 @@ contains
     if( allocated( input_design%layerNames ) ) deallocate( input_design%layerNames )
 
   end subroutine DeleteDesign
-  subroutine swap_layer(a, b)
+  subroutine swap_layer(a, b, filename_as_well)
     ! Assuming you have the appropriate USE statements in the host module:
     ! use iso_fortran_env, only: int64, real64
     ! use iso_c_binding, only: c_int
     implicit none
 
     type(Layer), intent(inout) :: a, b
-
+    logical, intent(in)        :: filename_as_well
     ! 1. Temporaries for Scalars
     integer(kind=int64) :: temp_int64
     integer(kind=c_int) :: temp_c_int
@@ -1332,12 +1351,11 @@ contains
     call move_alloc(a%layer_boxes, temp_boxes)
     call move_alloc(b%layer_boxes, a%layer_boxes)
     call move_alloc(temp_boxes,    b%layer_boxes)
-
-    call move_alloc(a%fileName, temp_fileName)
-    call move_alloc(b%fileName, a%fileName)
-    call move_alloc(temp_fileName, b%fileName)
-
-
+    if( filename_as_well ) then
+       call move_alloc(a%fileName, temp_fileName)
+       call move_alloc(b%fileName, a%fileName)
+       call move_alloc(temp_fileName, b%fileName)
+    end if
     ! --- Swap Nested Derived Types ---
     temp_tree = a%tree; a%tree = b%tree; b%tree = temp_tree
 

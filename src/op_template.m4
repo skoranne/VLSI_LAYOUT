@@ -6,7 +6,7 @@ define(`__HOME__', esyscmd(`printf "%s" "$HOME"'))dnl
 define(`__PWD__', esyscmd(`printf "%s" "$PWD"'))dnl
 dnl define(`__D1_INPUT__', esyscmd(`printf "%s" "$D1_INPUT"'))dnl
 dnl define(`mkTempFolder', esyscmd(`printf "%s" "mktemp -d MTL_TEMP_XXX"'))dnl
-define(`mkTempFolder', esyscmd(`printf "%s" "$(mktemp -d MTL_TEMP_XXX)"'))dnl
+define(`mkTempFolder', esyscmd(`printf "%s/" "$(mktemp -d MTL_TEMP_XXX)"'))dnl
 define(`RUN_LOOP', `ifelse(`$4', `', `',
 `$1(`$2', `$3', `$4', `$5')
 RUN_LOOP(`$1', `$2', `$3', shift(shift(shift(shift(shift($@))))))')')dnl
