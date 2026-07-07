@@ -1296,7 +1296,7 @@ contains
     output_layer%layerState = input_layer_A%layerState
     output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
     output_layer%tree%root_index = input_layer_A%tree%root_index
-    if(allocated(input_layer_A%fileName)) output_layer%fileName = K_COPY_PREFIX//input_layer_A%fileName
+    !if(allocated(input_layer_A%fileName)) output_layer%fileName = K_COPY_PREFIX//input_layer_A%fileName
   end subroutine CopyLayer
 
   subroutine DeleteDesign( input_design )

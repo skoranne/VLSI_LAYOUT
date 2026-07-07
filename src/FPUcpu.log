@@ -1,0 +1,57 @@
+ MAGPARSER.exe by Sandeep Koranne (C) All rights reserved.
+ Released under MIT License. See the README and LICENSE 
+ https://github.com/skoranne/VLSI_LAYOUT/
+ Release: 8e874dd
+ Reading filename: FPU8x8.ctr
+ --- Starting Program:square
+ =========================================================
+                   SYSTEM INFORMATION                     
+ =========================================================
+Date:          2026-07-06
+Time:          21:55:02.207
+Time Zone:     -0700
+ ---------------------------------------------------------
+ OS Kernel Info:
+Linux 4.18.0-348.12.2.el8_5.x86_64
+ ---------------------------------------------------------
+ CPU Metrics:
+CPU(s):              48
+Thread(s) per core:  2
+Model name:          Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz
+NUMA node0 CPU(s):   0-11,24-35
+NUMA node1 CPU(s):   12-23,36-47
+ ---------------------------------------------------------
+  Virtual Memory (VmSize):       251764 kB
+  Resident Memory (VmRSS):        12620 kB
+ GPU Information:
+=========================================
+       OpenMP Target Device Query        
+=========================================
+Number of available target devices : 0
+Default target device ID           : 0
+Host device ID                     : 0
+-----------------------------------------
+ [INFO] No target devices detected by the OpenMP runtime.
+=========================================
+ =========================================================
+ Variable found: temp_folder MTL_FPU8x8_PQR/
+ VAR x = temp_folder
+ USING TEMP_FOLDER = MTL_FPU8x8_PQR/
+ Variable found: temporary_layers 2
+ VAR x = temporary_layers
+ INFO: VAR changing temporary_layers =            2
+ Variable found: abort_on_xor 1
+ VAR x = abort_on_xor
+ INFO: VAR changing abort_on_xor =            1
+ Variable found: abort_on_assert_zero 2
+ VAR x = abort_on_assert_zero
+ INFO: VAR changing abort_on_assert_zero =            0
+ Variable found: debug_verbosity 0
+ VAR x = debug_verbosity
+ INFO: VAR changing debug_verbosity =            0
+ +-----------------------------------------------------------------+
+ The file is NOT a gzipped file, w/prefix: 
+ /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8
+  Layer = L235_D4       = id:     1
+  Layer = nwell         = id:     2
+  Layer = diff          = id:     3

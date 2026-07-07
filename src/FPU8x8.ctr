@@ -1,14 +1,39 @@
 # Control file for MAGPARSER
 program square
 systeminfo
+var temp_folder MTL_FPU8x8_PQR/
+var temporary_layers 2
+var abort_on_xor 1
+var abort_on_assert_zero 2
+var debug_verbosity 0
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT1.mag
-decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8.mag
+decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8.mag
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
-# decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
+# decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6.mag
-decl output o1 = FPU_8x8_output.mag
+decl memory d1 = nothing
 decl memory t1 = nothing
 info
+exec init t1:nothing
+exec run d1:nwell = d1_input:poly COPY t1:nothing
+exec run d1:diff  = d1_input:diff COPY t1:nothing
+exec run d1:poly  = d1_input:poly COPY t1:nothing
+exec run d1:met1  = d1_input:met1 COPY t1:nothing
+exec run d1:li1   = d1_input:li1  COPY  t1:nothing
+exec run d1:met2  = d1_input:met2 COPY t1:nothing
+exec run d1:met3  = d1_input:met3 COPY t1:nothing
+exec run d1:met4  = d1_input:met4 COPY t1:nothing
+exec run d1:met5  = d1_input:met5 COPY t1:nothing
+delete d1_input
+flush
+exec run t1:gate = d1:poly AND2 d1:diff
+exec run t1:ng   = d1:poly ~ t1:gate
+exec run t1:sd   = d1:diff ~ t1:gate
+exec run t1:diff_xor_poly = d1:diff XOR d1:poly
+flush
+end
+
+
 exec run o1:sd1   = d1:diff - d1:poly
 end
 exec run o1:sd2  = d1:diff ~ d1:poly
@@ -18,11 +43,11 @@ exec run o1:gate = d1:poly * d1:diff
 exec run o1:ng_poly2 = d1:poly ~ o1:gate
 exec run o1:sd2  = d1:diff ~ d1:poly
 exec run o1:ng_poly1 = d1:poly - o1:gate
-exec run t1:grow_poly = d1:poly GROW nothing 0.1 0.1 0.1 0.1
-exec run t1:shrink_poly = d1:poly SHRINK nothing 0.1
-exec run o1:met1_grow = d1:met1 GROW nothing 0.1 0.1 0.1 0.1
-exec run o1:poly_retarget = d1:poly GROW nothing 0.2 0.1 0.2 0.2
-exec run o1:li1 = d1:li1 COPY nothing
+exec run t1:grow_poly = d1:poly GROW t1:nothing 0.1 0.1 0.1 0.1
+exec run t1:shrink_poly = d1:poly SHRINK t1:nothing 0.1
+exec run o1:met1_grow = d1:met1 GROW t1:nothing 0.1 0.1 0.1 0.1
+exec run o1:poly_retarget = d1:poly GROW t1:nothing 0.2 0.1 0.2 0.2
+exec run o1:li1 = d1:li1 COPY t1:nothing
 exec run o1:poly_outer_ring = t1:grow_poly ~ d1:poly
 exec run o1:poly_inner_ring = d1:poly ~ t1:shrink_poly
 flush
