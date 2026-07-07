@@ -55,3 +55,115 @@ Host device ID                     : 0
   Layer = L235_D4       = id:     1
   Layer = nwell         = id:     2
   Layer = diff          = id:     3
+  Layer = poly          = id:     4
+  Layer = li1           = id:     5
+  Layer = met1          = id:     6
+  Layer = met2          = id:     7
+  Layer = met3          = id:     8
+  Layer = met4          = id:     9
+  Layer = met5          = id:    10
+ Parsed           10  layer(s).
+              ReadDB   3272.72 CPU seconds.     97.15 REAL seconds. FULL TIME:    97.18 MEM: VM    123382536 RSS:     20573024
+      SortBuildRTree      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:    97.18 MEM: VM    123382536 RSS:     20573024
+ +--------------------------------------------------+
+ +--------------------------------------------------+
+   Layer       Total       RTree CPU and REAL time
+ +--------------------------------------------------+
+L235_D4           64        0.00        0.00
+nwell       49693504        0.00        0.00
+diff        96241216        0.00        0.00
+poly       311765120        0.00        0.00
+li1        424548608        0.00        0.00
+met1       191963008        0.00        0.00
+met2        44699968        0.00        0.00
+met3         3536576        0.00        0.00
+met4          397824        0.00        0.00
+met5           12672        0.00        0.00
+ +--------------------------------------------------+
+       TreeCheckLoop      0.01 CPU seconds.      0.00 REAL seconds. FULL TIME:    97.19 MEM: VM    123382536 RSS:     20573024
+ +-----------------------------------------------------------------------------+
+   Layer    Polygons       Rects       Total   ST       RTree CPU and REAL time
+ +-----------------------------------------------------------------------------+
+L235_D4            0           8           8   15        0.05        0.00
+nwell          20992           0      443184   15      144.11       10.87
+diff         5484288    82999744    96241216   15      147.45        4.70
+poly        94158464         128   312985397   15      530.55      160.03
+li1         22760197    11659899   308864816   15      964.23      198.95
+met1        15685690     6379654   100101297   15      417.11       64.10
+met2        10699328      504960    44699968   15       78.65        3.55
+met3          575104      504576     3536576   15       14.20        0.33
+met4          118592       13760      397824   15        1.58        0.04
+met5               0       12672       12672   15        0.02        0.00
+ +-----------------------------------------------------------------------------+
+            PNumLoop  12588.68 CPU seconds.    442.56 REAL seconds. FULL TIME:   539.75 MEM: VM    128041372 RSS:     25158212
+          ExtentLoop     21.53 CPU seconds.     12.24 REAL seconds. FULL TIME:   551.98 MEM: VM    128041372 RSS:     25158212
+ +-----------------------------------------------------------------+
+ +                Layer Areas and Perimeters                       +
+ +-----------------------------------------------------------------+
+ L235_D4     207063157.91561577       259.26015935
+ nwell       106080158.04257335     75087.12429042
+ diff         83793826.23004092    361169.86596813
+ poly         64373942.41507142    483629.74213895
+ li1         138775585.90402532    598277.07624950
+ met1         55998711.20741685    430772.42067240
+ met2         23829103.62303730    333162.43563885
+ met3          5702071.90880365     38514.71350276
+ met4          9951950.54767374     42553.92501256
+ met5          4888322.03565817      6150.95294447
+ +-----------------------------------------------------------------+
+ 
+ +-------------------------- Design Extent ------------------------+
+ Box: [           0 ,           0 ] to [    14396520 ,    14407240 ]
+ +---------------------------Layers Extent ------------------------+
+ Box: [           0 ,           0 ] to [    14396520 ,    14407240 ]
+ Box: [        5330 ,       12185 ] to [    14390970 ,    14393895 ]
+ Box: [        5655 ,       11115 ] to [    14390645 ,    14394965 ]
+ Box: [        5775 ,       10985 ] to [    14390525 ,    14395095 ]
+ Box: [        5520 ,       10795 ] to [    14390780 ,    14395285 ]
+ Box: [         530 ,       10640 ] to [    14390780 ,    14395440 ]
+ Box: [         550 ,           0 ] to [    14389300 ,    14407240 ]
+ Box: [           0 ,       10715 ] to [    14382435 ,    14395365 ]
+ Box: [        7655 ,       10640 ] to [    14381745 ,    14395440 ]
+ Box: [        5520 ,       26730 ] to [    14390780 ,    14390900 ]
+ +-----------------------------------------------------------------+
+ 
+ Creating MEMORY db: d1
+ Creating MEMORY db: t1
+                info     21.54 CPU seconds.     12.24 REAL seconds. FULL TIME:   551.99 MEM: VM    127979872 RSS:     25097000
+                COPY      3.46 CPU seconds.      3.47 REAL seconds. FULL TIME:   555.45 MEM: VM    136671572 RSS:     33225880
+                COPY      1.46 CPU seconds.      1.46 REAL seconds. FULL TIME:   556.91 MEM: VM    139293024 RSS:     35732168
+                COPY      5.35 CPU seconds.      5.36 REAL seconds. FULL TIME:   562.27 MEM: VM    148009324 RSS:     43882860
+                COPY      1.73 CPU seconds.      1.73 REAL seconds. FULL TIME:   564.00 MEM: VM    150630776 RSS:     46489860
+                COPY      5.31 CPU seconds.      5.32 REAL seconds. FULL TIME:   569.33 MEM: VM    159347076 RSS:     54533148
+                COPY      0.76 CPU seconds.      0.76 REAL seconds. FULL TIME:   570.09 MEM: VM    160551312 RSS:     55697388
+                COPY      0.06 CPU seconds.      0.06 REAL seconds. FULL TIME:   570.15 MEM: VM    160642456 RSS:     55785956
+                COPY      0.00 CPU seconds.      0.01 REAL seconds. FULL TIME:   570.15 MEM: VM    160648684 RSS:     55792028
+                COPY      0.00 CPU seconds.      0.00 REAL seconds. FULL TIME:   570.15 MEM: VM    160648684 RSS:     55792028
+              delete      0.26 CPU seconds.      0.26 REAL seconds. FULL TIME:   570.41 MEM: VM    136667472 RSS:     33202472
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_nwell
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_diff
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_poly
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_met1
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_li1
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_met2
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_met3
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_met4
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_met5
+             dbFlush    252.95 CPU seconds.     14.75 REAL seconds. FULL TIME:   585.16 MEM: VM    103640552 RSS:      2309236
+|V| =   1|L| =        7|N| =      312985397 |C| =               4776 |M| =1
+|V| =   1|L| =        7|N| =       96241216 |C| =               1469 |M| =1
+                AND2   3350.19 CPU seconds.     86.22 REAL seconds. FULL TIME:   671.38 MEM: VM    120119848 RSS:     17723708
+Getting ready to execute:  t1:    MTL_ng =   d1:            MTL_poly   ~ t1:            MTL_gate
+            FRAMENOT  10424.81 CPU seconds.    302.16 REAL seconds. FULL TIME:   973.54 MEM: VM    131850116 RSS:     28479688
+Getting ready to execute:  t1:    MTL_sd =   d1:            MTL_diff   ~ t1:            MTL_gate
+            FRAMENOT   5584.72 CPU seconds.    144.68 REAL seconds. FULL TIME:  1118.22 MEM: VM    139508052 RSS:     36259240
+                 XOR  15516.27 CPU seconds.    528.36 REAL seconds. FULL TIME:  1646.58 MEM: VM    158596552 RSS:     54748920
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_diff
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/d1_MTL_poly
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/t1_MTL_gate
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/t1_MTL_ng
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/t1_MTL_sd
+ INFO: Writing layer to FILE: MTL_FPU8x8_PQR/t1_MTL_diff_xor_poly
+             dbFlush    312.38 CPU seconds.     17.87 REAL seconds. FULL TIME:  1664.44 MEM: VM    109147764 RSS:      7973760
+ --- End of file
+                END     312.38 CPU seconds.     17.87 REAL seconds. FULL TIME:  1664.44 MEM: VM    109147764 RSS:      7973760
