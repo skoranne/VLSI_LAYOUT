@@ -152,6 +152,8 @@ contains
        !write(*,'(A,I4,A,A80)') 'Line number: ', line_number, ' ', line       
        if (ios < 0) exit read_loop ! End of file
        line_number = line_number+1
+       ! Check if line is empty or contains only spaces
+       if (len_trim(line) == 0) cycle
        line = adjustl(line)       ! Remove leading whitespace
        if (len(line) == 0) cycle  ! Skip empty lines
 
@@ -324,8 +326,15 @@ contains
              call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
              if( .not. ins ) then
                 write(*,*) 'ERROR: Unable to INIT layer: ', trim(rest(1:pos-1)), ' at index: ', lhs_layer_index
+             else
+                design_dbs( lhs_db_index )%layerNames( lhs_layer_index ) = trim(TEMPORARY_LAYER_PREFIX)//trim(rest(1:pos-1))
              end if
-             allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName, source = 'MTL_NOTHING')
+             if( trim(rest(1:pos-1)) == 'nothing') then
+                allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName, source = 'MTL_NOTHING')
+             else
+                design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName = trim(TEMPORARY_FOLDER)//trim(design_dbs( lhs_db_index )%designName)//'_'//trim(design_dbs( lhs_db_index )%layerNames(lhs_layer_index))
+                write(*,*) 'INFO: Reusing FILE: ', design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName
+             end if
              call ClearLayer( design_dbs( lhs_db_index )%layers( lhs_layer_index ) )
              cycle
           end if

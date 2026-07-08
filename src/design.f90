@@ -28,7 +28,7 @@ module DesignModule
        RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer,&
        CalculateFrameNOT, CalculateBoostOperation, FilterLayer, push_box, FinalizeLayer,&
        DeleteDesign, SaveLayerToSnap, RestoreSnapToLayer, RestoreSnapToDLayer, BuildTree, PerformOperation,&
-       CalculateXOR, CalculateFrameAND, MergeHealLayer, swap_layer, CertifyHealing
+       CalculateXOR, CalculateFrameAND, MergeHealLayer, swap_layer, CertifyHealing, PerformMergeLayer
 
   type :: LayerTree
      integer(kind=int64) :: root_index
@@ -153,6 +153,10 @@ module DesignModule
 
   interface
 
+     module subroutine PerformMergeLayer( input_layer )
+       type(Layer), intent( inout )    :: input_layer
+     end subroutine PerformMergeLayer
+     
      module function CertifyHealing( input_layer ) result(retval)
        type(Layer), intent( in )    :: input_layer
        logical                      :: retval

@@ -333,10 +333,10 @@ contains
     print *, "================================================="
     print *, "BOX ORDER STATISTICS"
     print *, "================================================="
-    print '(A, I15)', "Total Boxes (N):        ", n_boxes
-    print '(A, I15)', "Unique W/H Pairs (K):   ", k_unique
-    print '(A, I15)', "Distinct Widths (W1):   ", w1_count
-    print '(A, I15)', "Distinct Heights (H1):  ", h1_count
+    print '(A, I15)', "Total Boxes       (N) :   ", n_boxes
+    print '(A, I15)', "Unique W/H Pairs  (K) :   ", k_unique
+    print '(A, I15)', "Distinct Widths  (W1) :   ", w1_count
+    print '(A, I15)', "Distinct Heights (H1) :   ", h1_count
     print *, "-------------------------------------------------"
     if (k_unique > 0) then
        print '(A, I15)', "Min Width:              ", unique_w(1)

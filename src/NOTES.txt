@@ -646,6 +646,29 @@ Getting ready to execute:  t1:MTL_li1_ou =   t1:           MTL_li1_1   ~ d1:    
             FRAMENOT    423.37 CPU seconds.    423.37 REAL seconds. FULL TIME:  1218.89 MEM: VM   3880241172 RSS:     41763236
 Getting ready to execute:  t1:MTL_li1_in =   d1:                 li1   ~ t1:           MTL_li1_2                              
 Killed
+ On SNAZ file
+ ./generate_bin.exe /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8_FLAT_L
+67_D20_LIMIT_MERGED.snaz          
+ Analyzing FILE:                  
+ /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8_FLAT_L67_D20_LIMI
+ T_MERGED.snaz                    
+                                  
+                                  
+|V| =   1|L| =        2|N| =      314159232 |C| =               4794 |M| =3
+ =================================================
+ BOX ORDER STATISTICS                          
+ =================================================                                                                            
+Total Boxes       (N) :         314159232
+Unique W/H Pairs  (K) :              2658                                                                                     
+Distinct Widths  (W1) :               529                                                                                     
+Distinct Heights (H1) :               251               
+ -------------------------------------------------
+Min Width:                          170
+Max Width:                        10000
+Median Width (approx):              385                   
+ UNION AREA BY POLYGON =        138775586254400
+               CUABF   4218.65 CPU seconds.    140.50 REAL seconds. FULL TIME:   147.13 MEM: VM    113645536 RSS:     11136884
+                CUAF    541.70 CPU seconds.    542.99 REAL seconds. FULL TIME:   692.38 MEM: VM    113545880 RSS:     10856092
 
 
 

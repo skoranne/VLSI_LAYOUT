@@ -283,13 +283,39 @@ end module SnappyCompressionTest
 program main
    use SnappyCompressionTest
    use SerializationModule
+   use SystemInformationModule
    implicit none
    integer :: narg, iostat
    character(len=256)            :: filenameA, filenameB
+   integer(kind=int64)           :: cuabp, cuaf
+   call InitSystem()
    narg = command_argument_count()
    select case (narg)
     case (0)
-      error stop "./GEN_BIN BIN-FILE BIN-SNAP-FILE"
+       error stop "./GEN_BIN BIN-FILE BIN-SNAP-FILE"
+    case (1)
+       block
+         type(Layer) :: input_layer
+         call get_command_argument(1, filenameA, status=iostat)   ! allocates automatically
+         if (iostat /= 0) then
+            write (*,*) "ERROR: 1st argument must be a filename."
+            stop 2
+         end if
+         write(*,*) 'Analyzing FILE: ', filenameA
+         call RestoreSnapToLayer( input_layer, filenameA )
+         call analyze_boxes( input_layer%layer_boxes )
+         call StartMarkTime("CUABP")
+         call PerformMergeLayer( input_layer )
+         cuabp = calculate_union_area_by_polygon( input_layer )
+         write(*,*) 'UNION AREA BY POLYGON = ', cuabp
+         call StopMarkTime("CUABF")
+         call StartMarkTime("CUAF")
+         cuaf = calculate_union_area_fast( input_layer%layer_boxes )
+         write(*,*) 'UNION AREA FAST = ', cuaf
+         call StopMarkTime("CUAF")
+         if( cuabp /= cuaf ) error stop "ERROR: CUABP /= CUAF"
+         stop
+       end block
     case (2)
       call get_command_argument(1, filenameA, status=iostat)   ! allocates automatically
       if (iostat /= 0) then

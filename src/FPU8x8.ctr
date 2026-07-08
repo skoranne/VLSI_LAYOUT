@@ -1,20 +1,24 @@
 # Control file for MAGPARSER
-program square
+include(`/home/skoranne/GITHUB/VLSI_LAYOUT/src/op_template.m4')dnl
+program FPU8x8
 systeminfo
 var temp_folder MTL_FPU8x8_PQR/
 var temporary_layers 2
 var abort_on_xor 1
 var abort_on_assert_zero 2
 var debug_verbosity 0
+ifdef(`LOAD_DATA',`dnl
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT1.mag
 decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/FPU_8x8_DATA/FPU_8x8.mag
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_FLAT.mag
 # decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
 # decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6.mag
+')dnl
 decl memory d1 = nothing
 decl memory t1 = nothing
 info
 exec init t1:nothing
+ifdef(`LOAD_DATA',`dnl
 exec run d1:nwell = d1_input:poly COPY t1:nothing
 exec run d1:diff  = d1_input:diff COPY t1:nothing
 exec run d1:poly  = d1_input:poly COPY t1:nothing
@@ -25,11 +29,25 @@ exec run d1:met3  = d1_input:met3 COPY t1:nothing
 exec run d1:met4  = d1_input:met4 COPY t1:nothing
 exec run d1:met5  = d1_input:met5 COPY t1:nothing
 delete d1_input
+',`dnl
+# info "Not loading data"
+exec init d1:poly
+exec init d1:diff
+exec init d1:li1
+exec init d1:met1
+exec init d1:met2
+exec init d1:met3
+exec init d1:met4
+exec init d1:met5
+')dnl
 flush
+RUN_LOOP(`OP1',`t1',`d1',`poly',`0.001',`li1',`0.001',`met1',`0.001',`met2',`0.001')dnl
+# end
 exec run t1:gate = d1:poly AND2 d1:diff
 exec run t1:ng   = d1:poly ~ t1:gate
 exec run t1:sd   = d1:diff ~ t1:gate
 exec run t1:diff_xor_poly = d1:diff XOR d1:poly
+delete d1
 flush
 end
 

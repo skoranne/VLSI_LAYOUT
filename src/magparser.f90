@@ -459,7 +459,7 @@ contains
     do i = 1, NUM_LAYERS
        associate( resolved_layer => layers(i) )
          if( extents(i)%is_valid() ) then
-            write(*,'(A1,A12,F18.8,A1,F18.8)') ' ',layerNames(i), resolved_layer%area*1e-6, ' ', resolved_layer%perimeter*1e-6
+            write(*,'(A1,A12,F18.8,A1,F18.8)') ' ',layerNames(i), resolved_layer%area*1e-6_real64, ' ', resolved_layer%perimeter*1e-3_real64
          else if( resolved_layer%n_used > 0 ) then
             write(*,*) 'ERROR: This is not expected: ', resolved_layer%n_used, ' ', extents(i)
             error stop

@@ -21,6 +21,17 @@ submodule (DesignModule) DesignImplModule
 
 contains
 
+  module subroutine PerformMergeLayer( input_layer )
+    type(Layer), intent( inout )    :: input_layer
+    real(kind=real64)               :: overlap_area, overlap_perimeter
+    if( NeedsRTree( input_layer ) ) call BuildTree( input_layer )
+    if( NeedsHealing( input_layer ) ) call MergeHealLayer( input_layer )
+    if( NeedsRTree( input_layer ) ) call BuildTree( input_layer )
+    call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
+                      input_layer%tree%root_index, overlap_area, overlap_perimeter)
+    input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )    
+  end subroutine PerformMergeLayer
+  
   module function CertifyHealing( input_layer ) result(retval)
     type(Layer), intent( in ) :: input_layer
     logical                   :: retval

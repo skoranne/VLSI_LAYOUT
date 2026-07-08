@@ -7,6 +7,9 @@ DEBUG ?= 0
 VERBOSE ?= 0
 PROFILE ?= 0
 BOOST_DIR=/scratch1/skoranne/OSS_EDA_TOOLS/boost/boost
+THRUST_INCLUDE=-I/scratch1/skoranne/OSS_EDA_TOOLS/cccl/thrust  -I/scratch1/skoranne/OSS_EDA_TOOLS/cccl/libcudacxx/include
+THRUST_OPTIONS=-std=c++17 -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP -DTHRUST_HOST_SYSTEM=THRUST_HOST_SYSTEM_CPP -D__CUB_INTERNAL_REDUCE__=0
+
 export HDF5_FC=mpiifx
 export HDF5_Fortran_COMPILER=mpiifx
 FORTRAN_COMPILER=/scratch1/skoranne/INTELCOMPILERS/bin/h5fc
