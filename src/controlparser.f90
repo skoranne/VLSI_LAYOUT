@@ -190,7 +190,6 @@ contains
              pos = index( rest, ' ' )
              rest = trim( adjustl( rest(pos+1:)))
              read(rest, *, iostat=ios) abort_on_xor
-             abort_on_xor = 1
              if( ios == 0 ) then
                 write(*,*) 'INFO: VAR changing abort_on_xor = ', abort_on_xor
              else
@@ -200,8 +199,7 @@ contains
              rest = adjustl(rest)
              pos = index( rest, ' ' )
              rest = trim( adjustl( rest(pos+1:)))
-             read(rest, *, iostat=ios) abort_on_xor
-             abort_on_xor = 1
+             read(rest, *, iostat=ios) abort_on_assert_zero
              if( ios == 0 ) then
                 write(*,*) 'INFO: VAR changing abort_on_assert_zero = ', abort_on_assert_zero
              else

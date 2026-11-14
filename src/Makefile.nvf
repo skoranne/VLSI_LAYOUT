@@ -80,7 +80,7 @@ $(LIBRARY): $(LIB_OBJS)
 # --- Executable Builds ---
 # By linking against the library, we don't have to list out all objects again.
 MAGPARSER.exe: mainmagparser.o $(LIBRARY)
-	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)

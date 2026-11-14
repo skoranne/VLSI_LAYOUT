@@ -1,0 +1,51 @@
+# Regression: Boolean AND, OR, NOT, XOR for MAGPARSER (NVIDIA/nvf build)
+# Exercises Boolean operations using symbol/Boost-backed operators:
+#   *  AND
+#   +  OR  (Boost)
+#   ^  XOR (Boost)
+#   @  NOT (frame)
+#   !  NOT (Boost)
+# Runs against examples/INV.mag and includes XOR identity checks (A ^ A == empty)
+# enforced via abort_on_xor.
+
+program regress_boolean
+systeminfo
+var debug_verbosity 0
+var abort_on_xor 0
+
+decl design d1 = ../examples/INV.mag
+decl memory m1 = nothing
+info
+
+exec init m1:nothing
+
+# --- AND, OR, XOR, NOT: poly vs ndiff ---
+exec run m1:and_pn = d1:poly * d1:ndiff
+exec run m1:or_pn  = d1:poly + d1:ndiff
+exec run m1:xor_pn = d1:poly ^ d1:ndiff
+exec run m1:not_pn = d1:poly @ d1:ndiff
+exec run m1:bnot_pn = d1:poly ! d1:ndiff
+
+# --- AND, OR, XOR, NOT: poly vs metal1 ---
+exec run m1:and_pm = d1:poly * d1:metal1
+exec run m1:or_pm  = d1:poly + d1:metal1
+exec run m1:xor_pm = d1:poly ^ d1:metal1
+exec run m1:not_pm = d1:poly @ d1:metal1
+exec run m1:bnot_pm = d1:poly ! d1:metal1
+
+# --- AND, OR, XOR, NOT: ndiff vs pdiff ---
+exec run m1:and_np = d1:ndiff * d1:pdiff
+exec run m1:or_np  = d1:ndiff + d1:pdiff
+exec run m1:xor_np = d1:ndiff ^ d1:pdiff
+exec run m1:not_np = d1:ndiff @ d1:pdiff
+exec run m1:bnot_np = d1:ndiff ! d1:pdiff
+
+# --- XOR identity checks (must produce empty result) ---
+var abort_on_xor 1
+exec run m1:xor_id_poly = d1:poly ^ d1:poly
+exec run m1:xor_id_ndiff = d1:ndiff ^ d1:ndiff
+
+flush
+end
+
+
