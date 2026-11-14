@@ -1,0 +1,15 @@
+# Boolean perf regression: local SED bin layers (large synthetic from src bins)
+# Run from src/: ./MAGPARSER.exe ../Regressions/boolean_perf_sed_bins.ctr 10
+program bool_perf_sed
+systeminfo
+var debug_verbosity 0
+decl design d1 = ../Regressions/sed_bool_perf.mag
+decl memory m1 = nothing
+info
+exec init m1:nothing
+exec run m1:and_pd = d1:poly * d1:diff
+exec run m1:or_pd  = d1:poly + d1:diff
+exec run m1:xor_pd = d1:poly ^ d1:diff
+exec run m1:not_pd = d1:poly ! d1:diff
+flush
+end
