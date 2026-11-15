@@ -14,7 +14,7 @@ module RTreeBuilderGPU
   implicit none
   private
 
-  public :: ComputeInteractionsGPU, CertifyHealingGPU, ComputeSelfCheckGPULayer, &
+  public :: ComputeInteractionsGPU, CertifyHealingGPU, &
        ComputeANDPairsCountGPU, ComputeANDPairsFillGPU
 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024

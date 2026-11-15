@@ -154,8 +154,8 @@ extern "C" int ldb_write_oasis_gear_multigon(const char* out_path, char* errbuf,
     fclose(fp); return 0;
 }
 
-// Generic OASIS writer from current (limited) in-memory model - emits what we have (cells, names, props)
-// Not a full IR-to-OASIS serializer for all parsed records yet; but produces valid OASIS with properties.
+// Generic OASIS writer from current in-memory model.
+// Emits cell names, cells, and geometry boxes as POLYGON records (encoding aligned with our parser).
 extern "C" int ldb_write_oasis(const ldb_file_t* fh, const char* out_path, char* errbuf, size_t errbuf_sz){
     auto* f=(const LdbFile*)fh; if(errbuf&&errbuf_sz) errbuf[0]='\0';
     if(!f){ if(errbuf) snprintf(errbuf,errbuf_sz,"null"); return -1; }
@@ -169,13 +169,31 @@ extern "C" int ldb_write_oasis(const ldb_file_t* fh, const char* out_path, char*
     W w; const char magic[]="%SEMI-OASIS\r\n"; w.bytes(magic,13);
     w.u8(1); w.astr("1.0"); w.real_pos_int_exp(1,-9); w.u8(0);
     // property names
-    uint64_t pnref=0; for(auto& kv: f->propnames){ w.u8(6); w.nstr(kv.second.empty()?("P"+std::to_string(kv.first)):kv.second); w.uvar((uint64_t)kv.first); if((uint64_t)kv.first>=pnref) pnref=kv.first+1; }
-    // cell names and cells
+    for(auto& kv: f->propnames){ w.u8(6); w.nstr(kv.second.empty()?("P"+std::to_string(kv.first)):kv.second); w.uvar((uint64_t)kv.first); }
+    // cell names
     uint64_t cref=0; std::map<std::string,uint64_t> cmap;
     for(auto& c: f->cells){ cmap[c.name]=cref; w.u8(3); w.nstr(c.name); w.uvar(cref); cref++; }
+    // cells and geometry
     for(auto& c: f->cells){
         w.u8(13); w.uvar(cmap[c.name]);
-        // emit placeholder? no geometry stored in current model except extents; we cannot reconstruct - but at least valid structure
+        for(const auto& b : c.boxes){
+            // POLYGON (21) encoding aligned with our parser:
+            // info bit 0x01 => XY present (svar dx,dy) - with abs mode sets position
+            // info bit 0x20 => layer present, 0x40 => datatype present
+            uint8_t info = 0x01 | 0x20 | 0x40;
+            w.u8(21); w.u8(info);
+            w.svar(b.x1); w.svar(b.y1); // position = (x1,y1)
+            w.uvar((uint64_t)b.layer);
+            w.uvar((uint64_t)b.datatype);
+            // point-list: type 3 (all-delta) with 3 more vertices forming rectangle
+            w.u8(3);
+            w.uvar(3);
+            int64_t wdt = b.x2 - b.x1;
+            int64_t hgt = b.y2 - b.y1;
+            w.svar(wdt); w.svar(0);      // (x2,y1)
+            w.svar(0);   w.svar(hgt);    // (x2,y2)
+            w.svar(-wdt); w.svar(0);     // (x1,y2)
+        }
     }
     w.u8(2);
     FILE* fp=fopen(out_path,"wb"); if(!fp){ if(errbuf) snprintf(errbuf,errbuf_sz,"open for write failed"); return -1; }

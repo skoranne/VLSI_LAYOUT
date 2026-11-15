@@ -7,10 +7,10 @@ ifdef NVCOMP
 CXXFLAGS += -DLAYOUTDB_USE_NVCOMP
 endif
 
-CORE_SRCS = layoutdb.cpp gdsii.cpp oasis.cpp oasis_writer.cpp db_stats.cpp nvcomp_support.cpp
+CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp gdsii.cpp oasis.cpp oasis_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
 
-TESTS = db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip
+TESTS = db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent
 
 all: $(TESTS)
 
@@ -30,6 +30,12 @@ db_propnames: db_propnames.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 db_roundtrip: db_roundtrip.cpp $(CORE_OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+db_oasis2lefdef: db_oasis2lefdef.cpp $(CORE_OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+db_hier_extent: db_hier_extent.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:

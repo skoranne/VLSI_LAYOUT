@@ -1,0 +1,64 @@
+# Control file for MAGPARSER - SDT regression using OASIS direct frontend
+# Equivalent flow to src/SDT.ctr but loads OASIS (layer:datatype refs) instead of MAG.
+# SkyWater layers (typ): diff=65:20, poly=66:20, li1=67:20, met1=68:20
+program SDT16_oasis
+systeminfo
+var temp_folder RUN_OASIS_SDT/
+var temporary_layers 2
+var abort_on_xor 1
+var abort_on_assert_zero 2
+var debug_verbosity 0
+decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SDT_16.oas
+decl memory o1 = nothing
+decl memory d1 = nothing
+decl memory t1 = nothing
+decl memory t2 = nothing
+info
+exec init t1:nothing
+# Copy OASIS layers (direct frontend) into named working layers
+exec run d1:poly = d1_input:66:20 COPY nothing
+exec run d1:diff = d1_input:65:20 COPY nothing
+exec run d1:met1 = d1_input:68:20 COPY nothing
+exec run d1:li1  = d1_input:67:20 COPY nothing
+delete d1_input
+exec run o1:diff = d1:diff COPY nothing
+exec run o1:poly = d1:poly COPY nothing
+exec run o1:li1  = d1:li1 COPY nothing
+exec run o1:met1 = d1:met1 COPY nothing
+flush
+delete o1
+flush
+exec run t1:gate = d1:poly * d1:diff
+exec run t1:ng_poly1 = d1:poly ~ t1:gate
+exec run t1:ng_poly2 = d1:poly ! t1:gate
+exec run t1:xor_ng_poly = t1:ng_poly1 ^ t1:ng_poly2
+exec run t1:sd1  = d1:diff ! d1:poly
+exec run t1:sd2  = d1:diff ~ d1:poly
+exec run t1:check_sd = t1:sd1 ^ t1:sd2
+exec run t1:check_and1 = t1:sd1 * d1:poly
+exec run t1:nothing = t1:check_and1 ASSERT_ZERO t1:nothing
+exec run t1:poly_grow = d1:poly SIZE t1:nothing 0.01
+exec run t1:self_poly = t1:poly_grow * d1:poly
+exec run t1:self_poly_xor = t1:self_poly ^ d1:poly
+exec run t1:poly_shrink = d1:poly SIZE t1:nothing -0.01
+exec run t1:self_poly_shrink = d1:poly * t1:poly_shrink
+exec run t1:self_poly_shrink_xor = t1:self_poly_shrink ^ t1:poly_shrink
+exec run t1:poly_outer_ring = t1:poly_grow ! d1:poly
+exec run t1:poly_inner_ring = d1:poly ! t1:poly_shrink
+exec run t1:ring_intersection = t1:poly_outer_ring * t1:poly_inner_ring
+exec run t1:nothing = t1:ring_intersection ASSERT_ZERO t1:nothing
+flush
+delete t1
+decl memory t1 = nothing
+exec init t1:nothing
+exec init t2:nothing
+exec run t2:met1_grow = d1:met1 SIZE t1:nothing 0.01
+exec run t2:met1_shrink = d1:met1 SIZE t1:nothing -0.01
+exec run t2:met1_outer_ring = t2:met1_grow ! d1:met1
+exec run t2:met1_inner_ring = d1:met1 ! t2:met1_shrink
+exec run t2:m1_ring_intersection = t2:met1_outer_ring * t2:met1_inner_ring
+exec run t2:nothing = t2:m1_ring_intersection ASSERT_ZERO t1:nothing
+delete t2
+delete d1
+flush
+end

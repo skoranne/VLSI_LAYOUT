@@ -170,25 +170,33 @@ static void parse_records(Stream& s, Ctx& ctx){
         case 1: { // START
             s.astr(); // version
             s.real(); // unit
-            // validation: 0=none, 1=checksum present (then uint32 follows)
-            // offset table: in OASIS, after validation comes a byte indicating if offset table is present?
-            // Spec: "The START record... contains... validation scheme... [offset table flag and offsets]"
-            // Common: byte 0x00 = no validation, then offset table may follow. Many files have 12 offset values.
+            // After unit: offset-flag byte in modern OASIS. Bits 0-5 indicate present offset-table values, bit 6 strict, bit 7 reserved.
             if(s.ok && s.off < s.n){
-                // peek: if this looks like start of offset table marker/value rather than next record
-                // consume rest of START by scanning for a byte sequence that begins a plausible next record in context
-                // but safer: consume varints/bytes until we reach a position where parsing CELLNAME(3)+string makes sense
-                // Try to find next PAD/END/CELLNAME/PROPNAME/PROPSTRING/CELL by attempting parse at candidates
-                size_t saved = s.off;
+                uint8_t oflags = s.p[s.off];
+                // Heuristic: if oflags looks like a plausible offset-flag (not a common record start like 0,2,3,6,13 etc in that position), consume it and entries
+                bool looks_record = (oflags==0||oflags==2||oflags==3||oflags==6||oflags==7||oflags==13||oflags==34);
+                if(!looks_record){
+                    s.off++; // consume offset-flag
+                    for(int i=0;i<6;i++) if(oflags & (1<<i)) s.uvar();
+                    // if bit 7 set, some files include additional offsets/validation info; try to consume up to 6 more if present
+                    if(oflags & 0x80){ for(int i=0;i<6;i++) s.uvar(); }
+                }
+                // Resync: scan for next plausible record start. Prefer CBLOCK(34) if present (KLayout files often start with offset/CBLOCK data).
                 size_t found = s.n;
-                for(size_t j=saved; j < s.n && j < saved + 1024; ++j){
-                    // candidate for next record
-                    uint8_t nb = s.p[j];
-                    if(nb==0||nb==2||nb==34){ found=j; break; }
-                    if(nb==3||nb==6||nb==7||nb==13){
-                        // verify it can be a valid a-string+ref record
-                        // quick check: length byte reasonable
-                        if(j+1 < s.n){ uint8_t len = s.p[j+1]; if(len < 128 && j+2+len < s.n) { found=j; break; } }
+                size_t first_cblock = s.n;
+                for(size_t k=s.off; k < s.n; ++k){ if(s.p[k]==34){ first_cblock = k; break; } }
+                if(first_cblock < s.n && first_cblock <= s.off + 4096){
+                    found = first_cblock;
+                } else {
+                    for(size_t j=s.off; j < s.n && j < s.off + 4096; ++j){
+                        uint8_t nb = s.p[j];
+                        if(nb==0){ found=j; break; }
+                        if(nb==2){ if(j + 8 >= s.n){ found=j; break; } continue; }
+                        if(nb==3||nb==6||nb==7||nb==13||nb==1||nb==4||nb==5||nb==8||nb==9||nb==14||nb==15||nb==16||nb==17||nb==18||nb==19||nb==20||nb==21||nb==22||nb==28||nb==34){
+                            if(nb==3||nb==6||nb==7||nb==5){
+                                if(j+1 < s.n){ uint8_t len = s.p[j+1]; if(len>0 && len < 128 && j+2+len < s.n) { found=j; break; } }
+                            } else { found=j; break; }
+                        }
                     }
                 }
                 s.off = found;
@@ -215,19 +223,21 @@ static void parse_records(Stream& s, Ctx& ctx){
             uint8_t info=s.u8();
             if(info & 0x80){} else { ctx.m.placement_cell = s.uvar(); }
             uint64_t cref = ctx.m.placement_cell;
-            if(info & 0x01){ int64_t dx=s.svar(), dy=s.svar(); if(ctx.m.abs_xy){ ctx.m.x=dx; ctx.m.y=dy; } else { ctx.m.x+=dx; ctx.m.y+=dy; } }
-            if(id==18){ // transform flags: C(0x02)? spec: bit1=mirror/rot, bit2=mag, bit3=angle
-                // decode by info bits: 0x02 C(mag),0x04 A(angle),0x08 M(mirror) in placement-transform? simplified consume
-                // placement-transform info: N(7),C(6)? actually complex; consume possible real fields
-                // heuristic: if info has 0x04 mag, 0x02 angle, 0x08 reflect
-            }
-            // general: placement info bits for transform are (for record 18): 0,XY, M, C, A, R, F, N - better consume reals if set
-            // We'll do a safer parse:
-            // revert and do careful: already consumed info and maybe XY and cell ref; for transform record extra fields follow
-            // but we don't know exact bits mapping without more state; skip repetition if present
+            int64_t px = ctx.m.x, py = ctx.m.y;
+            if(info & 0x01){ int64_t dx=s.svar(), dy=s.svar(); if(ctx.m.abs_xy){ px=dx; py=dy; } else { px+=dx; py+=dy; } ctx.m.x=px; ctx.m.y=py; }
+            // best-effort: for placement-transform (18) some fields may follow; avoid breaking stream by not consuming unknowns here
+            // repetition
             if(info & 0x20){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
-            // add hierarchy ref
-            if(ctx.cur_cell!=(size_t)-1){ auto it=ctx.geom_idx.find(ctx.cur_cell); if(it!=ctx.geom_idx.end()){ std::string rn=tget(ctx.cellnames,cref); if(rn.empty()) rn="__cell_"+std::to_string(cref); ctx.f->cells[it->second].refs.insert(rn); } }
+            // add hierarchy ref and basic instance (translation)
+            if(ctx.cur_cell!=(size_t)-1){
+                auto it=ctx.geom_idx.find(ctx.cur_cell);
+                if(it!=ctx.geom_idx.end()){
+                    std::string rn=tget(ctx.cellnames,cref); if(rn.empty()) rn="__cell_"+std::to_string(cref);
+                    ctx.f->cells[it->second].refs.insert(rn);
+                    LdbInstance inst; inst.ref_name = rn; inst.tr.ox = px; inst.tr.oy = py;
+                    ctx.f->cells[it->second].instances.push_back(inst);
+                }
+            }
             rec_raw(s,rec_start,ctx);
         } break;
         case 19: { // TEXT
@@ -255,8 +265,7 @@ static void parse_records(Stream& s, Ctx& ctx){
             // but exact SWH bits: in spec 20: D,W,H,S,X,Y,R -> info bits [R,Y,X,S,H,W,D]=[0..6]? varies. handle common
             if(w==0 && h==0){ w=s.uvar(); h=s.uvar(); }
             if(info & 0x08){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
-            add_geom(ctx,ctx.m.layer,ctx.m.datatype,ctx.m.x,ctx.m.y);
-            add_geom(ctx,ctx.m.layer,ctx.m.datatype,ctx.m.x+w,ctx.m.y+h);
+            add_box(ctx, ctx.m.layer, ctx.m.datatype, 2, ctx.m.x, ctx.m.y, ctx.m.x+w, ctx.m.y+h);
             rec_raw(s,rec_start,ctx);
         } break;
         case 21: { // POLYGON
@@ -340,21 +349,35 @@ static void parse_records(Stream& s, Ctx& ctx){
             rec_raw(s,rec_start,ctx);
         } break;
         case 31: { // XGEOMETRY
-            uint8_t info=s.u8(); s.uvar(); // attribute
+            uint8_t info=s.u8(); if(s.ok) s.uvar(); // attribute
             if(info & 0x20) ctx.m.layer=s.uvar();
             if(info & 0x40) ctx.m.datatype=s.uvar();
-            // geometry data: complex; skip until next known record by peeking? hard. store raw and best-effort consume
             rec_raw(s,rec_start,ctx);
-            // cannot reliably continue parsing unknown-size xgeometry payload in this tolerant mode
-            s.ok=false; s.err="XGEOMETRY payload size unknown in tolerant parser";
+            // payload size unknown; resync
+            bool found=false;
+            for(size_t j = s.off; j < s.n && j < s.off + 4096; ++j){
+                uint8_t nb=s.p[j];
+                if(nb==0||nb==2||nb==3||nb==13||nb==19||nb==20||nb==21||nb==22||nb==34||nb==28){ s.off=j; s.ok=true; found=true; break; }
+            }
+            if(!found){ s.ok=false; s.err="XGEOMETRY payload size unknown in tolerant parser"; }
         } break;
         case 34: { // CBLOCK
             handle_cblock(s, ctx, rec_start);
         } break;
         default: {
-            // Unknown record: cannot determine length -> stop semantic parse but raw file is preserved for round-trip
+            // Unknown/unsupported record in tolerant mode: record raw byte and resync forward
             rec_raw(s,rec_start,ctx);
-            s.ok=false; s.err="unhandled OASIS record "+std::to_string((int)id)+" at "+std::to_string(rec_start);
+            // try to resync to a plausible next record id
+            bool found=false;
+            for(size_t j = rec_start + 1; j < s.n && j < rec_start + 4096; ++j){
+                uint8_t nb = s.p[j];
+                if(nb==0||nb==1||nb==2||nb==3||nb==4||nb==5||nb==6||nb==7||nb==8||nb==9||
+                   nb==13||nb==14||nb==15||nb==16||nb==17||nb==18||nb==19||nb==20||nb==21||
+                   nb==22||nb==23||nb==24||nb==25||nb==28||nb==29||nb==30||nb==31||nb==34){
+                    s.off = j; s.ok = true; found = true; break;
+                }
+            }
+            if(!found){ s.ok=false; s.err="unhandled OASIS record "+std::to_string((int)id)+" at "+std::to_string(rec_start); }
         } break;
         }
     }

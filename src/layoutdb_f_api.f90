@@ -42,6 +42,37 @@ module layoutdb_f_api
        type(c_ptr), value :: f
        type(c_ptr), value :: out_fp
      end function ldb_print_hierarchy_c
+
+     function ldb_iterate_boxes_hier_c(f, top_cell, depth, cb, ud) bind(C, name="ldb_iterate_boxes_hier")
+       import :: c_ptr, c_funptr, c_int, c_char
+       integer(c_int) :: ldb_iterate_boxes_hier_c
+       type(c_ptr), value :: f
+       character(kind=c_char), dimension(*), intent(in) :: top_cell
+       integer(c_int), value :: depth
+       type(c_funptr), value :: cb
+       type(c_ptr), value :: ud
+     end function ldb_iterate_boxes_hier_c
+
+     function ldb_extent_whole_hier_c(f, top_cell, out_ext) bind(C, name="ldb_extent_whole_hier")
+       import :: c_ptr, c_int, c_char, ldb_extent_c
+       integer(c_int) :: ldb_extent_whole_hier_c
+       type(c_ptr), value :: f
+       character(kind=c_char), dimension(*), intent(in) :: top_cell
+       type(ldb_extent_c), intent(out) :: out_ext
+     end function ldb_extent_whole_hier_c
+
+     function ldb_top_cell_count_c(f) bind(C, name="ldb_top_cell_count")
+       import :: c_ptr, c_int
+       integer(c_int) :: ldb_top_cell_count_c
+       type(c_ptr), value :: f
+     end function ldb_top_cell_count_c
+
+     function ldb_top_cell_name_c(f, i) bind(C, name="ldb_top_cell_name")
+       import :: c_ptr, c_int
+       type(c_ptr) :: ldb_top_cell_name_c
+       type(c_ptr), value :: f
+       integer(c_int), value :: i
+     end function ldb_top_cell_name_c
   end interface
 
 end module layoutdb_f_api

@@ -3,12 +3,12 @@ module LayoutDBLoaderModule
   use iso_c_binding
   use CommonModule
   use hash_mod
-  use DesignModule
-  use GeometryModule
+  use DesignModule, only: Design, Layer
+  use GeometryModule, only: Box
   use layoutdb_f_api
   implicit none
   private
-  public :: LoadLayoutDBFile
+  public :: LoadLayoutDBFile, LoadLayoutDBFileHier
 
   type :: ldb_load_ctx
      type(Design), pointer :: design => null()
@@ -80,19 +80,16 @@ contains
     L%layer_boxes(L%n_used)%y2 = max(y1,y2)
   end subroutine push_box_local
 
-  subroutine LoadLayoutDBFile(load_design, MAX_LAYERS)
+  subroutine load_ldb_common(load_design, MAX_LAYERS, fh_out, ctx)
     type(Design), intent(inout), target :: load_design
     integer, intent(in) :: MAX_LAYERS
-    type(c_ptr) :: fh
+    type(c_ptr), intent(out) :: fh_out
+    type(ldb_load_ctx), intent(out), target :: ctx
     character(kind=c_char), allocatable :: cpath(:)
     character(kind=c_char) :: errbuf(512)
     integer(c_size_t) :: esz
     integer :: i, n
-    type(ldb_load_ctx), target :: ctx
-    type(c_funptr) :: cb
-    integer(c_int) :: rc
     character(len=:), allocatable :: fname
-
     fname = load_design%fileName
     n = len_trim(fname)
     allocate(cpath(n+1))
@@ -102,13 +99,12 @@ contains
     cpath(n+1) = c_null_char
     errbuf = c_null_char
     esz = 512
-    fh = ldb_open_c(cpath, errbuf, esz)
-    if(.not. c_associated(fh)) then
+    fh_out = ldb_open_c(cpath, errbuf, esz)
+    if(.not. c_associated(fh_out)) then
        write(*,*) 'ERROR: ldb_open failed for ', trim(fname)
        return
     end if
-    write(*,*) 'INFO: Loading layout DB file (GDSII/OASIS): ', trim(fname), ' format=', ldb_format_c(fh)
-
+    write(*,*) 'INFO: Loading layout DB file (GDSII/OASIS): ', trim(fname), ' format=', ldb_format_c(fh_out)
     allocate(load_design%layers(MAX_LAYERS))
     allocate(load_design%layerNames(MAX_LAYERS))
     call hash_create(load_design%ht, MAX_LAYERS)
@@ -116,14 +112,40 @@ contains
     do i=1,MAX_LAYERS
        load_design%layers(i)%n_used=0; load_design%layers(i)%n_alloc=0
     end do
-
     ctx%design => load_design
     ctx%max_layers = MAX_LAYERS
+  end subroutine load_ldb_common
+
+  subroutine LoadLayoutDBFile(load_design, MAX_LAYERS)
+    type(Design), intent(inout), target :: load_design
+    integer, intent(in) :: MAX_LAYERS
+    type(c_ptr) :: fh
+    type(ldb_load_ctx), target :: ctx
+    type(c_funptr) :: cb
+    integer(c_int) :: rc
+    call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
+    if(.not. c_associated(fh)) return
     cb = c_funloc(box_callback)
     rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
     call ldb_close_c(fh)
-
-    write(*,*) 'INFO: Loaded ', hash_nitems(load_design%ht), ' layers from ', trim(fname)
+    write(*,*) 'INFO: Loaded ', hash_nitems(load_design%ht), ' layers from ', trim(load_design%fileName)
   end subroutine LoadLayoutDBFile
+
+  subroutine LoadLayoutDBFileHier(load_design, MAX_LAYERS)
+    type(Design), intent(inout), target :: load_design
+    integer, intent(in) :: MAX_LAYERS
+    type(c_ptr) :: fh
+    type(ldb_load_ctx), target :: ctx
+    type(c_funptr) :: cb
+    integer(c_int) :: rc
+    character(kind=c_char) :: topc(1)
+    call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
+    if(.not. c_associated(fh)) return
+    cb = c_funloc(box_callback)
+    topc(1) = c_null_char
+    rc = ldb_iterate_boxes_hier_c(fh, topc, -1, cb, c_loc(ctx))
+    call ldb_close_c(fh)
+    write(*,*) 'INFO: Hierarchically loaded ', hash_nitems(load_design%ht), ' layers from ', trim(load_design%fileName)
+  end subroutine LoadLayoutDBFileHier
 
 end module LayoutDBLoaderModule

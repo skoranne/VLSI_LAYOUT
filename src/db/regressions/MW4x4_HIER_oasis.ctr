@@ -1,0 +1,38 @@
+# Control file for MAGPARSER - MW4x4 HIER regression using OASIS direct frontend
+# Loads OASIS directly; exercises layer copy and boolean/size/XOR/ASSERT_ZERO checks.
+program MW4x4_HIER_oasis
+systeminfo
+var temp_folder RUN_OASIS_MW/
+var temporary_layers 2
+var abort_on_xor 1
+var abort_on_assert_zero 2
+var debug_verbosity 0
+decl design d1_input = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/MW4x4_FLAT_DATA/MW4x4_HIER.oas
+decl memory d1 = nothing
+decl memory t1 = nothing
+decl memory t2 = nothing
+info
+exec init t1:nothing
+# Common SkyWater-like layers present in file (adjust as needed): 65:20 diff, 66:20 poly, 67:20 li1, 68:20 met1
+exec run d1:poly = d1_input:66:20 COPY nothing
+exec run d1:diff = d1_input:65:20 COPY nothing
+exec run d1:met1 = d1_input:68:20 COPY nothing
+exec run d1:li1  = d1_input:67:20 COPY nothing
+delete d1_input
+exec run t1:gate = d1:poly * d1:diff
+exec run t1:ng_poly1 = d1:poly ~ t1:gate
+exec run t1:ng_poly2 = d1:poly ! t1:gate
+exec run t1:xor_ng_poly = t1:ng_poly1 ^ t1:ng_poly2
+exec run t1:nothing = t1:xor_ng_poly ASSERT_ZERO t1:nothing
+exec run t1:sd1  = d1:diff ! d1:poly
+exec run t1:sd2  = d1:diff ~ d1:poly
+exec run t1:check_sd = t1:sd1 ^ t1:sd2
+exec run t1:nothing = t1:check_sd ASSERT_ZERO t1:nothing
+exec run t1:poly_grow = d1:poly SIZE t1:nothing 0.01
+exec run t1:self_poly_xor = (t1:poly_grow * d1:poly) ^ d1:poly
+exec run t1:nothing = t1:self_poly_xor ASSERT_ZERO t1:nothing
+flush
+delete t1
+delete d1
+flush
+end

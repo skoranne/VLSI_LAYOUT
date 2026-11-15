@@ -53,7 +53,33 @@ bool nvcomp_decompress_deflate(const uint8_t* comp, size_t comp_size, uint8_t* o
 
 bool decompress_cblock(uint8_t comp_type, const uint8_t* comp, size_t comp_size, std::vector<uint8_t>& out, size_t uncomp_size, NvcompStatus& st){
     out.resize(uncomp_size);
-    if(comp_type==0){ if(comp_size==uncomp_size) { memcpy(out.data(),comp,comp_size); return true; } out.assign(comp,comp+comp_size); return true; }
+
+#if defined(LAYOUTDB_USE_NVCOMP)
+    if(comp_type != 0 && st.available){
+        std::string e; if(nvcomp_decompress_deflate(comp,comp_size,out.data(),uncomp_size,e)){ st.used=true; return true; }
+        st.detail = e;
+    }
+#endif
+
+    if(comp_type==0){
+        // Some writers mark CBLOCK as uncompressed but store deflate-compressed payload; try decompression first.
+#if defined(LAYOUTDB_USE_ZLIB)
+        {
+            std::vector<uint8_t> tmp(uncomp_size);
+            uLongf dst = (uLongf)uncomp_size;
+            int zr = uncompress((Bytef*)tmp.data(), &dst, (const Bytef*)comp, (uLong)comp_size);
+            if(zr == Z_OK){ out.swap(tmp); out.resize((size_t)dst); st.detail += "; cpu-zlib(type0)"; return true; }
+            z_stream zs{}; zs.next_in=(Bytef*)comp; zs.avail_in=(uInt)comp_size; zs.next_out=(Bytef*)tmp.data(); zs.avail_out=(uInt)uncomp_size;
+            if(inflateInit2(&zs,-15)==Z_OK){
+                int r=inflate(&zs,Z_FINISH); inflateEnd(&zs);
+                if(r==Z_STREAM_END){ out.swap(tmp); out.resize(uncomp_size - zs.avail_out); st.detail += "; cpu-raw-deflate(type0)"; return true; }
+            }
+        }
+#endif
+        if(comp_size==uncomp_size) { memcpy(out.data(),comp,comp_size); return true; }
+        out.assign(comp,comp+comp_size); return true;
+    }
+
 #if defined(LAYOUTDB_USE_NVCOMP)
     if(st.available){
         std::string e; if(nvcomp_decompress_deflate(comp,comp_size,out.data(),uncomp_size,e)){ st.used=true; return true; }

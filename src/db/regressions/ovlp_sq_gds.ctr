@@ -1,0 +1,19 @@
+# Control file for MAGPARSER - GDSII direct frontend regression (local binary sample)
+program ovlp_sq_gds
+systeminfo
+var temp_folder RUN_GDS_OVLP/
+var temporary_layers 2
+var abort_on_assert_zero 2
+decl design d1 = ../../ovlp_sq.gds
+decl memory t1 = nothing
+info
+exec init t1:nothing
+# ovlp_sq.gds contains layer 67 datatype 20 in sample; copy and sanity-check
+exec run t1:copy = d1:67:20 COPY nothing
+exec run t1:copy2 = t1:copy COPY nothing
+exec run t1:xor = t1:copy ^ t1:copy2
+exec run t1:nothing = t1:xor ASSERT_ZERO t1:nothing
+flush
+delete t1
+flush
+end
