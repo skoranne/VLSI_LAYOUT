@@ -1,0 +1,11 @@
+# build artifacts
+*.o
+*.a
+db_extent
+db_extent_by_cell_layer
+db_hierarchy
+db_propnames
+db_roundtrip
+db_oasis_debug
+*.rt
+*.oas.out

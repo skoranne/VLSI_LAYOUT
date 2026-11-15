@@ -1,0 +1,15 @@
+The Fortran code uses a binary file to read polygon data but for industry standard format we need to connect it to
+GDSII and OASIS. Implement C or C++ OASIS and GDSII file reader/writer which can be used with Fortran as well as Julia (test this)
+since these layout file are very large (multi tera bytes) efficiency of memory is very important so use clever encoded and compressed
+data structures like Union, compressed and entropy encoded storage, dont expand repetitions in OASIS till needed
+
+Use mmap for file /IO and also use nvComp for decompression especially CBLOCKs in OASIS. Implement full support of all OASIS/GDSII records
+including PROPERTY and MULTIGON. There are a lot of example OASIS and GDSII files in this project.
+
+Implement the READER and WRITER with small test programs which do the following
+1) Compute the DB EXTENT of the whole file
+2) compute DB extent layer by layer, cell by cell
+3) Print the cell hierarchy
+4) Print the property name table of the file
+
+

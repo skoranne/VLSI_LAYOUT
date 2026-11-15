@@ -31,7 +31,7 @@ endif
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables ---
 LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
-LDLIBS = -lz -lhdf5_fortran -lhdf5 -lstdc++ -lsnappy -lzstd
+LDLIBS = db/liblayoutdb.a -lz -lhdf5_fortran -lhdf5 -lstdc++ -lsnappy -lzstd
 
 # --- Library Definition ---
 LIBRARY = libmagparser.a

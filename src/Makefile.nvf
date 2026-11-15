@@ -29,7 +29,7 @@ endif
 # --- Linker Variables ---
 #LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
 LDFLAGS = -L/scratch1/skoranne/NVCOMPILERS/lib/
-LDLIBS = -lz -lstdc++ -lsnappy -lzstd
+LDLIBS = db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd
 #LDLIBS = -lz -lhdf5_fortran -lhdf5
 # --- Library Definition ---
 LIBRARY = libmagparser.a

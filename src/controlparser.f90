@@ -28,6 +28,7 @@ module ControlModule
   use DesignModule
   use SystemInformationModule
   use MagicVLSILayoutParser
+  use LayoutDBLoaderModule
   use iso_fortran_env, only: int32, int64, real64
   implicit none
   public :: ParseControlFile, GetLayerFromDBName
@@ -35,6 +36,23 @@ module ControlModule
   integer, parameter :: PARSE_ERR_SYNTAX = 1
   integer, parameter :: PARSE_ERR_UNKNOWN = 2
 contains
+
+  subroutine LoadDesignFileByExt(load_design, MAX_LAYERS)
+    type(Design), intent(inout) :: load_design
+    integer, intent(in) :: MAX_LAYERS
+    character(len=:), allocatable :: fn, ext
+    integer :: dot
+    fn = trim(load_design%fileName)
+    dot = index(fn, '.', back=.true.)
+    ext = ''
+    if(dot > 0) ext = fn(dot+1:)
+    ! case-insensitive compare (simple)
+    if(ext == 'gds' .or. ext == 'GDS' .or. ext == 'oas' .or. ext == 'OAS' .or. ext == 'oasis' .or. ext == 'OASIS') then
+       call LoadLayoutDBFile(load_design, MAX_LAYERS)
+    else
+       call parseMagicLayoutFile(load_design, MAX_LAYERS)
+    end if
+  end subroutine LoadDesignFileByExt
 
   !=================================================================
   ! 1) GetLayerFromDBName – the routine you asked for.
@@ -249,8 +267,8 @@ contains
              !call hash_create(design_dbs(db_count)%ht, MAX_LAYERS )
              !allocate( design_dbs(db_count)%layers( MAX_LAYERS ) )
              !> we also want output association of layer data with disk
-             design_dbs(db_count)%fileName = trim(keyword(1:pos))             
-             call parseMagicLayoutFile(design_dbs(db_count), MAX_LAYERS)             
+             design_dbs(db_count)%fileName = trim(keyword(1:pos))
+             call LoadDesignFileByExt(design_dbs(db_count), MAX_LAYERS)
              db_count = db_count+1
           else if( trim(rest(1:pos-1)) == 'design' ) then
              rest = adjustl(rest(pos+1:))             
@@ -265,7 +283,7 @@ contains
              pos = index( keyword, ' ' )
              !write(*,*) 'DB file handle = ', trim(keyword(1:pos)) !> file
              design_dbs(db_count)%fileName = trim(keyword(1:pos))
-             call parseMagicLayoutFile(design_dbs(db_count), MAX_LAYERS)
+             call LoadDesignFileByExt(design_dbs(db_count), MAX_LAYERS)
              db_count = db_count + 1
           else if( trim(rest(1:pos-1)) == 'memory' ) then
              rest = adjustl(rest(pos+1:))             

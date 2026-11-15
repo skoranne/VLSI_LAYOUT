@@ -20,6 +20,7 @@ Guidance for agentic work in this VLSI layout research repository (Fortran 90 + 
 ## Architecture / code map (high level)
 - Fortran core modules/impl in `src/`: parsing/control (`mainmagparser.f90`, `magparser.f90`, `controlparser.f90`), design/geometry (`design*.f90`, `geometry*.f90`, `datastructures.f90`), spatial/index/ops (`rtree.f90`, `morton.f90`, `pnummerge.f90`, `RLEMerge.f90`, `interaction.f90`, `contour.f90`, `polygon_fracture.f90`, `box*`), I/O/serialization (`hdfdata.f90`, `kldata.f90`, `serialization.f90`, `boxbytestream.f90`).
 - GPU/OpenMP and native pieces: `gpu_morton.cu`/`gpu_morton_sort.f90`, `event_sorter.cu`/`event_sorter_apif.f90`, `systeminfo_gpu.f90`, `boost_polygon_api.{cpp,h}` + Fortran API, `snappy_api.cpp`.
+- `src/db/`: planned/active GDSII+OASIS reader/writer library (C/C++ core with Fortran/Julia-callable API). Requirements tracked in `src/db/dbplan.txt`: mmap I/O, efficient/compressed in-memory representation (unions/entropy encoding), lazy OASIS repetition expansion, nvComp for OASIS CBLOCK decompression, full record support incl. PROPERTY/MULTIGON, and test programs for whole-file extent, per-cell/layer extent, cell hierarchy, and property name table. Sample `.gds`/`.oas` inputs exist in `src/` and `data/FPU`, `data/SDT`.
 - Data/examples: `examples/` (small `.mag`), `data/` (images, SDT/FPU datasets; some large/split archives like `SDT6x6_FLAT.mag.gz.part*`).
 
 ## Repo-specific gotchas
