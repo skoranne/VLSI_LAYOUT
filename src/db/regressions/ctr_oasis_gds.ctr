@@ -1,0 +1,15 @@
+# Sample CTR demonstrating GDSII/OASIS design loading (MAGPARSER integration)
+# Layers from GDSII/OASIS are named L<layer>_<datatype> and aliased as <layer>:<datatype>
+program oasis_gds_demo
+systeminfo
+var temp_folder /tmp
+var abort_on_assert_zero 1
+var temporary_layers 2
+decl design d1 = ../ovlp_sq.gds
+decl memory t1 = nothing
+info
+exec init t1:nothing
+# Example: reference a loaded GDS layer (adjust layer/datatype to file contents)
+# exec run t1:copy = d1:67:20 AND d1:67:20
+flush
+end
