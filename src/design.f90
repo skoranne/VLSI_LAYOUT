@@ -12,6 +12,7 @@ module DesignModule
   use MortonSortModule
   use MortonSortOMT
   use BoostPolygonAPIModule
+  use RTreeBuilderGPU
   use iso_c_binding
   use iso_fortran_env, only : int32, int64, real64
   use omp_lib
@@ -1132,7 +1133,7 @@ contains
     character(len=*), parameter :: functionName = "CalculateAND"
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
     type(Layer), intent(inout)   :: output_layer
-    integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC
+    integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC, numNodesB
     integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
     integer(kind=int64) :: number_leaves
     integer(kind=int64) :: i, j, k
@@ -1140,20 +1141,70 @@ contains
     type(Box) :: tempBox
     integer :: nthreads, tid, alloc_status
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-    !> we can create the RTree for A and B if needed
-    !> since the SkipList is not re-entrant, we cannot do parallel here (yet)
-    !$komp parallel default(shared)
-    !$komp single nowait
-    !$komp task depend(out:Adone)
+    integer(kind=int64), allocatable :: andCounts(:), andOffsets(:)
+    logical :: use_gpu
+    character(len=32) :: offload_env
+    integer :: offload_len, offload_stat
+    !> preprocess A,B (builds RTrees/sorting as needed)
+    !$omp parallel default(shared)
+    !$omp single nowait
+    !$omp task
     call PreprocessLayer( input_layer_A )
-    !$komp end task
-    !$komp task depend(out:Bdone)
+    !$omp end task
+    !$omp task
     call PreprocessLayer( input_layer_B )
-    !$komp end task
-    !$komp end single
-    !$komp end parallel
-    !> automatic wait here
-    !write(*,*) 'PREAMBLE COMPLETE in ', functionName
+    !$omp end task
+    !$omp taskwait
+    !$omp end single
+    !$omp end parallel
+
+    num_boxesA = input_layer_A%n_used
+    num_boxesB = input_layer_B%n_used
+    use_gpu = .false.
+#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
+    if (num_boxesA > 0 .and. num_boxesB > 0 .and. allocated(input_layer_B%tree%tree_nodes)) then
+       numNodesB = size(input_layer_B%tree%tree_nodes, kind=int64)
+       if (numNodesB > 0 .and. input_layer_B%tree%root_index > 0) then
+          use_gpu = (omp_get_num_devices() > 0)
+          call get_environment_variable('OMP_TARGET_OFFLOAD', offload_env, length=offload_len, status=offload_stat)
+          if (offload_stat == 0 .and. offload_len > 0) then
+             if (trim(offload_env) == 'DISABLED' .or. trim(offload_env) == 'disabled') use_gpu = .false.
+          end if
+       end if
+    end if
+#else
+    use_gpu = .false.
+#endif
+
+    if (use_gpu) then
+       allocate(andCounts(num_boxesA), andOffsets(num_boxesA), stat=alloc_status)
+       if (alloc_status == 0) then
+          call ComputeANDPairsCountGPU(input_layer_B%tree%tree_nodes, numNodesB, &
+               input_layer_B%layer_boxes, num_boxesB, input_layer_B%tree%root_index, &
+               input_layer_A%layer_boxes, num_boxesA, andCounts, num_boxesC)
+          andOffsets(1) = 0_int64
+          do i = 2, num_boxesA
+             andOffsets(i) = andOffsets(i-1) + andCounts(i-1)
+          end do
+          if (allocated(output_layer%layer_boxes)) deallocate(output_layer%layer_boxes)
+          allocate(output_layer%layer_boxes(max(num_boxesC, 1_int64)), stat=alloc_status)
+          if (alloc_status == 0 .and. num_boxesC > 0) then
+             call ComputeANDPairsFillGPU(input_layer_B%tree%tree_nodes, numNodesB, &
+                  input_layer_B%layer_boxes, num_boxesB, input_layer_B%tree%root_index, &
+                  input_layer_A%layer_boxes, num_boxesA, andOffsets, output_layer%layer_boxes, num_boxesC)
+          end if
+          output_layer%n_used = num_boxesC
+          output_layer%layerState = ior(output_layer%layerState, LAYER_STATE_HEAL)
+          if (allocated(andCounts)) deallocate(andCounts)
+          if (allocated(andOffsets)) deallocate(andOffsets)
+          call PreprocessLayer(output_layer)
+          return
+       end if
+       if (allocated(andCounts)) deallocate(andCounts)
+       if (allocated(andOffsets)) deallocate(andOffsets)
+    end if
+
+    !> CPU fallback (original multithreaded RTree search)
     nthreads = omp_get_max_threads()
     allocate(buffers(nthreads))
     do i=1,nthreads
@@ -1161,8 +1212,6 @@ contains
        allocate(buffers(i)%layer_boxes(K_INIT_BOX_COUNT))
        buffers(i)%n_alloc = K_INIT_BOX_COUNT
     end do
-    num_boxesA = input_layer_A%n_used
-    num_boxesB = input_layer_B%n_used
     !write(*,*) 'DBG: ', num_boxesA, ' ', num_boxesB, ' RTB ', size(input_layer_B%tree%tree_nodes)
     !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
     !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid, tempBox)

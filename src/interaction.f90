@@ -14,7 +14,8 @@ module RTreeBuilderGPU
   implicit none
   private
 
-  public :: ComputeInteractionsGPU, CertifyHealingGPU !, ComputeSelfCheckGPULayer
+  public :: ComputeInteractionsGPU, CertifyHealingGPU, ComputeSelfCheckGPULayer, &
+       ComputeANDPairsCountGPU, ComputeANDPairsFillGPU
 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024
 
@@ -571,4 +572,187 @@ contains
     if (GlobalAbortFlag == 1) IsValid = .false.
 
   end function CertifyHealingGPU
+
+  !> GPU-accelerated AND: count finite-area intersections of A boxes against B RTree.
+  !> Produces per-A counts and total count for exact output allocation.
+  subroutine ComputeANDPairsCountGPU(TreeNodes, NumNodes, SortedBoxesB, NumBoxesB, RootIndex, &
+       BoxesA, NumBoxesA, Counts, TotalCount)
+    integer(kind=int64), intent(in) :: NumNodes, NumBoxesB, NumBoxesA
+    type(RTreeNode), intent(in)     :: TreeNodes(NumNodes)
+    type(Box), intent(in)           :: SortedBoxesB(NumBoxesB)
+    integer(kind=int64), intent(in) :: RootIndex
+    type(Box), intent(in)           :: BoxesA(NumBoxesA)
+    integer(kind=int64), intent(out):: Counts(NumBoxesA)
+    integer(kind=int64), intent(out):: TotalCount
+
+    integer(kind=int64) :: I, J, K, ChildIdx, CurrNode, LocalCount
+    integer(kind=int64), parameter :: K_STACK_SIZE = 64
+    integer(kind=int64) :: Stack(K_STACK_SIZE)
+    integer(kind=int64) :: StackPtr
+    type(Box) :: QBox, NodeMbr, TargetBox
+    logical :: OverlapX, OverlapY
+    integer(kind=K_COORDINATE_KIND) :: ix1, iy1, ix2, iy2
+
+    Counts = 0_int64
+    TotalCount = 0_int64
+    if (NumBoxesA <= 0 .or. NumBoxesB <= 0 .or. NumNodes <= 0) return
+
+    !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA))
+    !$omp target enter data map(alloc: Counts(1:NumBoxesA))
+
+    !$omp target teams distribute parallel do &
+    !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,LocalCount,QBox,NodeMbr,TargetBox,OverlapX,OverlapY,ix1,iy1,ix2,iy2)
+    do I = 1, NumBoxesA
+       QBox = BoxesA(I)
+       LocalCount = 0_int64
+
+       NodeMbr = TreeNodes(RootIndex)%Mbr
+       OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2)
+       if (OverlapX) then
+          OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
+       else
+          OverlapY = .false.
+       end if
+
+       if (OverlapX .and. OverlapY) then
+          StackPtr = 1
+          Stack(StackPtr) = RootIndex
+          do while (StackPtr > 0)
+             CurrNode = Stack(StackPtr)
+             StackPtr = StackPtr - 1
+             if (TreeNodes(CurrNode)%IsLeaf) then
+                do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+                   J = TreeNodes(CurrNode)%ChildStart + K
+                   TargetBox = SortedBoxesB(J)
+                   OverlapX = max(TargetBox%X1, QBox%X1) < min(TargetBox%X2, QBox%X2)
+                   if (OverlapX) then
+                      OverlapY = max(TargetBox%Y1, QBox%Y1) < min(TargetBox%Y2, QBox%Y2)
+                      if (OverlapY) then
+                         ix1 = max(TargetBox%X1, QBox%X1); iy1 = max(TargetBox%Y1, QBox%Y1)
+                         ix2 = min(TargetBox%X2, QBox%X2); iy2 = min(TargetBox%Y2, QBox%Y2)
+                         if (ix2 > ix1 .and. iy2 > iy1) LocalCount = LocalCount + 1_int64
+                      end if
+                   end if
+                end do
+             else
+                do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+                   ChildIdx = TreeNodes(CurrNode)%ChildStart + K
+                   NodeMbr = TreeNodes(ChildIdx)%Mbr
+                   OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2)
+                   if (OverlapX) then
+                      OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
+                      if (OverlapY) then
+                         if (StackPtr < K_STACK_SIZE) then
+                            StackPtr = StackPtr + 1
+                            Stack(StackPtr) = ChildIdx
+                         end if
+                      end if
+                   end if
+                end do
+             end if
+          end do
+       end if
+       Counts(I) = LocalCount
+    end do
+
+    !$omp target update from(Counts(1:NumBoxesA))
+    !$omp target exit data map(release: Counts(1:NumBoxesA))
+    !$omp target exit data map(release: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA))
+
+    do I = 1, NumBoxesA
+       TotalCount = TotalCount + Counts(I)
+    end do
+  end subroutine ComputeANDPairsCountGPU
+
+  !> GPU-accelerated AND fill: generate intersection boxes using per-A offsets.
+  !> Offsets(I) must contain starting index-1 for A box I results (0-based in result array conceptually).
+  subroutine ComputeANDPairsFillGPU(TreeNodes, NumNodes, SortedBoxesB, NumBoxesB, RootIndex, &
+       BoxesA, NumBoxesA, Offsets, OutBoxes, OutCount)
+    integer(kind=int64), intent(in) :: NumNodes, NumBoxesB, NumBoxesA, OutCount
+    type(RTreeNode), intent(in)     :: TreeNodes(NumNodes)
+    type(Box), intent(in)           :: SortedBoxesB(NumBoxesB)
+    integer(kind=int64), intent(in) :: RootIndex
+    type(Box), intent(in)           :: BoxesA(NumBoxesA)
+    integer(kind=int64), intent(in) :: Offsets(NumBoxesA)
+    type(Box), intent(out)          :: OutBoxes(OutCount)
+
+    integer(kind=int64) :: I, J, K, ChildIdx, CurrNode, WriteIdx, Base
+    integer(kind=int64), parameter :: K_STACK_SIZE = 64
+    integer(kind=int64) :: Stack(K_STACK_SIZE)
+    integer(kind=int64) :: StackPtr
+    type(Box) :: QBox, NodeMbr, TargetBox
+    logical :: OverlapX, OverlapY
+    integer(kind=K_COORDINATE_KIND) :: ix1, iy1, ix2, iy2
+
+    if (OutCount <= 0 .or. NumBoxesA <= 0 .or. NumBoxesB <= 0 .or. NumNodes <= 0) return
+
+    !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA), Offsets(1:NumBoxesA))
+    !$omp target enter data map(alloc: OutBoxes(1:OutCount))
+
+    !$omp target teams distribute parallel do &
+    !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,Base,WriteIdx,QBox,NodeMbr,TargetBox,OverlapX,OverlapY,ix1,iy1,ix2,iy2)
+    do I = 1, NumBoxesA
+       QBox = BoxesA(I)
+       Base = Offsets(I)
+       WriteIdx = Base
+
+       NodeMbr = TreeNodes(RootIndex)%Mbr
+       OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2)
+       if (OverlapX) then
+          OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
+       else
+          OverlapY = .false.
+       end if
+
+       if (OverlapX .and. OverlapY) then
+          StackPtr = 1
+          Stack(StackPtr) = RootIndex
+          do while (StackPtr > 0)
+             CurrNode = Stack(StackPtr)
+             StackPtr = StackPtr - 1
+             if (TreeNodes(CurrNode)%IsLeaf) then
+                do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+                   J = TreeNodes(CurrNode)%ChildStart + K
+                   TargetBox = SortedBoxesB(J)
+                   OverlapX = max(TargetBox%X1, QBox%X1) < min(TargetBox%X2, QBox%X2)
+                   if (OverlapX) then
+                      OverlapY = max(TargetBox%Y1, QBox%Y1) < min(TargetBox%Y2, QBox%Y2)
+                      if (OverlapY) then
+                         ix1 = max(TargetBox%X1, QBox%X1); iy1 = max(TargetBox%Y1, QBox%Y1)
+                         ix2 = min(TargetBox%X2, QBox%X2); iy2 = min(TargetBox%Y2, QBox%Y2)
+                         if (ix2 > ix1 .and. iy2 > iy1) then
+                            WriteIdx = WriteIdx + 1_int64
+                            if (WriteIdx <= OutCount) then
+                               OutBoxes(WriteIdx)%X1 = ix1; OutBoxes(WriteIdx)%Y1 = iy1
+                               OutBoxes(WriteIdx)%X2 = ix2; OutBoxes(WriteIdx)%Y2 = iy2
+                            end if
+                         end if
+                      end if
+                   end if
+                end do
+             else
+                do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+                   ChildIdx = TreeNodes(CurrNode)%ChildStart + K
+                   NodeMbr = TreeNodes(ChildIdx)%Mbr
+                   OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2)
+                   if (OverlapX) then
+                      OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
+                      if (OverlapY) then
+                         if (StackPtr < K_STACK_SIZE) then
+                            StackPtr = StackPtr + 1
+                            Stack(StackPtr) = ChildIdx
+                         end if
+                      end if
+                   end if
+                end do
+             end if
+          end do
+       end if
+    end do
+
+    !$omp target update from(OutBoxes(1:OutCount))
+    !$omp target exit data map(release: OutBoxes(1:OutCount))
+    !$omp target exit data map(release: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA), Offsets(1:NumBoxesA))
+  end subroutine ComputeANDPairsFillGPU
+
 end module RTreeBuilderGPU
