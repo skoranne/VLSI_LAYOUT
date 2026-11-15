@@ -39,6 +39,15 @@ contains
        if(layer_idx <= size(ctx%design%layerNames)) ctx%design%layerNames(layer_idx) = trim(buf)
        ctx%design%layers(layer_idx)%n_used = 0
        ctx%design%layers(layer_idx)%n_alloc = 0
+       ! also register aliases: "layer:datatype" and "layer_datatype" for CTR references like d1:67:20
+       block
+         character(len=64) :: alias1, alias2
+         logical :: ins2
+         write(alias1,'(I0,":",I0)') layer, datatype
+         write(alias2,'(I0,"_",I0)') layer, datatype
+         call hash_put(ctx%design%ht, trim(alias1), layer_idx, ins2)
+         call hash_put(ctx%design%ht, trim(alias2), layer_idx, ins2)
+       end block
     end if
     L => ctx%design%layers(layer_idx)
     call push_box_local(L, int(x1,kind=K_COORDINATE_KIND), int(y1,kind=K_COORDINATE_KIND), &

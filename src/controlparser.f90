@@ -40,14 +40,18 @@ contains
   subroutine LoadDesignFileByExt(load_design, MAX_LAYERS)
     type(Design), intent(inout) :: load_design
     integer, intent(in) :: MAX_LAYERS
-    character(len=:), allocatable :: fn, ext
-    integer :: dot
+    character(len=:), allocatable :: fn, ext, lower_ext
+    integer :: dot, i
     fn = trim(load_design%fileName)
     dot = index(fn, '.', back=.true.)
     ext = ''
     if(dot > 0) ext = fn(dot+1:)
-    ! case-insensitive compare (simple)
-    if(ext == 'gds' .or. ext == 'GDS' .or. ext == 'oas' .or. ext == 'OAS' .or. ext == 'oasis' .or. ext == 'OASIS') then
+    lower_ext = ext
+    do i=1,len_trim(lower_ext)
+       if(lower_ext(i:i)>='A' .and. lower_ext(i:i)<='Z') lower_ext(i:i)=achar(iachar(lower_ext(i:i))+32)
+    end do
+    if(lower_ext == 'gds' .or. lower_ext == 'gdsii' .or. lower_ext == 'oas' .or. lower_ext == 'oasis') then
+       write(*,*) 'INFO: CTR loading GDSII/OASIS design: ', trim(fn)
        call LoadLayoutDBFile(load_design, MAX_LAYERS)
     else
        call parseMagicLayoutFile(load_design, MAX_LAYERS)
