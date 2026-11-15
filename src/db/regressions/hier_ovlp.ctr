@@ -1,0 +1,8 @@
+program hier_ovlp
+systeminfo
+var temporary_layers 2
+decl hierdesign d1 = ../ovlp_sq.gds
+info
+exec hierinfo d1
+exec hierextent d1
+end

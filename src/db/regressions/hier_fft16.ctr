@@ -1,0 +1,9 @@
+# Hierarchical geometrical operations regression: load GDS with hierarchy-aware flatten and report extents
+program hier_fft16
+systeminfo
+var temporary_layers 2
+decl hierdesign d1 = /home/skoranne/bsc_julia/or_out_fft16/FFT16Complex16.gds
+info
+exec hierinfo d1
+exec hierextent d1
+end
