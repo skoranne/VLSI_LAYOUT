@@ -30,7 +30,7 @@ datastructures.o:	commonmodule.o
 pnummerge.o:	datastructures.o rtree.o geometry.o gpu_pnummerge.o utilities.o
 gpu_pnummerge.o:	interaction.o
 polygon_fracture.o:	hdfdata.o
-design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o interaction.o boost_polygon_apif.o
+design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o
 design_impl.o:	design.o geometry.o boost_polygon_apif.o diskdesign_impl.o
 diskdesign_impl.o:	 utilities.o
 magparser.o:	polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o

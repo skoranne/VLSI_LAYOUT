@@ -13,10 +13,17 @@ FORTRAN_COMPILER =nvfortran
 #FCFLAGS = -g -O0 -check bounds -check all -traceback -warn all -qopenmp -qopt-report=3
 #FCFLAGS = -O3 -parallel -qopenmp -qopt-report=3
 GIT_HASH := $(shell git rev-parse --short HEAD)
+# GPU/OpenMP target tuning (nvfortran). Override as needed, e.g. make -f Makefile.nvf GPU_CC=cc121
+GPU_CC ?= ccnative
+NSYS ?= nsys
+NSYS_DELAY ?= 0
+NSYS_DUR ?= 0
+NSYS_TRACE ?= cuda,nvtx,openmp,osrt
+NSYS_OUT ?= /tmp/magparser_nvf_profile
 ifeq ($(DEBUG),1)
-   FCFLAGS = -cuda -O0 -Mbounds -g -traceback -Mchkptr -O0  -Mpreprocess -mp=gpu -fopenmp -Minfo=accel,mp
+   FCFLAGS = -cuda -O0 -Mbounds -g -traceback -Mchkptr -Mpreprocess -mp=gpu -gpu=$(GPU_CC) -fopenmp -Minfo=accel,mp
 else
-   FCFLAGS = -cuda -O3 -g -fno-strict-aliasing -Mpreprocess -mp=gpu -fopenmp -Minfo=accel,mp
+   FCFLAGS = -cuda -O3 -g -fno-strict-aliasing -Mpreprocess -mp=gpu -gpu=$(GPU_CC) -fopenmp -Minfo=accel,mp
 endif
 #FCFLAGS = -g -O3 -Mpreprocess -Minfo=accel -fopenmp -mp=gpu
 # --- Linker Variables ---
@@ -40,7 +47,7 @@ DEP_FILES = $(ALL_OBJS:.o=.d)
 
 # --- Phony Targets ---
 # Tells Make these aren't actual files to generate
-.PHONY: all clean unit_test
+.PHONY: all clean unit_test profile profile-delayed
 
 all: MAGPARSER.exe
 # This target writes a small .f90 module containing the hash
@@ -106,6 +113,22 @@ event_sorter.o:	       event_sorter.cu
 		       nvcc -arch=sm_121 -DUSE_GPU -O3 -c event_sorter.cu
 gpu_morton.o:   gpu_morton.cu
 		       nvcc -arch=sm_121 -DUSE_GPU -O3 -c gpu_morton.cu
+# Nsight Systems profiling for nvfortran+OpenMP target offload (GB10). Example:
+#   make -f Makefile.nvf profile CTR=check_interactions.ctr LAYERS=10
+#   make -f Makefile.nvf profile-delayed NSYS_DELAY=30 NSYS_DUR=60 CTR=check_interactions.ctr LAYERS=10
+CTR ?= regress_boolean_ops.ctr
+LAYERS ?= 10
+profile: MAGPARSER.exe
+	$(NSYS) profile -t $(NSYS_TRACE) --cuda-memory-usage=true --stats=true \
+	  -o $(NSYS_OUT) --force-overwrite true \
+	  ./MAGPARSER.exe $(CTR) $(LAYERS)
+
+profile-delayed: MAGPARSER.exe
+	$(NSYS) profile -t $(NSYS_TRACE) --cuda-memory-usage=true --stats=true \
+	  --delay=$(NSYS_DELAY) --duration=$(NSYS_DUR) \
+	  -o $(NSYS_OUT)_d$(NSYS_DELAY)_t$(NSYS_DUR) --force-overwrite true \
+	  ./MAGPARSER.exe $(CTR) $(LAYERS)
+
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe test_contour.exe
 
 

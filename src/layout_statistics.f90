@@ -405,7 +405,7 @@ contains
     character(len=MAX_BAR_LEN) :: bar
     integer :: printed
 
-    print *, "Top 20 Frequent W/H Signatures (Y-Axis) | Frequency (X-Axis)"
+    print *, "Top 10 Frequent W/H Signatures (Y-Axis) | Frequency (X-Axis)"
     print *, "------------------------------------------------------------"
 
     ! Find max frequency for scaling
@@ -432,7 +432,7 @@ contains
                ht%entries(i)%count, " | ", trim(bar)
 
           printed = printed + 1
-          if (printed >= 20) exit
+          if (printed >= 10) exit
        end if
     end do
   end subroutine print_histogram

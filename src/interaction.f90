@@ -8,12 +8,13 @@ module RTreeBuilderGPU
   use CommonModule
   use Utilities
   use GeometryModule
+  !use DesignModule
   use DataStructuresModule
   use RTreeBuilder
   implicit none
   private
 
-  public :: ComputeInteractionsGPU, CertifyHealingGPU
+  public :: ComputeInteractionsGPU, CertifyHealingGPU !, ComputeSelfCheckGPULayer
 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024
 
@@ -143,8 +144,12 @@ contains
        end if
     end do
 
-    ! 4. Retrieve only the populated portion of the edge buffers back to CPU memory
-    !$omp target update from(d_edge_i(1:edge_count), d_edge_k(1:edge_count))
+    ! 4. Retrieve edge count, then only the populated portion of edge buffers (minimize D2H)
+    !$omp target update from(edge_count)
+    edge_count = min(edge_count, max_expected_edges)
+    if (edge_count > 0) then
+       !$omp target update from(d_edge_i(1:edge_count), d_edge_k(1:edge_count))
+    end if
 
     !$omp end target data
 
@@ -154,8 +159,6 @@ contains
     ! ---------------------------------------------------------
 
     if (abs(overlap_area) > K_SMALL_EPSILON) overlap_perimeter = 0.0
-
-    edge_count = min(edge_count, max_expected_edges)
 
     call uf%init(num_boxes)
     do idx = 1, edge_count
@@ -312,6 +315,120 @@ contains
 
   end subroutine ComputeInteractionsGPU
 
+  !> GPU Offloaded Self checker
+  !function ComputeSelfCheckGPULayer( input_layer ) result( retval )
+  !  type(Layer), intent(inout) :: input_layer
+  !  integer(kind=int64)        :: self_check_count
+  !  logical                    :: retval
+  !  self_check_count = 0
+  !  call ComputeSelfCheckGPU( input_layer%tree%tree_nodes,size(input_layer%tree%tree_nodes,kind=int64),&
+  !       input_layer%layer_boxes, input_layer%n_used, input_layer%tree%root_index, self_check_count)
+  !  
+  !  retval = self_check_count == input_layer%n_used
+  !end function ComputeSelfCheckGPULayer
+  
+  subroutine ComputeSelfCheckGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex, KernelCount)
+    ! 1. The exact sizes MUST come first
+    integer(kind=int64), intent(in) :: NumNodes, NumBoxes
+
+    ! 2. Force Explicit-Shape (No colons allowed!)
+    type(RTreeNode), intent(in) :: TreeNodes(NumNodes)
+    type(Box), intent(in) :: SortedBoxes(NumBoxes)
+
+    integer(kind=int64), intent(in) :: RootIndex
+    integer(kind=int64), intent(out) :: KernelCount
+
+    integer(kind=int64) :: I, J, K, ChildIdx, CurrNode
+
+    ! 3. Stack size of 512 is now massive overkill, which is a good thing.
+    integer(kind=int64), parameter :: K_STACK_SIZE = 64
+    integer(kind=int64) :: Stack(K_STACK_SIZE) 
+    integer(kind=int64) :: StackPtr
+
+    type(Box) :: QBox, NodeMbr, TargetBox
+    logical :: OverlapX, OverlapY
+
+    KernelCount = 0
+
+    ! Map the explicit bounds
+    !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
+
+    ! Launch kernel
+    !$omp target teams distribute parallel do &
+    !$omp private(I, J, K, ChildIdx, CurrNode, Stack, StackPtr, &
+    !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY) &
+    !$omp reduction(+:KernelCount)
+    do I = 1, NumBoxes
+       QBox = SortedBoxes(I)
+
+       ! =======================================================
+       ! Pre-Check the Root Node so we don't push it blindly
+       ! =======================================================
+       NodeMbr = TreeNodes(RootIndex)%Mbr
+       OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2)
+       if (OverlapX) then
+          OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
+       else
+          OverlapY = .false.
+       end if
+
+       ! Prune immediately if the root itself does not overlap
+       if (.not. (OverlapX .and. OverlapY)) cycle
+
+       ! Initialize static stack
+       StackPtr = 1
+       Stack(StackPtr) = RootIndex
+
+       ! Iterative Depth-First Search
+       do while (StackPtr > 0)
+          CurrNode = Stack(StackPtr)
+          StackPtr = StackPtr - 1
+
+          ! Because we pre-check, we KNOW CurrNode already overlaps.
+          ! We no longer need to check its MBR here.
+
+          if (TreeNodes(CurrNode)%IsLeaf) then
+             ! Leaf Node: Check exact geometry intersections
+             do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+                J = TreeNodes(CurrNode)%ChildStart + K
+
+                if (J == I) then
+                   KernelCount = KernelCount + 1
+                   cycle
+                end if
+             end do
+          else
+             ! =======================================================
+             ! Internal Node: ONLY push children that actually overlap!
+             ! =======================================================
+             do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+                ChildIdx = TreeNodes(CurrNode)%ChildStart + K
+                NodeMbr = TreeNodes(ChildIdx)%Mbr
+
+                OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2)
+                if (OverlapX) then
+                   OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
+
+                   if (OverlapY) then
+                      StackPtr = StackPtr + 1
+
+                      ! GPU Guard: Prevent silent death if tree is inexplicably deep
+                      if (StackPtr <= K_STACK_SIZE) then
+                         Stack(StackPtr) = ChildIdx
+                      else
+
+                      end if
+                   end if
+                end if
+             end do
+          end if
+       end do
+    end do
+    !$omp target exit data map(release:  TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
+
+  end subroutine ComputeSelfCheckGPU
+
+  
   !> GPU Offloaded All-Query Interaction Generator (With Fast Abort)
   logical function CertifyHealingGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex) result(IsValid)
     ! 1. The exact sizes MUST come first

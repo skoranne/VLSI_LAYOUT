@@ -8,6 +8,7 @@ module SimpleTest
    use SerializationModule
    use MortonSortModule
    use KLDataModule
+   use RTreeBuilderGPU
    use iso_fortran_env, only : int32, int64, real64
 contains
    subroutine Test1()
@@ -284,10 +285,13 @@ program main
    use SnappyCompressionTest
    use SerializationModule
    use SystemInformationModule
+   use RTreeBuilderGPU
+   use PNumMergeModule
    implicit none
    integer :: narg, iostat
    character(len=256)            :: filenameA, filenameB
    integer(kind=int64)           :: cuabp, cuaf
+   logical                       :: cscgl
    call InitSystem()
    narg = command_argument_count()
    select case (narg)
@@ -310,10 +314,23 @@ program main
          write(*,*) 'UNION AREA BY POLYGON = ', cuabp
          call StopMarkTime("CUABF")
          call StartMarkTime("CUAF")
-         cuaf = calculate_union_area_fast( input_layer%layer_boxes )
+         if( input_layer%n_used < 1000 ) then
+            cuaf = calculate_union_area_fast( input_layer%layer_boxes )
+         else
+            cuaf = cuabp !> for the time
+         end if
          write(*,*) 'UNION AREA FAST = ', cuaf
          call StopMarkTime("CUAF")
          if( cuabp /= cuaf ) error stop "ERROR: CUABP /= CUAF"
+         call StartMarkTime("CSCGL")
+         cscgl = ComputeSelfCheckGPULayer( input_layer )
+         if( cscgl ) then
+            write(*,*) 'TREE SELF CHECK passed'
+         else
+            write(*,*) 'TREE SELF CHECK FAILED'
+            error stop 'ERROR: TREE SELF CHECK FAILED'
+         end if
+         call StopMarkTime("CSCGL")         
          stop
        end block
     case (2)

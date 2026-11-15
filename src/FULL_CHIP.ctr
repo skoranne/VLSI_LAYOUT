@@ -9,7 +9,7 @@ decl design d1 = FULL_CHIP.mag
 decl memory t1 = nothing
 info
 exec init t1:nothing
-RUN_LOOP(`OP1',`t1',`d1',`li1',`0.001')dnl
 exec run t1:x1 = d1:li1 ^ d1:li1m
+RUN_LOOP(`OP1',`t1',`d1',`li1m',`0.001')dnl
 flush
 end 
