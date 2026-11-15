@@ -16,6 +16,7 @@ submodule (DesignModule) DesignImplModule
    use PNumMergeModule
    use KLDataModule
    use BoostPolygonAPIModule
+   use omp_lib
    implicit none
 
 
@@ -933,11 +934,41 @@ contains
       type(Layer), intent(inout)   :: output_layer
       integer(kind=int64), intent(in) :: control_parameter, control_value
       type(Layer) :: tempLayer
+      type(Box), allocatable :: sized_boxes(:)
+      integer(kind=int64) :: i, nA
+      logical :: gpu_size
+      character(len=32) :: offload_env
+      integer :: offload_len, offload_stat
       allocate( tempLayer%layer_boxes(1) )
       !> this function does the allocation
       if( control_parameter == K_BOOST_CONTROL_SIZE ) then
-         call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&
-            K_BOOST_CONTROL_SIZE, control_value )
+         nA = input_layer_A%n_used
+         gpu_size = .false.
+#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
+         if (nA > 0 .and. control_value > 0 .and. omp_get_num_devices() > 0) then
+            gpu_size = .true.
+            call get_environment_variable('OMP_TARGET_OFFLOAD', offload_env, length=offload_len, status=offload_stat)
+            if (offload_stat == 0 .and. offload_len > 0) then
+               if (trim(offload_env) == 'DISABLED' .or. trim(offload_env) == 'disabled') gpu_size = .false.
+            end if
+         end if
+#endif
+         if (gpu_size) then
+            allocate(sized_boxes(nA))
+            sized_boxes(1:nA) = input_layer_A%layer_boxes(1:nA)
+            !$omp target teams distribute parallel do map(tofrom: sized_boxes(1:nA))
+            do i = 1, nA
+               sized_boxes(i)%x1 = sized_boxes(i)%x1 - int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%y1 = sized_boxes(i)%y1 - int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%x2 = sized_boxes(i)%x2 + int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%y2 = sized_boxes(i)%y2 + int(control_value, kind=K_COORDINATE_KIND)
+            end do
+            call MergeBoxesUsingBoostPolygon(sized_boxes, output_layer%layer_boxes)
+            if (allocated(sized_boxes)) deallocate(sized_boxes)
+         else
+            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&
+               K_BOOST_CONTROL_SIZE, control_value )
+         end if
       else if( control_parameter == K_BOOST_CONTROL_MERGE ) then
          call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&
             K_BOOST_CONTROL_MERGE, control_value )
