@@ -310,6 +310,18 @@ contains
              design_dbs(db_count)%fileName = trim(keyword(1:pos))
              call LoadDesignFileByExt(design_dbs(db_count), MAX_LAYERS)
              db_count = db_count + 1
+          else if( trim(rest(1:pos-1)) == 'hierdesign' ) then
+             rest = adjustl(rest(pos+1:))
+             pos = index( rest, ' ' )
+             call hash_put( ht, trim(rest(1:pos-1)) , db_count, ins )
+             if( .not. ins ) write (*,*) 'Duplicate db handle seen: ', trim(rest(1:pos-1))
+             allocate( design_dbs( db_count )%designName, source = trim(adjustl(rest(1:pos-1))))
+             pos = index( rest, ' ' )
+             keyword = adjustl(rest(pos+2:))
+             pos = index( keyword, ' ' )
+             design_dbs(db_count)%fileName = trim(keyword(1:pos))
+             call LoadDesignFileByExtHier(design_dbs(db_count), MAX_LAYERS)
+             db_count = db_count + 1
           else if( trim(rest(1:pos-1)) == 'memory' ) then
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
