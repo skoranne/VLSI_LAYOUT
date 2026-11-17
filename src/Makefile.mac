@@ -29,7 +29,8 @@ endif
 ifeq ($(DEBUG),1)
   FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp $(FCFLAGS_EXTRA)
 else
-  FCFLAGS = -fpp -g -O3 -qopenmp $(FCFLAGS_EXTRA)
+  # Intel ifort performance tuning (OpenMP + host-tuned codegen)
+  FCFLAGS = -fpp -g -O3 -qopenmp -xHost $(FCFLAGS_EXTRA)
 endif
 
 GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)

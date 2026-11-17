@@ -36,6 +36,15 @@ if [[ -z "${OMP_NUM_THREADS:-}" ]]; then
   export OMP_NUM_THREADS
 fi
 
+# KLayout (used by some regressions/conversion workflows)
+if [[ -z "${KLAYOUT:-}" ]]; then
+  if command -v klayout >/dev/null 2>&1; then
+    export KLAYOUT="$(command -v klayout)"
+  elif [[ "$(uname -s)" == "Darwin" && -x "/Applications/KLayout/klayout.app/Contents/MacOS/klayout" ]]; then
+    export KLAYOUT="/Applications/KLayout/klayout.app/Contents/MacOS/klayout"
+  fi
+fi
+
 # Locate executable: explicit > local src build > repo bin > PATH
 find_exe() {
   if [[ -n "${MAGPARSER_EXE:-}" ]]; then

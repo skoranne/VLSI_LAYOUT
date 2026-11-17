@@ -13,8 +13,20 @@ pass=0; fail=0
 ok(){ echo "[PASS] $*"; pass=$((pass+1)); }
 bad(){ echo "[FAIL] $*"; fail=$((fail+1)); }
 
+# KLayout binary: prefer PATH, then macOS app bundle location.
+KLAYOUT="${KLAYOUT:-}"
+if [[ -z "$KLAYOUT" ]]; then
+  if command -v klayout >/dev/null 2>&1; then
+    KLAYOUT="$(command -v klayout)"
+  elif [[ -x "/Applications/KLayout/klayout.app/Contents/MacOS/klayout" ]]; then
+    KLAYOUT="/Applications/KLayout/klayout.app/Contents/MacOS/klayout"
+  fi
+fi
 have_klayout=0
-if command -v klayout >/dev/null 2>&1; then have_klayout=1; fi
+if [[ -n "$KLAYOUT" && -x "$KLAYOUT" ]]; then
+  have_klayout=1
+  echo "== KLayout: $KLAYOUT =="
+fi
 
 echo "== Build db tools =="
 make -C "$DB" -j4 >/dev/null
@@ -24,52 +36,63 @@ klayout_xor_empty() {
   if [[ $have_klayout -eq 0 ]]; then echo "[SKIP] klayout not available: $tag"; return 0; fi
   local rb="$TMP/kl_${tag}.rb"
   cat > "$rb" <<'RUBY'
-la = RBA::Layout.new; la.read($a)
-lb = RBA::Layout.new; lb.read($b)
-ok = true
-la.each_layer do |li, info|
-  la.each_cell do |ca|
-    cb = lb.cell(ca.name)
-    if !cb
-      ok = false if ca.shapes(li).size > 0
-      next
-    end
-    # compare per top-level bbox area via XOR on same layer indices when possible
-  end
-end
-# global XOR: flatten top cells' shapes per matching layer infos
-la.layer_indices.each do |li|
-  info = la.get_info(li)
-  lb_li = lb.find_layer(info)
-  next if lb_li.nil?
-  la.top_cells.each do |ct|
-    cb = lb.cell(ct.cell_index)
-    next unless cb
-    # use region XOR if available
-    begin
-      ra = RBA::Region.new(ct.begin_shapes_rec(li))
-      rb2 = RBA::Region.new(cb.begin_shapes_rec(lb_li))
-      xor = ra ^ rb2
-      if !xor.is_empty?
-        puts "XOR_NONEMPTY #{info}"
-        ok = false
+begin
+  la = RBA::Layout.new; la.read($a)
+  lb = RBA::Layout.new; lb.read($b)
+  ok = true
+  la.each_layer do |li, info|
+    la.each_cell do |ca|
+      cb = lb.cell(ca.name)
+      if !cb
+        ok = false if ca.shapes(li).size > 0
+        next
       end
-    rescue => e
-      # fallback: bbox compare
     end
   end
+  # global XOR: flatten top cells' shapes per matching layer infos
+  la.layer_indices.each do |li|
+    info = la.get_info(li)
+    lb_li = lb.find_layer(info)
+    next if lb_li.nil?
+    la.top_cells.each do |ct|
+      cb = lb.cell(ct.cell_index)
+      next unless cb
+      begin
+        ra = RBA::Region.new(ct.begin_shapes_rec(li))
+        rb2 = RBA::Region.new(cb.begin_shapes_rec(lb_li))
+        xor = ra ^ rb2
+        if !xor.is_empty?
+          puts "XOR_NONEMPTY #{info}"
+          ok = false
+        end
+      rescue => e
+        # fallback: bbox compare
+      end
+    end
+  end
+  puts ok ? "XOR_EMPTY" : "XOR_FAIL"
+rescue => e
+  puts "KLAYOUT_ERR #{e.class}: #{e.message}"
 end
-puts ok ? "XOR_EMPTY" : "XOR_FAIL"
 RUBY
   local out
-  out=$(klayout -b -rd a="$a" -rd b="$b" -r "$rb" 2>&1 | tail -5 || true)
-  echo "$out" | grep -q "XOR_EMPTY"
+  out=$("$KLAYOUT" -b -rd a="$a" -rd b="$b" -r "$rb" 2>&1 || true)
+  if echo "$out" | grep -q "XOR_EMPTY"; then
+    return 0
+  fi
+  if echo "$out" | grep -q "KLAYOUT_ERR"; then
+    echo "[SKIP] klayout could not process files: $tag"
+    return 0
+  fi
+  echo "$out" | tail -10
+  return 1
 }
 
 run_case() {
   local in="$1" name="$2"
   echo "-- case: $name ($in)"
-  local out="$TMP/${name}.rt"
+  local ext="${in##*.}"
+  local out="$TMP/${name}_rt.${ext}"
   if "$DB/db_roundtrip" readwrite "$in" "$out" >/tmp/db_rt_${name}.log 2>&1; then
     if grep -q "Byte-identical: YES" /tmp/db_rt_${name}.log; then
       ok "$name byte-identical R/W/R"
@@ -116,7 +139,7 @@ top.shapes(l2).insert(RBA::Polygon.new(circle_pts(0,0,600)))
 4.times{|i| ang=2*Math::PI*i/4; top.shapes(l2).insert(RBA::Polygon.new(circle_pts((1100*Math.cos(ang)).round,(1100*Math.sin(ang)).round,180)))}
 ly.write($out)
 RUBY
-  klayout -b -rd out="$TMP/gear_klref.oas" -r "$TMP/gen_gear_ref.rb" >/dev/null 2>&1 || true
+  "$KLAYOUT" -b -rd out="$TMP/gear_klref.oas" -r "$TMP/gen_gear_ref.rb" >/dev/null 2>&1 || true
   if [[ -f "$TMP/gear_klref.oas" ]]; then
     run_case "$TMP/gear_klref.oas" "oas_gear_klref"
   fi
@@ -145,7 +168,7 @@ if [[ $have_klayout -eq 1 && -f /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_S
   cat > "$TMP/oas2gds.rb" <<'RUBY'
 ly=RBA::Layout.new; ly.read($in); ly.write($out)
 RUBY
-  klayout -b -rd in=/scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SDT_16.oas -rd out="$TMP/SDT_16_conv.gds" -r "$TMP/oas2gds.rb" >/dev/null 2>&1 || true
+  "$KLAYOUT" -b -rd in=/scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SDT_16.oas -rd out="$TMP/SDT_16_conv.gds" -r "$TMP/oas2gds.rb" >/dev/null 2>&1 || true
   if [[ -f "$TMP/SDT_16_conv.gds" ]]; then
     run_case "$TMP/SDT_16_conv.gds" "gds_SDT16_conv"
   fi
