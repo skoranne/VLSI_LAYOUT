@@ -12,6 +12,11 @@ module CommonModule
   integer(kind=int64), parameter :: K_BOOST_CONTROL_XOR = 0, K_BOOST_CONTROL_OR = 1, &
        K_BOOST_CONTROL_AND = 2, K_BOOST_CONTROL_NOT = 3,&
        K_BOOST_CONTROL_MERGE = 4, K_BOOST_CONTROL_SIZE = 5
+  integer(kind=int64), parameter :: K_TOPO_INTERACT = 101, K_TOPO_NOT_INTERACT = 102, &
+       K_TOPO_CUT = 103, K_TOPO_NOT_CUT = 104, &
+       K_TOPO_TOUCH = 105, K_TOPO_NOT_TOUCH = 106, &
+       K_TOPO_INSIDE = 107, K_TOPO_NOT_INSIDE = 108, &
+       K_TOPO_OUTSIDE = 109, K_TOPO_NOT_OUTSIDE = 110
   integer, parameter             :: K_TEMPORARY_LAYER_MEMORY = 1, K_TEMPORARY_LAYER_DISK = 2
   integer(kind=K_COORDINATE_KIND):: PRECISION
   integer                        :: debug_verbosity = 0
@@ -25,7 +30,10 @@ module CommonModule
        TrackerCell, K_SMALL_EPSILON, K_BOOST_CONTROL_XOR, K_BOOST_CONTROL_OR, K_BOOST_CONTROL_AND,&
        K_BOOST_CONTROL_NOT, K_BOOST_CONTROL_MERGE, K_BOOST_CONTROL_SIZE, debug_verbosity, abort_on_xor,&
        abort_on_assert_zero, temporary_layers, K_COMPRESSION_METHOD_TO_USE, K_TEMPORARY_LAYER_MEMORY, &
-       K_TEMPORARY_LAYER_DISK, beep, CODEC_VERSION, K_FRAME_THRESHOLD
+       K_TEMPORARY_LAYER_DISK, beep, CODEC_VERSION, K_FRAME_THRESHOLD,&
+       K_TOPO_INTERACT, K_TOPO_NOT_INTERACT, K_TOPO_CUT, K_TOPO_NOT_CUT, &
+       K_TOPO_TOUCH, K_TOPO_NOT_TOUCH, K_TOPO_INSIDE, K_TOPO_NOT_INSIDE, &
+       K_TOPO_OUTSIDE, K_TOPO_NOT_OUTSIDE
 
   type :: XYTracker
      integer(kind=K_COORDINATE_KIND) :: X, Y

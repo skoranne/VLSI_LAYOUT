@@ -673,7 +673,27 @@ contains
                      case ('XOR')
                         !> d1:poly XOR d2:poly
                         !write(*,*) 'Found PRIMARY_OPERATOR = XOR'
-                        call CalculateXOR(rhs1_layer, rhs2_layer, lhs_layer )                        
+                        call CalculateXOR(rhs1_layer, rhs2_layer, lhs_layer )
+                     case ('INTERACT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_INTERACT)
+                     case ('NOT_INTERACT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_INTERACT)
+                     case ('CUT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_CUT)
+                     case ('NOT_CUT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_CUT)
+                     case ('TOUCH')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_TOUCH)
+                     case ('NOT_TOUCH')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_TOUCH)
+                     case ('INSIDE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_INSIDE)
+                     case ('NOT_INSIDE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_INSIDE)
+                     case ('OUTSIDE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_OUTSIDE)
+                     case ('NOT_OUTSIDE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_OUTSIDE)
                      case ('COPY')
                         !> d1:poly COPY nothing
                         !if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"
