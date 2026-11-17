@@ -4,6 +4,7 @@
 #include <functional>
 #include <set>
 #include <algorithm>
+#include <unordered_map>
 
 static void transform_point(const LdbTransform& t, int64_t ix, int64_t iy, int64_t& ox, int64_t& oy){
     double x = (double)ix * t.mag;
@@ -44,6 +45,72 @@ static void compose_transform(const LdbTransform& parent, const LdbTransform& in
     out.cols = 1; out.rows = 1; out.dx=out.dy=out.row_dx=out.row_dy=0;
 }
 
+// Compute bbox of an axis-aligned repetition array given one element's bbox and repetition params.
+// For general rotation/mirror this is approximate via corners; for orthogonal (common) it's exact.
+static void repetition_array_bbox(const LdbTransform& rep, int64_t x1,int64_t y1,int64_t x2,int64_t y2,
+                                  int64_t& ax1,int64_t& ay1,int64_t& ax2,int64_t& ay2){
+    int64_t cols = rep.cols < 1 ? 1 : rep.cols;
+    int64_t rows = rep.rows < 1 ? 1 : rep.rows;
+    if(cols==1 && rows==1){ ax1=x1; ay1=y1; ax2=x2; ay2=y2; return; }
+    // compute bbox over all 4 corners of the array grid of element bboxes
+    ax1=ax2=0; ay1=ay2=0; bool first=true;
+    int64_t lastc = cols-1, lastr = rows-1;
+    auto add_pt=[&](int64_t px,int64_t py){
+        if(first){ ax1=ax2=px; ay1=ay2=py; first=false; }
+        else { if(px<ax1)ax1=px; if(px>ax2)ax2=px; if(py<ay1)ay1=py; if(py>ay2)ay2=py; }
+    };
+    // corners of element bbox translated by array offsets at (0,0),(lastc,0),(0,lastr),(lastc,lastr)
+    int64_t corners_c[2] = {0, lastc};
+    int64_t corners_r[2] = {0, lastr};
+    for(int ir=0; ir<2; ++ir){
+        for(int ic=0; ic<2; ++ic){
+            int64_t c=corners_c[ic], r=corners_r[ir];
+            int64_t ox = c*rep.dx + r*rep.row_dx;
+            int64_t oy = c*rep.dy + r*rep.row_dy;
+            add_pt(x1+ox, y1+oy); add_pt(x2+ox, y1+oy);
+            add_pt(x2+ox, y2+oy); add_pt(x1+ox, y2+oy);
+        }
+    }
+}
+
+// Repetition-aware hierarchical extent with memoization: computes flattened bbox of a cell once.
+static bool cell_extent_flat(LdbFile* f, const std::string& cname,
+                             std::unordered_map<std::string, ldb_extent_t>& memo,
+                             std::set<std::string>& visiting,
+                             ldb_extent_t& out){
+    auto mit = memo.find(cname);
+    if(mit != memo.end()){ out = mit->second; return out.valid; }
+    auto it = f->cell_index.find(cname);
+    if(it == f->cell_index.end()){ out.valid=0; memo[cname]=out; return false; }
+    // cycle guard
+    if(visiting.count(cname)){ out.valid=0; return false; }
+    visiting.insert(cname);
+    auto& cell = f->cells[it->second];
+    ldb_extent_t ext{0,0,0,0,0};
+    // local geometry bbox
+    for(auto& b : cell.boxes){
+        ldb_extent_add_point(ext, b.x1,b.y1); ldb_extent_add_point(ext, b.x2,b.y2);
+    }
+    // instances
+    for(auto& inst : cell.instances){
+        ldb_extent_t child_ext{0,0,0,0,0};
+        if(!cell_extent_flat(f, inst.ref_name, memo, visiting, child_ext)) continue;
+        // transform child bbox by instance transform (single)
+        LdbTransform tr = inst.tr; tr.cols=1; tr.rows=1;
+        int64_t x1,y1,x2,y2;
+        transform_bbox(tr, child_ext.xmin, child_ext.ymin, child_ext.xmax, child_ext.ymax, x1,y1,x2,y2);
+        // apply repetition array analytically (compressed/repeated layout)
+        int64_t ax1,ay1,ax2,ay2;
+        repetition_array_bbox(inst.tr, x1,y1,x2,y2, ax1,ay1,ax2,ay2);
+        ldb_extent_t aext{ax1,ay1,ax2,ay2,1};
+        ldb_extent_merge(ext, aext);
+    }
+    visiting.erase(cname);
+    out = ext; memo[cname]=ext;
+    return ext.valid;
+}
+
+// For hierarchical iteration, emit boxes. Use repetition expansion but avoid per-call overhead where possible.
 static void hier_iter_cell(LdbFile* f, const std::string& cname, const LdbTransform& cur_tr,
                            int depth, int max_depth, ldb_box_cb cb, void* ud,
                            std::set<std::string>& visiting){
@@ -61,7 +128,7 @@ static void hier_iter_cell(LdbFile* f, const std::string& cname, const LdbTransf
     // recurse into instances if depth allows
     if(max_depth < 0 || depth < max_depth){
         for(auto& inst : cell.instances){
-            // expand array/repetition
+            // expand array/repetition (OASIS repetition-aware)
             int64_t cols = inst.tr.cols < 1 ? 1 : inst.tr.cols;
             int64_t rows = inst.tr.rows < 1 ? 1 : inst.tr.rows;
             for(int64_t r=0; r<rows; ++r){
@@ -108,6 +175,27 @@ static void ext_hier_cb(void* ud, const char*, int, int, int, int64_t x1,int64_t
 
 extern "C" int ldb_extent_whole_hier(ldb_file_t* fh, const char* top_cell, ldb_extent_t* out){
     if(!fh||!out) return -1;
+    auto* f=(LdbFile*)fh;
+    std::string top = (top_cell && top_cell[0]) ? std::string(top_cell) : std::string();
+    std::unordered_map<std::string, ldb_extent_t> memo;
+    memo.reserve(f->cells.size()*2);
+    ldb_extent_t result{0,0,0,0,0};
+    auto compute_one=[&](const std::string& cname){
+        std::set<std::string> visiting;
+        ldb_extent_t e{0,0,0,0,0};
+        if(cell_extent_flat(f, cname, memo, visiting, e)) ldb_extent_merge(result, e);
+    };
+    if(!top.empty()){
+        compute_one(top);
+    } else {
+        std::map<std::string,int> indeg;
+        for(auto& c: f->cells){ indeg[c.name]; for(auto& r: c.refs) indeg[r]++; for(auto& ins: c.instances) indeg[ins.ref_name]++; }
+        bool any=false;
+        for(auto& c: f->cells){ if(indeg[c.name]==0){ any=true; compute_one(c.name); } }
+        if(!any){ for(auto& c: f->cells) compute_one(c.name); }
+    }
+    if(result.valid){ *out = result; return 0; }
+    // fallback to box iteration if memoized extent unavailable
     ExtHierCtx ctx;
     if(ldb_iterate_boxes_hier(fh, top_cell, -1, ext_hier_cb, &ctx) != 0) return -1;
     *out = ctx.ext; return ctx.ext.valid?0:1;

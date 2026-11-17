@@ -1,5 +1,6 @@
 #include "layoutdb.h"
 #include "layoutdb_hier.h"
+#include "layoutdb_internal.hpp"
 #include <cstdio>
 
 int main(int argc, char** argv){
@@ -32,6 +33,8 @@ int main(int argc, char** argv){
         fprintf(stdout, "FLAT_EXTENT %lld %lld %lld %lld\n",
             (long long)fe.xmin,(long long)fe.ymin,(long long)fe.xmax,(long long)fe.ymax);
     }
+    const char* info = ((LdbFile*)f)->error.c_str();
+    if(info && info[0]) fprintf(stdout, "INFO: %s\n", info);
     ldb_close(f);
     return 0;
 }

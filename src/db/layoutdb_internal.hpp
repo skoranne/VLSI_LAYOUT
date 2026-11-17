@@ -37,8 +37,9 @@ struct LdbCell {
     std::map<std::pair<int,int>, ldb_extent_t> layer_ext;
     ldb_extent_t cell_ext{0,0,0,0,0};
     std::set<std::string> refs;
-    std::vector<LdbBoxElem> boxes; // element bboxes (local)
-    std::vector<LdbInstance> instances; // hierarchical placements
+    std::vector<LdbBoxElem> boxes; // element bboxes (local), may be cleared after compaction
+    std::vector<uint8_t> boxes_compact; // delta+varint entropy-encoded box stream
+    std::vector<LdbInstance> instances; // hierarchical placements (repeated layout preserved)
 };
 
 struct LdbFile {
