@@ -79,6 +79,43 @@ contains
     end if
   end subroutine LoadDesignFileByExtHier
 
+  subroutine ensure_layer_capacity(d, idx)
+    type(Design), intent(inout) :: d
+    integer, intent(in) :: idx
+    type(Layer), allocatable :: tmp_layers(:)
+    character(len=1024), allocatable :: tmp_names(:)
+    integer :: oldn, oldn_names, newn, i
+
+    if (allocated(d%layers)) then
+       oldn = size(d%layers)
+    else
+       oldn = 0
+    end if
+    if (allocated(d%layerNames)) then
+       oldn_names = size(d%layerNames)
+    else
+       oldn_names = 0
+    end if
+    if (idx <= oldn .and. idx <= oldn_names) return
+
+    newn = max(1, max(oldn, oldn_names))
+    if (newn < idx) newn = idx
+    newn = max(newn, max(oldn, oldn_names) + max(oldn, oldn_names)/2 + 8)
+
+    if (.not. allocated(d%layers) .or. oldn < newn) then
+       allocate(tmp_layers(newn))
+       if (allocated(d%layers) .and. oldn > 0) tmp_layers(1:oldn) = d%layers(1:oldn)
+       call move_alloc(tmp_layers, d%layers)
+    end if
+
+    if (.not. allocated(d%layerNames) .or. oldn_names < newn) then
+       allocate(tmp_names(newn))
+       tmp_names = ''
+       if (allocated(d%layerNames) .and. oldn_names > 0) tmp_names(1:oldn_names) = d%layerNames(1:oldn_names)
+       call move_alloc(tmp_names, d%layerNames)
+    end if
+  end subroutine ensure_layer_capacity
+
   !=================================================================
   ! 1) GetLayerFromDBName – the routine you asked for.
   !=================================================================
@@ -408,6 +445,7 @@ contains
              pos  = index( rest, ' ')
              lhs_layer_index = hash_nitems( design_dbs( lhs_db_index )%ht ) + 1
              call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
+             call ensure_layer_capacity( design_dbs(lhs_db_index), lhs_layer_index )
              if( .not. ins ) then
                 write(*,*) 'ERROR: Unable to INIT layer: ', trim(rest(1:pos-1)), ' at index: ', lhs_layer_index
              else
@@ -450,6 +488,7 @@ contains
                 lhs_layer_index = hash_nitems(design_dbs( lhs_db_index )%ht)+1
                 call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
                 if( .not. ins ) error stop "DB HASH TABLE CORRUPTED"
+                call ensure_layer_capacity( design_dbs(lhs_db_index), lhs_layer_index )
                 !> we have to decide temporary layer format
                 associate( resolved_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index) )
                   lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)

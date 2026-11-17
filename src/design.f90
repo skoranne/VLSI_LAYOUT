@@ -1147,7 +1147,7 @@ contains
     integer :: offload_len, offload_stat
     !> preprocess A,B (builds RTrees/sorting as needed)
     !$omp parallel default(shared)
-    !$omp single nowait
+    !$omp single
     !$omp task
     call PreprocessLayer( input_layer_A )
     !$omp end task

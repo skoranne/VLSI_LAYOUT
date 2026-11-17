@@ -1,0 +1,115 @@
+################################################################################
+# File   : Makefile.mac
+# Purpose: Build MAGPARSER.exe on macOS with Intel classic ifort (OneAPI 2022.x)
+################################################################################
+
+# --- Toolchain ---
+FORTRAN_COMPILER ?= /opt/intel/oneapi/compiler/2022.2.1/mac/bin/intel64/ifort
+FC := $(FORTRAN_COMPILER)
+CXX ?= g++
+AR ?= ar
+
+DEBUG ?= 0
+USE_HDF5 ?= 0
+
+# --- Local dependency paths (override on command line if needed) ---
+BOOST_DIR ?= /Users/skoranne/boost_1_80_0
+SNAPPY_PREFIX ?= /opt/intel/oneapi/intelpython/python3.9/envs/2022.2.1
+ZSTD_PREFIX ?= /usr/local/opt/zstd
+
+CPPFLAGS_EXTRA ?= -I$(SNAPPY_PREFIX)/include -I$(ZSTD_PREFIX)/include
+
+ifeq ($(USE_HDF5),1)
+  FCFLAGS_EXTRA += -DUSE_HDF5
+  LDLIBS_HDF5 = -lhdf5_fortran -lhdf5
+else
+  LDLIBS_HDF5 =
+endif
+
+ifeq ($(DEBUG),1)
+  FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp $(FCFLAGS_EXTRA)
+else
+  FCFLAGS = -fpp -g -O3 -qopenmp $(FCFLAGS_EXTRA)
+endif
+
+GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+
+# --- Linker ---
+LDFLAGS ?= -L$(SNAPPY_PREFIX)/lib -L$(ZSTD_PREFIX)/lib
+LDLIBS ?= db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd $(LDLIBS_HDF5)
+
+LIBRARY = libmagparser.a
+
+include DEPENDENCIES.txt
+
+# --- Phony ---
+.PHONY: all clean unit_test
+
+all: MAGPARSER.exe
+
+version_mod.f90: ../.git/HEAD
+	@printf 'module version_mod\n' > $@
+	@printf '  implicit none\n' >> $@
+	@printf "  character(len=*), parameter :: commit_hash = '$(GIT_HASH)'\n" >> $@
+	@printf 'end module version_mod\n' >> $@
+
+# --- Pattern rules ---
+%.o: %.f90
+	$(FC) $(FCFLAGS) -c $< -o $@
+
+%.o: %.F90
+	$(FC) $(FCFLAGS) -c $< -o $@
+
+# --- Library ---
+$(LIBRARY): $(LIB_OBJS)
+	$(AR) rcs $@ $^
+
+# --- Executables ---
+MAGPARSER.exe: mainmagparser.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_contour.exe: test_contour.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_morton.exe: test_morton.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+CONVERT.exe: test_polygonfracture.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_boxmerge.exe: test_boxmerge.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_skiplist.exe: test_skiplist.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+generate_bin.exe: generate_bin.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_interaction.exe: test_interaction.f90 $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_repetition.exe: test_repetition.f90 $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+# --- C/C++ support objects ---
+BOOST_XOR_CHECKER.exe: boost_xor_checker.cpp
+	$(CXX) -O3 -funroll-loops -I$(BOOST_DIR) boost_xor_checker.cpp -o $@
+
+snappy_api.o: snappy_api.cpp
+	$(CXX) -O3 -Wall $(CPPFLAGS_EXTRA) -c snappy_api.cpp -o $@
+
+boost_polygon_api.o: boost_polygon_api.cpp
+	$(CXX) -O3 -funroll-loops -I$(BOOST_DIR) $(CPPFLAGS_EXTRA) -c boost_polygon_api.cpp -o $@
+
+# CPU stubs for CUDA sources (same approach as Makefile.ifx)
+event_sorter.o: event_sorter.cu
+	$(CXX) -x c++ -O3 -c event_sorter.cu -o $@
+
+gpu_morton.o: gpu_morton.cu
+	$(CXX) -O3 -c -x c++ gpu_morton.cu -o $@
+
+unit_test: test_contour.exe test_morton.exe test_polygonfracture.exe test_boxmerge.exe test_skiplist.exe
+
+clean:
+	rm -f *.o *.mod *.a *.exe *.optrpt version_mod.f90

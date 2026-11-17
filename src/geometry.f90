@@ -716,7 +716,7 @@ contains
     ! during the recursive splitting steps.
     allocate(workspace(size(arr)))
     !$omp parallel default(none) shared(arr,workspace) firstprivate(node_capacity)
-    !$omp single nowait
+    !$omp single
     call omt_pack_recursive(arr, 1_int64, int(size(arr),kind=int64), node_capacity, workspace)
     !$omp end single
     !$omp end parallel
@@ -724,7 +724,7 @@ contains
     deallocate(workspace)
   end subroutine omt_pack
   !#define OLD_WORKING_OMT
-  #ifdef OLD_WORKING_OMT
+#ifdef OLD_WORKING_OMT
   ! Recursive Top-Down Partitioning
   recursive subroutine omt_pack_recursive(arr, start_idx, end_idx, node_capacity, workspace)
     type(Box), intent(inout), dimension(:) :: arr
@@ -880,7 +880,7 @@ contains
     end if
 
   end subroutine omt_pack_recursive
-  #endif
+#endif
   ! Helper Subroutine: Computes the cost (Overlap and Area) of a proposed split
   subroutine evaluate_split(arr, start_idx, split_idx, end_idx, overlap, total_area)
     type(Box), intent(in), dimension(:) :: arr

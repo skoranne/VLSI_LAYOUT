@@ -996,7 +996,7 @@ contains
       type(Layer), intent(inout) :: output_layer
       type(Layer)                :: AnotB, BnotA
       !$omp parallel default(shared)
-      !$omp single nowait
+      !$omp single
       !$omp task
       call PreprocessLayer( input_layer_A )
       !$omp end task
@@ -1009,7 +1009,7 @@ contains
       AnotB%layerState = LAYER_STATE_EVERYTHING
       BnotA%layerState = LAYER_STATE_EVERYTHING
       !$omp parallel default(shared)
-      !$omp single nowait
+      !$omp single
       !$omp task
       call CalculateFrameNOT( input_layer_A, input_layer_B, AnotB )
       !$omp end task

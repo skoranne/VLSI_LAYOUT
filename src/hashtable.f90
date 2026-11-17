@@ -55,9 +55,9 @@ contains
     ht%nitems   = 0
 
     allocate ( ht%bucket(nb) )
-    !do i = 1, nb
-    !   ht%bucket(i)%next => null()
-    !end do
+    do i = 1, nb
+       ht%bucket(i)%next => null()
+    end do
   end subroutine hash_create
 
 
@@ -70,12 +70,15 @@ contains
     integer,      intent(in) :: nbuckets
     integer                  :: h
     integer                  :: i, c
+    integer(kind=8)          :: hh
 
-    h = 5381
+    hh = 5381_8
     do i = 1, len_trim(key)
        c = iachar(key(i:i))
-       h = mod( (h*33) + c, nbuckets )
+       hh = mod(hh*33_8 + int(c,8), int(nbuckets,8))
     end do
+    if (hh < 0_8) hh = hh + int(nbuckets,8)
+    h = int(hh)
   end function hash_fun
 
 

@@ -3,7 +3,7 @@ module LayoutDBLoaderModule
   use iso_c_binding
   use CommonModule
   use hash_mod
-  use DesignModule, only: Design, Layer
+  use DesignModule
   use GeometryModule, only: Box
   use layoutdb_f_api
   implicit none
@@ -23,7 +23,6 @@ contains
     integer(c_int), value :: layer, datatype, element_kind
     integer(c_int64_t), value :: x1,y1,x2,y2
     type(ldb_load_ctx), pointer :: ctx
-    type(Layer), pointer :: L
     integer :: layer_idx
     logical :: ins
     character(len=64) :: buf
@@ -49,8 +48,7 @@ contains
          call hash_put(ctx%design%ht, trim(alias2), layer_idx, ins2)
        end block
     end if
-    L => ctx%design%layers(layer_idx)
-    call push_box_local(L, int(x1,kind=K_COORDINATE_KIND), int(y1,kind=K_COORDINATE_KIND), &
+    call push_box_local(ctx%design, layer_idx, int(x1,kind=K_COORDINATE_KIND), int(y1,kind=K_COORDINATE_KIND), &
                         int(x2,kind=K_COORDINATE_KIND), int(y2,kind=K_COORDINATE_KIND))
     if(int(x1,kind=K_COORDINATE_KIND) < ctx%design%DESIGN_EXTENT%x1) ctx%design%DESIGN_EXTENT%x1 = int(x1,kind=K_COORDINATE_KIND)
     if(int(y1,kind=K_COORDINATE_KIND) < ctx%design%DESIGN_EXTENT%y1) ctx%design%DESIGN_EXTENT%y1 = int(y1,kind=K_COORDINATE_KIND)
@@ -58,26 +56,29 @@ contains
     if(int(y2,kind=K_COORDINATE_KIND) > ctx%design%DESIGN_EXTENT%y2) ctx%design%DESIGN_EXTENT%y2 = int(y2,kind=K_COORDINATE_KIND)
   end subroutine box_callback
 
-  subroutine push_box_local(L, x1,y1,x2,y2)
-    type(Layer), intent(inout) :: L
+  subroutine push_box_local(d, layer_idx, x1,y1,x2,y2)
+    type(Design), intent(inout) :: d
+    integer, intent(in) :: layer_idx
     integer(kind=K_COORDINATE_KIND), intent(in) :: x1,y1,x2,y2
     type(Box), allocatable :: tmp(:)
     integer :: n, na
-    n = int(L%n_used); na = int(L%n_alloc)
-    if(.not. allocated(L%layer_boxes)) then
-       allocate(L%layer_boxes(4)); L%n_alloc=4; na=4; L%n_used=0; n=0
-    end if
-    if(n >= na) then
-       allocate(tmp(max(4,na*2)))
-       if(na>0 .and. allocated(L%layer_boxes)) tmp(1:n)=L%layer_boxes(1:n)
-       call move_alloc(tmp, L%layer_boxes)
-       L%n_alloc = max(4,na*2)
-    end if
-    L%n_used = L%n_used + 1
-    L%layer_boxes(L%n_used)%x1 = min(x1,x2)
-    L%layer_boxes(L%n_used)%y1 = min(y1,y2)
-    L%layer_boxes(L%n_used)%x2 = max(x1,x2)
-    L%layer_boxes(L%n_used)%y2 = max(y1,y2)
+    associate(L => d%layers(layer_idx))
+      n = int(L%n_used); na = int(L%n_alloc)
+      if(.not. allocated(L%layer_boxes)) then
+         allocate(L%layer_boxes(4)); L%n_alloc=4; na=4; L%n_used=0; n=0
+      end if
+      if(n >= na) then
+         allocate(tmp(max(4,na*2)))
+         if(na>0 .and. allocated(L%layer_boxes)) tmp(1:n)=L%layer_boxes(1:n)
+         call move_alloc(tmp, L%layer_boxes)
+         L%n_alloc = max(4,na*2)
+      end if
+      L%n_used = L%n_used + 1
+      L%layer_boxes(L%n_used)%x1 = min(x1,x2)
+      L%layer_boxes(L%n_used)%y1 = min(y1,y2)
+      L%layer_boxes(L%n_used)%x2 = max(x1,x2)
+      L%layer_boxes(L%n_used)%y2 = max(y1,y2)
+    end associate
   end subroutine push_box_local
 
   subroutine load_ldb_common(load_design, MAX_LAYERS, fh_out, ctx)

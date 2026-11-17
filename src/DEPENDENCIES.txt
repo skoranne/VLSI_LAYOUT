@@ -9,36 +9,37 @@ LIB_OBJS = commonmodule.o systeminfo.o hashtable.o geometry.o design.o \
 	   gpu_morton.o layoutdb_f_api.o layoutdb_loader.o
 
 
+boxbytestream.o: commonmodule.o
 box_compression.o: boxbytestream.o snappy_apif.o
-box_codec.o:	   snappy_apif.o
-snappy_apif.o:	   snappy_api.o
-serialization.o:   box_codec.o
+box_codec.o: commonmodule.o snappy_apif.o
+snappy_apif.o: snappy_api.o
+serialization.o: box_codec.o
 diskdesign_impl.o: serialization.o box_codec.o snappy_apif.o
-systeminfo.o:	commonmodule.o version_mod.o
-hashtable.o:	systeminfo.o
-geometry.o:	hashtable.o
-boost_polygon_apif.o:	boost_polygon_api.o geometry.o
+systeminfo.o: commonmodule.o version_mod.o
+hashtable.o: systeminfo.o
+geometry.o: hashtable.o
+boost_polygon_apif.o: boost_polygon_api.o geometry.o
 gpu_morton_sort.o: commonmodule.o geometry.o
-morton.o:	commonmodule.o geometry.o
-rtree.o:	geometry.o
-gridlayer.o:	design_impl.o
-boxmerge.o:	geometry.o
-contour.o:	geometry.o polygon_fracture.o
-hdfdata.o:	geometry.o
-kldata.o:	geometry.o
-datastructures.o:	commonmodule.o
-pnummerge.o:	datastructures.o rtree.o geometry.o gpu_pnummerge.o utilities.o
-gpu_pnummerge.o:	interaction.o
-polygon_fracture.o:	hdfdata.o
-design.o:	datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o
-design_impl.o:	design.o geometry.o boost_polygon_apif.o diskdesign_impl.o
-diskdesign_impl.o:	 utilities.o
-magparser.o:	polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
-mainmagparser.o:	magparser.o controlparser.o
-controlparser.o:	design.o layoutdb_loader.o
-layoutdb_loader.o:	layoutdb_f_api.o design.o geometry.o commonmodule.o hashtable.o
-systeminfo_gpu.o:	systeminfo.o
-interaction.o:	gpu_morton_sort.o utilities.o
-RLEMerge.o:	gpu_morton_sort.o interaction.o
-event_sorter_apif.o:		  event_sorter.o polygon_fracture.o
+morton.o: commonmodule.o geometry.o
+rtree.o: geometry.o
+gridlayer.o: design_impl.o
+boxmerge.o: geometry.o
+contour.o: geometry.o polygon_fracture.o
+hdfdata.o: geometry.o
+kldata.o: geometry.o
+datastructures.o: commonmodule.o
+pnummerge.o: datastructures.o rtree.o geometry.o gpu_pnummerge.o utilities.o
+gpu_pnummerge.o: interaction.o
+polygon_fracture.o: commonmodule.o hdfdata.o
+design.o: datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o
+design_impl.o: commonmodule.o design.o geometry.o boost_polygon_apif.o diskdesign_impl.o
+diskdesign_impl.o: utilities.o
+magparser.o: polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
+mainmagparser.o: magparser.o controlparser.o
+controlparser.o: design.o layoutdb_loader.o
+layoutdb_loader.o: layoutdb_f_api.o design.o geometry.o commonmodule.o hashtable.o
+systeminfo_gpu.o: systeminfo.o
+interaction.o: gpu_morton_sort.o utilities.o
+RLEMerge.o: gpu_morton_sort.o interaction.o
+event_sorter_apif.o: commonmodule.o event_sorter.o polygon_fracture.o
 

@@ -131,7 +131,7 @@ program test_fracture
   temporary_layers = 2 !> empty file is EMPTY layer
   debug_verbosity = 3  !> since we want to test
   !$omp parallel default(shared)
-  !$omp single nowait
+  !$omp single
   !$omp task
   call RestoreSnapToLayer( input_layer, filenameA )
   !$omp end task
