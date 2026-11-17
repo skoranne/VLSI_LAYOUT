@@ -8,11 +8,12 @@ module RTReeBuilder
    implicit none
    private
    public:: RTReeNode, CalculateTotalNodes, BuildRTree, SelfTestTheTree, SearchTree, SearchTreeRecursive, K_MAX_SEARCH_LEAVES
+   ! Compact spatial index node (32 bytes): mbr(16)+ChildStart(8)+NumChildren(4)+IsLeaf(4)
    type :: RTreeNode
       type(Box) :: mbr
       integer(kind=int64) :: ChildStart   ! Index of first child in the flat array
-      integer(kind=int64) :: NumChildren  ! Number of contiguous children
-      logical :: IsLeaf                   ! Clean boolean flag, no negative number hacks
+      integer(kind=int32) :: NumChildren  ! Number of contiguous children
+      logical             :: IsLeaf       ! Leaf flag
    end type RTreeNode
    integer, parameter :: K_MAX_SEARCH_LEAVES = 16*4096
 contains
@@ -77,7 +78,7 @@ contains
          ! Initialize the aggregate MBR with the first child
          agg_mbr = sorted_boxes(ChildStart)
          tree_nodes(node_idx)%ChildStart = ChildStart
-         tree_nodes(node_idx)%NumChildren = child_end - ChildStart + 1
+         tree_nodes(node_idx)%NumChildren = int(child_end - ChildStart + 1, kind=int32)
          tree_nodes(node_idx)%IsLeaf = .true.
 
          ! Compute MBR for this contiguous chunk of boxes
@@ -108,7 +109,7 @@ contains
             agg_mbr = tree_nodes(ChildStart)%mbr
 
             tree_nodes(node_idx)%ChildStart = ChildStart
-            tree_nodes(node_idx)%NumChildren = child_end - ChildStart + 1
+            tree_nodes(node_idx)%NumChildren = int(child_end - ChildStart + 1, kind=int32)
             tree_nodes(node_idx)%IsLeaf = .false.
 
             ! Compute MBR for this contiguous chunk of child nodes

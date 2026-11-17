@@ -61,17 +61,19 @@ contains
     integer, intent(in) :: layer_idx
     integer(kind=K_COORDINATE_KIND), intent(in) :: x1,y1,x2,y2
     type(Box), allocatable :: tmp(:)
-    integer :: n, na
+    integer :: n, na, new_na
     associate(L => d%layers(layer_idx))
       n = int(L%n_used); na = int(L%n_alloc)
       if(.not. allocated(L%layer_boxes)) then
-         allocate(L%layer_boxes(4)); L%n_alloc=4; na=4; L%n_used=0; n=0
+         allocate(L%layer_boxes(256)); L%n_alloc=256; na=256; L%n_used=0; n=0
       end if
       if(n >= na) then
-         allocate(tmp(max(4,na*2)))
-         if(na>0 .and. allocated(L%layer_boxes)) tmp(1:n)=L%layer_boxes(1:n)
+         ! 1.5x growth reduces peak memory vs 2x while keeping amortized copies low
+         new_na = max(na + na/2, na + 256)
+         allocate(tmp(new_na))
+         tmp(1:n)=L%layer_boxes(1:n)
          call move_alloc(tmp, L%layer_boxes)
-         L%n_alloc = max(4,na*2)
+         L%n_alloc = new_na
       end if
       L%n_used = L%n_used + 1
       L%layer_boxes(L%n_used)%x1 = min(x1,x2)
@@ -117,6 +119,28 @@ contains
     ctx%max_layers = MAX_LAYERS
   end subroutine load_ldb_common
 
+  subroutine trim_design_layers(d)
+    type(Design), intent(inout) :: d
+    integer :: i, n
+    type(Box), allocatable :: tmp(:)
+    if(.not. allocated(d%layers)) return
+    do i=1,size(d%layers)
+       associate(L => d%layers(i))
+         n = int(L%n_used)
+         if(allocated(L%layer_boxes)) then
+            if(n <= 0) then
+               deallocate(L%layer_boxes); L%n_alloc = 0
+            else if(int(L%n_alloc) /= n) then
+               allocate(tmp(n))
+               tmp = L%layer_boxes(1:n)
+               call move_alloc(tmp, L%layer_boxes)
+               L%n_alloc = n
+            end if
+         end if
+       end associate
+    end do
+  end subroutine trim_design_layers
+
   subroutine LoadLayoutDBFile(load_design, MAX_LAYERS)
     type(Design), intent(inout), target :: load_design
     integer, intent(in) :: MAX_LAYERS
@@ -129,6 +153,7 @@ contains
     cb = c_funloc(box_callback)
     rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
     call ldb_close_c(fh)
+    call trim_design_layers(load_design)
     write(*,*) 'INFO: Loaded ', hash_nitems(load_design%ht), ' layers from ', trim(load_design%fileName)
   end subroutine LoadLayoutDBFile
 
@@ -146,6 +171,7 @@ contains
     topc(1) = c_null_char
     rc = ldb_iterate_boxes_hier_c(fh, topc, -1, cb, c_loc(ctx))
     call ldb_close_c(fh)
+    call trim_design_layers(load_design)
     write(*,*) 'INFO: Hierarchically loaded ', hash_nitems(load_design%ht), ' layers from ', trim(load_design%fileName)
   end subroutine LoadLayoutDBFileHier
 
