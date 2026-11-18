@@ -17,6 +17,7 @@ module CommonModule
   integer                        :: debug_verbosity = 0
   integer                        :: abort_on_xor = 0
   integer                        :: abort_on_assert_zero = 0
+  logical                       :: profiling_enabled = .true.
   integer                        :: temporary_layers = K_TEMPORARY_LAYER_MEMORY
   integer                        :: K_COMPRESSION_METHOD_TO_USE = 1 !> ZLIB
   integer                        :: CODEC_VERSION = 1
@@ -25,7 +26,7 @@ module CommonModule
        TrackerCell, K_SMALL_EPSILON, K_BOOST_CONTROL_XOR, K_BOOST_CONTROL_OR, K_BOOST_CONTROL_AND,&
        K_BOOST_CONTROL_NOT, K_BOOST_CONTROL_MERGE, K_BOOST_CONTROL_SIZE, debug_verbosity, abort_on_xor,&
        abort_on_assert_zero, temporary_layers, K_COMPRESSION_METHOD_TO_USE, K_TEMPORARY_LAYER_MEMORY, &
-       K_TEMPORARY_LAYER_DISK, beep, CODEC_VERSION, K_FRAME_THRESHOLD
+       K_TEMPORARY_LAYER_DISK, beep, CODEC_VERSION, K_FRAME_THRESHOLD, profiling_enabled
 
   type :: XYTracker
      integer(kind=K_COORDINATE_KIND) :: X, Y

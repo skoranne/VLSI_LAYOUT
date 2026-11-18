@@ -3,7 +3,7 @@ module LayoutDBLoaderModule
   use iso_c_binding
   use CommonModule
   use hash_mod
-  use DesignModule, only: Design, Layer
+  use DesignModule
   use GeometryModule, only: Box
   use layoutdb_f_api
   implicit none
@@ -17,10 +17,10 @@ module LayoutDBLoaderModule
 
 contains
 
-  subroutine box_callback(ud, cell, layer, datatype, element_kind, x1,y1,x2,y2) bind(C)
+  subroutine box_callback(ud, cell, layer_num, datatype, element_kind, x1,y1,x2,y2) bind(C)
     type(c_ptr), value :: ud
     type(c_ptr), value :: cell
-    integer(c_int), value :: layer, datatype, element_kind
+    integer(c_int), value :: layer_num, datatype, element_kind
     integer(c_int64_t), value :: x1,y1,x2,y2
     type(ldb_load_ctx), pointer :: ctx
     type(Layer), pointer :: L
@@ -30,7 +30,7 @@ contains
     call c_f_pointer(ud, ctx)
     if(.not. associated(ctx)) return
     if(.not. associated(ctx%design)) return
-    write(buf,'("L",I0,"_",I0)') layer, datatype
+    write(buf,'("L",I0,"_",I0)') layer_num, datatype
     call hash_get(ctx%design%ht, trim(buf), layer_idx, ins)
     if(.not. ins) then
        layer_idx = hash_nitems(ctx%design%ht) + 1
@@ -43,8 +43,8 @@ contains
        block
          character(len=64) :: alias1, alias2
          logical :: ins2
-         write(alias1,'(I0,":",I0)') layer, datatype
-         write(alias2,'(I0,"_",I0)') layer, datatype
+         write(alias1,'(I0,":",I0)') layer_num, datatype
+         write(alias2,'(I0,"_",I0)') layer_num, datatype
          call hash_put(ctx%design%ht, trim(alias1), layer_idx, ins2)
          call hash_put(ctx%design%ht, trim(alias2), layer_idx, ins2)
        end block
@@ -123,12 +123,16 @@ contains
     type(ldb_load_ctx), target :: ctx
     type(c_funptr) :: cb
     integer(c_int) :: rc
+    integer :: i
     call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
     if(.not. c_associated(fh)) return
     cb = c_funloc(box_callback)
     rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
     call ldb_close_c(fh)
     write(*,*) 'INFO: Loaded ', hash_nitems(load_design%ht), ' layers from ', trim(load_design%fileName)
+    do i = 1, hash_nitems(load_design%ht)
+       write(*,*) '  Layer ', i, ': ', trim(load_design%layerNames(i))
+    end do
   end subroutine LoadLayoutDBFile
 
   subroutine LoadLayoutDBFileHier(load_design, MAX_LAYERS)

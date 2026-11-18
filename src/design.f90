@@ -11,6 +11,7 @@ module DesignModule
   use PolygonFractureModule
   use MortonSortModule
   use MortonSortOMT
+  use ProfilerModule
   use BoostPolygonAPIModule
   use RTreeBuilderGPU
   use iso_c_binding
@@ -1071,6 +1072,10 @@ contains
     implicit none
     type(Layer), intent(inout) :: input_layer
     integer            :: env_len, env_status
+    real(kind=real64)  :: t_start, t_end
+
+    if (profiling_enabled) t_start = cpu_time()
+
     call get_environment_variable( 'MAGPARSER_CONTROL_PREPROCESS_LAYER_BY_POLYGON', length=env_len, status=env_status )
     if( env_status == 0 ) then !> value is set
        call PreprocessLayerByPolygon( input_layer )
@@ -1081,6 +1086,8 @@ contains
        !> make sure its TREE is empty
        if( allocated( input_layer%tree%tree_nodes ) ) error stop "ERROR: INCONSISTENT LAYER STATE during PREPROCESS"
     end if
+
+    if (profiling_enabled) call RecordTime("PreprocessLayer", cpu_time() - t_start)
   end subroutine PreprocessLayer
 
   subroutine CalculateOR( input_layer_A, input_layer_B, output_layer )
@@ -1133,6 +1140,7 @@ contains
     character(len=*), parameter :: functionName = "CalculateAND"
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
     type(Layer), intent(inout)   :: output_layer
+    real(kind=real64) :: t_start, t_end
     integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC, numNodesB
     integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
     integer(kind=int64) :: number_leaves
@@ -1145,6 +1153,9 @@ contains
     logical :: use_gpu
     character(len=32) :: offload_env
     integer :: offload_len, offload_stat
+
+    if (profiling_enabled) t_start = cpu_time()
+
     !> preprocess A,B (builds RTrees/sorting as needed)
     !$omp parallel default(shared)
     !$omp single nowait
@@ -1281,6 +1292,8 @@ contains
     !> we can use the optimization that by construction the output is HEALED
     output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
     call PreprocessLayer( output_layer )
+
+    if (profiling_enabled) call RecordTime("CalculateAND", cpu_time() - t_start)
   end subroutine CalculateAND
 
   !> Multiple algorithms for A NOT B

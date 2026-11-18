@@ -36,6 +36,9 @@ LDLIBS = db/liblayoutdb.a -lz -lhdf5_fortran -lhdf5 -lstdc++ -lsnappy -lzstd
 # --- Library Definition ---
 LIBRARY = libmagparser.a
 
+db/liblayoutdb.a:
+	$(MAKE) -C db all
+
 include DEPENDENCIES.txt
 
 hdfdata.o:	hdfdata.f90
@@ -89,7 +92,7 @@ $(LIBRARY): $(LIB_OBJS)
 
 # --- Executable Builds ---
 # By linking against the library, we don't have to list out all objects again.
-MAGPARSER.exe: mainmagparser.o $(LIBRARY)
+MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a
 	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)
@@ -120,6 +123,6 @@ gpu_morton.o:	gpu_morton.cu
 	g++ -O3 -c -x c++ gpu_morton.cu
 MAGVIEWER.exe:	magviewer.f90 $(LIBRARY)
 		ifx -c -O3 -fpp glf90w.F90
-		ifx $(FCFLAGS) -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o -L ./lib/ifx -lglfw -lGL -o MAGVIEWER.exe -lz -lsnappy -lzstd -lstdc++
+		ifx $(FCFLAGS) -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o /scratch1/skoranne/OSS_EDA_TOOLS/glfw/build/src/libglfw3.a -lGL -o MAGVIEWER.exe -lz -lsnappy -lzstd -lstdc++
        
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe MAGVIEWER.exe
