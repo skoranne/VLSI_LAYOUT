@@ -63,6 +63,9 @@ struct Ctx {
     size_t cur_cell = (size_t)-1;
     Modal m;
     db::NvcompStatus nvst;
+    std::vector<size_t> cblock_offsets;
+    size_t cblock_ok = 0;
+    size_t cblock_fail = 0;
 };
 
 static void ensure_table(std::vector<std::string>& t, uint64_t idx, const std::string& v=""){ if(t.size()<=idx) t.resize(idx+1); if(!v.empty()) t[idx]=v; }
@@ -213,24 +216,20 @@ static void handle_cblock(Stream& s, Ctx& ctx, size_t rec_start){
     const uint8_t* comp_data = s.p + s.off;
     s.skip((size_t)comp_len);
     rec_raw(s, rec_start, ctx);
+    ctx.cblock_offsets.push_back(rec_start);
     ctx.doc.cblock_count++;
     ctx.doc.cblock_comp_bytes += (size_t)comp_len;
     ctx.doc.cblock_uncomp_bytes += (size_t)uncomp_len;
-    // decompress
     std::vector<uint8_t> out;
     bool ok = db::decompress_cblock(comp_type, comp_data, (size_t)comp_len, out, (size_t)uncomp_len, ctx.nvst);
-    if(ok || !out.empty()){
-        // parse decompressed records
-        // if decompressed size differs slightly, still try to parse what we have
-        if(ok && !out.empty()){
-            Stream ds(out.data(), out.size(), true);
-            parse_records(ds, ctx);
-        } else if(!ok) {
-            // if decompression failed but we got compressed bytes back, can't parse inner; records already preserved via raw CBLOCK
-        }
+    if(ok && !out.empty()){
+        ctx.cblock_ok++;
+        Stream ds(out.data(), out.size(), true);
+        parse_records(ds, ctx);
+    } else {
+        ctx.cblock_fail++;
     }
     if(ctx.nvst.used) ctx.doc.used_gpu_decompress = true;
-    ctx.doc.decompress_info = ctx.nvst.detail;
 }
 
 static void parse_records(Stream& s, Ctx& ctx){
@@ -244,36 +243,10 @@ static void parse_records(Stream& s, Ctx& ctx){
         case 1: { // START
             s.astr(); // version
             s.real(); // unit
-            // After unit: offset-flag byte in modern OASIS. Bits 0-5 indicate present offset-table values, bit 6 strict, bit 7 reserved.
+            // OASIS START: offset-flag byte; bits 0-5 indicate presence of table offsets A-F
             if(s.ok && s.off < s.n){
-                uint8_t oflags = s.p[s.off];
-                // Heuristic: if oflags looks like a plausible offset-flag (not a common record start like 0,2,3,6,13 etc in that position), consume it and entries
-                bool looks_record = (oflags==0||oflags==2||oflags==3||oflags==6||oflags==7||oflags==13||oflags==34);
-                if(!looks_record){
-                    s.off++; // consume offset-flag
-                    for(int i=0;i<6;i++) if(oflags & (1<<i)) s.uvar();
-                    // if bit 7 set, some files include additional offsets/validation info; try to consume up to 6 more if present
-                    if(oflags & 0x80){ for(int i=0;i<6;i++) s.uvar(); }
-                }
-                // Resync: scan for next plausible record start. Prefer CBLOCK(34) if present (KLayout files often start with offset/CBLOCK data).
-                size_t found = s.n;
-                size_t first_cblock = s.n;
-                for(size_t k=s.off; k < s.n; ++k){ if(s.p[k]==34){ first_cblock = k; break; } }
-                if(first_cblock < s.n && first_cblock <= s.off + 4096){
-                    found = first_cblock;
-                } else {
-                    for(size_t j=s.off; j < s.n && j < s.off + 4096; ++j){
-                        uint8_t nb = s.p[j];
-                        if(nb==0){ found=j; break; }
-                        if(nb==2){ if(j + 8 >= s.n){ found=j; break; } continue; }
-                        if(nb==3||nb==6||nb==7||nb==13||nb==1||nb==4||nb==5||nb==8||nb==9||nb==14||nb==15||nb==16||nb==17||nb==18||nb==19||nb==20||nb==21||nb==22||nb==28||nb==34){
-                            if(nb==3||nb==6||nb==7||nb==5){
-                                if(j+1 < s.n){ uint8_t len = s.p[j+1]; if(len>0 && len < 128 && j+2+len < s.n) { found=j; break; } }
-                            } else { found=j; break; }
-                        }
-                    }
-                }
-                s.off = found;
+                uint8_t oflags = s.u8();
+                for(int i=0;i<6;i++) if(oflags & (1<<i)) s.uvar();
             }
             rec_raw(s,rec_start,ctx);
         } break;
@@ -465,6 +438,67 @@ static void parse_records(Stream& s, Ctx& ctx){
 
 } // anon
 
+static void recover_cblocks(Ctx& ctx){
+    if(!ctx.f || !ctx.f->map) return;
+    const uint8_t* data = (const uint8_t*)ctx.f->map;
+    size_t n = ctx.f->size;
+    auto is_processed = [&](size_t off)->bool{
+        for(size_t o: ctx.cblock_offsets){ if(o==off) return true; }
+        return false;
+    };
+    struct Cand { size_t off, end; uint8_t ct; uint64_t ul, cl; size_t hsz; };
+    std::vector<Cand> cands;
+    for(size_t j=0; j+6 < n; ++j){
+        if(data[j] != 34) continue;
+        Stream hs(data + j + 1, n - (j + 1), false);
+        uint64_t ct = hs.uvar();
+        uint64_t ul = hs.uvar();
+        uint64_t cl = hs.uvar();
+        if(!hs.ok) continue;
+        if(ct > 2) continue;
+        if(ul == 0 || cl == 0) continue;
+        if(cl > 500ull*1024*1024 || ul > 500ull*1024*1024) continue;
+        size_t hsz = hs.off;
+        size_t end = j + 1 + hsz + (size_t)cl;
+        if(end > n) continue;
+        std::vector<uint8_t> out;
+        db::NvcompStatus st = ctx.nvst;
+        bool ok = db::decompress_cblock((uint8_t)ct, data + j + 1 + hsz, (size_t)cl, out, (size_t)ul, st);
+        if(!ok || out.empty()) continue;
+        uint8_t fb = out[0];
+        bool plausible = (fb==0||fb==1||fb==2||fb==3||fb==4||fb==5||fb==6||fb==7||fb==8||fb==9||
+                          fb==13||fb==14||fb==15||fb==16||fb==17||fb==18||fb==19||fb==20||fb==21||
+                          fb==22||fb==23||fb==24||fb==25||fb==28||fb==29||fb==30||fb==31||fb==34);
+        if(!plausible) continue;
+        cands.push_back({j, end, (uint8_t)ct, ul, cl, hsz});
+    }
+    std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b){ return a.off < b.off; });
+    std::vector<Cand> sel;
+    size_t cur_end = 0;
+    for(auto& c: cands){
+        if(c.off < cur_end) continue;
+        sel.push_back(c); cur_end = c.end;
+    }
+    for(auto& c: sel){
+        if(is_processed(c.off)) continue;
+        ctx.cblock_offsets.push_back(c.off);
+        ctx.doc.cblock_count++;
+        ctx.doc.cblock_comp_bytes += (size_t)c.cl;
+        ctx.doc.cblock_uncomp_bytes += (size_t)c.ul;
+        std::vector<uint8_t> out;
+        db::NvcompStatus st = ctx.nvst;
+        bool ok = db::decompress_cblock(c.ct, data + c.off + 1 + c.hsz, (size_t)c.cl, out, (size_t)c.ul, st);
+        if(ok && !out.empty()){
+            ctx.cblock_ok++;
+            Stream ds(out.data(), out.size(), true);
+            parse_records(ds, ctx);
+        } else {
+            ctx.cblock_fail++;
+        }
+        if(st.used) ctx.doc.used_gpu_decompress = true;
+    }
+}
+
 bool parse_oasis(LdbFile* f) {
     Ctx ctx; ctx.f=f;
     ctx.nvst = db::nvcomp_init();
@@ -473,6 +507,8 @@ bool parse_oasis(LdbFile* f) {
     f->oasis_raw = ctx.doc.original;
     Stream s((const uint8_t*)f->map, f->size, false);
     parse_records(s, ctx);
+    // Recovery pass for CBLOCKs missed due to parser misalignment
+    recover_cblocks(ctx);
     // Entropy/compact encoding of box streams: delta+varint compression per cell
     size_t raw_box_bytes = 0, compact_box_bytes = 0;
     for(auto& cell : f->cells){
@@ -480,10 +516,8 @@ bool parse_oasis(LdbFile* f) {
         if(!cell.boxes.empty()){
             cell.boxes_compact = compact::encode_boxes(cell.boxes);
             compact_box_bytes += cell.boxes_compact.size();
-            // keep decoded boxes for current consumers; compact form available for memory-efficient storage/transfer
         }
     }
-    // (heuristic name scan omitted - too many false positives on binary/compressed data; rely on structured parse + CBLOCK decompression)
     f->mem_bytes_extra = f->oasis_raw.capacity() + ctx.doc.records.size()*sizeof(oasis::Record);
     for(auto& r: ctx.doc.records) f->mem_bytes_extra += r.raw.capacity();
     for(auto& cell : f->cells) f->mem_bytes_extra += cell.boxes_compact.capacity();
@@ -493,7 +527,11 @@ bool parse_oasis(LdbFile* f) {
                  compact_box_bytes ? (double)raw_box_bytes/(double)compact_box_bytes : 0.0);
         f->error = (f->error.empty()?"":f->error+"; ") + std::string(buf);
     }
-    if(!ctx.doc.decompress_info.empty()) f->error = (f->error.empty()?"":f->error+"; ") + std::string("CBLOCK:")+ctx.doc.decompress_info;
+    {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "CBLOCK_DECOMPRESS ok=%zu fail=%zu count=%zu", ctx.cblock_ok, ctx.cblock_fail, ctx.doc.cblock_count);
+        f->error = (f->error.empty()?"":f->error+"; ") + std::string(buf);
+    }
     if(f->cells.empty() && !s.err.empty() && f->error.empty()) f->error = s.err;
     return true;
 }
