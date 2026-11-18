@@ -163,7 +163,8 @@ static ldb_file_t* do_open_native(const char* path, const ldb_open_opts_t* opts,
 
 static ldb_file_t* do_open(const char* path, const ldb_open_opts_t* opts, char* errbuf, size_t errbuf_sz) {
     if (errbuf && errbuf_sz) errbuf[0]='\0';
-    // Detect OASIS and try KLayout conversion for correct parsing when available (KLayout-equivalent results)
+    // Native readers are the default for all formats (GDSII/OASIS).
+    // Optional KLayout-assisted conversion path for OASIS can be enabled with LDB_OASIS_KLAYOUT=1.
     int fd = ::open(path, O_RDONLY);
     int fmt = 0;
     if(fd >= 0){
@@ -172,8 +173,8 @@ static ldb_file_t* do_open(const char* path, const ldb_open_opts_t* opts, char* 
         fmt = detect_format(hdr, (size_t)(n>0?n:0));
         ::close(fd);
     }
-    const char* native = getenv("LDB_NATIVE_OASIS");
-    if(fmt == 2 && !(native && native[0] && native[0] != '0')){
+    const char* use_kl = getenv("LDB_OASIS_KLAYOUT");
+    if(fmt == 2 && use_kl && use_kl[0] && use_kl[0] != '0'){
         std::string kl = find_klayout();
         if(!kl.empty()){
             char outgds[256];
