@@ -205,7 +205,8 @@ static void add_box(Ctx& ctx, uint64_t layer, uint64_t datatype, int kind, int64
 static void parse_records(Stream& s, Ctx& ctx);
 
 static void handle_cblock(Stream& s, Ctx& ctx, size_t rec_start){
-    uint8_t comp_type = s.u8();
+    uint64_t comp_type_v = s.uvar();
+    uint8_t comp_type = (uint8_t)comp_type_v;
     uint64_t uncomp_len = s.uvar();
     uint64_t comp_len = s.uvar();
     if(!s.need((size_t)comp_len)) return;
@@ -220,7 +221,8 @@ static void handle_cblock(Stream& s, Ctx& ctx, size_t rec_start){
     bool ok = db::decompress_cblock(comp_type, comp_data, (size_t)comp_len, out, (size_t)uncomp_len, ctx.nvst);
     if(ok || !out.empty()){
         // parse decompressed records
-        if(ok && out.size() == (size_t)uncomp_len){
+        // if decompressed size differs slightly, still try to parse what we have
+        if(ok && !out.empty()){
             Stream ds(out.data(), out.size(), true);
             parse_records(ds, ctx);
         } else if(!ok) {

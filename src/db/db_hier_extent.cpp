@@ -2,6 +2,7 @@
 #include "layoutdb_hier.h"
 #include "layoutdb_internal.hpp"
 #include <cstdio>
+#include <string>
 
 int main(int argc, char** argv){
     if(argc < 2){
@@ -34,7 +35,22 @@ int main(int argc, char** argv){
             (long long)fe.xmin,(long long)fe.ymin,(long long)fe.xmax,(long long)fe.ymax);
     }
     const char* info = ((LdbFile*)f)->error.c_str();
-    if(info && info[0]) fprintf(stdout, "INFO: %s\n", info);
+    if(info && info[0]){
+        // Print concise info: BOX_ENC and decompression status summary
+        std::string s(info);
+        size_t pos = s.find("BOX_ENC");
+        if(pos != std::string::npos){
+            size_t end = s.find(';', pos);
+            if(end == std::string::npos) end = s.size();
+            fprintf(stdout, "INFO: %s\n", s.substr(pos, end-pos).c_str());
+        }
+        size_t fails = 0, okdef = 0;
+        for(size_t p=0; (p=s.find("zlib inflate failed", p))!=std::string::npos; ++p) fails++;
+        for(size_t p=0; (p=s.find("cpu-raw-deflate", p))!=std::string::npos; ++p) okdef++;
+        for(size_t p=0; (p=s.find("cpu-zlib", p))!=std::string::npos; ++p) okdef++;
+        for(size_t p=0; (p=s.find("cpu-auto-deflate", p))!=std::string::npos; ++p) okdef++;
+        fprintf(stdout, "INFO: CBLOCK_DECOMPRESS ok=%zu fail=%zu\n", okdef, fails);
+    }
     ldb_close(f);
     return 0;
 }
