@@ -29,23 +29,58 @@ contains
     call c_f_pointer(ud, ctx)
     if(.not. associated(ctx)) return
     if(.not. associated(ctx%design)) return
-    write(buf,'("L",I0,"_",I0)') layer, datatype
+    write(buf,'("L",I0,"_D",I0)') layer, datatype
     call hash_get(ctx%design%ht, trim(buf), layer_idx, ins)
     if(.not. ins) then
-       layer_idx = hash_nitems(ctx%design%ht) + 1
+       layer_idx = int(hash_nitems(ctx%design%ht)) + 1
+       ! count unique layers by tracking via canonical name; but simpler: assign new slot based on existing unique count
+       ! find if any alias exists
+       block
+         character(len=64) :: k2,k3,k4,k5
+         logical :: insa
+         integer :: idx2
+         write(k2,'("L",I0,"_",I0)') layer, datatype
+         write(k3,'(I0,":",I0)') layer, datatype
+         write(k4,'(I0,"_",I0)') layer, datatype
+         write(k5,'(I0,"_D",I0)') layer, datatype
+         call hash_get(ctx%design%ht, trim(k2), idx2, insa)
+         if(.not. insa) call hash_get(ctx%design%ht, trim(k3), idx2, insa)
+         if(.not. insa) call hash_get(ctx%design%ht, trim(k4), idx2, insa)
+         if(.not. insa) call hash_get(ctx%design%ht, trim(k5), idx2, insa)
+         if(insa) then
+            layer_idx = idx2
+            ins = .true.
+         end if
+       end block
+    end if
+    if(.not. ins) then
+       ! determine next unique layer slot by counting layerNames entries
+       layer_idx = 0
+       block
+         integer :: j
+         do j=1,size(ctx%design%layerNames)
+            if(len_trim(ctx%design%layerNames(j)) == 0) then
+               layer_idx = j; exit
+            end if
+         end do
+         if(layer_idx == 0) layer_idx = min(int(hash_nitems(ctx%design%ht))+1, ctx%max_layers)
+       end block
        if(layer_idx > ctx%max_layers) return
-       call hash_put(ctx%design%ht, trim(buf), layer_idx, ins)
        if(layer_idx <= size(ctx%design%layerNames)) ctx%design%layerNames(layer_idx) = trim(buf)
        ctx%design%layers(layer_idx)%n_used = 0
        ctx%design%layers(layer_idx)%n_alloc = 0
-       ! also register aliases: "layer:datatype" and "layer_datatype" for CTR references like d1:67:20
+       ! register canonical and aliases
        block
-         character(len=64) :: alias1, alias2
+         character(len=64) :: a1,a2,a3,a4
          logical :: ins2
-         write(alias1,'(I0,":",I0)') layer, datatype
-         write(alias2,'(I0,"_",I0)') layer, datatype
-         call hash_put(ctx%design%ht, trim(alias1), layer_idx, ins2)
-         call hash_put(ctx%design%ht, trim(alias2), layer_idx, ins2)
+         write(a1,'("L",I0,"_D",I0)') layer, datatype
+         write(a2,'("L",I0,"_",I0)') layer, datatype
+         write(a3,'(I0,":",I0)') layer, datatype
+         write(a4,'(I0,"_",I0)') layer, datatype
+         call hash_put(ctx%design%ht, trim(a1), layer_idx, ins2)
+         call hash_put(ctx%design%ht, trim(a2), layer_idx, ins2)
+         call hash_put(ctx%design%ht, trim(a3), layer_idx, ins2)
+         call hash_put(ctx%design%ht, trim(a4), layer_idx, ins2)
        end block
     end if
     call push_box_local(ctx%design, layer_idx, int(x1,kind=K_COORDINATE_KIND), int(y1,kind=K_COORDINATE_KIND), &
@@ -110,6 +145,7 @@ contains
     write(*,*) 'INFO: Loading layout DB file (GDSII/OASIS): ', trim(fname), ' format=', ldb_format_c(fh_out)
     allocate(load_design%layers(MAX_LAYERS))
     allocate(load_design%layerNames(MAX_LAYERS))
+    load_design%layerNames = ''
     call hash_create(load_design%ht, MAX_LAYERS)
     call load_design%DESIGN_EXTENT%reset_to_infinity()
     do i=1,MAX_LAYERS
