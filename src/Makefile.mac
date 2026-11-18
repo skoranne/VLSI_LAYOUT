@@ -97,6 +97,9 @@ test_repetition.exe: test_repetition.f90 $(LIBRARY)
 BOOST_XOR_CHECKER.exe: boost_xor_checker.cpp
 	$(CXX) -O3 -funroll-loops -I$(BOOST_DIR) boost_xor_checker.cpp -o $@
 
+systeminfo_macos.o: systeminfo_macos.c
+	$(CC) -O3 -Wall -c systeminfo_macos.c -o $@
+
 snappy_api.o: snappy_api.cpp
 	$(CXX) -O3 -Wall $(CPPFLAGS_EXTRA) -c snappy_api.cpp -o $@
 

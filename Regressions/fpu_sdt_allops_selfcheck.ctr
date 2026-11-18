@@ -1,0 +1,252 @@
+# Large-scale self-checking regression for MAGPARSER using FPU_8x8 and SDT_16.
+# Exercises most defined MAGPARSER operations and verifies algebraic/topological identities.
+# Run with correct OASIS parsing for these files (e.g. LDB_OASIS_KLAYOUT=1) while
+# the native OASIS reader is the default but not yet semantically complete here.
+# Self-checking: all ASSERT_ZERO checks must pass; exit code 0 on success.
+
+program fpu_sdt_allops_selfcheck
+systeminfo
+info
+
+# --- configuration / variables (shows var feature) ---
+var temp_folder /tmp/fpu_sdt_allops/
+var temporary_layers 2
+var debug_verbosity 0
+var abort_on_assert_zero 2
+var abort_on_xor 0
+
+# --- declarations (shows decl design/memory) ---
+decl design df = ../data/FPU/FPU_8x8.oas
+decl design ds = ../data/SDT/SDT_16.oas
+decl memory m = nothing
+decl memory t = nothing
+
+# --- hierarchy/extent features ---
+exec hierextent df
+exec hierextent ds
+exec hierinfo df
+exec hierinfo ds
+
+# --- init ---
+exec init m:nothing
+exec init t:nothing
+
+# =========================
+# FPU large-layer feature ops: df:64:20 (776k boxes)
+# COPY, EXTENT, XOR identity (large scale)
+# =========================
+exec run m:fa = df:64:20 COPY nothing
+exec run m:fx = m:fa ^ df:64:20
+exec run m:z = m:fx ASSERT_ZERO nothing
+
+exec run m:fe = df:64:20 EXTENT nothing
+exec run m:fx = m:fe ^ m:fe
+exec run m:z = m:fx ASSERT_ZERO nothing
+
+# =========================
+# SDT topological predicate suite (large pair): ds:69:20 (77k) vs ds:70:20 (7k)
+# INTERACT/NOT_INTERACT/CUT/NOT_CUT/TOUCH/NOT_TOUCH/INSIDE/NOT_INSIDE/OUTSIDE/NOT_OUTSIDE
+# =========================
+exec run m:si = ds:69:20 INTERACT ds:70:20
+exec run m:sni = ds:69:20 NOT_INTERACT ds:70:20
+exec run m:schk = m:si * m:sni
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:sunion = m:si + m:sni
+exec run m:sx = ds:69:20 ^ m:sunion
+exec run m:z = m:sx ASSERT_ZERO nothing
+
+exec run m:sc = ds:69:20 CUT ds:70:20
+exec run m:snc = ds:69:20 NOT_CUT ds:70:20
+exec run m:schk = m:sc * m:snc
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:sunion = m:sc + m:snc
+exec run m:sx = ds:69:20 ^ m:sunion
+exec run m:z = m:sx ASSERT_ZERO nothing
+
+exec run m:st = ds:69:20 TOUCH ds:70:20
+exec run m:snt = ds:69:20 NOT_TOUCH ds:70:20
+exec run m:schk = m:st * m:snt
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:sunion = m:st + m:snt
+exec run m:sx = ds:69:20 ^ m:sunion
+exec run m:z = m:sx ASSERT_ZERO nothing
+
+exec run m:sin = ds:69:20 INSIDE ds:70:20
+exec run m:snin = ds:69:20 NOT_INSIDE ds:70:20
+exec run m:schk = m:sin * m:snin
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:sunion = m:sin + m:snin
+exec run m:sx = ds:69:20 ^ m:sunion
+exec run m:z = m:sx ASSERT_ZERO nothing
+
+exec run m:so = ds:69:20 OUTSIDE ds:70:20
+exec run m:sno = ds:69:20 NOT_OUTSIDE ds:70:20
+exec run m:schk = m:so * m:sno
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:sunion = m:so + m:sno
+exec run m:sx = ds:69:20 ^ m:sunion
+exec run m:z = m:sx ASSERT_ZERO nothing
+
+exec run m:schk = m:sin * m:so
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:schk = m:sc * m:sin
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:schk = m:sc * m:so
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:schk = m:st * m:sin
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:schk = m:st * m:so
+exec run m:z = m:schk ASSERT_ZERO nothing
+exec run m:schk = m:st * m:sc
+exec run m:z = m:schk ASSERT_ZERO nothing
+
+# =========================
+# FPU topological predicate suite (large pair): df:70:20 (16k) vs df:71:20 (2k)
+# =========================
+exec run m:fi = df:70:20 INTERACT df:71:20
+exec run m:fni = df:70:20 NOT_INTERACT df:71:20
+exec run m:fchk = m:fi * m:fni
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:funion = m:fi + m:fni
+exec run m:fx = df:70:20 ^ m:funion
+exec run m:z = m:fx ASSERT_ZERO nothing
+
+exec run m:fc = df:70:20 CUT df:71:20
+exec run m:fnc = df:70:20 NOT_CUT df:71:20
+exec run m:fchk = m:fc * m:fnc
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:funion = m:fc + m:fnc
+exec run m:fx = df:70:20 ^ m:funion
+exec run m:z = m:fx ASSERT_ZERO nothing
+
+exec run m:ft = df:70:20 TOUCH df:71:20
+exec run m:fnt = df:70:20 NOT_TOUCH df:71:20
+exec run m:fchk = m:ft * m:fnt
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:funion = m:ft + m:fnt
+exec run m:fx = df:70:20 ^ m:funion
+exec run m:z = m:fx ASSERT_ZERO nothing
+
+exec run m:fin = df:70:20 INSIDE df:71:20
+exec run m:fnin = df:70:20 NOT_INSIDE df:71:20
+exec run m:fchk = m:fin * m:fnin
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:funion = m:fin + m:fnin
+exec run m:fx = df:70:20 ^ m:funion
+exec run m:z = m:fx ASSERT_ZERO nothing
+
+exec run m:fo = df:70:20 OUTSIDE df:71:20
+exec run m:fno = df:70:20 NOT_OUTSIDE df:71:20
+exec run m:fchk = m:fo * m:fno
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:funion = m:fo + m:fno
+exec run m:fx = df:70:20 ^ m:funion
+exec run m:z = m:fx ASSERT_ZERO nothing
+
+exec run m:fchk = m:fin * m:fo
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:fchk = m:fc * m:fin
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:fchk = m:fc * m:fo
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:fchk = m:ft * m:fin
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:fchk = m:ft * m:fo
+exec run m:z = m:fchk ASSERT_ZERO nothing
+exec run m:fchk = m:ft * m:fc
+exec run m:z = m:fchk ASSERT_ZERO nothing
+
+# =========================
+# Boolean ops (char): + * @ ~ ! ^ and text: OR2 AND2 NOT FRAMENOT XOR
+# Single-layer AND merge, EXTENT, COPY - SDT (full coverage) and FPU (representative)
+# =========================
+exec run m:scopy = ds:64:20 COPY nothing
+exec run m:sx = m:scopy ^ ds:64:20
+exec run m:z = m:sx ASSERT_ZERO nothing
+exec run m:sext = ds:64:20 EXTENT nothing
+exec run m:scopy2 = m:sext COPY nothing
+exec run m:sx = m:scopy2 ^ m:sext
+exec run m:z = m:sx ASSERT_ZERO nothing
+exec run m:smerge = ds:64:20 AND nothing
+
+exec run m:s_or_c = ds:64:20 + ds:65:20
+exec run m:s_and_c = ds:64:20 * ds:65:20
+exec run m:s_xor_c = ds:64:20 ^ ds:65:20
+exec run m:s_not_c = ds:64:20 @ ds:65:20
+exec run m:s_fnot_c = ds:64:20 ~ ds:65:20
+exec run m:s_bnot_c = ds:64:20 ! ds:65:20
+
+exec run m:s_or_t = ds:64:20 OR2 ds:65:20
+exec run m:s_and_t = ds:64:20 AND2 ds:65:20
+exec run m:s_not_t = ds:64:20 NOT ds:65:20
+exec run m:s_fnot_t = ds:64:20 FRAMENOT ds:65:20
+exec run m:s_xor_t = ds:64:20 XOR ds:65:20
+
+exec run m:sx = ds:64:20 ^ ds:64:20
+exec run m:z = m:sx ASSERT_ZERO nothing
+exec run m:sx = ds:64:20 XOR ds:64:20
+exec run m:z = m:sx ASSERT_ZERO nothing
+
+# FPU representative boolean ops on copied layers (df:70:20 16k vs df:71:20 2k)
+exec run m:f70 = df:70:20 COPY nothing
+exec run m:f71 = df:71:20 COPY nothing
+exec run m:f_or_c = m:f70 + m:f71
+exec run m:f_and_c = m:f70 * m:f71
+exec run m:f_xor_c = m:f70 ^ m:f71
+exec run m:f_not_c = m:f70 @ m:f71
+exec run m:f_fnot_c = m:f70 ~ m:f71
+exec run m:f_bnot_c = m:f70 ! m:f71
+exec run m:f_or_t = m:f70 OR2 m:f71
+exec run m:f_and_t = m:f70 AND2 m:f71
+
+exec run m:fx = m:f70 ^ m:f70
+exec run m:z = m:fx ASSERT_ZERO nothing
+
+# =========================
+# GROW, SIZE, GRID (feature coverage)
+# =========================
+exec run m:sgrow = ds:64:20 GROW nothing 0.1 0.1 0.1 0.1
+exec run m:ssize = ds:64:20 SIZE nothing 0.05
+exec run m:sgrid = ds:64:20 GRID nothing 10 10
+exec run m:fgrow = df:235:4 GROW nothing 0.2 0.1 0.2 0.1
+exec run m:fsize = df:235:4 SIZE nothing 0.1
+exec run m:fgrid = df:235:4 GRID nothing 10 10
+
+# =========================
+# Cross-design operations (FPU vs SDT)
+# =========================
+exec run m:ci = df:235:4 INTERACT ds:64:20
+exec run m:cni = df:235:4 NOT_INTERACT ds:64:20
+exec run m:cchk = m:ci * m:cni
+exec run m:z = m:cchk ASSERT_ZERO nothing
+exec run m:cu = m:ci + m:cni
+exec run m:cx = df:235:4 ^ m:cu
+exec run m:z = m:cx ASSERT_ZERO nothing
+
+exec run m:cor = df:235:4 + ds:64:20
+exec run m:cand = df:235:4 * ds:64:20
+exec run m:cxor = df:235:4 ^ ds:64:20
+exec run m:ccopy = df:235:4 COPY nothing
+exec run m:cx = m:ccopy ^ df:235:4
+exec run m:z = m:cx ASSERT_ZERO nothing
+
+# =========================
+# Memory management features: flush/delete
+# =========================
+exec run t:tmpcopy = ds:64:20 COPY nothing
+exec run t:tmpx = t:tmpcopy ^ ds:64:20
+exec run m:z = t:tmpx ASSERT_ZERO nothing
+flush
+
+delete t
+flush
+
+# =========================
+# XOR identity self-check mode (abort_on_xor feature)
+# =========================
+var abort_on_xor 1
+exec run m:xid1 = df:64:20 ^ df:64:20
+exec run m:xid2 = ds:69:20 ^ ds:69:20
+exec run m:xid3 = df:235:4 ^ df:235:4
+
+end
