@@ -672,8 +672,10 @@ contains
                         call CalculateSingleLayerAND( rhs1_layer, lhs_layer )
                      case ('XOR')
                         !> d1:poly XOR d2:poly
-                        !write(*,*) 'Found PRIMARY_OPERATOR = XOR'
-                        call CalculateXOR(rhs1_layer, rhs2_layer, lhs_layer )
+                        !> Use direct Boost polygon XOR (same as ^) for robustness/performance.
+                        !> The grid/frame path (CalculateXOR/CalculateFrameFunction2) can be
+                        !> expensive or unstable on large/unhealed inputs.
+                        call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_XOR, 0_int64 )
                      case ('INTERACT')
                         call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_INTERACT)
                      case ('NOT_INTERACT')
