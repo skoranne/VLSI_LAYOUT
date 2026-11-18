@@ -110,6 +110,15 @@ event_sorter.o: event_sorter.cu
 gpu_morton.o: gpu_morton.cu
 	$(CXX) -O3 -c -x c++ gpu_morton.cu -o $@
 
+# MAGVIEWER (OpenGL/glfw + f90gl wrappers). On macOS this may require glfw/f90gl libraries.
+GLFW_LIBS ?= -lglfw
+GL_LIBS_MAC ?= -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
+glf90w.o: glf90w.F90
+	$(FC) $(FCFLAGS) -c glf90w.F90 -o $@
+
+MAGVIEWER.exe: magviewer.f90 $(LIBRARY) glf90w.o
+	$(FC) $(FCFLAGS) -fpp -qopenmp magviewer.f90 $(LIBRARY) glf90w.o -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS) $(GLFW_LIBS) $(GL_LIBS_MAC)
+
 unit_test: test_contour.exe test_morton.exe test_polygonfracture.exe test_boxmerge.exe test_skiplist.exe
 
 clean:

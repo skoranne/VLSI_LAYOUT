@@ -129,6 +129,6 @@ gpu_morton.o:	gpu_morton.cu
 	g++ -O3 -c -x c++ gpu_morton.cu
 MAGVIEWER.exe:	magviewer.f90 $(LIBRARY)
 		ifx -c -O3 -fpp glf90w.F90
-		ifx $(FCFLAGS) -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o -L ./lib/ifx -lglfw -lGL -o MAGVIEWER.exe -lz -lsnappy -lzstd -lstdc++
+		ifx $(FCFLAGS) -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o -L ./lib/ifx -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
        
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe MAGVIEWER.exe

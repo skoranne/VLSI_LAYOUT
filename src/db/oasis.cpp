@@ -243,9 +243,10 @@ static void parse_records(Stream& s, Ctx& ctx){
         case 1: { // START
             s.astr(); // version
             s.real(); // unit
-            // OASIS START: offset-flag byte; bits 0-5 indicate presence of table offsets A-F
+            // OASIS START: offset-flag byte; bits 0-5 indicate presence of table offsets A-F, bit 6 = strict mode
             if(s.ok && s.off < s.n){
                 uint8_t oflags = s.u8();
+                ctx.f->strict_mode = ctx.f->strict_mode || ((oflags & 0x40) != 0);
                 for(int i=0;i<6;i++) if(oflags & (1<<i)) s.uvar();
             }
             rec_raw(s,rec_start,ctx);
@@ -384,14 +385,43 @@ static void parse_records(Stream& s, Ctx& ctx){
             if(info & 0x08){ uint8_t rtype=s.u8(); (void)parse_repetition(s,rtype); }
             rec_raw(s,rec_start,ctx);
         } break;
-        case 28: { // PROPERTY
+        case 28: { // PROPERTY (tolerant parse + capture)
             uint8_t info=s.u8();
-            if(info & 0x04){ ctx.m.prop_name = s.uvar(); } else { std::string ns=s.astr(); (void)ns; }
+            std::string pname;
+            if(info & 0x04){
+                uint64_t pnref = s.uvar();
+                auto it = ctx.f->propnames.find((int)pnref);
+                if(it != ctx.f->propnames.end()) pname = it->second;
+                else pname = "prop#" + std::to_string(pnref);
+                ctx.m.prop_name = pnref;
+            } else {
+                pname = s.astr();
+            }
             if(info & 0x02){ /* prop value list by ref */ s.uvar(); }
-            int nv = info & 0x03; // not exact; simplified
-            // values: type byte + value
-            // safer: try to read 1 value
-            if(s.ok && s.off < s.n){ uint8_t vt=s.u8(); if(vt==0x0f){ /* ref */ s.uvar(); } else if(vt==0x08||vt==0x09||vt==0x0a||vt==0x0b||vt==0x0c||vt==0x0d||vt==0x0e) s.astr(); else if(vt<=7) s.real(); else s.uvar(); }
+            // Best-effort: consume and stringify first value when possible
+            std::string pval;
+            if(s.ok && s.off < s.n){
+                uint8_t vt=s.u8();
+                if(vt==0x0f){ uint64_t r=s.uvar(); pval = std::to_string(r); }
+                else if(vt==0x08||vt==0x09||vt==0x0a||vt==0x0b||vt==0x0c||vt==0x0d||vt==0x0e){ pval = s.astr(); }
+                else if(vt<=7){ double rv = s.real(); char buf[64]; snprintf(buf,sizeof(buf),"%.17g",rv); pval = buf; }
+                else { uint64_t r=s.uvar(); pval = std::to_string(r); }
+            }
+            bool want_props = (ctx.f->open_flags & LDB_OPEN_PROPERTY) != 0 || ctx.f->strict_mode;
+            if(want_props && !pname.empty()){
+                LdbProperty lp;
+                lp.target_kind = (ctx.cur_cell==(size_t)-1) ? 0 : 1;
+                if(ctx.cur_cell!=(size_t)-1){
+                    auto itc = ctx.geom_idx.find(ctx.cur_cell);
+                    if(itc!=ctx.geom_idx.end()) lp.cell = ctx.f->cells[itc->second].name;
+                }
+                lp.name = pname; lp.value = pval;
+                if(lp.target_kind==0) ctx.f->file_properties.push_back(lp);
+                else {
+                    auto itc = ctx.geom_idx.find(ctx.cur_cell);
+                    if(itc!=ctx.geom_idx.end()) ctx.f->cells[itc->second].properties.push_back(lp);
+                }
+            }
             rec_raw(s,rec_start,ctx);
         } break;
         case 29: { std::string nm=s.astr(); uint64_t ref=s.uvar(); ensure_table(ctx.xnames,ref,nm); rec_raw(s,rec_start,ctx);} break; // XNAME

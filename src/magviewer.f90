@@ -1413,28 +1413,39 @@ end program main
 
 program main
   use DrawUsingOpenGL
+  use LayoutDBLoaderModule, only: LoadLayoutDBFile
   implicit none
-  integer :: narg, iostat
+  integer :: narg, iostat, extpos, j, ch
   type(Design), target :: load_design
   type(DrawnLayer),allocatable     :: input_layers(:)
   integer                :: N, i
   character(len=256)     :: filename
   character(len=256)     :: buf
+  character(len=16)      :: fext
   integer                :: MAX_LAYERS
+  logical                :: is_layoutdb
   narg = command_argument_count()
-  if( narg < 2 ) error stop "./MAGVIEW MAGIC-FILE MAX-LAYERS"
-  call get_command_argument(1, filename, status=iostat)   ! allocates automatically
+  if( narg < 2 ) error stop "./MAGVIEWER <MAGIC|OASIS|GDS file> MAX-LAYERS"
+  call get_command_argument(1, filename, status=iostat)
   if (iostat /= 0) then
-     write (*,*) "ERROR: 1st argument must be an MAGIC VLSI Layout filename."
+     write (*,*) "ERROR: 1st argument must be a layout filename."
      stop 2
   end if
-  call get_command_argument(2, buf, status=iostat)   ! allocates automatically
+  call get_command_argument(2, buf, status=iostat)
   read( buf, *, iostat=iostat ) MAX_LAYERS
   if (iostat /= 0) then
      write (*,*) "ERROR: 2nd argument must be an integer."
      stop 2
   end if
-  if( MAX_LAYERS == 1 ) then
+  fext = ''
+  extpos = index(trim(filename), '.', back=.true.)
+  if (extpos > 0) fext = filename(extpos+1:)
+  do j=1,len_trim(fext)
+     ch = iachar(fext(j:j))
+     if (ch >= iachar('A') .and. ch <= iachar('Z')) fext(j:j) = achar(ch+32)
+  end do
+  is_layoutdb = (trim(fext)=='oas' .or. trim(fext)=='oasis' .or. trim(fext)=='gds' .or. trim(fext)=='gds2' .or. trim(fext)=='gdsii')
+  if( (.not. is_layoutdb) .and. MAX_LAYERS == 1 ) then
      block
        type(Layer), target :: tempLayer
        !> short cut for single layer
@@ -1448,7 +1459,12 @@ program main
   load_design%fileName = trim( filename )
   load_design%design_direction = DESIGN_DIRECTION_INPUT
   temporary_layers = 2 !> so we can parse empty files as empty layers
-  call parseMagicLayoutFile( load_design, MAX_LAYERS )
+  if (is_layoutdb) then
+     write(*,*) 'INFO: MAGVIEWER loading OASIS/GDS via layoutdb (compressed/on-demand view): ', trim(filename)
+     call LoadLayoutDBFile(load_design, MAX_LAYERS)
+  else
+     call parseMagicLayoutFile( load_design, MAX_LAYERS )
+  end if
   N = hash_nitems( load_design%ht )
   write(*,*) 'Loaded: ', N, ' layers.'
   allocate( input_layers(N+2) )
@@ -1458,6 +1474,6 @@ program main
   do i=1,N
      input_layers(i)%input_layer => load_design%layers(i)
   end do
-  call SimpleWindow(N, input_layers, 1600.0, 900.0)  
+  call SimpleWindow(N, input_layers, 1600.0, 900.0)
 end program main
 
