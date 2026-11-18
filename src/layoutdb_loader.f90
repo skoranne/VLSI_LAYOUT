@@ -137,11 +137,17 @@ contains
     cpath(n+1) = c_null_char
     errbuf = c_null_char
     esz = 512
-    fh_out = ldb_open_c(cpath, errbuf, esz)
+    block
+       type(ldb_open_opts_c_t) :: opts
+       opts%flags = LDB_OPEN_PROPERTY_F + LDB_OPEN_LOW_MEMORY_F
+       opts%large_cell_box_threshold = 100000_c_int64_t
+       fh_out = ldb_open_opts_c(cpath, opts, errbuf, esz)
+    end block
     if(.not. c_associated(fh_out)) then
        write(*,*) 'ERROR: ldb_open failed for ', trim(fname)
        return
     end if
+    if(ldb_is_strict_c(fh_out) /= 0) write(*,*) 'INFO: OASIS STRICT mode detected/enforced'
     write(*,*) 'INFO: Loading layout DB file (GDSII/OASIS): ', trim(fname), ' format=', ldb_format_c(fh_out)
     allocate(load_design%layers(MAX_LAYERS))
     allocate(load_design%layerNames(MAX_LAYERS))
