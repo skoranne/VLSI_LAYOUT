@@ -58,48 +58,54 @@ contains
     bboxA = mbr_of_array( input_boxes_A, AN )
     !> how to guess the output size, A * B could be O(n^2)
     if( control_parameter == K_BOOST_CONTROL_AND ) then
-       !write(*,*) 'INFO: this is not supported.'
-       guessed_output_size = 10*max(AN,BN) !> this is insufficient
+       guessed_output_size = 10*max(AN,BN)
     else
        guessed_output_size = 4*max(AN,BN)
     end if
-    !> we have a problem here since due to INTRODUCED fracturing we can create
-    !> unbounded (as a function of AN/BN) number of output boxes
-    !> K_MAXIMUM_WIDTH is set to 100,000
-    !guessed_output_size = guessed_output_size*(1+(bboxA%x2-bboxA%x1)/100000)
-    !write(*,*) 'Performing BOOST operation: ', control_parameter, ' on ', AN, ' ', BN, ' guessed: ', guessed_output_size    
-    allocate( temp_output( guessed_output_size), stat=alloc_status ) !> this could be optimistic, use 2*N
-    if( alloc_status /= 0 ) then
-       write(*,*) 'ERROR: Requested memory: ', guessed_output_size, ' from ', AN, ' ', BN
-       error stop "ERROR: MEMORY ALLOCATION FAILED: "
-    end if
-    ! Call the C/C++ backend
-    call PerformBoostPolygonOperation(input_boxes_A, AN, input_boxes_B, BN, temp_output, outN, control_parameter, control_value)
+    guessed_output_size = max(guessed_output_size, 1024_c_long)
+    do
+       allocate( temp_output( guessed_output_size), stat=alloc_status )
+       if( alloc_status /= 0 ) then
+          write(*,*) 'ERROR: Requested memory: ', guessed_output_size, ' from ', AN, ' ', BN
+          error stop "ERROR: MEMORY ALLOCATION FAILED: "
+       end if
+       ! Call the C/C++ backend
+       call PerformBoostPolygonOperation(input_boxes_A, AN, input_boxes_B, BN, temp_output, outN, control_parameter, control_value)
+       if (outN <= guessed_output_size) exit
+       if (allocated(temp_output)) deallocate(temp_output)
+       guessed_output_size = max(outN * 2_c_long, guessed_output_size * 2_c_long)
+    end do
     ! Allocate final output to exact size and copy
     allocate(merged_boxes(outN))
-    merged_boxes(1:outN) = temp_output(1:outN)
-
+    if (outN > 0) merged_boxes(1:outN) = temp_output(1:outN)
+  
   end subroutine OperateBoxesUsingBoostPolygon
 
   subroutine MergeBoxesUsingBoostPolygon(input_boxes, merged_boxes)
     type(Box), dimension(:), intent(in) :: input_boxes
     type(Box), dimension(:), allocatable, intent(out) :: merged_boxes
-    integer(c_long) :: N, outN
+    integer(c_long) :: N, outN, guessed_output_size
+    integer :: alloc_status
     type(Box), dimension(:), allocatable :: temp_output
     N = size(input_boxes, kind=c_long)
     if (N == 0) then
        allocate(merged_boxes(0))
        return
     end if
-    ! Allocate temp output to max possible size (N)
-    allocate(temp_output(2*N)) !> this could be optimistic, use 2*N
-
-    ! Call the C/C++ backend
-    call PerformBoostPolygonMerge(input_boxes, N, temp_output, outN)
-    ! Allocate final output to exact size and copy
-
+    guessed_output_size = max(2_c_long*N, 1024_c_long)
+    do
+       allocate(temp_output(guessed_output_size), stat=alloc_status)
+       if (alloc_status /= 0) then
+          write(*,*) 'ERROR: Requested memory: ', guessed_output_size
+          error stop "ERROR: MEMORY ALLOCATION FAILED"
+       end if
+       call PerformBoostPolygonMerge(input_boxes, N, temp_output, outN)
+       if (outN <= guessed_output_size) exit
+       if (allocated(temp_output)) deallocate(temp_output)
+       guessed_output_size = max(outN * 2_c_long, guessed_output_size * 2_c_long)
+    end do
     allocate(merged_boxes(outN))
-    merged_boxes(1:outN) = temp_output(1:outN)
+    if (outN > 0) merged_boxes(1:outN) = temp_output(1:outN)
   end subroutine MergeBoxesUsingBoostPolygon
   
 end module BoostPolygonAPIModule
