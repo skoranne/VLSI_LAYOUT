@@ -179,15 +179,75 @@ contains
     real(kind=real64)  :: rvar(16)
     integer(kind=K_COORDINATE_KIND):: ivar(16)
     integer(kind=K_COORDINATE_KIND) :: used_precision
+    character(len=1024) :: m4_cmd, expanded_file, echo_line, helper_name
+    integer :: m4_stat, echo_unit, echo_ios, pid_self, pid_unit, helper_unit, helper_ios
     db_count = 1
     !TEMPORARY_LAYER_PREFIX = "MAG_TEMP_LAYER_"
     TEMPORARY_LAYER_PREFIX = "MTL_"
     call hash_create(ht,K_MAX_DBS)
     allocate( design_dbs( K_MAX_DBS ) )
-    ! Open the file
-    open(newunit=unit, file=fileName, status='old', action='read', iostat=ios)
+
+    ! Preprocess control file through m4, echo expanded content to stdout, then parse it.
+    ! Use mktemp under /tmp/MAGPARSER/ to avoid conflicts between concurrent users/runs.
+    open(newunit=pid_unit, file='/proc/self/stat', status='old', action='read', iostat=ios)
     if (ios /= 0) then
-       print *, "Error: Could not open file."
+       write(*,*) 'ERROR: Could not determine process id for temporary m4 file.'
+       stop
+    end if
+    read(pid_unit, *, iostat=ios) pid_self
+    close(pid_unit)
+    if (ios /= 0) then
+       write(*,*) 'ERROR: Could not read process id for temporary m4 file.'
+       stop
+    end if
+
+    call execute_command_line('mkdir -p /tmp/MAGPARSER')
+    write(helper_name, '(A,I0,A)') '/tmp/MAGPARSER/.m4name_', pid_self, '.tmp'
+    expanded_file = ''
+    m4_cmd = 'sh -c ''f=$(mktemp /tmp/MAGPARSER/magparser_m4_XXXXXX.ctr) && m4 "$1" > "$f" && printf "%s\n" "$f" > "$2"'' sh "' &
+         // trim(fileName) // '" "' // trim(helper_name) // '"'
+    call execute_command_line(trim(m4_cmd), exitstat=m4_stat)
+    if (m4_stat /= 0) then
+       write(*,*) 'ERROR: m4 preprocessing failed for control file: ', trim(fileName)
+       write(*,*) '       m4 exit status: ', m4_stat
+       call execute_command_line('rm -f "' // trim(helper_name) // '"')
+       stop
+    end if
+
+    open(newunit=helper_unit, file=trim(helper_name), status='old', action='read', iostat=helper_ios)
+    if (helper_ios /= 0) then
+       write(*,*) 'ERROR: Could not read temporary m4 filename for control file: ', trim(fileName)
+       call execute_command_line('rm -f "' // trim(helper_name) // '"')
+       stop
+    end if
+    read(helper_unit, '(A)', iostat=helper_ios) expanded_file
+    close(helper_unit)
+    call execute_command_line('rm -f "' // trim(helper_name) // '"')
+    if (helper_ios /= 0 .or. len_trim(expanded_file) == 0) then
+       write(*,*) 'ERROR: Could not determine expanded control file name for: ', trim(fileName)
+       stop
+    end if
+
+    write(*,'(A)') '--- BEGIN M4-EXPANDED CONTROL FILE: ' // trim(fileName) // ' ---'
+    open(newunit=echo_unit, file=trim(expanded_file), status='old', action='read', iostat=echo_ios)
+    if (echo_ios /= 0) then
+       write(*,*) 'ERROR: Could not open m4-expanded control file: ', trim(expanded_file)
+       call execute_command_line('rm -f "' // trim(expanded_file) // '"')
+       stop
+    end if
+    do
+       read(echo_unit, '(A)', iostat=echo_ios) echo_line
+       if (echo_ios /= 0) exit
+       write(*,'(A)') trim(echo_line)
+    end do
+    close(echo_unit)
+    write(*,'(A)') '--- END M4-EXPANDED CONTROL FILE ---'
+
+    ! Open the expanded file for parsing
+    open(newunit=unit, file=trim(expanded_file), status='old', action='read', iostat=ios)
+    if (ios /= 0) then
+       print *, "Error: Could not open expanded control file."
+       call execute_command_line('rm -f "' // trim(expanded_file) // '"')
        stop
     end if
     call InitPrecision(1000) !> read it from CTR file to override
@@ -765,7 +825,7 @@ contains
        end select
     end do read_loop
 100 continue !end of file
-    close(unit)
+    close(unit, status='delete')
   end subroutine ParseControlFile
 
   !> helper function, hopefully we do not have to debug them often
