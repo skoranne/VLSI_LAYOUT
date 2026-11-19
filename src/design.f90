@@ -1074,7 +1074,7 @@ contains
     integer            :: env_len, env_status
     real(kind=real64)  :: t_start, t_end
 
-    if (profiling_enabled) t_start = cpu_time()
+    if (profiling_enabled) t_start = get_cpu_time()
 
     call get_environment_variable( 'MAGPARSER_CONTROL_PREPROCESS_LAYER_BY_POLYGON', length=env_len, status=env_status )
     if( env_status == 0 ) then !> value is set
@@ -1087,7 +1087,7 @@ contains
        if( allocated( input_layer%tree%tree_nodes ) ) error stop "ERROR: INCONSISTENT LAYER STATE during PREPROCESS"
     end if
 
-    if (profiling_enabled) call RecordTime("PreprocessLayer", cpu_time() - t_start)
+    if (profiling_enabled) call RecordTime("PreprocessLayer", get_cpu_time() - t_start)
   end subroutine PreprocessLayer
 
   subroutine CalculateOR( input_layer_A, input_layer_B, output_layer )
@@ -1154,7 +1154,7 @@ contains
     character(len=32) :: offload_env
     integer :: offload_len, offload_stat
 
-    if (profiling_enabled) t_start = cpu_time()
+    !if (profiling_enabled) t_start = get_cpu_time()
 
     !> preprocess A,B (builds RTrees/sorting as needed)
     !$omp parallel default(shared)
@@ -1293,7 +1293,7 @@ contains
     output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
     call PreprocessLayer( output_layer )
 
-    if (profiling_enabled) call RecordTime("CalculateAND", cpu_time() - t_start)
+    if (profiling_enabled) call RecordTime("CalculateAND", get_cpu_time() - t_start)
   end subroutine CalculateAND
 
   !> Multiple algorithms for A NOT B

@@ -29,10 +29,10 @@ contains
     logical                     :: dominated_by_squares
     dominated_by_squares = .false.
 
-    if (profiling_enabled) t_start = cpu_time()
+    if (profiling_enabled) t_start = get_cpu_time()
 
     if( .not. NeedsRTree( input_layer ) ) then
-       if (profiling_enabled) call RecordTime("BuildTree", cpu_time() - t_start)
+       if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
        return
     end if
     if( NeedsSorting( input_layer ) ) then
@@ -60,7 +60,7 @@ contains
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
 
-    if (profiling_enabled) call RecordTime("BuildTree", cpu_time() - t_start)
+    if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
   end subroutine BuildTree
 
   module subroutine SaveLayerToSnap( input_layer, snap_filename, method_to_use )

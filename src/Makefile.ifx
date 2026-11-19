@@ -21,7 +21,7 @@ FORTRAN_COMPILER=/scratch1/skoranne/INTELCOMPILERS/bin/h5fc
 ifeq ($(DEBUG),1)
    FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp
 else
-   FCFLAGS = -g -fpp -O3 -parallel -qopenmp -qopt-report=3
+   FCFLAGS = -g -fpp -O3 -parallel -qopenmp -qopt-report=3 -xHost
 endif
 ifeq ($(PROFILE),1)
    FCFLAGS += -pg
@@ -63,7 +63,7 @@ version_mod.f90: ../.git/HEAD ../.git/index
 	@echo "  character(len=*), parameter :: commit_hash = '$(GIT_HASH)'" >> $@
 	@echo "end module version_mod" >> $@
 
-unit_test: test_contour.exe test_morton.exe test_polygonfracture.exe test_boxmerge.exe \
+unit_test: test_contour.exe test_morton.exe CONVERT.exe test_boxmerge.exe \
 	   test_skiplist.exe
 
 clean:
