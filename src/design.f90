@@ -1155,7 +1155,7 @@ contains
     character(len=32) :: offload_env
     integer :: offload_len, offload_stat
 
-    !if (profiling_enabled) t_start = get_cpu_time()
+    if (profiling_enabled) t_start = get_cpu_time()
 
     !> preprocess A,B (builds RTrees/sorting as needed)
     !$omp parallel default(shared)
@@ -1206,10 +1206,14 @@ contains
                   input_layer_A%layer_boxes, num_boxesA, andOffsets, output_layer%layer_boxes, num_boxesC)
           end if
           output_layer%n_used = num_boxesC
-          output_layer%layerState = ior(output_layer%layerState, LAYER_STATE_HEAL)
+          output_layer%n_alloc = max(num_boxesC, 1_int64)
+          if (allocated(output_layer%tree%tree_nodes)) deallocate(output_layer%tree%tree_nodes)
+          if (allocated(output_layer%pnumtable%arr)) deallocate(output_layer%pnumtable%arr)
+          output_layer%layerState = LAYER_STATE_HEAL
           if (allocated(andCounts)) deallocate(andCounts)
           if (allocated(andOffsets)) deallocate(andOffsets)
           call PreprocessLayer(output_layer)
+          if (profiling_enabled) call RecordTime("CalculateAND", get_cpu_time() - t_start)
           return
        end if
        if (allocated(andCounts)) deallocate(andCounts)
@@ -1290,8 +1294,12 @@ contains
        i = i + buffers(tid)%n_used
     end do
     output_layer%n_used = num_boxesC
+    output_layer%n_alloc = num_boxesC
+    if (allocated(buffers)) deallocate(buffers)
+    if (allocated(output_layer%tree%tree_nodes)) deallocate(output_layer%tree%tree_nodes)
+    if (allocated(output_layer%pnumtable%arr)) deallocate(output_layer%pnumtable%arr)
     !> we can use the optimization that by construction the output is HEALED
-    output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
+    output_layer%layerState = LAYER_STATE_HEAL
     call PreprocessLayer( output_layer )
 
     if (profiling_enabled) call RecordTime("CalculateAND", get_cpu_time() - t_start)
@@ -1333,6 +1341,8 @@ contains
   subroutine DeleteLayer( input_layer_A )
     type(Layer), intent(inout) :: input_layer_A
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
+    if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
+    if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
     if( allocated( input_layer_A%fileName ) ) deallocate( input_layer_A%fileName )
     input_layer_A%n_used = 0
     input_layer_A%n_alloc = 0
@@ -1357,12 +1367,22 @@ contains
        call ClearLayer( output_layer )
        return
     end if
-    output_layer%layer_boxes = input_layer_A%layer_boxes
+    output_layer%layer_boxes = input_layer_A%layer_boxes(1:input_layer_A%n_used)
     output_layer%n_used = input_layer_A%n_used
-    output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
+    output_layer%n_alloc = input_layer_A%n_used
+    if( allocated( input_layer_A%pnumtable%arr ) ) then
+       output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
+    else if( allocated( output_layer%pnumtable%arr ) ) then
+       deallocate( output_layer%pnumtable%arr )
+    end if
     output_layer%layerState = input_layer_A%layerState
-    output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
-    output_layer%tree%root_index = input_layer_A%tree%root_index
+    if( allocated( input_layer_A%tree%tree_nodes ) ) then
+       output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
+       output_layer%tree%root_index = input_layer_A%tree%root_index
+    else if( allocated( output_layer%tree%tree_nodes ) ) then
+       deallocate( output_layer%tree%tree_nodes )
+       output_layer%tree%root_index = 0
+    end if
     !if(allocated(input_layer_A%fileName)) output_layer%fileName = K_COPY_PREFIX//input_layer_A%fileName
   end subroutine CopyLayer
 

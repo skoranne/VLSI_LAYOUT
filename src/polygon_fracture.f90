@@ -968,18 +968,9 @@ contains
 
     call destroy_skiplist(active_edges)
 
-    if (output_box_count > 0 .and. output_box_count < size(boxes)) then
-       block
-         type(Box), allocatable :: temp(:)
-         temp = temp_boxes(1:output_box_count)
-         boxes = temp
-       end block ! Temp is automatically cleaned up here
-       !boxes(1:output_box_count) = temp_boxes(1:output_box_count)
-    else
-       allocate(resized_boxes(output_box_count))
-       if (output_box_count > 0) resized_boxes(1:output_box_count) = temp_boxes(1:output_box_count)
-       call move_alloc(from=resized_boxes, to=boxes)
-    end if
+    allocate(resized_boxes(output_box_count))
+    if (output_box_count > 0) resized_boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+    call move_alloc(from=resized_boxes, to=boxes)
 
   contains
 

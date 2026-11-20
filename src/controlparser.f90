@@ -208,16 +208,13 @@ contains
     character :: operator_char !> single letter only
     character(len=256) :: TEMPORARY_FOLDER
     character(len=256) :: TEMPORARY_LAYER_PREFIX
-     character(len=4096) :: filename_work
-    type(Layer), allocatable :: tmp_layers(:)
-    character(len=1024), allocatable :: tmp_layerNames(:)
-    integer :: grow_size, old_size
+    character(len=4096) :: filename_work
     character(len=256) :: strvar
     real(kind=real64)  :: rvar(16)
     integer(kind=K_COORDINATE_KIND):: ivar(16)
     integer(kind=K_COORDINATE_KIND) :: used_precision
     db_count = 1
-    !TEMPORARY_LAYER_PREFIX = "MAG_TEMP_LAYER_"
+    TEMPORARY_FOLDER = ''
     TEMPORARY_LAYER_PREFIX = "MTL_"
     call hash_create(ht,K_MAX_DBS)
     allocate( design_dbs( K_MAX_DBS ) )

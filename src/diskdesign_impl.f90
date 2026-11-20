@@ -26,7 +26,7 @@ contains
   module subroutine BuildTree( input_layer )
     type(Layer), intent(inout)  :: input_layer
     real(kind=real64)           :: t_start
-    integer(kind=int64)         :: total_nodes, num_squares
+    integer(kind=int64)         :: total_nodes, num_squares, n_used, i
     logical                     :: dominated_by_squares
     dominated_by_squares = .false.
 
@@ -36,45 +36,52 @@ contains
        if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
        return
     end if
+    n_used = input_layer%n_used
+    if( n_used <= 0 ) then
+       input_layer%layerState = ior( input_layer%layerState, ior( LAYER_STATE_SORT, LAYER_STATE_RTREE ) )
+       if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
+       return
+    end if
     if( NeedsSorting( input_layer ) ) then
-       block
-         type(Box), allocatable :: sort_boxes(:)
-         integer(kind=int64) :: saved_n_alloc
-         saved_n_alloc = input_layer%n_alloc
-         ! Sort only used boxes to avoid corrupting tail slots
-         allocate(sort_boxes(input_layer%n_used))
-         sort_boxes = input_layer%layer_boxes(1:input_layer%n_used)
-         num_squares = count( is_square( sort_boxes ) )
-         if( num_squares*1.0_real64 / (input_layer%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
-            dominated_by_squares = .true.
-         end if
-         if( dominated_by_squares ) then       
+       num_squares = 0_int64
+       do i = 1, n_used
+          if ( input_layer%layer_boxes(i)%x1 < input_layer%layer_boxes(i)%x2 .and. &
+               input_layer%layer_boxes(i)%y1 < input_layer%layer_boxes(i)%y2 .and. &
+               (input_layer%layer_boxes(i)%x2 - input_layer%layer_boxes(i)%x1) == &
+               (input_layer%layer_boxes(i)%y2 - input_layer%layer_boxes(i)%y1) ) then
+             num_squares = num_squares + 1_int64
+          end if
+       end do
+       if( num_squares*1.0_real64 / (n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+          dominated_by_squares = .true.
+       end if
 #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
-           ! keep original array for CUDA path (expects full array + n_used)
-           deallocate(sort_boxes)
+       call SortBoxesDirect( input_layer%layer_boxes, int( n_used, kind=int64 ) )
 #else
-           call MortonSort( sort_boxes )
-           input_layer%layer_boxes(1:input_layer%n_used) = sort_boxes
-           deallocate(sort_boxes)
+       if( dominated_by_squares ) then
+          if( size( input_layer%layer_boxes, kind=int64 ) == n_used ) then
+             call MortonSort( input_layer%layer_boxes )
+          else
+             block
+               type(Box), allocatable :: sort_boxes(:)
+               allocate( sort_boxes(n_used) )
+               sort_boxes = input_layer%layer_boxes(1:n_used)
+               call MortonSort( sort_boxes )
+               call move_alloc( from=sort_boxes, to=input_layer%layer_boxes )
+               input_layer%n_alloc = n_used
+             end block
+          end if
+       else
+          ! omt_pack sorts the slice in place without copying the full layer
+          call omt_pack( input_layer%layer_boxes(1:n_used), K_LEAF_CAPACITY )
+       end if
 #endif
-         else
-#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
-           deallocate(sort_boxes)
-#else
-           call omt_pack( sort_boxes , K_LEAF_CAPACITY )
-           input_layer%layer_boxes(1:input_layer%n_used) = sort_boxes
-           deallocate(sort_boxes)
-#endif         
-         end if
-#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
-         call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
-#endif
-       end block
        input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     end if
-    total_nodes = CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY )
+    total_nodes = CalculateTotalNodes( n_used, K_LEAF_CAPACITY )
+    if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
-    call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
+    call BuildRTree( input_layer%layer_boxes(1:n_used), K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
 
     if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
@@ -100,7 +107,7 @@ contains
        write(*,*) 'ERROR: unknown compression method: ', method_to_use, ' requested.'
        error stop
     end if
-    call CompressBoxesToStream( input_layer%layer_boxes, snappy_stream, method_to_use )
+    call CompressBoxesToStream( input_layer%layer_boxes(1:input_layer%n_used), snappy_stream, method_to_use )
     call SaveCompressedStreamToDisk( snap_filename, snappy_stream )
   end subroutine SaveLayerToSnap
 
@@ -122,13 +129,15 @@ contains
     pos = index( snap_filename, ".bin" )
     if( pos /= 0 ) then !> we are going to assume this is a non-compressed binary file
        call LoadKLBin( snap_filename, input_layer%layer_boxes)
-       input_layer%n_used  = size(input_layer%layer_boxes)
+       input_layer%n_used  = size(input_layer%layer_boxes, kind=int64)
+       input_layer%n_alloc = input_layer%n_used
        call BuildTree( input_layer )
        return
     end if
     call RestoreCompressedStreamFromDisk( snap_filename, snappy_stream )
     call DecompressStreamToBoxes( snappy_stream, input_layer%layer_boxes )
-    input_layer%n_used = size( input_layer%layer_boxes )
+    input_layer%n_used  = size( input_layer%layer_boxes, kind=int64 )
+    input_layer%n_alloc = input_layer%n_used
     if( input_layer%n_used /= snappy_stream%total_boxes) then
        write(*,*) 'ERROR: SNAP restoration failed for file: ', snap_filename
        error stop "ERROR: SNAP RESTORATION FAILED"

@@ -10,33 +10,31 @@ module BoostPolygonAPIModule
   implicit none
   public:: MergeBoxesUsingBoostPolygon, OperateBoxesUsingBoostPolygon
   interface
-     ! Bind to the C function
-     subroutine PerformBoostPolygonMerge(input, N, output, outN) bind(c, name="PerformBoostPolygonMerge")
-       import :: c_long, Box
+     ! Exact-sized allocating C bindings (no caller pre-allocation or buffer overflow)
+     function PerformBoostPolygonMergeAlloc(input, N, outN) result(res_ptr) bind(c, name="PerformBoostPolygonMergeAlloc")
+       import :: c_long, c_ptr, Box
        implicit none
-       ! Dimension(*) is used for C-array compatibility (assumed-size)
        type(Box), dimension(*), intent(in) :: input
-       ! Pass by value to match 'unsigned long N'
        integer(c_long), value, intent(in) :: N
-       ! Pre-allocated output array
-       type(Box), dimension(*), intent(out) :: output
-       ! Pass by reference (pointer in C) for the output count
        integer(c_long), intent(out) :: outN
-     end subroutine PerformBoostPolygonMerge
+       type(c_ptr) :: res_ptr
+     end function PerformBoostPolygonMergeAlloc
 
-     subroutine PerformBoostPolygonOperation(input_A, AN, input_B, BN, output, outN, control_parameter, control_value) bind(c, name="PerformBoostPolygonOperation")
-       import :: c_long, Box
+     function PerformBoostPolygonOperationAlloc(input_A, AN, input_B, BN, outN, control_parameter, control_value) &
+          result(res_ptr) bind(c, name="PerformBoostPolygonOperationAlloc")
+       import :: c_long, c_ptr, Box
        implicit none
-       ! Dimension(*) is used for C-array compatibility (assumed-size)
        type(Box), dimension(*), intent(in) :: input_A, input_B
-       ! Pass by value to match 'unsigned long AN'
        integer(c_long), value, intent(in) :: AN, BN, control_parameter, control_value
-       ! Pre-allocated output array
-       type(Box), dimension(*), intent(out) :: output
-       ! Pass by reference (pointer in C) for the output count
        integer(c_long), intent(out) :: outN
-     end subroutine PerformBoostPolygonOperation
-     
+       type(c_ptr) :: res_ptr
+     end function PerformBoostPolygonOperationAlloc
+
+     subroutine FreeBoostPolygonBuffer(ptr) bind(c, name="FreeBoostPolygonBuffer")
+       import :: c_ptr
+       implicit none
+       type(c_ptr), value, intent(in) :: ptr
+     end subroutine FreeBoostPolygonBuffer
   end interface
 
 contains
@@ -45,67 +43,84 @@ contains
     type(Box), dimension(:), intent(in) :: input_boxes_A, input_boxes_B
     type(Box), dimension(:), allocatable, intent(out) :: merged_boxes
     integer(c_long), intent(in) :: control_parameter, control_value
-    integer(c_long) :: AN, BN, outN, guessed_output_size
+    integer(c_long) :: AN, BN, outN
     integer :: alloc_status
-    type(Box), dimension(:), allocatable :: temp_output
-    type(Box) :: bboxA
+    type(c_ptr) :: c_out_ptr
+    type(Box), pointer :: f_out_ptr(:)
+    type(Box) :: dummy_box(1)
+
     AN = size(input_boxes_A, kind=c_long)
     BN = size(input_boxes_B, kind=c_long)
-    if ( (AN == 0) .and. (BN  == 0 ) ) then
+    if ( (AN == 0) .and. (BN == 0) ) then
        allocate(merged_boxes(0))
        return
     end if
-    bboxA = mbr_of_array( input_boxes_A, AN )
-    !> how to guess the output size, A * B could be O(n^2)
-    if( control_parameter == K_BOOST_CONTROL_AND ) then
-       guessed_output_size = 10*max(AN,BN)
+
+    outN = 0_c_long
+    if (AN > 0 .and. BN > 0) then
+       c_out_ptr = PerformBoostPolygonOperationAlloc(input_boxes_A, AN, input_boxes_B, BN, outN, control_parameter, control_value)
+    else if (AN > 0) then
+       c_out_ptr = PerformBoostPolygonOperationAlloc(input_boxes_A, AN, dummy_box, 0_c_long, outN, control_parameter, control_value)
     else
-       guessed_output_size = 4*max(AN,BN)
+       c_out_ptr = PerformBoostPolygonOperationAlloc(dummy_box, 0_c_long, input_boxes_B, BN, outN, control_parameter, control_value)
     end if
-    guessed_output_size = max(guessed_output_size, 1024_c_long)
-    do
-       allocate( temp_output( guessed_output_size), stat=alloc_status )
-       if( alloc_status /= 0 ) then
-          write(*,*) 'ERROR: Requested memory: ', guessed_output_size, ' from ', AN, ' ', BN
-          error stop "ERROR: MEMORY ALLOCATION FAILED: "
-       end if
-       ! Call the C/C++ backend
-       call PerformBoostPolygonOperation(input_boxes_A, AN, input_boxes_B, BN, temp_output, outN, control_parameter, control_value)
-       if (outN <= guessed_output_size) exit
-       if (allocated(temp_output)) deallocate(temp_output)
-       guessed_output_size = max(outN * 2_c_long, guessed_output_size * 2_c_long)
-    end do
-    ! Allocate final output to exact size and copy
-    allocate(merged_boxes(outN))
-    if (outN > 0) merged_boxes(1:outN) = temp_output(1:outN)
-  
+
+    if (outN == 0) then
+       if (c_associated(c_out_ptr)) call FreeBoostPolygonBuffer(c_out_ptr)
+       allocate(merged_boxes(0))
+       return
+    end if
+    if (.not. c_associated(c_out_ptr)) then
+       write(*,*) 'ERROR: BoostPolygon C++ buffer allocation failed for ', outN, ' boxes from ', AN, ' ', BN
+       error stop "ERROR: MEMORY ALLOCATION FAILED: "
+    end if
+
+    allocate(merged_boxes(outN), stat=alloc_status)
+    if (alloc_status /= 0) then
+       call FreeBoostPolygonBuffer(c_out_ptr)
+       write(*,*) 'ERROR: Requested memory: ', outN, ' from ', AN, ' ', BN
+       error stop "ERROR: MEMORY ALLOCATION FAILED: "
+    end if
+    call c_f_pointer(c_out_ptr, f_out_ptr, [outN])
+    merged_boxes(1:outN) = f_out_ptr(1:outN)
+    call FreeBoostPolygonBuffer(c_out_ptr)
   end subroutine OperateBoxesUsingBoostPolygon
 
   subroutine MergeBoxesUsingBoostPolygon(input_boxes, merged_boxes)
     type(Box), dimension(:), intent(in) :: input_boxes
     type(Box), dimension(:), allocatable, intent(out) :: merged_boxes
-    integer(c_long) :: N, outN, guessed_output_size
+    integer(c_long) :: N, outN
     integer :: alloc_status
-    type(Box), dimension(:), allocatable :: temp_output
+    type(c_ptr) :: c_out_ptr
+    type(Box), pointer :: f_out_ptr(:)
+
     N = size(input_boxes, kind=c_long)
     if (N == 0) then
        allocate(merged_boxes(0))
        return
     end if
-    guessed_output_size = max(2_c_long*N, 1024_c_long)
-    do
-       allocate(temp_output(guessed_output_size), stat=alloc_status)
-       if (alloc_status /= 0) then
-          write(*,*) 'ERROR: Requested memory: ', guessed_output_size
-          error stop "ERROR: MEMORY ALLOCATION FAILED"
-       end if
-       call PerformBoostPolygonMerge(input_boxes, N, temp_output, outN)
-       if (outN <= guessed_output_size) exit
-       if (allocated(temp_output)) deallocate(temp_output)
-       guessed_output_size = max(outN * 2_c_long, guessed_output_size * 2_c_long)
-    end do
-    allocate(merged_boxes(outN))
-    if (outN > 0) merged_boxes(1:outN) = temp_output(1:outN)
+
+    outN = 0_c_long
+    c_out_ptr = PerformBoostPolygonMergeAlloc(input_boxes, N, outN)
+    if (outN == 0) then
+       if (c_associated(c_out_ptr)) call FreeBoostPolygonBuffer(c_out_ptr)
+       allocate(merged_boxes(0))
+       return
+    end if
+    if (.not. c_associated(c_out_ptr)) then
+       write(*,*) 'ERROR: BoostPolygon C++ merge buffer allocation failed for ', outN, ' boxes'
+       error stop "ERROR: MEMORY ALLOCATION FAILED"
+    end if
+
+    allocate(merged_boxes(outN), stat=alloc_status)
+    if (alloc_status /= 0) then
+       call FreeBoostPolygonBuffer(c_out_ptr)
+       write(*,*) 'ERROR: Requested memory: ', outN
+       error stop "ERROR: MEMORY ALLOCATION FAILED"
+    end if
+    call c_f_pointer(c_out_ptr, f_out_ptr, [outN])
+    merged_boxes(1:outN) = f_out_ptr(1:outN)
+    call FreeBoostPolygonBuffer(c_out_ptr)
   end subroutine MergeBoxesUsingBoostPolygon
   
 end module BoostPolygonAPIModule

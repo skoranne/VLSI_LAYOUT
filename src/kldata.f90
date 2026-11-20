@@ -86,7 +86,7 @@ contains
        stop
     end if
     ! 3. Write the entire array cleanly into the file in one shot
-    write(file_unit, iostat=io_status) boxes
+    write(file_unit, iostat=io_status) boxes(1:total_boxes)
     if (io_status == 0) then
        !write(*,'(A,I12,A)') 'INFO: Write successful for ', total_boxes, ' boxes.'
     else

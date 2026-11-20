@@ -26,11 +26,12 @@ contains
   module subroutine PerformMergeLayer( input_layer )
     type(Layer), intent( inout )    :: input_layer
     real(kind=real64)               :: overlap_area, overlap_perimeter
+    if( input_layer%n_used == 0 ) return
     if( NeedsRTree( input_layer ) ) call BuildTree( input_layer )
     if( NeedsHealing( input_layer ) ) call MergeHealLayer( input_layer )
     if( NeedsRTree( input_layer ) ) call BuildTree( input_layer )
-    call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
-                      input_layer%tree%root_index, overlap_area, overlap_perimeter)
+    call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY, &
+                      input_layer%tree%tree_nodes, input_layer%tree%root_index, overlap_area, overlap_perimeter)
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )    
   end subroutine PerformMergeLayer
   
@@ -937,16 +938,16 @@ contains
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout)   :: output_layer
       integer(kind=int64), intent(in) :: control_parameter, control_value
-      type(Layer) :: tempLayer
-      type(Box), allocatable :: sized_boxes(:)
-      integer(kind=int64) :: i, nA
+      type(Box), allocatable :: empty_boxes(:), sized_boxes(:), result_boxes(:)
+      integer(kind=int64) :: i, nA, nB
       logical :: gpu_size
       character(len=32) :: offload_env
       integer :: offload_len, offload_stat
-      allocate( tempLayer%layer_boxes(1) )
-      !> this function does the allocation
+      allocate( empty_boxes(0) )
+      nA = input_layer_A%n_used
+      nB = input_layer_B%n_used
+      !> this function does the allocation; always slice to 1:n_used so uninitialized tail slots are never read
       if( control_parameter == K_BOOST_CONTROL_SIZE ) then
-         nA = input_layer_A%n_used
          gpu_size = .false.
 #if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
          if (nA > 0 .and. control_value > 0 .and. omp_get_num_devices() > 0) then
@@ -957,7 +958,9 @@ contains
             end if
          end if
 #endif
-         if (gpu_size) then
+         if (nA == 0) then
+            allocate(result_boxes(0))
+         else if (gpu_size) then
             allocate(sized_boxes(nA))
             sized_boxes(1:nA) = input_layer_A%layer_boxes(1:nA)
             !$omp target teams distribute parallel do map(tofrom: sized_boxes(1:nA))
@@ -967,22 +970,39 @@ contains
                sized_boxes(i)%x2 = sized_boxes(i)%x2 + int(control_value, kind=K_COORDINATE_KIND)
                sized_boxes(i)%y2 = sized_boxes(i)%y2 + int(control_value, kind=K_COORDINATE_KIND)
             end do
-            call MergeBoxesUsingBoostPolygon(sized_boxes, output_layer%layer_boxes)
+            call MergeBoxesUsingBoostPolygon(sized_boxes, result_boxes)
             if (allocated(sized_boxes)) deallocate(sized_boxes)
          else
-            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&
+            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes(1:nA), empty_boxes, result_boxes,&
                K_BOOST_CONTROL_SIZE, control_value )
          end if
       else if( control_parameter == K_BOOST_CONTROL_MERGE ) then
-         call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&
-            K_BOOST_CONTROL_MERGE, control_value )
+         if (nA == 0) then
+            allocate(result_boxes(0))
+         else
+            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes(1:nA), empty_boxes, result_boxes,&
+               K_BOOST_CONTROL_MERGE, control_value )
+         end if
       else
-         call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, input_layer_B%layer_boxes, output_layer%layer_boxes,&
-            control_parameter, control_value )
+         if (nA > 0 .and. nB > 0) then
+            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes(1:nA), input_layer_B%layer_boxes(1:nB), result_boxes,&
+               control_parameter, control_value )
+         else if (nA > 0) then
+            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes(1:nA), empty_boxes, result_boxes,&
+               control_parameter, control_value )
+         else if (nB > 0) then
+            call OperateBoxesUsingBoostPolygon( empty_boxes, input_layer_B%layer_boxes(1:nB), result_boxes,&
+               control_parameter, control_value )
+         else
+            allocate(result_boxes(0))
+         end if
       end if
+      call move_alloc( from=result_boxes, to=output_layer%layer_boxes )
       if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
+      if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )
       output_layer%layerState = LAYER_STATE_HEAL
-      output_layer%n_used = size( output_layer%layer_boxes )
+      output_layer%n_used = size( output_layer%layer_boxes, kind=int64 )
+      output_layer%n_alloc = output_layer%n_used
    end subroutine CalculateBoostOperation
 
    module subroutine MergeBoxes( input_N, boxes, output_N )
