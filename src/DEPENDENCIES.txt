@@ -1,7 +1,7 @@
 LIB_OBJS = commonmodule.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
-	   polygon_fracture.o boxmerge.o kldata.o design_impl.o gpu_morton_sort.o\
+	   polygon_fracture.o boxmerge.o kldata.o design_impl.o design_boolean_impl.o design_topo_impl.o gpu_morton_sort.o\
 	   systeminfo_gpu.o interaction.o gpu_pnummerge.o RLEMerge.o ascii_plot.o\
 	   boost_polygon_apif.o boost_polygon_api.o boxbytestream.o box_compression.o\
 	   snappy_api.o snappy_apif.o layout_statistics.o box_codec.o serialization.o\
@@ -32,7 +32,9 @@ gpu_pnummerge.o: interaction.o
 polygon_fracture.o: commonmodule.o hdfdata.o
 design.o: datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o profiler.o
 design_impl.o: commonmodule.o design.o geometry.o boost_polygon_apif.o diskdesign_impl.o
-diskdesign_impl.o: serialization.o box_codec.o snappy_apif.o utilities.o
+design_boolean_impl.o: commonmodule.o design.o geometry.o rtree.o interaction.o polygon_fracture.o profiler.o
+design_topo_impl.o: commonmodule.o design.o geometry.o rtree.o
+diskdesign_impl.o: design.o serialization.o box_codec.o snappy_apif.o utilities.o
 magparser.o: polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
 mainmagparser.o: magparser.o controlparser.o
 controlparser.o: design.o layoutdb_loader.o
