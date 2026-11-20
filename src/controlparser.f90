@@ -613,7 +613,7 @@ contains
                      operator_char, &
                      design_dbs(rhs2_db_index)%designName,':',trim(design_dbs(rhs2_db_index)%layerNames(rhs2_layer_index))
                 if( rhs1_layer%n_used == 0 ) call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
-                if( rhs2_layer%n_used == 0 ) call RestoreSnapToLayer( rhs2_layer, rhs2_layer%fileName )                
+                if( rhs2_layer%n_used == 0 ) call RestoreSnapToLayer( rhs2_layer, rhs2_layer%fileName )
                 select case (operator_char)
                 case('+')
                    call StartMarkTime("OR")

@@ -1348,22 +1348,27 @@ contains
     input_layer_A%layerState = LAYER_STATE_EVERYTHING
   end subroutine ClearLayer
 
-  subroutine CopyLayer( output_layer, input_layer_A )
-    type(Layer), intent(inout) :: output_layer
-    type(Layer), intent(in) :: input_layer_A
-    character(len=*), parameter :: K_COPY_PREFIX = "MTL_COPY_"
-    if( input_layer_A%n_used == 0 ) then
-       call ClearLayer( output_layer )
-       return
-    end if
-    output_layer%layer_boxes = input_layer_A%layer_boxes
-    output_layer%n_used = input_layer_A%n_used
-    output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
-    output_layer%layerState = input_layer_A%layerState
-    output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
-    output_layer%tree%root_index = input_layer_A%tree%root_index
-    !if(allocated(input_layer_A%fileName)) output_layer%fileName = K_COPY_PREFIX//input_layer_A%fileName
-  end subroutine CopyLayer
+   subroutine CopyLayer( output_layer, input_layer_A )
+     type(Layer), intent(inout) :: output_layer
+     type(Layer), intent(in) :: input_layer_A
+     character(len=*), parameter :: K_COPY_PREFIX = "MTL_COPY_"
+     if( input_layer_A%n_used == 0 ) then
+        call ClearLayer( output_layer )
+        return
+     end if
+     ! Deallocate output arrays first since they might be pre-allocated
+     if( allocated( output_layer%layer_boxes ) ) then
+        deallocate( output_layer%layer_boxes )
+     end if
+     if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )
+     if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
+     output_layer%layer_boxes = input_layer_A%layer_boxes
+     output_layer%n_used = input_layer_A%n_used
+     output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
+     output_layer%layerState = input_layer_A%layerState
+     output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
+     output_layer%tree%root_index = input_layer_A%tree%root_index
+   end subroutine CopyLayer
 
   subroutine DeleteDesign( input_design )
     type(Design), intent(inout) :: input_design

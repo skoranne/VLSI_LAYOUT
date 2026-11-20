@@ -21,7 +21,7 @@ FORTRAN_COMPILER=/scratch1/skoranne/INTELCOMPILERS/bin/h5fc
 ifeq ($(DEBUG),1)
    FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp
 else
-   FCFLAGS = -g -fpp -O3 -parallel -qopenmp -qopt-report=3 -xHost
+   FCFLAGS = -g -traceback -fpp -O3 -parallel -qopenmp -qopt-report=3 -xHost
 endif
 ifeq ($(PROFILE),1)
    FCFLAGS += -pg

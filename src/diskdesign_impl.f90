@@ -55,6 +55,7 @@ contains
       end if
       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     end if
+    if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )
     total_nodes = CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY )
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
@@ -93,6 +94,7 @@ contains
     type(CompressedStream)     :: snappy_stream
     integer                    :: pos, iunit, ios
     !> for memory based layers we need an optimization that NO-FILE => EMPTY LAYER
+    !        write(*,*) 'DEBUG RestoreSnapToLayer: input_layer%layer_boxes allocated = ', allocated(input_layer%layer_boxes), ' n_used = ', input_layer%n_used
     if( temporary_layers > 1 ) then
        open(newunit=iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
        if (ios /= 0) then
@@ -104,6 +106,10 @@ contains
     end if
     pos = index( snap_filename, ".bin" )
     if( pos /= 0 ) then !> we are going to assume this is a non-compressed binary file
+       if( allocated(input_layer%layer_boxes) )   deallocate(input_layer%layer_boxes)
+       if( allocated(input_layer%pnumtable%arr) )  deallocate(input_layer%pnumtable%arr)
+       if( allocated(input_layer%tree%tree_nodes) ) deallocate(input_layer%tree%tree_nodes)
+       input_layer%layerState = LAYER_STATE_EVERYTHING
        call LoadKLBin( snap_filename, input_layer%layer_boxes)
        input_layer%n_used  = size(input_layer%layer_boxes)
        call BuildTree( input_layer )

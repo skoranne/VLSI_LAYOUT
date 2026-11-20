@@ -572,22 +572,25 @@ contains
       input_layer%n_used = size( input_layer%layer_boxes )
    end subroutine RemoveIdentical
 
-   module subroutine CalculateGROWLayer( input_layer, output_layer, ivar )
-      type(Layer),      intent(in)    :: input_layer
-      type(Layer),      intent(inout) :: output_layer
-      integer(kind=K_COORDINATE_KIND), intent(in)   :: ivar(4)
-      call ClearLayer( output_layer )
-      output_layer%layerState = LAYER_STATE_NONE
-      output_layer%layer_boxes = input_layer%layer_boxes
-      output_layer%n_used = input_layer%n_used
-      !write(*,*) 'GROW : ', ivar
-      call box_grow_directional(output_layer%layer_boxes, ivar(1), ivar(2), ivar(3), ivar(4) )
-      !write(*,*) 'OUTPUT_STATE = ', output_layer%layerState
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_SORT ) !> optimization
-      call BuildTree( output_layer ) !> this can be built from the input_layer, see above
-      call MergeHealLayer( output_layer )
-      call PreprocessLayer( output_layer )
-   end subroutine CalculateGROWLayer
+    module subroutine CalculateGROWLayer( input_layer, output_layer, ivar )
+       type(Layer),      intent(in)    :: input_layer
+       type(Layer),      intent(inout) :: output_layer
+       integer(kind=K_COORDINATE_KIND), intent(in)   :: ivar(4)
+       ! Check if input layer is empty - if so, clear output and return
+       if( input_layer%n_used == 0 ) then
+          call ClearLayer( output_layer )
+          return
+       end if
+       call ClearLayer( output_layer )
+       output_layer%layerState = LAYER_STATE_NONE
+       output_layer%layer_boxes = input_layer%layer_boxes
+       output_layer%n_used = input_layer%n_used
+       call box_grow_directional(output_layer%layer_boxes, ivar(1), ivar(2), ivar(3), ivar(4) )
+       output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_SORT )
+       call BuildTree( output_layer )
+       call MergeHealLayer( output_layer )
+       call PreprocessLayer( output_layer )
+    end subroutine CalculateGROWLayer
 
    module subroutine CalculateSHRINKLayer( input_layer_A, shrink_value, output_layer )
       type(Layer), intent(inout) :: input_layer_A

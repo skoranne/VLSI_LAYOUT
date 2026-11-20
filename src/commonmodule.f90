@@ -17,7 +17,7 @@ module CommonModule
   integer                        :: debug_verbosity = 0
   integer                        :: abort_on_xor = 0
   integer                        :: abort_on_assert_zero = 0
-  logical                       :: profiling_enabled = .true.
+  logical                       :: profiling_enabled = .false.
   integer                        :: temporary_layers = K_TEMPORARY_LAYER_MEMORY
   integer                        :: K_COMPRESSION_METHOD_TO_USE = 1 !> ZLIB
   integer                        :: CODEC_VERSION = 1

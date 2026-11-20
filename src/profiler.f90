@@ -27,21 +27,29 @@ module ProfilerModule
     end function get_cpu_time
 
     subroutine InitProfiler()
-       if (profiler_initialized) return
-       allocate(profiles(1000))
-       num_profiles = 0
-       profiler_initialized = .true.
+       !$omp critical(profiler_lock)
+       if (.not. profiler_initialized) then
+          allocate(profiles(1000))
+          num_profiles = 0
+          profiler_initialized = .true.
+       end if
+       !$omp end critical(profiler_lock)
     end subroutine InitProfiler
 
     subroutine RecordTime(name, duration)
        character(len=*), intent(in) :: name
        real(kind=real64), intent(in) :: duration
        integer :: i
-       logical :: found = .false.
+       logical :: found
 
-       if (.not. profiler_initialized) call InitProfiler()
+       !$omp critical(profiler_lock)
+       if (.not. profiler_initialized) then
+          allocate(profiles(1000))
+          num_profiles = 0
+          profiler_initialized = .true.
+       end if
 
-       !$omp critical
+       found = .false.
        do i = 1, num_profiles
           if (profiles(i)%name == name) then
              profiles(i)%total_time = profiles(i)%total_time + duration
@@ -67,7 +75,7 @@ module ProfilerModule
           profiles(num_profiles)%total_time = duration
           profiles(num_profiles)%call_count = 1
        end if
-       !$omp end critical
+       !$omp end critical(profiler_lock)
     end subroutine RecordTime
 
     subroutine PrintProfileSummary()
