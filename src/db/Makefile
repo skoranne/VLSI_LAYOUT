@@ -1,4 +1,5 @@
 CXX ?= g++
+AR ?= ar
 CXXFLAGS ?= -O2 -std=c++17 -Wall -Wextra -I. -DLAYOUTDB_USE_ZLIB
 LDFLAGS ?= -lz
 NVCC ?= nvcc
@@ -18,7 +19,7 @@ $(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 liblayoutdb.a: $(CORE_OBJS)
-	ar rcs $@ $^
+	$(AR) rcs $@ $^
 
 db_extent: db_extent.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)

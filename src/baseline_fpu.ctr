@@ -1,0 +1,12 @@
+# Baseline performance test for FPU
+program BaselineFPU
+systeminfo
+decl design d1 = ../data/FPU/FPU_8x8.oas
+decl memory t1 = nothing
+exec run t1:l1 = d1:L690_650 COPY nothing
+info
+exec run t1:l2 = d1:L350_200 COPY nothing
+info
+exec run t1:res = t1:l1 AND2 t1:l2
+info
+end

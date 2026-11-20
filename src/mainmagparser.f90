@@ -52,6 +52,7 @@ program mag_parser
   use MagicVLSILayoutParser               ! <-- your parser module
   use DesignModule
   use ControlModule
+  use ProfilerModule
   use version_mod, only: commit_hash
   implicit none
 
@@ -114,7 +115,11 @@ program mag_parser
   !-----------------------------------------------------------------
   !call parseMagicLayoutFile(load_design, trim(filename), maxLayers)
   call ParseControlFile( trim(filename), maxLayers )
-
+  
+  if (profiling_enabled) then
+     call PrintProfileSummary()
+  end if
+  
   !-----------------------------------------------------------------
   !  Normal program termination
   !-----------------------------------------------------------------

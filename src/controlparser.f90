@@ -208,6 +208,10 @@ contains
     character :: operator_char !> single letter only
     character(len=256) :: TEMPORARY_FOLDER
     character(len=256) :: TEMPORARY_LAYER_PREFIX
+     character(len=4096) :: filename_work
+    type(Layer), allocatable :: tmp_layers(:)
+    character(len=1024), allocatable :: tmp_layerNames(:)
+    integer :: grow_size, old_size
     character(len=256) :: strvar
     real(kind=real64)  :: rvar(16)
     integer(kind=K_COORDINATE_KIND):: ivar(16)
@@ -454,7 +458,10 @@ contains
              if( trim(rest(1:pos-1)) == 'nothing') then
                 allocate( design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName, source = 'MTL_NOTHING')
              else
-                design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName = trim(TEMPORARY_FOLDER)//trim(design_dbs( lhs_db_index )%designName)//'_'//trim(design_dbs( lhs_db_index )%layerNames(lhs_layer_index))
+                filename_work = ' '
+                write(filename_work,'(A,A,A,A)') trim(TEMPORARY_FOLDER), trim(design_dbs( lhs_db_index )%designName), '_', &
+                     trim(design_dbs( lhs_db_index )%layerNames(lhs_layer_index))
+                design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName = filename_work(1:len_trim(filename_work))
                 write(*,*) 'INFO: Reusing FILE: ', design_dbs( lhs_db_index )%layers( lhs_layer_index )%fileName
              end if
              call ClearLayer( design_dbs( lhs_db_index )%layers( lhs_layer_index ) )
@@ -494,7 +501,10 @@ contains
                   lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
                   if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
                   design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
-                  lhs_layer%fileName = trim(TEMPORARY_FOLDER)//trim(design_dbs( lhs_db_index )%designName)//'_'//trim(design_dbs( lhs_db_index )%layerNames(lhs_layer_index))
+                  filename_work = ' '
+                  write(filename_work,'(A,A,A,A)') trim(TEMPORARY_FOLDER), trim(design_dbs( lhs_db_index )%designName), '_', &
+                       trim(design_dbs( lhs_db_index )%layerNames(lhs_layer_index))
+                  lhs_layer%fileName = filename_work(1:len_trim(filename_work))
                   !write(*,*) 'NEW LHS layer index = ', lhs_layer_index, ' for ', trim(adjustl(rest(1:pos-1))), ' ', &
                   !     trim(adjustl(design_dbs( lhs_db_index )%layerNames(lhs_layer_index))), ' FILENAME: ',&
                   !     resolved_layer%fileName

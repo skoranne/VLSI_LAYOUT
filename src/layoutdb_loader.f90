@@ -17,10 +17,10 @@ module LayoutDBLoaderModule
 
 contains
 
-  subroutine box_callback(ud, cell, layer, datatype, element_kind, x1,y1,x2,y2) bind(C)
+  subroutine box_callback(ud, cell, layer_num, datatype, element_kind, x1,y1,x2,y2) bind(C)
     type(c_ptr), value :: ud
     type(c_ptr), value :: cell
-    integer(c_int), value :: layer, datatype, element_kind
+    integer(c_int), value :: layer_num, datatype, element_kind
     integer(c_int64_t), value :: x1,y1,x2,y2
     type(ldb_load_ctx), pointer :: ctx
     integer :: layer_idx
@@ -29,7 +29,7 @@ contains
     call c_f_pointer(ud, ctx)
     if(.not. associated(ctx)) return
     if(.not. associated(ctx%design)) return
-    write(buf,'("L",I0,"_D",I0)') layer, datatype
+    write(buf,'("L",I0,"_D",I0)') layer_num, datatype
     call hash_get(ctx%design%ht, trim(buf), layer_idx, ins)
     if(.not. ins) then
        layer_idx = int(hash_nitems(ctx%design%ht)) + 1
@@ -39,10 +39,10 @@ contains
          character(len=64) :: k2,k3,k4,k5
          logical :: insa
          integer :: idx2
-         write(k2,'("L",I0,"_",I0)') layer, datatype
-         write(k3,'(I0,":",I0)') layer, datatype
-         write(k4,'(I0,"_",I0)') layer, datatype
-         write(k5,'(I0,"_D",I0)') layer, datatype
+         write(k2,'("L",I0,"_",I0)') layer_num, datatype
+         write(k3,'(I0,":",I0)') layer_num, datatype
+         write(k4,'(I0,"_",I0)') layer_num, datatype
+         write(k5,'(I0,"_D",I0)') layer_num, datatype
          call hash_get(ctx%design%ht, trim(k2), idx2, insa)
          if(.not. insa) call hash_get(ctx%design%ht, trim(k3), idx2, insa)
          if(.not. insa) call hash_get(ctx%design%ht, trim(k4), idx2, insa)
@@ -73,10 +73,10 @@ contains
        block
          character(len=64) :: a1,a2,a3,a4
          logical :: ins2
-         write(a1,'("L",I0,"_D",I0)') layer, datatype
-         write(a2,'("L",I0,"_",I0)') layer, datatype
-         write(a3,'(I0,":",I0)') layer, datatype
-         write(a4,'(I0,"_",I0)') layer, datatype
+         write(a1,'("L",I0,"_D",I0)') layer_num, datatype
+         write(a2,'("L",I0,"_",I0)') layer_num, datatype
+         write(a3,'(I0,":",I0)') layer_num, datatype
+         write(a4,'(I0,"_",I0)') layer_num, datatype
          call hash_put(ctx%design%ht, trim(a1), layer_idx, ins2)
          call hash_put(ctx%design%ht, trim(a2), layer_idx, ins2)
          call hash_put(ctx%design%ht, trim(a3), layer_idx, ins2)
@@ -190,6 +190,7 @@ contains
     type(ldb_load_ctx), target :: ctx
     type(c_funptr) :: cb
     integer(c_int) :: rc
+    integer :: i
     call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
     if(.not. c_associated(fh)) return
     cb = c_funloc(box_callback)
@@ -197,6 +198,9 @@ contains
     call ldb_close_c(fh)
     call trim_design_layers(load_design)
     write(*,*) 'INFO: Loaded ', hash_nitems(load_design%ht), ' layers from ', trim(load_design%fileName)
+    do i = 1, hash_nitems(load_design%ht)
+       write(*,*) '  Layer ', i, ': ', trim(load_design%layerNames(i))
+    end do
   end subroutine LoadLayoutDBFile
 
   subroutine LoadLayoutDBFileHier(load_design, MAX_LAYERS)

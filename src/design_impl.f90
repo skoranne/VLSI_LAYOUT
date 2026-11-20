@@ -162,6 +162,7 @@ contains
       type(Layer), intent(inout) :: output_layer
       integer,     intent(in)    :: rows, cols
       integer,     intent(in)    :: GridOverlap
+      real(kind=real64)           :: t_start
 
       type(Box)                  :: input_box
       integer(kind=K_COORDINATE_KIND) :: x_lo, x_hi, y_lo, y_hi
@@ -174,6 +175,7 @@ contains
       ! Overlap padding variables
       integer(kind=K_COORDINATE_KIND) :: overlap_val, pad_left, pad_right, pad_bottom, pad_top
 
+      if (profiling_enabled) t_start = get_cpu_time()
       input_box = mbr_of_array( input_layer%layer_boxes, input_layer%n_used )
       if( allocated( output_layer%layer_boxes ) ) then
          deallocate( output_layer%layer_boxes )
@@ -273,6 +275,7 @@ contains
       end do
       output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL ) !> otherwise this might merge
       call PreprocessLayer( output_layer )
+       if (profiling_enabled) call RecordTime("CreateGrid", get_cpu_time() - t_start)
    end subroutine CreateGrid
 
    module subroutine CreateEXTENT( input_layer, output_layer )
@@ -1026,6 +1029,7 @@ contains
       type(Layer), intent(inout)   :: output_layer
       type(CGFunction) :: functype
       integer(kind=int64), intent(in) :: control_opcode, control_parameter
+      real(kind=real64)           :: t_start
       integer(kind=int64) :: total_count, i, number_tree_nodes
       integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
       integer :: K_GRID
@@ -1042,6 +1046,7 @@ contains
       integer(kind=int64), allocatable :: grid_layer_counts(:,:,:)
       integer,parameter :: A_IN_GRID=1, B_IN_GRID=2, TRACKER_GRID=3, TEMP_LAYER_GRID=4, OUTPUT_LAYER_GRID=5
       type(CGArgument2) :: local_arg
+      if (profiling_enabled) t_start = get_cpu_time()
       number_tree_nodes = CalculateTotalNodes( max( input_layer_A%n_used, input_layer_B%n_used ), K_LEAF_CAPACITY )
       K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
       !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
@@ -1157,6 +1162,7 @@ contains
       call MergeHealLayer( output_layer )
       call PreprocessLayer( output_layer )
       if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
+      if (profiling_enabled) call RecordTime("CalculateFrameFunction2", get_cpu_time() - t_start)
    end subroutine CalculateFrameFunction2
 
    subroutine BoostMainCompute1(ad)

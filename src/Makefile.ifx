@@ -28,7 +28,7 @@ endif
 ifeq ($(DEBUG),1)
    FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp $(FCFLAGS_EXTRA)
 else
-   FCFLAGS = -g -fpp -O3 -parallel -qopenmp -qopt-report=3 $(FCFLAGS_EXTRA)
+   FCFLAGS = -g -fpp -O3 -parallel -qopenmp -qopt-report=3 -xHost $(FCFLAGS_EXTRA)
 endif
 ifeq ($(PROFILE),1)
    FCFLAGS += -pg
@@ -44,6 +44,9 @@ endif
 
 # --- Library Definition ---
 LIBRARY = libmagparser.a
+
+db/liblayoutdb.a:
+	$(MAKE) -C db all
 
 include DEPENDENCIES.txt
 
@@ -69,7 +72,7 @@ version_mod.f90: ../.git/HEAD ../.git/index
 	@echo "  character(len=*), parameter :: commit_hash = '$(GIT_HASH)'" >> $@
 	@echo "end module version_mod" >> $@
 
-unit_test: test_contour.exe test_morton.exe test_polygonfracture.exe test_boxmerge.exe \
+unit_test: test_contour.exe test_morton.exe CONVERT.exe test_boxmerge.exe \
 	   test_skiplist.exe
 
 clean:
@@ -98,7 +101,7 @@ $(LIBRARY): $(LIB_OBJS)
 
 # --- Executable Builds ---
 # By linking against the library, we don't have to list out all objects again.
-MAGPARSER.exe: mainmagparser.o $(LIBRARY)
+MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a
 	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)
