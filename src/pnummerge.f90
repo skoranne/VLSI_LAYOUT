@@ -148,13 +148,14 @@ contains
     num_boxes = size(sorted_boxes, kind=int64)
     call uf%init(num_boxes)
 
-    if( num_boxes == 1 ) then
-       uf%arr(1) = 0
+    if( num_boxes <= 1 ) then
+       if( num_boxes == 1 ) uf%arr(1) = 0
        overlap_area = 0.0_real64
        overlap_perimeter = 0.0_real64
-       allocate(area_overlap_roots(0)) ! Return empty
+       allocate(area_overlap_roots(0))
        return
     end if
+    if( root_index == 0 ) error stop "ERROR: No PNUM processing without RTree"
 
     !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
     do i = 1, num_boxes
