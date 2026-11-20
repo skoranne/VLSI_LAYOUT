@@ -1,0 +1,46 @@
+program topo_extra_sq
+var temp_folder /tmp/topo_extra_sq/
+var temporary_layers 2
+var abort_on_assert_zero 2
+decl design d0 = /Users/skoranne/GITHUB/VLSI_LAYOUT/src/square.mag
+decl memory m = nothing
+exec init m:nothing
+exec run m:e2_0_interact = d0:metal1 INTERACT d0:metal1
+exec run m:e2_0_not_interact = d0:metal1 NOT_INTERACT d0:metal1
+exec run m:e2_0_ch = m:e2_0_interact * m:e2_0_not_interact
+exec run m:e2_0_az = m:e2_0_ch ASSERT_ZERO nothing
+exec run m:e2_0_un = m:e2_0_interact + m:e2_0_not_interact
+exec run m:e2_0_eq = m:e2_0_un ^ d0:metal1
+exec run m:e2_0_ez = m:e2_0_eq ASSERT_ZERO nothing
+exec run m:e2_1_cut = d0:metal1 CUT d0:metal1
+exec run m:e2_1_not_cut = d0:metal1 NOT_CUT d0:metal1
+exec run m:e2_1_ch = m:e2_1_cut * m:e2_1_not_cut
+exec run m:e2_1_az = m:e2_1_ch ASSERT_ZERO nothing
+exec run m:e2_1_un = m:e2_1_cut + m:e2_1_not_cut
+exec run m:e2_1_eq = m:e2_1_un ^ d0:metal1
+exec run m:e2_1_ez = m:e2_1_eq ASSERT_ZERO nothing
+exec run m:e2_2_touch = d0:metal1 TOUCH d0:metal1
+exec run m:e2_2_not_touch = d0:metal1 NOT_TOUCH d0:metal1
+exec run m:e2_2_ch = m:e2_2_touch * m:e2_2_not_touch
+exec run m:e2_2_az = m:e2_2_ch ASSERT_ZERO nothing
+exec run m:e2_2_un = m:e2_2_touch + m:e2_2_not_touch
+exec run m:e2_2_eq = m:e2_2_un ^ d0:metal1
+exec run m:e2_2_ez = m:e2_2_eq ASSERT_ZERO nothing
+exec run m:e2_3_inside = d0:metal1 INSIDE d0:metal1
+exec run m:e2_3_not_inside = d0:metal1 NOT_INSIDE d0:metal1
+exec run m:e2_3_ch = m:e2_3_inside * m:e2_3_not_inside
+exec run m:e2_3_inside_chain = m:e2_3_inside * m:e2_3_not_inside
+exec run m:e2_3_inside_z = m:e2_3_inside_chain ASSERT_ZERO nothing
+exec run m:e2_3_az = m:e2_3_ch ASSERT_ZERO nothing
+exec run m:e2_3_un = m:e2_3_inside + m:e2_3_not_inside
+exec run m:e2_3_eq = m:e2_3_un ^ d0:metal1
+exec run m:e2_3_ez = m:e2_3_eq ASSERT_ZERO nothing
+exec run m:e2_4_outside = d0:metal1 OUTSIDE d0:metal1
+exec run m:e2_4_not_outside = d0:metal1 NOT_OUTSIDE d0:metal1
+exec run m:e2_4_ch = m:e2_4_outside * m:e2_4_not_outside
+exec run m:e2_4_az = m:e2_4_ch ASSERT_ZERO nothing
+exec run m:e2_4_un = m:e2_4_outside + m:e2_4_not_outside
+exec run m:e2_4_eq = m:e2_4_un ^ d0:metal1
+exec run m:e2_4_ez = m:e2_4_eq ASSERT_ZERO nothing
+flush
+end

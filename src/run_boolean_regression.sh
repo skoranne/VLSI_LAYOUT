@@ -8,7 +8,9 @@ SRC="$ROOT/src"
 cd "$SRC"
 
 NVF_BIN="${NVF_BIN:-/opt/nvidia/hpc_sdk/Linux_aarch64/26.1/compilers/bin}"
-export PATH="$NVF_BIN:$PATH"
+if [[ -d "$NVF_BIN" ]]; then
+  export PATH="$NVF_BIN:$PATH"
+fi
 
 BUILD_NVF="${BUILD_NVF:-0}"
 if [[ "$BUILD_NVF" == "1" ]]; then

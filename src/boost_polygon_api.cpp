@@ -5,6 +5,10 @@
 // 
 #include "boost_polygon_api.h"
 #include <boost/polygon/polygon.hpp>
+#include <algorithm>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <vector>
 
 namespace bp = boost::polygon;
@@ -38,122 +42,192 @@ namespace boost { namespace polygon {
 
 extern "C" {
 
-  void PerformBoostPolygonMerge(const struct c_box* input, 
-				unsigned long N, 
-				struct c_box* output, 
-				unsigned long* outN) 
+  void FreeBoostPolygonBuffer(struct c_box* ptr) {
+    std::free(ptr);
+  }
+
+  struct c_box* PerformBoostPolygonMergeAlloc(const struct c_box* input,
+                                              unsigned long N,
+                                              unsigned long* outN)
   {
-    if (N == 0) {
+    if (N == 0 || input == nullptr) {
       *outN = 0;
-      return;
+      return nullptr;
     }
 
-    Polygon90Set poly_set;
-
-    // 2. Zero-Copy Ingestion
-    // Pass the raw C-array pointers. Boost will iterate over the Fortran memory 
-    // directly and use the traits defined above to extract the coordinates.
-    poly_set.insert(input, input + N);
-
-    // 3. Extract the merged rectangles
     std::vector<bp::rectangle_data<coord_t>> merged_rects;
-    poly_set.get_rectangles(merged_rects);
-    poly_set.clear();
-    // 4. Write back to the pre-allocated output buffer
-    *outN = merged_rects.size();
-    for (size_t i = 0; i < merged_rects.size(); ++i) {
-      output[i].x1 = bp::xl(merged_rects[i]);
-      output[i].y1 = bp::yl(merged_rects[i]);
-      output[i].x2 = bp::xh(merged_rects[i]);
-      output[i].y2 = bp::yh(merged_rects[i]);
+    {
+      Polygon90Set poly_set;
+      // Zero-Copy Ingestion
+      poly_set.insert(input, input + N);
+      // Extract the merged rectangles; poly_set is destroyed at scope exit to free memory immediately
+      poly_set.get_rectangles(merged_rects);
     }
-  }
-  const coord_t K_MAXIMUM_WIDTH  = 100000;
-  const coord_t K_MAXIMUM_HEIGHT = 100000;
-  typedef bp::rectangle_data<coord_t> Rectangle;
-  void subdivide_rectangles(const std::vector<Rectangle>& input_rects, 
-			    std::vector<Rectangle>& output_rects) {
-    
-    for (const auto& rect : input_rects) {
-      coord_t x_min = bp::xl(rect);
-      coord_t y_min = bp::yl(rect);
-      coord_t x_max = bp::xh(rect);
-      coord_t y_max = bp::yh(rect);
 
-      // Tile the rectangle along the X and Y axes
-      for (coord_t x = x_min; x < x_max; x += K_MAXIMUM_WIDTH) {
-	coord_t current_x_max = std::min(x + K_MAXIMUM_WIDTH, x_max);
-            
-	for (coord_t y = y_min; y < y_max; y += K_MAXIMUM_HEIGHT) {
-	  coord_t current_y_max = std::min(y + K_MAXIMUM_HEIGHT, y_max);
-                
-	  // Construct the bounded chunk safely using Boost's API
-	  Rectangle chunk(x, y, current_x_max, current_y_max);
-	  output_rects.push_back(chunk);
-	}
+    const size_t count = merged_rects.size();
+    *outN = static_cast<unsigned long>(count);
+    if (count == 0) {
+      return nullptr;
+    }
+
+    struct c_box* out_buf = static_cast<struct c_box*>(std::malloc(count * sizeof(struct c_box)));
+    if (out_buf == nullptr) {
+      return nullptr;
+    }
+    for (size_t i = 0; i < count; ++i) {
+      out_buf[i].x1 = bp::xl(merged_rects[i]);
+      out_buf[i].y1 = bp::yl(merged_rects[i]);
+      out_buf[i].x2 = bp::xh(merged_rects[i]);
+      out_buf[i].y2 = bp::yh(merged_rects[i]);
+    }
+    return out_buf;
+  }
+
+  void PerformBoostPolygonMerge(const struct c_box* input,
+				unsigned long N,
+				struct c_box* output,
+				unsigned long* outN)
+  {
+    struct c_box* buf = PerformBoostPolygonMergeAlloc(input, N, outN);
+    if (buf != nullptr) {
+      if (output != nullptr && *outN > 0) {
+        std::memcpy(output, buf, (*outN) * sizeof(struct c_box));
       }
+      std::free(buf);
     }
   }
-  void PerformBoostPolygonOperation(const struct c_box* input_A, 
-				    unsigned long AN,
-				    const struct c_box* input_B, 
-				    unsigned long BN,
-				    struct c_box* output, 
-				    unsigned long* outN,
-				    unsigned long control_parameter,
-				    long control_value)
+
+  static const int64_t K_MAXIMUM_WIDTH  = 100000;
+  static const int64_t K_MAXIMUM_HEIGHT = 100000;
+  typedef bp::rectangle_data<coord_t> Rectangle;
+
+  struct c_box* PerformBoostPolygonOperationAlloc(const struct c_box* input_A,
+                                                  unsigned long AN,
+                                                  const struct c_box* input_B,
+                                                  unsigned long BN,
+                                                  unsigned long* outN,
+                                                  unsigned long control_parameter,
+                                                  long control_value)
   {
     using namespace boost::polygon::operators;
     if ((AN == 0) && (BN == 0)) {
       *outN = 0;
-      return;
+      return nullptr;
     }
-    coord_t size_amount = (coord_t) control_value;    
-    Polygon90Set set1, set2;
-    if( AN > 0 ) set1.insert(input_A, input_A + AN);
-    if( BN > 0 ) set2.insert(input_B, input_B + BN);
-    Polygon90Set result;
-    switch( control_parameter ) {
-    case 0:
-      result = set1 ^ set2;
-      break;
-    case 1:
-      result = set1 | set2;
-      break;
-    case 2:
-      result = set1 & set2;
-      break;
-    case 3:
-      result = set1 - set2;
-      break;
-    case 4:
-      result = set1 ;
-      break;
-    case 5:
-      result = set1;
-      boost::polygon::resize(result, size_amount);
-      break;
-    default:
-      *outN = 0;
-      return;
+
+    std::vector<Rectangle> merged_rects_pre_sd;
+    {
+      Polygon90Set set1;
+      if (AN > 0 && input_A != nullptr) {
+        set1.insert(input_A, input_A + AN);
+      }
+
+      switch (control_parameter) {
+      case 0: { // XOR
+        Polygon90Set set2;
+        if (BN > 0 && input_B != nullptr) set2.insert(input_B, input_B + BN);
+        set1 ^= set2;
+        break;
+      }
+      case 1: { // OR
+        Polygon90Set set2;
+        if (BN > 0 && input_B != nullptr) set2.insert(input_B, input_B + BN);
+        set1 |= set2;
+        break;
+      }
+      case 2: { // AND
+        Polygon90Set set2;
+        if (BN > 0 && input_B != nullptr) set2.insert(input_B, input_B + BN);
+        set1 &= set2;
+        break;
+      }
+      case 3: { // NOT (A - B)
+        Polygon90Set set2;
+        if (BN > 0 && input_B != nullptr) set2.insert(input_B, input_B + BN);
+        set1 -= set2;
+        break;
+      }
+      case 4: // MERGE (unary on A)
+        break;
+      case 5: { // SIZE (unary on A)
+        coord_t size_amount = static_cast<coord_t>(control_value);
+        boost::polygon::resize(set1, size_amount);
+        break;
+      }
+      default:
+        *outN = 0;
+        return nullptr;
+      }
+      // set2 (if any) is already destroyed here, freeing its memory before extraction.
+      set1.get_rectangles(merged_rects_pre_sd);
+      // set1 is destroyed at scope exit, freeing its memory before subdivision/allocation.
     }
-    // 3. Extract the merged rectangles
-    std::vector<bp::rectangle_data<coord_t>> merged_rects_pre_sd;
-    result.get_rectangles(merged_rects_pre_sd);
-    result.clear();
-    std::vector<bp::rectangle_data<coord_t>> merged_rects;    
-    subdivide_rectangles( merged_rects_pre_sd, merged_rects );
-    merged_rects_pre_sd.clear();
-    // 4. Write back to the pre-allocated output buffer
-    *outN = merged_rects.size();
-    for (size_t i = 0; i < merged_rects.size(); ++i) {
-      output[i].x1 = bp::xl(merged_rects[i]);
-      output[i].y1 = bp::yl(merged_rects[i]);
-      output[i].x2 = bp::xh(merged_rects[i]);
-      output[i].y2 = bp::yh(merged_rects[i]);
+
+    // Pass 1: count exact number of subdivided rectangles using 64-bit arithmetic
+    // (avoids int32_t overflow near INT32_MAX and avoids intermediate vector copy).
+    size_t total_out = 0;
+    for (const auto& rect : merged_rects_pre_sd) {
+      const int64_t x_min = static_cast<int64_t>(bp::xl(rect));
+      const int64_t y_min = static_cast<int64_t>(bp::yl(rect));
+      const int64_t x_max = static_cast<int64_t>(bp::xh(rect));
+      const int64_t y_max = static_cast<int64_t>(bp::yh(rect));
+      if (x_max <= x_min || y_max <= y_min) continue;
+      const int64_t nx = (x_max - x_min + K_MAXIMUM_WIDTH  - 1) / K_MAXIMUM_WIDTH;
+      const int64_t ny = (y_max - y_min + K_MAXIMUM_HEIGHT - 1) / K_MAXIMUM_HEIGHT;
+      total_out += static_cast<size_t>(nx) * static_cast<size_t>(ny);
     }
-    merged_rects.clear();
+
+    *outN = static_cast<unsigned long>(total_out);
+    if (total_out == 0) {
+      return nullptr;
+    }
+
+    // Pass 2: allocate exact output buffer and tile directly into it
+    struct c_box* out_buf = static_cast<struct c_box*>(std::malloc(total_out * sizeof(struct c_box)));
+    if (out_buf == nullptr) {
+      return nullptr;
+    }
+
+    size_t idx = 0;
+    for (const auto& rect : merged_rects_pre_sd) {
+      const int64_t x_min = static_cast<int64_t>(bp::xl(rect));
+      const int64_t y_min = static_cast<int64_t>(bp::yl(rect));
+      const int64_t x_max = static_cast<int64_t>(bp::xh(rect));
+      const int64_t y_max = static_cast<int64_t>(bp::yh(rect));
+      if (x_max <= x_min || y_max <= y_min) continue;
+
+      for (int64_t x = x_min; x < x_max; x += K_MAXIMUM_WIDTH) {
+        const int64_t current_x_max = std::min(x + K_MAXIMUM_WIDTH, x_max);
+        for (int64_t y = y_min; y < y_max; y += K_MAXIMUM_HEIGHT) {
+          const int64_t current_y_max = std::min(y + K_MAXIMUM_HEIGHT, y_max);
+          out_buf[idx].x1 = static_cast<coord_t>(x);
+          out_buf[idx].y1 = static_cast<coord_t>(y);
+          out_buf[idx].x2 = static_cast<coord_t>(current_x_max);
+          out_buf[idx].y2 = static_cast<coord_t>(current_y_max);
+          ++idx;
+        }
+      }
+    }
+    return out_buf;
   }
 
-  
+  void PerformBoostPolygonOperation(const struct c_box* input_A,
+				    unsigned long AN,
+				    const struct c_box* input_B,
+				    unsigned long BN,
+				    struct c_box* output,
+				    unsigned long* outN,
+				    unsigned long control_parameter,
+				    long control_value)
+  {
+    struct c_box* buf = PerformBoostPolygonOperationAlloc(
+        input_A, AN, input_B, BN, outN, control_parameter, control_value);
+    if (buf != nullptr) {
+      if (output != nullptr && *outN > 0) {
+        std::memcpy(output, buf, (*outN) * sizeof(struct c_box));
+      }
+      std::free(buf);
+    }
+  }
+
 } // extern "C"

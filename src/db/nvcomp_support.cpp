@@ -52,7 +52,7 @@ bool nvcomp_decompress_deflate(const uint8_t* comp, size_t comp_size, uint8_t* o
 }
 
 bool decompress_cblock(uint8_t comp_type, const uint8_t* comp, size_t comp_size, std::vector<uint8_t>& out, size_t uncomp_size, NvcompStatus& st){
-    out.resize(uncomp_size);
+    out.assign(uncomp_size ? uncomp_size : comp_size, 0);
 
 #if defined(LAYOUTDB_USE_NVCOMP)
     if(comp_type != 0 && st.available){
@@ -61,44 +61,65 @@ bool decompress_cblock(uint8_t comp_type, const uint8_t* comp, size_t comp_size,
     }
 #endif
 
+    auto try_inflate = [&](int wbits, const char* tag) -> bool {
+#if defined(LAYOUTDB_USE_ZLIB)
+        if(uncomp_size == 0) return false;
+        std::vector<uint8_t> tmp(uncomp_size);
+        z_stream zs{};
+        zs.next_in = (Bytef*)comp;
+        zs.avail_in = (uInt)comp_size;
+        zs.next_out = (Bytef*)tmp.data();
+        zs.avail_out = (uInt)uncomp_size;
+        if(inflateInit2(&zs, wbits) != Z_OK) return false;
+        int r = inflate(&zs, Z_FINISH);
+        inflateEnd(&zs);
+        if(r == Z_STREAM_END){
+            tmp.resize(uncomp_size - zs.avail_out);
+            out.swap(tmp);
+            st.detail += tag;
+            return true;
+        }
+        // Some streams may report Z_BUF_ERROR at end if sizes differ slightly; accept if all input consumed
+        if((r == Z_OK || r == Z_BUF_ERROR) && zs.avail_in == 0){
+            tmp.resize(uncomp_size - zs.avail_out);
+            out.swap(tmp);
+            st.detail += tag;
+            return true;
+        }
+        return false;
+#else
+        (void)wbits; (void)tag; return false;
+#endif
+    };
+
     if(comp_type==0){
         // Some writers mark CBLOCK as uncompressed but store deflate-compressed payload; try decompression first.
-#if defined(LAYOUTDB_USE_ZLIB)
-        {
-            std::vector<uint8_t> tmp(uncomp_size);
-            uLongf dst = (uLongf)uncomp_size;
-            int zr = uncompress((Bytef*)tmp.data(), &dst, (const Bytef*)comp, (uLong)comp_size);
-            if(zr == Z_OK){ out.swap(tmp); out.resize((size_t)dst); st.detail += "; cpu-zlib(type0)"; return true; }
-            z_stream zs{}; zs.next_in=(Bytef*)comp; zs.avail_in=(uInt)comp_size; zs.next_out=(Bytef*)tmp.data(); zs.avail_out=(uInt)uncomp_size;
-            if(inflateInit2(&zs,-15)==Z_OK){
-                int r=inflate(&zs,Z_FINISH); inflateEnd(&zs);
-                if(r==Z_STREAM_END){ out.swap(tmp); out.resize(uncomp_size - zs.avail_out); st.detail += "; cpu-raw-deflate(type0)"; return true; }
-            }
+        if(try_inflate(15, "; cpu-zlib(type0)") || try_inflate(-15, "; cpu-raw-deflate(type0)") || try_inflate(15+16, "; cpu-gzip(type0)")){
+            return true;
         }
-#endif
         if(comp_size==uncomp_size) { memcpy(out.data(),comp,comp_size); return true; }
         out.assign(comp,comp+comp_size); return true;
     }
 
-#if defined(LAYOUTDB_USE_NVCOMP)
-    if(st.available){
-        std::string e; if(nvcomp_decompress_deflate(comp,comp_size,out.data(),uncomp_size,e)){ st.used=true; return true; }
-        st.detail = e;
+    // OASIS comp_type 1 = deflate; try raw deflate (-15), zlib-wrapped (15), gzip/autodetect
+    if(try_inflate(-15, "; cpu-raw-deflate") || try_inflate(15, "; cpu-zlib") || try_inflate(15+32, "; cpu-auto-deflate")){
+        return true;
     }
-#endif
 #if defined(LAYOUTDB_USE_ZLIB)
     {
-        uLongf dst = (uLongf)uncomp_size;
-        int zr = uncompress((Bytef*)out.data(), &dst, (const Bytef*)comp, (uLong)comp_size);
-        if(zr == Z_OK){ out.resize((size_t)dst); st.detail += "; cpu-zlib"; return true; }
-        z_stream zs{}; zs.next_in=(Bytef*)comp; zs.avail_in=(uInt)comp_size; zs.next_out=(Bytef*)out.data(); zs.avail_out=(uInt)uncomp_size;
-        if(inflateInit2(&zs,-15)==Z_OK){
-            int r=inflate(&zs,Z_FINISH); inflateEnd(&zs);
-            if(r==Z_STREAM_END){ out.resize(uncomp_size - zs.avail_out); st.detail += "; cpu-raw-deflate"; return true; }
+        // try uncompress as fallback (zlib format)
+        if(uncomp_size > 0){
+            uLongf dst = (uLongf)uncomp_size;
+            int zr = uncompress((Bytef*)out.data(), &dst, (const Bytef*)comp, (uLong)comp_size);
+            if(zr == Z_OK){ out.resize((size_t)dst); st.detail += "; cpu-uncompress"; return true; }
         }
-        st.detail += "; zlib inflate failed";
     }
 #endif
+    {
+        char buf[96];
+        snprintf(buf, sizeof(buf), "; zlib inflate failed(type%u,csz=%zu,usz=%zu)", (unsigned)comp_type, comp_size, uncomp_size);
+        st.detail += buf;
+    }
     st.detail += "; decompression unavailable - kept compressed payload";
     out.assign(comp,comp+comp_size);
     return false;

@@ -16,6 +16,7 @@ submodule (DesignModule) DesignImplModule
    use PNumMergeModule
    use KLDataModule
    use BoostPolygonAPIModule
+   use ProfilerModule, only: get_cpu_time, RecordTime
    use omp_lib
    implicit none
 
@@ -25,11 +26,12 @@ contains
   module subroutine PerformMergeLayer( input_layer )
     type(Layer), intent( inout )    :: input_layer
     real(kind=real64)               :: overlap_area, overlap_perimeter
+    if( input_layer%n_used == 0 ) return
     if( NeedsRTree( input_layer ) ) call BuildTree( input_layer )
     if( NeedsHealing( input_layer ) ) call MergeHealLayer( input_layer )
     if( NeedsRTree( input_layer ) ) call BuildTree( input_layer )
-    call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
-                      input_layer%tree%root_index, overlap_area, overlap_perimeter)
+    call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY, &
+                      input_layer%tree%tree_nodes, input_layer%tree%root_index, overlap_area, overlap_perimeter)
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )    
   end subroutine PerformMergeLayer
   
@@ -50,7 +52,7 @@ contains
        return
     end if
     interaction_count_gpu = 0
-    call ComputeInteractionsGPU( input_layer%tree%tree_nodes,size(input_layer%tree%tree_nodes,kind=int64),&
+    call ComputeInteractionsCPU( input_layer%tree%tree_nodes, size(input_layer%tree%tree_nodes,kind=int64),&
          input_layer%layer_boxes, input_layer%n_used, input_layer%tree%root_index, interaction_count_gpu)
     
     retval = interaction_count_gpu == 0
@@ -101,41 +103,70 @@ contains
       type(Layer), intent(in)    :: input_layer
       type(Layer), intent(inout) :: output_layer
       type(Box),   intent(in)    :: input_box
-      type(Box)                  :: tempBox
-      integer(kind=int64) :: K_INIT_BOX_COUNT = 1024
-      integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
-      integer(kind=int64) :: number_leaves, num_boxes
-      integer(kind=int64) :: j, k
+      type(Box)                  :: tempBox, boxK
+      type(RTreeNode)            :: currNode, childNode
+      integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 1024
+      integer(kind=int64), parameter :: K_DFS_STACK = 256
+      integer(kind=int64) :: dfs_stack(K_DFS_STACK)
+      integer(kind=int64) :: sp, curr_idx, child_idx, c_end, root_idx, num_boxes, k
       num_boxes = input_layer%n_used
       if( num_boxes == 0 ) then
          call ClearLayer( output_layer )
          return
       end if
-      allocate(  output_layer%layer_boxes( K_INIT_BOX_COUNT ) )
-      output_layer%n_alloc = K_INIT_BOX_COUNT
       if( NeedsRTree( input_layer ) ) error stop "ERROR: Construct RTRee before this step"
-      number_leaves = 0
-      leafboxes = 0
-      call SearchTree( input_layer%tree%tree_nodes, input_layer%tree%root_index, &
-         input_box, leafboxes, number_leaves )
-      !write(*,'(A,4I8,A,I8)') 'Input Box = ', input_box, ' NL ', number_leaves
-      !write(*,'(A,4I8)') 'Input Tree ', input_layer%tree%tree_nodes( input_layer%tree%root_index )%mbr
-      if( number_leaves == 0 ) then
-         !> highly unlikely that a non-empty layer has 0 intersection in a FRAME, but its possible
+      if( allocated( output_layer%layer_boxes ) ) deallocate( output_layer%layer_boxes )
+      allocate( output_layer%layer_boxes( K_INIT_BOX_COUNT ) )
+      output_layer%n_alloc = K_INIT_BOX_COUNT
+      output_layer%n_used  = 0
+
+      if( size(input_layer%tree%tree_nodes) == 0 ) then
+         do k = 1, num_boxes
+            boxK = input_layer%layer_boxes(k)
+            if( box_interact( input_box, boxK ) ) then
+               tempBox = input_box * boxK
+               if( tempBox%is_valid() ) call push_box( tempBox, output_layer )
+            end if
+         end do
+      else
+         root_idx = input_layer%tree%root_index
+         childNode = input_layer%tree%tree_nodes(root_idx)
+         if( input_box%x1 <= childNode%mbr%x2 .and. input_box%x2 >= childNode%mbr%x1 .and. &
+             input_box%y1 <= childNode%mbr%y2 .and. input_box%y2 >= childNode%mbr%y1 ) then
+            sp = 1
+            dfs_stack(1) = root_idx
+            do while( sp > 0 )
+               curr_idx = dfs_stack(sp)
+               sp = sp - 1
+               currNode = input_layer%tree%tree_nodes(curr_idx)
+               if( currNode%IsLeaf ) then
+                  c_end = min( currNode%ChildStart + int(currNode%NumChildren, kind=int64) - 1_int64, num_boxes )
+                  do k = currNode%ChildStart, c_end
+                     boxK = input_layer%layer_boxes(k)
+                     if( box_interact( input_box, boxK ) ) then
+                        tempBox = input_box * boxK
+                        if( tempBox%is_valid() ) call push_box( tempBox, output_layer )
+                     end if
+                  end do
+               else
+                  c_end = currNode%ChildStart + int(currNode%NumChildren, kind=int64) - 1_int64
+                  do child_idx = currNode%ChildStart, c_end
+                     childNode = input_layer%tree%tree_nodes(child_idx)
+                     if( input_box%x1 <= childNode%mbr%x2 .and. input_box%x2 >= childNode%mbr%x1 .and. &
+                         input_box%y1 <= childNode%mbr%y2 .and. input_box%y2 >= childNode%mbr%y1 ) then
+                        if( sp < K_DFS_STACK ) then
+                           sp = sp + 1
+                           dfs_stack(sp) = child_idx
+                        end if
+                     end if
+                  end do
+               end if
+            end do
+         end if
+      end if
+      if( output_layer%n_used == 0 ) then
          call ClearLayer( output_layer )
          return
-         !error stop "ERROR: NUMBER_LEAVES == 0, while layer not empty"
-      end if
-      if( number_leaves > 0 ) then
-         outer: do j=1,number_leaves
-            over_leaves: do k=leafboxes(j),min(leafboxes(j)+K_LEAF_CAPACITY-1, num_boxes)
-               if( box_interact( input_box, input_layer%layer_boxes(k)) ) then
-                  tempBox = input_box * input_layer%layer_boxes(k)
-                  if( .not. tempBox%is_valid() ) cycle
-                  call push_box( tempBox, output_layer )
-               end if
-            end do over_leaves
-         end do outer
       end if
       !> we can choose not to perform some operations later
       call FinalizeLayer( output_layer )
@@ -679,7 +710,9 @@ contains
       !write(*,*) '|B| = ', input_layer_B%n_used, ' ', input_layer_B%layerState
       if( debug_verbosity > 1 ) then
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
-         write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
+         write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A12,A,A12,A,A,A)') &
+              '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', &
+              '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
       end if
 
@@ -824,7 +857,9 @@ contains
          end do
       end do
       write(*,'(A85)') '+----------------------------------------------------------------------------------+'
-      write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
+      write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A12,A,A12,A,A,A)') &
+           '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', &
+           '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
       write(*,'(A85)') '+----------------------------------------------------------------------------------+'
       !> Initiate OpenMP Parallel region and spawn tasks from a single thread
 
@@ -892,7 +927,8 @@ contains
                !$omp end critical (gpu_lock)
                call cpu_time(end_time(rows,cols))
                call system_clock(count=end_tick(rows,cols))
-               elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / real(clock_rate, kind=real64)
+               elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / &
+                    real(clock_rate, kind=real64)
                !$omp critical (print_lock)
                write(*,'(A,I3,A,I3,A,I12,A,I12,A,I12,A,I12,A,I12,A,F10.3,A)') '|',rows,'|',cols,'|',AinGrid(rows,cols)%n_used,'|',&
                   BinGrid(rows,cols)%n_used,'|', size(trackersGrid(rows,cols)%trackers),'|',&
@@ -939,16 +975,18 @@ contains
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout)   :: output_layer
       integer(kind=int64), intent(in) :: control_parameter, control_value
-      type(Layer) :: tempLayer
-      type(Box), allocatable :: sized_boxes(:)
-      integer(kind=int64) :: i, nA
+      type(Box), allocatable :: empty_boxes(:), sized_boxes(:), result_boxes(:)
+      integer(kind=int64) :: i, nA, nB
       logical :: gpu_size
+#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
       character(len=32) :: offload_env
       integer :: offload_len, offload_stat
-      allocate( tempLayer%layer_boxes(1) )
-      !> this function does the allocation
+#endif
+      allocate( empty_boxes(0) )
+      nA = input_layer_A%n_used
+      nB = input_layer_B%n_used
+      !> this function does the allocation; always slice to 1:n_used so uninitialized tail slots are never read
       if( control_parameter == K_BOOST_CONTROL_SIZE ) then
-         nA = input_layer_A%n_used
          gpu_size = .false.
 #if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
          if (nA > 0 .and. control_value > 0 .and. omp_get_num_devices() > 0) then
@@ -959,7 +997,9 @@ contains
             end if
          end if
 #endif
-         if (gpu_size) then
+         if (nA == 0) then
+            allocate(result_boxes(0))
+         else if (gpu_size) then
             allocate(sized_boxes(nA))
             sized_boxes(1:nA) = input_layer_A%layer_boxes(1:nA)
             !$omp target teams distribute parallel do map(tofrom: sized_boxes(1:nA))
@@ -969,22 +1009,39 @@ contains
                sized_boxes(i)%x2 = sized_boxes(i)%x2 + int(control_value, kind=K_COORDINATE_KIND)
                sized_boxes(i)%y2 = sized_boxes(i)%y2 + int(control_value, kind=K_COORDINATE_KIND)
             end do
-            call MergeBoxesUsingBoostPolygon(sized_boxes, output_layer%layer_boxes)
+            call MergeBoxesUsingBoostPolygon(sized_boxes, result_boxes)
             if (allocated(sized_boxes)) deallocate(sized_boxes)
          else
-            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&
+            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes(1:nA), empty_boxes, result_boxes,&
                K_BOOST_CONTROL_SIZE, control_value )
          end if
       else if( control_parameter == K_BOOST_CONTROL_MERGE ) then
-         call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, tempLayer%layer_boxes, output_layer%layer_boxes,&
-            K_BOOST_CONTROL_MERGE, control_value )
+         if (nA == 0) then
+            allocate(result_boxes(0))
+         else
+            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes(1:nA), empty_boxes, result_boxes,&
+               K_BOOST_CONTROL_MERGE, control_value )
+         end if
       else
-         call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes, input_layer_B%layer_boxes, output_layer%layer_boxes,&
-            control_parameter, control_value )
+         if (nA > 0 .and. nB > 0) then
+            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes(1:nA), input_layer_B%layer_boxes(1:nB), result_boxes,&
+               control_parameter, control_value )
+         else if (nA > 0) then
+            call OperateBoxesUsingBoostPolygon( input_layer_A%layer_boxes(1:nA), empty_boxes, result_boxes,&
+               control_parameter, control_value )
+         else if (nB > 0) then
+            call OperateBoxesUsingBoostPolygon( empty_boxes, input_layer_B%layer_boxes(1:nB), result_boxes,&
+               control_parameter, control_value )
+         else
+            allocate(result_boxes(0))
+         end if
       end if
+      call move_alloc( from=result_boxes, to=output_layer%layer_boxes )
       if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
+      if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )
       output_layer%layerState = LAYER_STATE_HEAL
-      output_layer%n_used = size( output_layer%layer_boxes )
+      output_layer%n_used = size( output_layer%layer_boxes, kind=int64 )
+      output_layer%n_alloc = output_layer%n_used
    end subroutine CalculateBoostOperation
 
    module subroutine MergeBoxes( input_N, boxes, output_N )
@@ -1002,7 +1059,7 @@ contains
       type(Layer), intent(inout) :: output_layer
       type(Layer)                :: AnotB, BnotA
       !$omp parallel default(shared)
-      !$omp single nowait
+      !$omp single
       !$omp task
       call PreprocessLayer( input_layer_A )
       !$omp end task
@@ -1015,7 +1072,7 @@ contains
       AnotB%layerState = LAYER_STATE_EVERYTHING
       BnotA%layerState = LAYER_STATE_EVERYTHING
       !$omp parallel default(shared)
-      !$omp single nowait
+      !$omp single
       !$omp task
       call CalculateFrameNOT( input_layer_A, input_layer_B, AnotB )
       !$omp end task
@@ -1027,7 +1084,8 @@ contains
       call CalculateOR( AnotB, BnotA, output_layer )
    end subroutine CalculateExplicitXOR
 
-   module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, functype, control_opcode, control_parameter )
+   module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, &
+        functype, control_opcode, control_parameter )
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout)   :: output_layer
       type(CGFunction) :: functype
@@ -1078,7 +1136,9 @@ contains
          write(*,*) '|A| = ', input_layer_A%n_used, ' ', input_layer_A%layerState
          write(*,*) '|B| = ', input_layer_B%n_used, ' ', input_layer_B%layerState
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
-         write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
+         write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A,A)') &
+              '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', &
+              '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
       end if
       ! Process grid cells sequentially to limit peak memory on large designs.
@@ -1297,7 +1357,8 @@ contains
                grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID) = outputGrid(rows,cols)%n_used
                call cpu_time(end_time(rows,cols))
                call system_clock(count=end_tick(rows,cols))
-               elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / real(clock_rate, kind=real64)
+               elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / &
+                    real(clock_rate, kind=real64)
                if( debug_verbosity > 1 ) then
                   !$omp critical(print_lock)
                   write(*,'(A,I3,A,I3,A,I12,A,I12,A,F10.3,A)') '|',rows,'|',cols,'|',&

@@ -3762,7 +3762,7 @@ module glf90w
             c_string(c_length) = c_null_char
         end function f_c_string
 #endif
-#define GLF90W_USE_INTRINSIC_C_F_STRPOINTER
+! #define GLF90W_USE_INTRINSIC_C_F_STRPOINTER
 #ifndef GLF90W_USE_INTRINSIC_C_F_STRPOINTER
         ! Obtain a Fortran pointer to a C string (char*)
         subroutine c_f_strpointer(cstrptr, fstrptr, nchars)

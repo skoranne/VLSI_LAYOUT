@@ -15,9 +15,22 @@ typedef struct {
     int valid;
 } ldb_extent_t;
 
+/* Open options: flags bitmask */
+#define LDB_OPEN_DEFAULT      0u
+#define LDB_OPEN_STRICT       1u  /* OASIS: enforce/expect STRICT mode semantics; strict validation */
+#define LDB_OPEN_PROPERTY     2u  /* parse and retain properties (PROPERTY mode) */
+#define LDB_OPEN_LOW_MEMORY   4u  /* keep large-cell geometry in disk-access/on-demand storage */
+
+typedef struct {
+    uint32_t flags;
+    uint64_t large_cell_box_threshold; /* if >0, cells with more boxes than this use disk/on-demand storage in LOW_MEMORY mode */
+} ldb_open_opts_t;
+
 ldb_file_t* ldb_open(const char* path, char* errbuf, size_t errbuf_sz);
+ldb_file_t* ldb_open_opts(const char* path, const ldb_open_opts_t* opts, char* errbuf, size_t errbuf_sz);
 void ldb_close(ldb_file_t* f);
 int ldb_format(const ldb_file_t* f); /* 1=GDSII, 2=OASIS, 0=unknown */
+int ldb_is_strict(const ldb_file_t* f); /* 1 if OASIS STRICT mode indicated/enforced */
 size_t ldb_memory_bytes(const ldb_file_t* f);
 
 /* 1) whole file extent */
@@ -34,6 +47,10 @@ int ldb_iterate_boxes(ldb_file_t* f, ldb_box_cb cb, void* ud);
 int ldb_print_hierarchy(ldb_file_t* f, void* out_fp);
 /* 4) print property name table */
 int ldb_print_propnames(ldb_file_t* f, void* out_fp);
+
+/* Property callback: target_kind 0=file,1=cell,2=element,3=instance */
+typedef void (*ldb_property_cb)(void* ud, int target_kind, const char* cell, const char* propname, const char* propvalue);
+int ldb_iterate_properties(ldb_file_t* f, ldb_property_cb cb, void* ud);
 
 /* lossless record-stream roundtrip for GDSII: returns 0 on success */
 int ldb_write_gdsii(const ldb_file_t* f, const char* out_path, char* errbuf, size_t errbuf_sz);

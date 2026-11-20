@@ -1,0 +1,76 @@
+program topo_top_hier
+var temp_folder /tmp/topo_top_hier/
+var temporary_layers 2
+var abort_on_assert_zero 2
+decl design d = ../examples/TOP.mag
+decl memory m = nothing
+exec init m:nothing
+exec run m:t_tb0_INTERACT_r = d:nwell INTERACT d:metal1
+exec run m:t_tb0_NOT_INTERACT_r = d:nwell NOT_INTERACT d:metal1
+exec run m:t_tb0_INTERACT_ch = m:t_tb0_INTERACT_r * m:t_tb0_NOT_INTERACT_r
+exec run m:t_tb0_INTERACT_az = m:t_tb0_INTERACT_ch ASSERT_ZERO nothing
+exec run m:t_tb0_CUT_r = d:nwell CUT d:metal1
+exec run m:t_tb0_NOT_CUT_r = d:nwell NOT_CUT d:metal1
+exec run m:t_tb0_CUT_ch = m:t_tb0_CUT_r * m:t_tb0_NOT_CUT_r
+exec run m:t_tb0_CUT_az = m:t_tb0_CUT_ch ASSERT_ZERO nothing
+exec run m:t_tb0_TOUCH_r = d:nwell TOUCH d:metal1
+exec run m:t_tb0_NOT_TOUCH_r = d:nwell NOT_TOUCH d:metal1
+exec run m:t_tb0_TOUCH_ch = m:t_tb0_TOUCH_r * m:t_tb0_NOT_TOUCH_r
+exec run m:t_tb0_TOUCH_az = m:t_tb0_TOUCH_ch ASSERT_ZERO nothing
+exec run m:t_tb0_INSIDE_r = d:nwell INSIDE d:metal1
+exec run m:t_tb0_NOT_INSIDE_r = d:nwell NOT_INSIDE d:metal1
+exec run m:t_tb0_INSIDE_ch = m:t_tb0_INSIDE_r * m:t_tb0_NOT_INSIDE_r
+exec run m:t_tb0_INSIDE_az = m:t_tb0_INSIDE_ch ASSERT_ZERO nothing
+exec run m:t_tb0_OUTSIDE_r = d:nwell OUTSIDE d:metal1
+exec run m:t_tb0_NOT_OUTSIDE_r = d:nwell NOT_OUTSIDE d:metal1
+exec run m:t_tb0_OUTSIDE_ch = m:t_tb0_OUTSIDE_r * m:t_tb0_NOT_OUTSIDE_r
+exec run m:t_tb0_OUTSIDE_az = m:t_tb0_OUTSIDE_ch ASSERT_ZERO nothing
+exec run m:t_tb0_inside_chain = m:t_tb0_INSIDE_r * m:t_tb0_NOT_INSIDE_r
+exec run m:t_tb0_inside_chain_z = m:t_tb0_inside_chain ASSERT_ZERO nothing
+exec run m:t_tb0_io = m:t_tb0_INSIDE_r * m:t_tb0_OUTSIDE_r
+exec run m:t_tb0_ioz = m:t_tb0_io ASSERT_ZERO nothing
+exec run m:t_tb0_co = m:t_tb0_CUT_r * m:t_tb0_OUTSIDE_r
+exec run m:t_tb0_coz = m:t_tb0_co ASSERT_ZERO nothing
+exec run m:t_tb0_to = m:t_tb0_TOUCH_r * m:t_tb0_OUTSIDE_r
+exec run m:t_tb0_toz = m:t_tb0_to ASSERT_ZERO nothing
+exec run m:t_tb0_ci = m:t_tb0_CUT_r * m:t_tb0_INSIDE_r
+exec run m:t_tb0_ciz = m:t_tb0_ci ASSERT_ZERO nothing
+exec run m:t_tb0_ti = m:t_tb0_TOUCH_r * m:t_tb0_INSIDE_r
+exec run m:t_tb0_tiz = m:t_tb0_ti ASSERT_ZERO nothing
+exec run m:t_tb0_tc = m:t_tb0_TOUCH_r * m:t_tb0_CUT_r
+exec run m:t_tb0_tcz = m:t_tb0_tc ASSERT_ZERO nothing
+exec run m:t_tb1_INTERACT_r = d:metal1 INTERACT d:nwell
+exec run m:t_tb1_NOT_INTERACT_r = d:metal1 NOT_INTERACT d:nwell
+exec run m:t_tb1_INTERACT_ch = m:t_tb1_INTERACT_r * m:t_tb1_NOT_INTERACT_r
+exec run m:t_tb1_INTERACT_az = m:t_tb1_INTERACT_ch ASSERT_ZERO nothing
+exec run m:t_tb1_CUT_r = d:metal1 CUT d:nwell
+exec run m:t_tb1_NOT_CUT_r = d:metal1 NOT_CUT d:nwell
+exec run m:t_tb1_CUT_ch = m:t_tb1_CUT_r * m:t_tb1_NOT_CUT_r
+exec run m:t_tb1_CUT_az = m:t_tb1_CUT_ch ASSERT_ZERO nothing
+exec run m:t_tb1_TOUCH_r = d:metal1 TOUCH d:nwell
+exec run m:t_tb1_NOT_TOUCH_r = d:metal1 NOT_TOUCH d:nwell
+exec run m:t_tb1_TOUCH_ch = m:t_tb1_TOUCH_r * m:t_tb1_NOT_TOUCH_r
+exec run m:t_tb1_TOUCH_az = m:t_tb1_TOUCH_ch ASSERT_ZERO nothing
+exec run m:t_tb1_INSIDE_r = d:metal1 INSIDE d:nwell
+exec run m:t_tb1_NOT_INSIDE_r = d:metal1 NOT_INSIDE d:nwell
+exec run m:t_tb1_INSIDE_ch = m:t_tb1_INSIDE_r * m:t_tb1_NOT_INSIDE_r
+exec run m:t_tb1_INSIDE_az = m:t_tb1_INSIDE_ch ASSERT_ZERO nothing
+exec run m:t_tb1_OUTSIDE_r = d:metal1 OUTSIDE d:nwell
+exec run m:t_tb1_NOT_OUTSIDE_r = d:metal1 NOT_OUTSIDE d:nwell
+exec run m:t_tb1_OUTSIDE_ch = m:t_tb1_OUTSIDE_r * m:t_tb1_NOT_OUTSIDE_r
+exec run m:t_tb1_OUTSIDE_az = m:t_tb1_OUTSIDE_ch ASSERT_ZERO nothing
+exec run m:t_tb1_inside_chain = m:t_tb1_INSIDE_r * m:t_tb1_NOT_INSIDE_r
+exec run m:t_tb1_inside_chain_z = m:t_tb1_inside_chain ASSERT_ZERO nothing
+exec run m:t_tb1_io = m:t_tb1_INSIDE_r * m:t_tb1_OUTSIDE_r
+exec run m:t_tb1_ioz = m:t_tb1_io ASSERT_ZERO nothing
+exec run m:t_tb1_co = m:t_tb1_CUT_r * m:t_tb1_OUTSIDE_r
+exec run m:t_tb1_coz = m:t_tb1_co ASSERT_ZERO nothing
+exec run m:t_tb1_to = m:t_tb1_TOUCH_r * m:t_tb1_OUTSIDE_r
+exec run m:t_tb1_toz = m:t_tb1_to ASSERT_ZERO nothing
+exec run m:t_tb1_ci = m:t_tb1_CUT_r * m:t_tb1_INSIDE_r
+exec run m:t_tb1_ciz = m:t_tb1_ci ASSERT_ZERO nothing
+exec run m:t_tb1_ti = m:t_tb1_TOUCH_r * m:t_tb1_INSIDE_r
+exec run m:t_tb1_tiz = m:t_tb1_ti ASSERT_ZERO nothing
+exec run m:t_tb1_tc = m:t_tb1_TOUCH_r * m:t_tb1_CUT_r
+exec run m:t_tb1_tcz = m:t_tb1_tc ASSERT_ZERO nothing
+end

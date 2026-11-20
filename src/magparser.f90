@@ -341,7 +341,8 @@ contains
          call get_environment_variable( 'MAGPARSER_CONTROL_SELFTEST_TREE', length=env_len, status=env_status )
          if( env_status == 0 ) then
             write(*,*) 'ENV MAGPARSER_CONTROL_SELFTEST_TREE is ON'
-            call SelfTestTheTree( resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes, resolved_layer%tree%root_index )
+            call SelfTestTheTree( resolved_layer%layer_boxes(1:resolved_layer%n_used), K_LEAF_CAPACITY, &
+                 resolved_layer%tree%tree_nodes, resolved_layer%tree%root_index )
          end if
          call cpu_time(t2)
          call system_clock(count=end_tick)
@@ -366,8 +367,8 @@ contains
            call system_clock(count=start_tick)
            call cpu_time(t1)
            call BuildTree( resolved_layer )
-           call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes,&
-                resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
+           call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes(1:resolved_layer%n_used), K_LEAF_CAPACITY, &
+                resolved_layer%tree%tree_nodes, resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
            call cpu_time(t2)
            call system_clock(count=end_tick)
            elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
@@ -391,8 +392,8 @@ contains
               !call PerformPolygonUnion( resolved_layer, area_overlap_roots ) !> this performs the Merge so no need to duplicate
               !if( allocated( area_overlap_roots ) ) deallocate( area_overlap_roots )
               if( NeedsPNum( resolved_layer ) ) then
-                 call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes, K_LEAF_CAPACITY, resolved_layer%tree%tree_nodes,&
-                      resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
+                 call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes(1:resolved_layer%n_used), K_LEAF_CAPACITY, &
+                      resolved_layer%tree%tree_nodes, resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
                  resolved_layer%layerState = ior( resolved_layer%layerState, LAYER_STATE_PNUM )
               end if
               num_roots = resolved_layer%pnumtable%count_roots()
@@ -461,7 +462,8 @@ contains
     do i = 1, NUM_LAYERS
        associate( resolved_layer => layers(i) )
          if( extents(i)%is_valid() ) then
-            write(*,'(A1,A12,F18.8,A1,F18.8)') ' ',layerNames(i), resolved_layer%area*1e-6_real64, ' ', resolved_layer%perimeter*1e-3_real64
+            write(*,'(A1,A12,F18.8,A1,F18.8)') ' ', layerNames(i), &
+                 resolved_layer%area*1e-6_real64, ' ', resolved_layer%perimeter*1e-3_real64
          else if( resolved_layer%n_used > 0 ) then
             write(*,*) 'ERROR: This is not expected: ', resolved_layer%n_used, ' ', extents(i)
             error stop

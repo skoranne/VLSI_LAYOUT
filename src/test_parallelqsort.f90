@@ -97,7 +97,7 @@ contains
       end if
 
 !$omp parallel default(none) shared(A) private(nt)
-!$omp single nowait
+!$omp single
       call quicksort_task(A, 1, size(A))
 !$omp end single
 !$omp end parallel

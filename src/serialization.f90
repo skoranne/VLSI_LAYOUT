@@ -238,10 +238,7 @@ contains
     
    subroutine AnalyzeSnapFile( fileName )
       character(len=*), intent(in) :: fileName
-      integer :: iunit, ios, i
-      integer(int64), allocatable :: chunk_offsets(:)
-      integer(int64) :: num_chunks
-      integer(int64) :: target_pos, N, raw_byte_size, compressed_size
+      integer :: iunit, ios
       open(newunit=iunit, file=fileName, status='old', access='stream', form='unformatted', iostat=ios)
       if (ios /= 0) stop "Error opening file for reading."
       call AnalyzeUnit( iunit )

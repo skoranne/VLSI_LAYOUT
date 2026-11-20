@@ -15,7 +15,7 @@ module RTreeBuilderGPU
   private
 
   public :: ComputeInteractionsGPU, CertifyHealingGPU, &
-       ComputeANDPairsCountGPU, ComputeANDPairsFillGPU
+       ComputeANDPairsCountGPU, ComputeANDPairsFillGPU, ComputeANDPairsGPU
 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024
 
@@ -754,5 +754,162 @@ contains
     !$omp target exit data map(release: OutBoxes(1:OutCount))
     !$omp target exit data map(release: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA), Offsets(1:NumBoxesA))
   end subroutine ComputeANDPairsFillGPU
+
+  !> Fused GPU-accelerated AND (single H2D upload of TreeNodes, SortedBoxesB, BoxesA for both count + fill).
+  !> Uses int32(128) local traversal stack, skips zero-count boxes in pass 2, and reports stack overflow via OverflowFlag.
+  subroutine ComputeANDPairsGPU(TreeNodes, NumNodes, SortedBoxesB, NumBoxesB, RootIndex, &
+       BoxesA, NumBoxesA, OutBoxes, OutCount, OverflowFlag)
+    integer(kind=int64), intent(in) :: NumNodes, NumBoxesB, NumBoxesA
+    type(RTreeNode), intent(in)     :: TreeNodes(NumNodes)
+    type(Box), intent(in)           :: SortedBoxesB(NumBoxesB)
+    integer(kind=int64), intent(in) :: RootIndex
+    type(Box), intent(in)           :: BoxesA(NumBoxesA)
+    type(Box), allocatable, intent(out) :: OutBoxes(:)
+    integer(kind=int64), intent(out):: OutCount
+    integer(kind=int32), intent(out):: OverflowFlag
+
+    integer(kind=int64), allocatable :: Counts(:), Offsets(:)
+    integer(kind=int64) :: I, J, K, ChildIdx, CurrNode, LocalCount, WriteIdx
+    integer(kind=int32), parameter :: K_STACK_SIZE = 128_int32
+    integer(kind=int32) :: Stack(K_STACK_SIZE), StackPtr
+    integer :: alloc_status
+    type(Box) :: QBox, NodeMbr, TargetBox
+
+    OutCount = 0_int64
+    OverflowFlag = 0_int32
+    if (NumBoxesA <= 0 .or. NumBoxesB <= 0 .or. NumNodes <= 0) then
+       allocate(OutBoxes(0))
+       return
+    end if
+
+    allocate(Counts(NumBoxesA), Offsets(NumBoxesA), stat=alloc_status)
+    if (alloc_status /= 0) then
+       OverflowFlag = 1_int32
+       allocate(OutBoxes(0))
+       return
+    end if
+    Counts = 0_int64
+
+    ! Single persistent device data region for both count and fill passes (halves H2D bandwidth)
+    !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA)) &
+    !$omp map(tofrom: OverflowFlag)
+
+    ! --- Pass 1: count intersections per A box ---
+    !$omp target data map(from: Counts(1:NumBoxesA))
+    !$omp target teams distribute parallel do &
+    !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,LocalCount,QBox,NodeMbr,TargetBox)
+    do I = 1, NumBoxesA
+       QBox = BoxesA(I)
+       LocalCount = 0_int64
+       NodeMbr = TreeNodes(RootIndex)%Mbr
+       if (QBox%X1 < NodeMbr%X2 .and. QBox%X2 > NodeMbr%X1 .and. &
+           QBox%Y1 < NodeMbr%Y2 .and. QBox%Y2 > NodeMbr%Y1) then
+          StackPtr = 1_int32
+          Stack(1) = int(RootIndex, kind=int32)
+          do while (StackPtr > 0_int32)
+             CurrNode = int(Stack(StackPtr), kind=int64)
+             StackPtr = StackPtr - 1_int32
+             if (TreeNodes(CurrNode)%IsLeaf) then
+                do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
+                   J = TreeNodes(CurrNode)%ChildStart + K
+                   TargetBox = SortedBoxesB(J)
+                   if (TargetBox%X1 < QBox%X2 .and. TargetBox%X2 > QBox%X1 .and. &
+                       TargetBox%Y1 < QBox%Y2 .and. TargetBox%Y2 > QBox%Y1) then
+                      LocalCount = LocalCount + 1_int64
+                   end if
+                end do
+             else
+                do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
+                   ChildIdx = TreeNodes(CurrNode)%ChildStart + K
+                   NodeMbr = TreeNodes(ChildIdx)%Mbr
+                   if (QBox%X1 < NodeMbr%X2 .and. QBox%X2 > NodeMbr%X1 .and. &
+                       QBox%Y1 < NodeMbr%Y2 .and. QBox%Y2 > NodeMbr%Y1) then
+                      if (StackPtr < K_STACK_SIZE) then
+                         StackPtr = StackPtr + 1_int32
+                         Stack(StackPtr) = int(ChildIdx, kind=int32)
+                      else
+                         !$omp atomic write
+                         OverflowFlag = 1_int32
+                      end if
+                   end if
+                end do
+             end if
+          end do
+       end if
+       Counts(I) = LocalCount
+    end do
+    !$omp end target data
+
+    !$omp target update from(OverflowFlag)
+    if (OverflowFlag == 0_int32) then
+       ! Exclusive prefix sum on host
+       Offsets(1) = 0_int64
+       do I = 2, NumBoxesA
+          Offsets(I) = Offsets(I - 1) + Counts(I - 1)
+       end do
+       OutCount = Offsets(NumBoxesA) + Counts(NumBoxesA)
+
+       if (OutCount > 0_int64) then
+          allocate(OutBoxes(OutCount), stat=alloc_status)
+          if (alloc_status /= 0) then
+             OverflowFlag = 1_int32
+             OutCount = 0_int64
+             allocate(OutBoxes(0))
+          else
+             ! --- Pass 2: fill output boxes (skips zero-count A boxes!) ---
+             !$omp target data map(to: Counts(1:NumBoxesA), Offsets(1:NumBoxesA)) map(from: OutBoxes(1:OutCount))
+             !$omp target teams distribute parallel do &
+             !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,WriteIdx,QBox,NodeMbr,TargetBox)
+             do I = 1, NumBoxesA
+                if (Counts(I) == 0_int64) cycle
+                QBox = BoxesA(I)
+                WriteIdx = Offsets(I)
+                StackPtr = 1_int32
+                Stack(1) = int(RootIndex, kind=int32)
+                do while (StackPtr > 0_int32)
+                   CurrNode = int(Stack(StackPtr), kind=int64)
+                   StackPtr = StackPtr - 1_int32
+                   if (TreeNodes(CurrNode)%IsLeaf) then
+                      do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
+                         J = TreeNodes(CurrNode)%ChildStart + K
+                         TargetBox = SortedBoxesB(J)
+                         if (TargetBox%X1 < QBox%X2 .and. TargetBox%X2 > QBox%X1 .and. &
+                             TargetBox%Y1 < QBox%Y2 .and. TargetBox%Y2 > QBox%Y1) then
+                            WriteIdx = WriteIdx + 1_int64
+                            if (WriteIdx <= OutCount) then
+                               OutBoxes(WriteIdx)%X1 = max(TargetBox%X1, QBox%X1)
+                               OutBoxes(WriteIdx)%Y1 = max(TargetBox%Y1, QBox%Y1)
+                               OutBoxes(WriteIdx)%X2 = min(TargetBox%X2, QBox%X2)
+                               OutBoxes(WriteIdx)%Y2 = min(TargetBox%Y2, QBox%Y2)
+                            end if
+                         end if
+                      end do
+                   else
+                      do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
+                         ChildIdx = TreeNodes(CurrNode)%ChildStart + K
+                         NodeMbr = TreeNodes(ChildIdx)%Mbr
+                         if (QBox%X1 < NodeMbr%X2 .and. QBox%X2 > NodeMbr%X1 .and. &
+                             QBox%Y1 < NodeMbr%Y2 .and. QBox%Y2 > NodeMbr%Y1) then
+                            if (StackPtr < K_STACK_SIZE) then
+                               StackPtr = StackPtr + 1_int32
+                               Stack(StackPtr) = int(ChildIdx, kind=int32)
+                            end if
+                         end if
+                      end do
+                   end if
+                end do
+             end do
+             !$omp end target data
+          end if
+       else
+          allocate(OutBoxes(0))
+       end if
+    else
+       allocate(OutBoxes(0))
+    end if
+
+    !$omp end target data
+    deallocate(Counts, Offsets)
+  end subroutine ComputeANDPairsGPU
 
 end module RTreeBuilderGPU

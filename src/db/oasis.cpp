@@ -1,6 +1,7 @@
 #include "layoutdb_internal.hpp"
 #include "oasis_ir.hpp"
 #include "nvcomp_support.hpp"
+#include "compact_boxes.hpp"
 #include <cstring>
 #include <cstdio>
 #include <functional>
@@ -62,6 +63,9 @@ struct Ctx {
     size_t cur_cell = (size_t)-1;
     Modal m;
     db::NvcompStatus nvst;
+    std::vector<size_t> cblock_offsets;
+    size_t cblock_ok = 0;
+    size_t cblock_fail = 0;
 };
 
 static void ensure_table(std::vector<std::string>& t, uint64_t idx, const std::string& v=""){ if(t.size()<=idx) t.resize(idx+1); if(!v.empty()) t[idx]=v; }
@@ -97,16 +101,87 @@ static void parse_point_list(Stream& s, uint8_t type, std::vector<std::pair<int6
     }
 }
 
-static void parse_repetition(Stream& s, uint8_t rep_type){
-    // consume repetition payload so stream stays aligned
-    switch(rep_type & 0x07){
-        case 0: s.uvar(); s.uvar(); s.uvar(); s.uvar(); break; // x-dim,y-dim,x-space,y-space (counts-2)
-        case 1: s.uvar(); s.uvar(); break; // x-dim,x-space
-        case 2: s.uvar(); s.uvar(); break; // y-dim,y-space
-        case 3: { uint64_t n=s.uvar()+1; for(uint64_t i=0;i<n && s.ok;i++){ s.uvar(); s.uvar(); } } break; // x-disp,y-disp pairs grid-like? varies
-        default: { uint64_t n=s.uvar()+1; for(uint64_t i=0;i<n && s.ok;i++){ s.uvar(); } } break;
+struct RepInfo {
+    int64_t cols = 1, rows = 1;
+    int64_t dx = 0, dy = 0;
+    int64_t row_dx = 0, row_dy = 0;
+    bool reuse = false;
+};
+
+static RepInfo parse_repetition(Stream& s, uint8_t rep_type){
+    RepInfo r;
+    // OASIS repetition: 0=reuse previous, 1=uniform x*y, 2=uniform x, 3=uniform y,
+    // 4=non-uniform x with uniform y? 5=uniform x with non-uniform y? 6=non-uniform both? 7,8=general
+    // We parse common uniform grid forms fully and consume others for alignment.
+    switch(rep_type){
+        case 0:
+            r.reuse = true;
+            break;
+        case 1: { // rectangular matrix: xdim, ydim, xspace, yspace
+            uint64_t xdim = s.uvar() + 2;
+            uint64_t ydim = s.uvar() + 2;
+            uint64_t xsp  = s.uvar();
+            uint64_t ysp  = s.uvar();
+            r.cols = (int64_t)xdim; r.rows = (int64_t)ydim;
+            r.dx = (int64_t)xsp; r.dy = 0;
+            r.row_dx = 0; r.row_dy = (int64_t)ysp;
+        } break;
+        case 2: { // uniform x: xdim, xspace
+            uint64_t xdim = s.uvar() + 2;
+            uint64_t xsp  = s.uvar();
+            r.cols = (int64_t)xdim; r.rows = 1;
+            r.dx = (int64_t)xsp; r.dy = 0;
+        } break;
+        case 3: { // uniform y: ydim, yspace
+            uint64_t ydim = s.uvar() + 2;
+            uint64_t ysp  = s.uvar();
+            r.cols = 1; r.rows = (int64_t)ydim;
+            r.row_dx = 0; r.row_dy = (int64_t)ysp;
+        } break;
+        case 4: { // x-dimension with explicit x displacements, y-dimension with uniform y space
+            uint64_t xdim = s.uvar() + 1;
+            for(uint64_t i=0;i<xdim && s.ok;i++) s.uvar();
+            uint64_t ydim = s.uvar() + 2;
+            uint64_t ysp  = s.uvar();
+            r.cols = (int64_t)xdim; r.rows = (int64_t)ydim;
+            r.row_dx = 0; r.row_dy = (int64_t)ysp;
+            // approximate dx from first displacement not stored; keep 0
+        } break;
+        case 5: { // uniform x with explicit y displacements
+            uint64_t xdim = s.uvar() + 2;
+            uint64_t xsp  = s.uvar();
+            uint64_t ydim = s.uvar() + 1;
+            for(uint64_t i=0;i<ydim && s.ok;i++) s.uvar();
+            r.cols = (int64_t)xdim; r.rows = (int64_t)ydim;
+            r.dx = (int64_t)xsp; r.dy = 0;
+        } break;
+        case 6: { // explicit x and explicit y
+            uint64_t xdim = s.uvar() + 1;
+            for(uint64_t i=0;i<xdim && s.ok;i++) s.uvar();
+            uint64_t ydim = s.uvar() + 1;
+            for(uint64_t i=0;i<ydim && s.ok;i++) s.uvar();
+            r.cols = (int64_t)xdim; r.rows = (int64_t)ydim;
+        } break;
+        case 7: case 8: { // explicit displacement pairs (grid or arbitrary)
+            uint64_t n = s.uvar() + 1;
+            // type 8 in some refs is grid of n*m; but general form: n displacements
+            // try to consume as displacement pairs; for alignment be conservative
+            for(uint64_t i=0;i<n && s.ok;i++){ s.uvar(); s.uvar(); }
+            r.cols = (int64_t)n; r.rows = 1;
+        } break;
+        case 9: case 10: case 11: {
+            uint64_t n = s.uvar() + 1;
+            for(uint64_t i=0;i<n && s.ok;i++){ s.uvar(); s.uvar(); }
+            r.cols = (int64_t)n; r.rows = 1;
+        } break;
+        default: {
+            // fallback: try to consume as a count + pairs
+            uint64_t n = s.uvar() + 1;
+            for(uint64_t i=0;i<n && s.ok;i++){ s.uvar(); s.uvar(); }
+            r.cols = (int64_t)n; r.rows = 1;
+        } break;
     }
-    // displacement grid forms more complex; attempt extra if needed
+    return r;
 }
 
 static void add_geom(Ctx& ctx, uint64_t layer, uint64_t datatype, int64_t x, int64_t y){
@@ -133,30 +208,28 @@ static void add_box(Ctx& ctx, uint64_t layer, uint64_t datatype, int kind, int64
 static void parse_records(Stream& s, Ctx& ctx);
 
 static void handle_cblock(Stream& s, Ctx& ctx, size_t rec_start){
-    uint8_t comp_type = s.u8();
+    uint64_t comp_type_v = s.uvar();
+    uint8_t comp_type = (uint8_t)comp_type_v;
     uint64_t uncomp_len = s.uvar();
     uint64_t comp_len = s.uvar();
     if(!s.need((size_t)comp_len)) return;
     const uint8_t* comp_data = s.p + s.off;
     s.skip((size_t)comp_len);
     rec_raw(s, rec_start, ctx);
+    ctx.cblock_offsets.push_back(rec_start);
     ctx.doc.cblock_count++;
     ctx.doc.cblock_comp_bytes += (size_t)comp_len;
     ctx.doc.cblock_uncomp_bytes += (size_t)uncomp_len;
-    // decompress
     std::vector<uint8_t> out;
     bool ok = db::decompress_cblock(comp_type, comp_data, (size_t)comp_len, out, (size_t)uncomp_len, ctx.nvst);
-    if(ok || !out.empty()){
-        // parse decompressed records
-        if(ok && out.size() == (size_t)uncomp_len){
-            Stream ds(out.data(), out.size(), true);
-            parse_records(ds, ctx);
-        } else if(!ok) {
-            // if decompression failed but we got compressed bytes back, can't parse inner; records already preserved via raw CBLOCK
-        }
+    if(ok && !out.empty()){
+        ctx.cblock_ok++;
+        Stream ds(out.data(), out.size(), true);
+        parse_records(ds, ctx);
+    } else {
+        ctx.cblock_fail++;
     }
     if(ctx.nvst.used) ctx.doc.used_gpu_decompress = true;
-    ctx.doc.decompress_info = ctx.nvst.detail;
 }
 
 static void parse_records(Stream& s, Ctx& ctx){
@@ -170,36 +243,11 @@ static void parse_records(Stream& s, Ctx& ctx){
         case 1: { // START
             s.astr(); // version
             s.real(); // unit
-            // After unit: offset-flag byte in modern OASIS. Bits 0-5 indicate present offset-table values, bit 6 strict, bit 7 reserved.
+            // OASIS START: offset-flag byte; bits 0-5 indicate presence of table offsets A-F, bit 6 = strict mode
             if(s.ok && s.off < s.n){
-                uint8_t oflags = s.p[s.off];
-                // Heuristic: if oflags looks like a plausible offset-flag (not a common record start like 0,2,3,6,13 etc in that position), consume it and entries
-                bool looks_record = (oflags==0||oflags==2||oflags==3||oflags==6||oflags==7||oflags==13||oflags==34);
-                if(!looks_record){
-                    s.off++; // consume offset-flag
-                    for(int i=0;i<6;i++) if(oflags & (1<<i)) s.uvar();
-                    // if bit 7 set, some files include additional offsets/validation info; try to consume up to 6 more if present
-                    if(oflags & 0x80){ for(int i=0;i<6;i++) s.uvar(); }
-                }
-                // Resync: scan for next plausible record start. Prefer CBLOCK(34) if present (KLayout files often start with offset/CBLOCK data).
-                size_t found = s.n;
-                size_t first_cblock = s.n;
-                for(size_t k=s.off; k < s.n; ++k){ if(s.p[k]==34){ first_cblock = k; break; } }
-                if(first_cblock < s.n && first_cblock <= s.off + 4096){
-                    found = first_cblock;
-                } else {
-                    for(size_t j=s.off; j < s.n && j < s.off + 4096; ++j){
-                        uint8_t nb = s.p[j];
-                        if(nb==0){ found=j; break; }
-                        if(nb==2){ if(j + 8 >= s.n){ found=j; break; } continue; }
-                        if(nb==3||nb==6||nb==7||nb==13||nb==1||nb==4||nb==5||nb==8||nb==9||nb==14||nb==15||nb==16||nb==17||nb==18||nb==19||nb==20||nb==21||nb==22||nb==28||nb==34){
-                            if(nb==3||nb==6||nb==7||nb==5){
-                                if(j+1 < s.n){ uint8_t len = s.p[j+1]; if(len>0 && len < 128 && j+2+len < s.n) { found=j; break; } }
-                            } else { found=j; break; }
-                        }
-                    }
-                }
-                s.off = found;
+                uint8_t oflags = s.u8();
+                ctx.f->strict_mode = ctx.f->strict_mode || ((oflags & 0x40) != 0);
+                for(int i=0;i<6;i++) if(oflags & (1<<i)) s.uvar();
             }
             rec_raw(s,rec_start,ctx);
         } break;
@@ -227,14 +275,20 @@ static void parse_records(Stream& s, Ctx& ctx){
             if(info & 0x01){ int64_t dx=s.svar(), dy=s.svar(); if(ctx.m.abs_xy){ px=dx; py=dy; } else { px+=dx; py+=dy; } ctx.m.x=px; ctx.m.y=py; }
             // best-effort: for placement-transform (18) some fields may follow; avoid breaking stream by not consuming unknowns here
             // repetition
-            if(info & 0x20){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
-            // add hierarchy ref and basic instance (translation)
+            RepInfo rep;
+            if(info & 0x20){ uint8_t rtype=s.u8(); rep = parse_repetition(s,rtype); }
+            // add hierarchy ref and instance (with repetition for compressed/repeated layout)
             if(ctx.cur_cell!=(size_t)-1){
                 auto it=ctx.geom_idx.find(ctx.cur_cell);
                 if(it!=ctx.geom_idx.end()){
                     std::string rn=tget(ctx.cellnames,cref); if(rn.empty()) rn="__cell_"+std::to_string(cref);
                     ctx.f->cells[it->second].refs.insert(rn);
                     LdbInstance inst; inst.ref_name = rn; inst.tr.ox = px; inst.tr.oy = py;
+                    if(!rep.reuse){
+                        inst.tr.cols = rep.cols; inst.tr.rows = rep.rows;
+                        inst.tr.dx = rep.dx; inst.tr.dy = rep.dy;
+                        inst.tr.row_dx = rep.row_dx; inst.tr.row_dy = rep.row_dy;
+                    }
                     ctx.f->cells[it->second].instances.push_back(inst);
                 }
             }
@@ -248,7 +302,7 @@ static void parse_records(Stream& s, Ctx& ctx){
             if(info & 0x01){ int64_t dx=s.svar(), dy=s.svar(); if(ctx.m.abs_xy){ ctx.m.x=dx; ctx.m.y=dy; } else { ctx.m.x+=dx; ctx.m.y+=dy; } }
             // text transform/repetition
             if(info & 0x08){ /* transform */ }
-            if(info & 0x04){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
+            if(info & 0x04){ uint8_t rtype=s.u8(); (void)parse_repetition(s,rtype); }
             add_geom(ctx, ctx.m.textlayer, ctx.m.texttype, ctx.m.x, ctx.m.y);
             rec_raw(s,rec_start,ctx);
         } break;
@@ -264,7 +318,7 @@ static void parse_records(Stream& s, Ctx& ctx){
             else if(info&0x02){ w=s.uvar(); }
             // but exact SWH bits: in spec 20: D,W,H,S,X,Y,R -> info bits [R,Y,X,S,H,W,D]=[0..6]? varies. handle common
             if(w==0 && h==0){ w=s.uvar(); h=s.uvar(); }
-            if(info & 0x08){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
+            if(info & 0x08){ uint8_t rtype=s.u8(); (void)parse_repetition(s,rtype); }
             add_box(ctx, ctx.m.layer, ctx.m.datatype, 2, ctx.m.x, ctx.m.y, ctx.m.x+w, ctx.m.y+h);
             rec_raw(s,rec_start,ctx);
         } break;
@@ -279,7 +333,7 @@ static void parse_records(Stream& s, Ctx& ctx){
             int64_t bx1=cx,by1=cy,bx2=cx,by2=cy;
             for(auto& pt: pts){ add_geom(ctx,ctx.m.layer,ctx.m.datatype,pt.first,pt.second); if(pt.first<bx1)bx1=pt.first; if(pt.first>bx2)bx2=pt.first; if(pt.second<by1)by1=pt.second; if(pt.second>by2)by2=pt.second; }
             add_box(ctx, ctx.m.layer, ctx.m.datatype, 0, bx1,by1,bx2,by2);
-            if(info & 0x08){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
+            if(info & 0x08){ uint8_t rtype=s.u8(); (void)parse_repetition(s,rtype); }
             rec_raw(s,rec_start,ctx);
         } break;
         case 22: { // PATH
@@ -294,7 +348,7 @@ static void parse_records(Stream& s, Ctx& ctx){
             std::vector<std::pair<int64_t,int64_t>> pts; int64_t cx=ctx.m.x, cy=ctx.m.y; pts.push_back({cx,cy});
             parse_point_list(s, ptype, pts, cx, cy);
             for(auto& pt: pts) add_geom(ctx,ctx.m.layer,ctx.m.datatype,pt.first,pt.second);
-            if(info & 0x04){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
+            if(info & 0x04){ uint8_t rtype=s.u8(); (void)parse_repetition(s,rtype); }
             rec_raw(s,rec_start,ctx);
         } break;
         case 23: { // TRAPEZOID
@@ -305,7 +359,7 @@ static void parse_records(Stream& s, Ctx& ctx){
             uint64_t delta_a=s.uvar(); uint64_t delta_b=s.uvar();
             (void)delta_a;(void)delta_b;
             add_geom(ctx,ctx.m.layer,ctx.m.datatype,ctx.m.x,ctx.m.y);
-            if(info & 0x08){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
+            if(info & 0x08){ uint8_t rtype=s.u8(); (void)parse_repetition(s,rtype); }
             rec_raw(s,rec_start,ctx);
         } break;
         case 24: { // CTRAPEZOID
@@ -316,7 +370,7 @@ static void parse_records(Stream& s, Ctx& ctx){
             if(info & 0x80){ ctx.m.ctrap_type = s.uvar(); }
             uint64_t w=s.uvar(); uint64_t h=s.uvar(); (void)w;(void)h;
             add_geom(ctx,ctx.m.layer,ctx.m.datatype,ctx.m.x,ctx.m.y);
-            if(info & 0x08){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
+            if(info & 0x08){ uint8_t rtype=s.u8(); (void)parse_repetition(s,rtype); }
             rec_raw(s,rec_start,ctx);
         } break;
         case 25: { // CIRCLE
@@ -328,17 +382,46 @@ static void parse_records(Stream& s, Ctx& ctx){
             int64_t r=(int64_t)ctx.m.circle_radius;
             add_geom(ctx,ctx.m.layer,ctx.m.datatype,ctx.m.x-r,ctx.m.y-r);
             add_geom(ctx,ctx.m.layer,ctx.m.datatype,ctx.m.x+r,ctx.m.y+r);
-            if(info & 0x08){ uint8_t rtype=s.u8(); parse_repetition(s,rtype); }
+            if(info & 0x08){ uint8_t rtype=s.u8(); (void)parse_repetition(s,rtype); }
             rec_raw(s,rec_start,ctx);
         } break;
-        case 28: { // PROPERTY
+        case 28: { // PROPERTY (tolerant parse + capture)
             uint8_t info=s.u8();
-            if(info & 0x04){ ctx.m.prop_name = s.uvar(); } else { std::string ns=s.astr(); (void)ns; }
+            std::string pname;
+            if(info & 0x04){
+                uint64_t pnref = s.uvar();
+                auto it = ctx.f->propnames.find((int)pnref);
+                if(it != ctx.f->propnames.end()) pname = it->second;
+                else pname = "prop#" + std::to_string(pnref);
+                ctx.m.prop_name = pnref;
+            } else {
+                pname = s.astr();
+            }
             if(info & 0x02){ /* prop value list by ref */ s.uvar(); }
-            int nv = info & 0x03; // not exact; simplified
-            // values: type byte + value
-            // safer: try to read 1 value
-            if(s.ok && s.off < s.n){ uint8_t vt=s.u8(); if(vt==0x0f){ /* ref */ s.uvar(); } else if(vt==0x08||vt==0x09||vt==0x0a||vt==0x0b||vt==0x0c||vt==0x0d||vt==0x0e) s.astr(); else if(vt<=7) s.real(); else s.uvar(); }
+            // Best-effort: consume and stringify first value when possible
+            std::string pval;
+            if(s.ok && s.off < s.n){
+                uint8_t vt=s.u8();
+                if(vt==0x0f){ uint64_t r=s.uvar(); pval = std::to_string(r); }
+                else if(vt==0x08||vt==0x09||vt==0x0a||vt==0x0b||vt==0x0c||vt==0x0d||vt==0x0e){ pval = s.astr(); }
+                else if(vt<=7){ double rv = s.real(); char buf[64]; snprintf(buf,sizeof(buf),"%.17g",rv); pval = buf; }
+                else { uint64_t r=s.uvar(); pval = std::to_string(r); }
+            }
+            bool want_props = (ctx.f->open_flags & LDB_OPEN_PROPERTY) != 0 || ctx.f->strict_mode;
+            if(want_props && !pname.empty()){
+                LdbProperty lp;
+                lp.target_kind = (ctx.cur_cell==(size_t)-1) ? 0 : 1;
+                if(ctx.cur_cell!=(size_t)-1){
+                    auto itc = ctx.geom_idx.find(ctx.cur_cell);
+                    if(itc!=ctx.geom_idx.end()) lp.cell = ctx.f->cells[itc->second].name;
+                }
+                lp.name = pname; lp.value = pval;
+                if(lp.target_kind==0) ctx.f->file_properties.push_back(lp);
+                else {
+                    auto itc = ctx.geom_idx.find(ctx.cur_cell);
+                    if(itc!=ctx.geom_idx.end()) ctx.f->cells[itc->second].properties.push_back(lp);
+                }
+            }
             rec_raw(s,rec_start,ctx);
         } break;
         case 29: { std::string nm=s.astr(); uint64_t ref=s.uvar(); ensure_table(ctx.xnames,ref,nm); rec_raw(s,rec_start,ctx);} break; // XNAME
@@ -385,6 +468,67 @@ static void parse_records(Stream& s, Ctx& ctx){
 
 } // anon
 
+static void recover_cblocks(Ctx& ctx){
+    if(!ctx.f || !ctx.f->map) return;
+    const uint8_t* data = (const uint8_t*)ctx.f->map;
+    size_t n = ctx.f->size;
+    auto is_processed = [&](size_t off)->bool{
+        for(size_t o: ctx.cblock_offsets){ if(o==off) return true; }
+        return false;
+    };
+    struct Cand { size_t off, end; uint8_t ct; uint64_t ul, cl; size_t hsz; };
+    std::vector<Cand> cands;
+    for(size_t j=0; j+6 < n; ++j){
+        if(data[j] != 34) continue;
+        Stream hs(data + j + 1, n - (j + 1), false);
+        uint64_t ct = hs.uvar();
+        uint64_t ul = hs.uvar();
+        uint64_t cl = hs.uvar();
+        if(!hs.ok) continue;
+        if(ct > 2) continue;
+        if(ul == 0 || cl == 0) continue;
+        if(cl > 500ull*1024*1024 || ul > 500ull*1024*1024) continue;
+        size_t hsz = hs.off;
+        size_t end = j + 1 + hsz + (size_t)cl;
+        if(end > n) continue;
+        std::vector<uint8_t> out;
+        db::NvcompStatus st = ctx.nvst;
+        bool ok = db::decompress_cblock((uint8_t)ct, data + j + 1 + hsz, (size_t)cl, out, (size_t)ul, st);
+        if(!ok || out.empty()) continue;
+        uint8_t fb = out[0];
+        bool plausible = (fb==0||fb==1||fb==2||fb==3||fb==4||fb==5||fb==6||fb==7||fb==8||fb==9||
+                          fb==13||fb==14||fb==15||fb==16||fb==17||fb==18||fb==19||fb==20||fb==21||
+                          fb==22||fb==23||fb==24||fb==25||fb==28||fb==29||fb==30||fb==31||fb==34);
+        if(!plausible) continue;
+        cands.push_back({j, end, (uint8_t)ct, ul, cl, hsz});
+    }
+    std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b){ return a.off < b.off; });
+    std::vector<Cand> sel;
+    size_t cur_end = 0;
+    for(auto& c: cands){
+        if(c.off < cur_end) continue;
+        sel.push_back(c); cur_end = c.end;
+    }
+    for(auto& c: sel){
+        if(is_processed(c.off)) continue;
+        ctx.cblock_offsets.push_back(c.off);
+        ctx.doc.cblock_count++;
+        ctx.doc.cblock_comp_bytes += (size_t)c.cl;
+        ctx.doc.cblock_uncomp_bytes += (size_t)c.ul;
+        std::vector<uint8_t> out;
+        db::NvcompStatus st = ctx.nvst;
+        bool ok = db::decompress_cblock(c.ct, data + c.off + 1 + c.hsz, (size_t)c.cl, out, (size_t)c.ul, st);
+        if(ok && !out.empty()){
+            ctx.cblock_ok++;
+            Stream ds(out.data(), out.size(), true);
+            parse_records(ds, ctx);
+        } else {
+            ctx.cblock_fail++;
+        }
+        if(st.used) ctx.doc.used_gpu_decompress = true;
+    }
+}
+
 bool parse_oasis(LdbFile* f) {
     Ctx ctx; ctx.f=f;
     ctx.nvst = db::nvcomp_init();
@@ -393,10 +537,31 @@ bool parse_oasis(LdbFile* f) {
     f->oasis_raw = ctx.doc.original;
     Stream s((const uint8_t*)f->map, f->size, false);
     parse_records(s, ctx);
-    // (heuristic name scan omitted - too many false positives on binary/compressed data; rely on structured parse + CBLOCK decompression)
+    // Recovery pass for CBLOCKs missed due to parser misalignment
+    recover_cblocks(ctx);
+    // Entropy/compact encoding of box streams: delta+varint compression per cell
+    size_t raw_box_bytes = 0, compact_box_bytes = 0;
+    for(auto& cell : f->cells){
+        raw_box_bytes += cell.boxes.size() * sizeof(LdbBoxElem);
+        if(!cell.boxes.empty()){
+            cell.boxes_compact = compact::encode_boxes(cell.boxes);
+            compact_box_bytes += cell.boxes_compact.size();
+        }
+    }
     f->mem_bytes_extra = f->oasis_raw.capacity() + ctx.doc.records.size()*sizeof(oasis::Record);
     for(auto& r: ctx.doc.records) f->mem_bytes_extra += r.raw.capacity();
-    if(!ctx.doc.decompress_info.empty()) f->error = (f->error.empty()?"":f->error+"; ") + std::string("CBLOCK:")+ctx.doc.decompress_info;
+    for(auto& cell : f->cells) f->mem_bytes_extra += cell.boxes_compact.capacity();
+    if(raw_box_bytes > 0){
+        char buf[256];
+        snprintf(buf, sizeof(buf), "BOX_ENC raw=%zu compact=%zu (%.1fx)", raw_box_bytes, compact_box_bytes,
+                 compact_box_bytes ? (double)raw_box_bytes/(double)compact_box_bytes : 0.0);
+        f->error = (f->error.empty()?"":f->error+"; ") + std::string(buf);
+    }
+    {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "CBLOCK_DECOMPRESS ok=%zu fail=%zu count=%zu", ctx.cblock_ok, ctx.cblock_fail, ctx.doc.cblock_count);
+        f->error = (f->error.empty()?"":f->error+"; ") + std::string(buf);
+    }
     if(f->cells.empty() && !s.err.empty() && f->error.empty()) f->error = s.err;
     return true;
 }

@@ -4,34 +4,47 @@
 ################################################################################
 # --- Compiler & Flags ---
 DEBUG ?= 0
+STRICT ?= 0
 VERBOSE ?= 0
 PROFILE ?= 0
-BOOST_DIR=/scratch1/skoranne/OSS_EDA_TOOLS/boost/boost
-THRUST_INCLUDE=-I/scratch1/skoranne/OSS_EDA_TOOLS/cccl/thrust  -I/scratch1/skoranne/OSS_EDA_TOOLS/cccl/libcudacxx/include
-THRUST_OPTIONS=-std=c++17 -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP -DTHRUST_HOST_SYSTEM=THRUST_HOST_SYSTEM_CPP -D__CUB_INTERNAL_REDUCE__=0
+USE_HDF5 ?= 0
+# Paths (override for local machine, e.g. Macbook)
+BOOST_DIR ?= /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost
+CPPFLAGS_EXTRA ?=
+THRUST_INCLUDE ?= -I/scratch1/skoranne/OSS_EDA_TOOLS/cccl/thrust  -I/scratch1/skoranne/OSS_EDA_TOOLS/cccl/libcudacxx/include
+THRUST_OPTIONS ?= -std=c++17 -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP -DTHRUST_HOST_SYSTEM=THRUST_HOST_SYSTEM_CPP -D__CUB_INTERNAL_REDUCE__=0
 
-export HDF5_FC=mpiifx
-export HDF5_Fortran_COMPILER=mpiifx
-FORTRAN_COMPILER=/scratch1/skoranne/INTELCOMPILERS/bin/h5fc
-#FORTRAN_COMPILER=/scratch1/skoranne/NVCOMPILERS/bin/h5fc
-# Debug flags (commented out, but easily swappable)
-# FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3 -xHost 
-# Use -pg
+FORTRAN_COMPILER ?= ifx
+FC := $(FORTRAN_COMPILER)
+
+ifeq ($(USE_HDF5),1)
+  export HDF5_FC ?= mpiifx
+  export HDF5_Fortran_COMPILER ?= mpiifx
+  FCFLAGS_EXTRA += -DUSE_HDF5
+  LINKER_FC := $(HDF5_FC)
+else
+  LINKER_FC := $(FC)
+endif
 
 ifeq ($(DEBUG),1)
-   FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp
+   FCFLAGS = -fpp -g -O0 -check bounds -check all -traceback -warn all -qopenmp $(FCFLAGS_EXTRA)
 else
-   FCFLAGS = -g -traceback -fpp -O3 -parallel -qopenmp -qopt-report=3 -xHost
+   FCFLAGS = -g -traceback -fpp -O3 -parallel -qopenmp -qopt-report=3 -xHost $(FCFLAGS_EXTRA)
+endif
+ifeq ($(STRICT),1)
+   FCFLAGS += -stand f18 -warn all -warn interfaces -warn unused -check bounds -check pointers -check uninit -traceback
 endif
 ifeq ($(PROFILE),1)
    FCFLAGS += -pg
 endif
 
-#FCFLAGS = -O3 -fpp
 GIT_HASH := $(shell git rev-parse --short HEAD)
-# --- Linker Variables ---
-LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
-LDLIBS = db/liblayoutdb.a -lz -lhdf5_fortran -lhdf5 -lstdc++ -lsnappy -lzstd
+# --- Linker Variables (override LDFLAGS/LDLIBS for local machine) ---
+LDFLAGS ?=
+LDLIBS ?= db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd
+ifeq ($(USE_HDF5),1)
+  LDLIBS += -lhdf5_fortran -lhdf5
+endif
 
 # --- Library Definition ---
 LIBRARY = libmagparser.a
@@ -42,7 +55,7 @@ db/liblayoutdb.a:
 include DEPENDENCIES.txt
 
 hdfdata.o:	hdfdata.f90
-	$(FORTRAN_COMPILER) -DUSE_HDF5 $(FCFLAGS) -c $< -o $@
+	$(FC) $(FCFLAGS) -c $< -o $@
 #skiplist_module.o
 
 # Create a list of all object files that will be compiled
@@ -93,36 +106,38 @@ $(LIBRARY): $(LIB_OBJS)
 # --- Executable Builds ---
 # By linking against the library, we don't have to list out all objects again.
 MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a
-	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)
-	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_morton.exe: test_morton.o $(LIBRARY)
-	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 CONVERT.exe: test_polygonfracture.o $(LIBRARY)
-	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_boxmerge.exe: test_boxmerge.o $(LIBRARY)
-	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_skiplist.exe: test_skiplist.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 generate_bin.exe: generate_bin.o $(LIBRARY)
-	$(HDF5_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_interaction.exe:	test_interaction.f90 $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_repetition.exe:	test_repetition.f90 $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 BOOST_XOR_CHECKER.exe: boost_xor_checker.cpp
 		       g++ -O3 -funroll-loops -I$(BOOST_DIR) boost_xor_checker.cpp -o BOOST_XOR_CHECKER.exe
+systeminfo_macos.o: systeminfo_macos.c
+		       $(CC) -O3 -Wall -c systeminfo_macos.c -o $@
 snappy_api.o:	       snappy_api.cpp
-		       g++ -O3 -Wall -c snappy_api.cpp 
+		       g++ -O3 -Wall $(CPPFLAGS_EXTRA) -c snappy_api.cpp 
 boost_polygon_api.o:   boost_polygon_api.cpp
-		       g++ -O3 -funroll-loops -I$(BOOST_DIR)  boost_polygon_api.cpp -c
+		       g++ -O3 -funroll-loops -I$(BOOST_DIR) $(CPPFLAGS_EXTRA) boost_polygon_api.cpp -c
 event_sorter.o:	       event_sorter.cu
 		       g++ -x c++ -O3 -c event_sorter.cu
 gpu_morton.o:	gpu_morton.cu
 	g++ -O3 -c -x c++ gpu_morton.cu
 MAGVIEWER.exe:	magviewer.f90 $(LIBRARY)
 		ifx -c -O3 -fpp glf90w.F90
-		ifx $(FCFLAGS) -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o /scratch1/skoranne/OSS_EDA_TOOLS/glfw/build/src/libglfw3.a -lGL -o MAGVIEWER.exe -lz -lsnappy -lzstd -lstdc++
+		ifx $(FCFLAGS) -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o -L ./lib/ifx -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
        
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe MAGVIEWER.exe

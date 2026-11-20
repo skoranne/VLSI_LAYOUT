@@ -468,81 +468,81 @@ contains
 
   end subroutine SearchTreeForChunks
   !> Parallel expansion of requested chunks into the vertex buffer
-  #ifdef MAYBE_USE_THIS
-  subroutine PerformLODCoordinateFilling(input_layer, snappy_stream, current_view, visible_boxes, num_visible)
-    type(Layer), intent(in)               :: input_layer
-    type(CompressedStream), intent(in)    :: snappy_stream
-    type(Box), intent(in)                 :: current_view
-    type(Box), intent(inout)              :: visible_boxes(:)
-    integer, intent(out)                  :: num_visible
+  ! #ifdef MAYBE_USE_THIS (disabled: requires CompressedStream type not in scope)
+!!  subroutine PerformLODCoordinateFilling(input_layer, snappy_stream, current_view, visible_boxes, num_visible)
+!     type(Layer), intent(in)               :: input_layer
+!     type(CompressedStream), intent(in)    :: snappy_stream
+!     type(Box), intent(in)                 :: current_view
+!     type(Box), intent(inout)              :: visible_boxes(:)
+!     integer, intent(out)                  :: num_visible
 
-    integer(kind=int64), allocatable :: hit_chunks(:)
-    integer :: num_hits, max_capacity
-    integer(kind=int64) :: i, k, chunk_id, local_count, space_left
-    type(Box), allocatable :: temp_boxes(:)
-    logical :: overlapx, overlapy
+!     integer(kind=int64), allocatable :: hit_chunks(:)
+!     integer :: num_hits, max_capacity
+!     integer(kind=int64) :: i, k, chunk_id, local_count, space_left
+!     type(Box), allocatable :: temp_boxes(:)
+!     logical :: overlapx, overlapy
 
-    max_capacity = size(visible_boxes)
-    num_visible = 0
-    num_hits = 0
+!     max_capacity = size(visible_boxes)
+!     num_visible = 0
+!     num_hits = 0
 
-    allocate(hit_chunks(min(10000_int64, snappy_stream%num_chunks)))
+!     allocate(hit_chunks(min(10000_int64, snappy_stream%num_chunks)))
 
-    ! Boot up the OpenMP Task pool for the tree traversal
-    !$omp parallel
-    !$omp single
-    call SearchTreeForChunks(input_layer%tree%tree_nodes, input_layer%tree%root_index, &
-         current_view, input_layer%layer_boxes, input_layer%n_used, &
-         hit_chunks, num_hits, size(hit_chunks))
-    !$omp end single
-    !$omp end parallel
+!     ! Boot up the OpenMP Task pool for the tree traversal
+!     !$omp parallel
+!     !$omp single
+!     call SearchTreeForChunks(input_layer%tree%tree_nodes, input_layer%tree%root_index, &
+!          current_view, input_layer%layer_boxes, input_layer%n_used, &
+!          hit_chunks, num_hits, size(hit_chunks))
+!     !$omp end single
+!     !$omp end parallel
 
-    if (num_hits > 0) then
-       ! Parallelize chunk decompression and culling
-       !$omp parallel do private(chunk_id, temp_boxes, local_count, k, overlapx, overlapy, space_left) &
-       !$omp shared(num_visible, visible_boxes, max_capacity, hit_chunks) schedule(dynamic)
-       do i = 1, num_hits
+!     if (num_hits > 0) then
+!        ! Parallelize chunk decompression and culling
+!        !$omp parallel do private(chunk_id, temp_boxes, local_count, k, overlapx, overlapy, space_left) &
+!        !$omp shared(num_visible, visible_boxes, max_capacity, hit_chunks) schedule(dynamic)
+!        do i = 1, num_hits
 
-          ! Early exit if the buffer was filled by other threads
-          if (num_visible >= max_capacity) cycle
+!           ! Early exit if the buffer was filled by other threads
+!           if (num_visible >= max_capacity) cycle
 
-          chunk_id = hit_chunks(i)
-          allocate(temp_boxes(snappy_stream%chunks(chunk_id)%num_boxes))
-          call DecompressSingleChunk(snappy_stream%chunks(chunk_id), snappy_stream%compression_method, temp_boxes)
+!           chunk_id = hit_chunks(i)
+!           allocate(temp_boxes(snappy_stream%chunks(chunk_id)%num_boxes))
+!           call DecompressSingleChunk(snappy_stream%chunks(chunk_id), snappy_stream%compression_method, temp_boxes)
 
-          ! Filter and Pack IN-PLACE locally to avoid locking the shared buffer
-          local_count = 0
-          do k = 1, size(temp_boxes)
-             overlapx = max(temp_boxes(k)%x1, current_view%x1) <= min(temp_boxes(k)%x2, current_view%x2)
-             if (overlapx) then
-                overlapy = max(temp_boxes(k)%y1, current_view%y1) <= min(temp_boxes(k)%y2, current_view%y2)
-                if (overlapy) then
-                   local_count = local_count + 1
-                   temp_boxes(local_count) = temp_boxes(k)
-                end if
-             end if
-          end do
+!           ! Filter and Pack IN-PLACE locally to avoid locking the shared buffer
+!           local_count = 0
+!           do k = 1, size(temp_boxes)
+!              overlapx = max(temp_boxes(k)%x1, current_view%x1) <= min(temp_boxes(k)%x2, current_view%x2)
+!              if (overlapx) then
+!                 overlapy = max(temp_boxes(k)%y1, current_view%y1) <= min(temp_boxes(k)%y2, current_view%y2)
+!                 if (overlapy) then
+!                    local_count = local_count + 1
+!                    temp_boxes(local_count) = temp_boxes(k)
+!                 end if
+!              end if
+!           end do
 
-          ! Lock briefly to push the entire local batch to the global OpenGL buffer
-          if (local_count > 0) then
-             !$omp critical (vbo_append)
-             space_left = max_capacity - num_visible
-             if (space_left > 0) then
-                local_count = min(local_count, space_left)
-                visible_boxes(num_visible + 1 : num_visible + local_count) = temp_boxes(1 : local_count)
-                num_visible = num_visible + local_count
-             end if
-             !$omp end critical
-          end if
+!           ! Lock briefly to push the entire local batch to the global OpenGL buffer
+!           if (local_count > 0) then
+!              !$omp critical (vbo_append)
+!              space_left = max_capacity - num_visible
+!              if (space_left > 0) then
+!                 local_count = min(local_count, space_left)
+!                 visible_boxes(num_visible + 1 : num_visible + local_count) = temp_boxes(1 : local_count)
+!                 num_visible = num_visible + local_count
+!              end if
+!              !$omp end critical
+!           end if
 
-          deallocate(temp_boxes)
-       end do
-       !$omp end parallel do
-    end if
+!           deallocate(temp_boxes)
+!        end do
+!        !$omp end parallel do
+!     end if
 
-    deallocate(hit_chunks)
-  end subroutine PerformLODCoordinateFilling
-  #endif
+!     deallocate(hit_chunks)
+!   end subroutine PerformLODCoordinateFilling
+  ! #endif
   subroutine PerformBoxFilling(input_layer, current_view, visible_mbrs, vertex_buffer, num_visible)
     type(Layer), intent(in)               :: input_layer
     type(Box), intent(in)                 :: current_view
@@ -1413,28 +1413,43 @@ end program main
 
 program main
   use DrawUsingOpenGL
+  use LayoutDBLoaderModule, only: LoadLayoutDBFile
+  use DesignModule, only: Design, Layer, DESIGN_DIRECTION_INPUT, RestoreSnapToLayer
+  use CommonModule, only: temporary_layers
+  use hash_mod, only: hash_nitems
+  use MagicVLSILayoutParser, only: parseMagicLayoutFile
   implicit none
-  integer :: narg, iostat
+  integer :: narg, iostat, extpos, j, ch
   type(Design), target :: load_design
   type(DrawnLayer),allocatable     :: input_layers(:)
   integer                :: N, i
   character(len=256)     :: filename
   character(len=256)     :: buf
+  character(len=16)      :: fext
   integer                :: MAX_LAYERS
+  logical                :: is_layoutdb
   narg = command_argument_count()
-  if( narg < 2 ) error stop "./MAGVIEW MAGIC-FILE MAX-LAYERS"
-  call get_command_argument(1, filename, status=iostat)   ! allocates automatically
+  if( narg < 2 ) error stop "./MAGVIEWER <MAGIC|OASIS|GDS file> MAX-LAYERS"
+  call get_command_argument(1, filename, status=iostat)
   if (iostat /= 0) then
-     write (*,*) "ERROR: 1st argument must be an MAGIC VLSI Layout filename."
+     write (*,*) "ERROR: 1st argument must be a layout filename."
      stop 2
   end if
-  call get_command_argument(2, buf, status=iostat)   ! allocates automatically
+  call get_command_argument(2, buf, status=iostat)
   read( buf, *, iostat=iostat ) MAX_LAYERS
   if (iostat /= 0) then
      write (*,*) "ERROR: 2nd argument must be an integer."
      stop 2
   end if
-  if( MAX_LAYERS == 1 ) then
+  fext = ''
+  extpos = index(trim(filename), '.', back=.true.)
+  if (extpos > 0) fext = filename(extpos+1:)
+  do j=1,len_trim(fext)
+     ch = iachar(fext(j:j))
+     if (ch >= iachar('A') .and. ch <= iachar('Z')) fext(j:j) = achar(ch+32)
+  end do
+  is_layoutdb = (trim(fext)=='oas' .or. trim(fext)=='oasis' .or. trim(fext)=='gds' .or. trim(fext)=='gds2' .or. trim(fext)=='gdsii')
+  if( (.not. is_layoutdb) .and. MAX_LAYERS == 1 ) then
      block
        type(Layer), target :: tempLayer
        !> short cut for single layer
@@ -1448,7 +1463,12 @@ program main
   load_design%fileName = trim( filename )
   load_design%design_direction = DESIGN_DIRECTION_INPUT
   temporary_layers = 2 !> so we can parse empty files as empty layers
-  call parseMagicLayoutFile( load_design, MAX_LAYERS )
+  if (is_layoutdb) then
+     write(*,*) 'INFO: MAGVIEWER loading OASIS/GDS via layoutdb (compressed/on-demand view): ', trim(filename)
+     call LoadLayoutDBFile(load_design, MAX_LAYERS)
+  else
+     call parseMagicLayoutFile( load_design, MAX_LAYERS )
+  end if
   N = hash_nitems( load_design%ht )
   write(*,*) 'Loaded: ', N, ' layers.'
   allocate( input_layers(N+2) )
@@ -1458,6 +1478,6 @@ program main
   do i=1,N
      input_layers(i)%input_layer => load_design%layers(i)
   end do
-  call SimpleWindow(N, input_layers, 1600.0, 900.0)  
+  call SimpleWindow(N, input_layers, 1600.0, 900.0)
 end program main
 

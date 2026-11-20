@@ -73,7 +73,7 @@ contains
 #endif
     write(*, '(A)') '========================================='
   end subroutine PrintGPUInfo
-  #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
   subroutine PrintDetailedInformationCUDA()
     use cudafor
     implicit none

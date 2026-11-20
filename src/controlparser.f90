@@ -79,6 +79,43 @@ contains
     end if
   end subroutine LoadDesignFileByExtHier
 
+  subroutine ensure_layer_capacity(d, idx)
+    type(Design), intent(inout) :: d
+    integer, intent(in) :: idx
+    type(Layer), allocatable :: tmp_layers(:)
+    character(len=1024), allocatable :: tmp_names(:)
+    integer :: oldn, oldn_names, newn
+
+    if (allocated(d%layers)) then
+       oldn = size(d%layers)
+    else
+       oldn = 0
+    end if
+    if (allocated(d%layerNames)) then
+       oldn_names = size(d%layerNames)
+    else
+       oldn_names = 0
+    end if
+    if (idx <= oldn .and. idx <= oldn_names) return
+
+    newn = max(1, max(oldn, oldn_names))
+    if (newn < idx) newn = idx
+    newn = max(newn, max(oldn, oldn_names) + max(oldn, oldn_names)/2 + 8)
+
+    if (.not. allocated(d%layers) .or. oldn < newn) then
+       allocate(tmp_layers(newn))
+       if (allocated(d%layers) .and. oldn > 0) tmp_layers(1:oldn) = d%layers(1:oldn)
+       call move_alloc(tmp_layers, d%layers)
+    end if
+
+    if (.not. allocated(d%layerNames) .or. oldn_names < newn) then
+       allocate(tmp_names(newn))
+       tmp_names = ''
+       if (allocated(d%layerNames) .and. oldn_names > 0) tmp_names(1:oldn_names) = d%layerNames(1:oldn_names)
+       call move_alloc(tmp_names, d%layerNames)
+    end if
+  end subroutine ensure_layer_capacity
+
   !=================================================================
   ! 1) GetLayerFromDBName – the routine you asked for.
   !=================================================================
@@ -171,18 +208,14 @@ contains
     character :: operator_char !> single letter only
     character(len=256) :: TEMPORARY_FOLDER
     character(len=256) :: TEMPORARY_LAYER_PREFIX
-     character(len=4096) :: filename_work
-    type(Layer), allocatable :: tmp_layers(:)
-    character(len=1024), allocatable :: tmp_layerNames(:)
-    integer :: grow_size, old_size
-    character(len=256) :: strvar
+    character(len=4096) :: filename_work
     real(kind=real64)  :: rvar(16)
     integer(kind=K_COORDINATE_KIND):: ivar(16)
     integer(kind=K_COORDINATE_KIND) :: used_precision
     character(len=1024) :: m4_cmd, expanded_file, echo_line, helper_name
     integer :: m4_stat, echo_unit, echo_ios, pid_self, pid_unit, helper_unit, helper_ios
     db_count = 1
-    !TEMPORARY_LAYER_PREFIX = "MAG_TEMP_LAYER_"
+    TEMPORARY_FOLDER = ''
     TEMPORARY_LAYER_PREFIX = "MTL_"
     call hash_create(ht,K_MAX_DBS)
     allocate( design_dbs( K_MAX_DBS ) )
@@ -472,6 +505,7 @@ contains
              pos  = index( rest, ' ')
              lhs_layer_index = hash_nitems( design_dbs( lhs_db_index )%ht ) + 1
              call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
+             call ensure_layer_capacity( design_dbs(lhs_db_index), lhs_layer_index )
              if( .not. ins ) then
                 write(*,*) 'ERROR: Unable to INIT layer: ', trim(rest(1:pos-1)), ' at index: ', lhs_layer_index
              else
@@ -517,32 +551,13 @@ contains
                 lhs_layer_index = hash_nitems(design_dbs( lhs_db_index )%ht)+1
                 call hash_put( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
                 if( .not. ins ) error stop "DB HASH TABLE CORRUPTED"
-                !> grow layer arrays if needed
-                if( .not. allocated(design_dbs(lhs_db_index)%layers) ) then
-                   grow_size = max(lhs_layer_index, 16)
-                   allocate(design_dbs(lhs_db_index)%layers(grow_size))
-                else if( lhs_layer_index > size(design_dbs(lhs_db_index)%layers) ) then
-                   old_size = size(design_dbs(lhs_db_index)%layers)
-                   grow_size = max(lhs_layer_index, old_size * 2)
-                   allocate(tmp_layers(grow_size))
-                   tmp_layers(1:old_size) = design_dbs(lhs_db_index)%layers(1:old_size)
-                   call move_alloc(tmp_layers, design_dbs(lhs_db_index)%layers)
-                end if
-                if( .not. allocated(design_dbs(lhs_db_index)%layerNames) ) then
-                   grow_size = max(lhs_layer_index, 16)
-                   allocate(design_dbs(lhs_db_index)%layerNames(grow_size))
-                else if( lhs_layer_index > size(design_dbs(lhs_db_index)%layerNames) ) then
-                   old_size = size(design_dbs(lhs_db_index)%layerNames)
-                   grow_size = max(lhs_layer_index, old_size * 2)
-                   allocate(tmp_layerNames(grow_size))
-                   tmp_layerNames(1:old_size) = design_dbs(lhs_db_index)%layerNames(1:old_size)
-                   call move_alloc(tmp_layerNames, design_dbs(lhs_db_index)%layerNames)
-                end if
+                call ensure_layer_capacity( design_dbs(lhs_db_index), lhs_layer_index )
                 !> we have to decide temporary layer format
                 associate( resolved_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index) )
                   lhs_layer => design_dbs( lhs_db_index )%layers(lhs_layer_index)
                   if( .not. allocated( design_dbs( lhs_db_index )%layerNames ) ) error stop "DB Layernames not populated"
-                  design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
+                  design_dbs( lhs_db_index )%layerNames(lhs_layer_index) = &
+                       trim(adjustl(TEMPORARY_LAYER_PREFIX))//trim(adjustl(rest(1:pos-1)))
                   filename_work = ' '
                   write(filename_work,'(A,A,A,A)') trim(TEMPORARY_FOLDER), trim(design_dbs( lhs_db_index )%designName), '_', &
                        trim(design_dbs( lhs_db_index )%layerNames(lhs_layer_index))
@@ -575,7 +590,8 @@ contains
              
              call hash_get( design_dbs( rhs1_db_index )%ht, trim(rest(1:pos-1)), rhs1_layer_index, ins )
              if( .not. ins ) then
-                write(*,*) 'ERROR: RHS1 layer not found: ',trim(rest(1:pos-1)), ' check spelling or existence of layer in db. Line: ', line_number-1
+                write(*,*) 'ERROR: RHS1 layer not found: ', trim(rest(1:pos-1)), &
+                     ' check spelling or existence of layer in db. Line: ', line_number-1
                 error stop "ERROR: layer not found"
              end if
              rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
@@ -596,7 +612,8 @@ contains
                 pos  = index( rest, ' ')
                 call hash_get( design_dbs( rhs2_db_index )%ht, trim(rest(1:pos-1)), rhs2_layer_index, ins )
                 if( .not. ins ) then
-                   write(*,*) 'ERROR: RHS2 layer not found: ',trim(rest(1:pos-1)) ,' check spelling or existence of layer in db: line: ', line_number-1
+                   write(*,*) 'ERROR: RHS2 layer not found: ', trim(rest(1:pos-1)), &
+                        ' check spelling or existence of layer in db: line: ', line_number-1
                    error stop "ERROR: layer not found"
                 end if
                 rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
@@ -698,9 +715,12 @@ contains
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case('ASSERT_ZERO')
                         !> for now we have to do t1:nothing = ASSERT_ZERO t1:check_and nothing
-                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) error stop "ASSERT_ZERO must use nothing as second layer"
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) &
+                             error stop "ASSERT_ZERO must use nothing as second layer"
                         if( rhs1_layer%n_used > 0 ) then
-                           write(*,'(A,I5,A)') '************ ASSERT_ZERO fail on layer. Line: ', line_number-1, ' **********************'
+                           write(*,'(A,I5,A)') &
+                                '************ ASSERT_ZERO fail on layer. Line: ', line_number-1, &
+                                ' **********************'
                            if( abort_on_assert_zero > 1 ) error stop "ERROR: ASSERT_ZERO variable > 1"
                         end if
                      case('AND2')
@@ -714,7 +734,8 @@ contains
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case ('EXTENT')
                         !> d1:poly EXTENT nothing
-                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing') error stop "EXTENT must use nothing as second layer"
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing') &
+                             error stop "EXTENT must use nothing as second layer"
                         !write(*,*) 'Found PRIMARY_OPERATOR = EXTENT'
                         call CreateEXTENT( rhs1_layer, lhs_layer )
                      case ('AND')
@@ -724,8 +745,30 @@ contains
                         call CalculateSingleLayerAND( rhs1_layer, lhs_layer )
                      case ('XOR')
                         !> d1:poly XOR d2:poly
-                        !write(*,*) 'Found PRIMARY_OPERATOR = XOR'
-                        call CalculateXOR(rhs1_layer, rhs2_layer, lhs_layer )                        
+                        !> Use direct Boost polygon XOR (same as ^) for robustness/performance.
+                        !> The grid/frame path (CalculateXOR/CalculateFrameFunction2) can be
+                        !> expensive or unstable on large/unhealed inputs.
+                        call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_XOR, 0_int64 )
+                     case ('INTERACT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_INTERACT)
+                     case ('NOT_INTERACT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_INTERACT)
+                     case ('CUT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_CUT)
+                     case ('NOT_CUT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_CUT)
+                     case ('TOUCH')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_TOUCH)
+                     case ('NOT_TOUCH')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_TOUCH)
+                     case ('INSIDE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_INSIDE)
+                     case ('NOT_INSIDE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_INSIDE)
+                     case ('OUTSIDE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_OUTSIDE)
+                     case ('NOT_OUTSIDE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_OUTSIDE)
                      case ('COPY')
                         !> d1:poly COPY nothing
                         !if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"
@@ -736,20 +779,23 @@ contains
                         !write(*,*) 'Found PRIMARY_OPERATOR = GRID'
                         call CreateGRID( rhs1_layer, lhs_layer, 10, 10, 10 ) !> the last argument is OVERLAP
                      case ('GROW') !> lhs = rhs GROW nothing EAST NORTH WEST SOUTH (all positive)
-                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) error stop "GROW must use nothing as second layer"
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) &
+                             error stop "GROW must use nothing as second layer"
                         !write(*,*) 'RESTJUST before: ', rest
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
-                        !write(*,'(A,I8,4(A,F8.2))') 'Found PRIMARY_OPERATOR = GROW at PRECISION ', used_precision, ' ', rvar(1), ' ', rvar(2), ' ', rvar(3), ' ', rvar(4)
+                        !write(*,'(A,I8,4(A,F8.2))') 'GROW prec ', used_precision, ' ', rvar(1:4)
                         do i=1,4
                            ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
                         end do
                         call CalculateGROWLayer( rhs1_layer, lhs_layer, ivar(1:4) )
                      case ('SIZE')
-                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) error stop "SIZE must use nothing as second layer"
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) &
+                             error stop "SIZE must use nothing as second layer"
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1)
                         !write(*,*) 'Found PRIMARY_OPERATOR = SIZE ', rvar(1)
-                        ivar(1) = int( rvar(1)*used_precision, kind=int64)
-                        call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_SIZE, int( ivar(1), kind=int64) )
+                        ivar(1) = int( rvar(1)*used_precision, kind=K_COORDINATE_KIND )
+                        call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, &
+                             K_BOOST_CONTROL_SIZE, int( ivar(1), kind=int64 ) )
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case ('WORMHOLE')
                         write(*,*) 'Found PRIMARY_OPERATOR = WORMHOLE'

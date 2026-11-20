@@ -1,0 +1,10 @@
+magic
+tech scmos
+timestamp 1
+<< a >>
+rect 0 0 20 7
+rect 0 8 20 15
+<< b >>
+rect 25 0 45 7
+rect 25 8 45 15
+<< end >>

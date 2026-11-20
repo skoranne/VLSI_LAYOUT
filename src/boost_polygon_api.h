@@ -23,18 +23,31 @@ struct c_box {
 };
 
 // C interface for the Boost implementation
-void PerformMerge(const struct c_box* input, 
-                  unsigned long N, 
-                  struct c_box* output, 
-                  unsigned long* outN);
-void PerformBoostPolygonOperation(const struct c_box* input_A, 
-				  unsigned long AN,
-				  const struct c_box* input_B, 
-				  unsigned long BN,
-				  struct c_box* output, 
-				  unsigned long* outN,
-				  unsigned long control_parameter,
-				  long control_value);
+void PerformBoostPolygonMerge(const struct c_box* input,
+                              unsigned long N,
+                              struct c_box* output,
+                              unsigned long* outN);
+void PerformBoostPolygonOperation(const struct c_box* input_A,
+                                  unsigned long AN,
+                                  const struct c_box* input_B,
+                                  unsigned long BN,
+                                  struct c_box* output,
+                                  unsigned long* outN,
+                                  unsigned long control_parameter,
+                                  long control_value);
+
+// Exact-sized allocating C interface (caller must free via FreeBoostPolygonBuffer)
+struct c_box* PerformBoostPolygonMergeAlloc(const struct c_box* input,
+                                            unsigned long N,
+                                            unsigned long* outN);
+struct c_box* PerformBoostPolygonOperationAlloc(const struct c_box* input_A,
+                                                unsigned long AN,
+                                                const struct c_box* input_B,
+                                                unsigned long BN,
+                                                unsigned long* outN,
+                                                unsigned long control_parameter,
+                                                long control_value);
+void FreeBoostPolygonBuffer(struct c_box* ptr);
 
 #ifdef __cplusplus
 }

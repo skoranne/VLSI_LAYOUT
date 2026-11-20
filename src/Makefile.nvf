@@ -20,10 +20,14 @@ NSYS_DELAY ?= 0
 NSYS_DUR ?= 0
 NSYS_TRACE ?= cuda,nvtx,openmp,osrt
 NSYS_OUT ?= /tmp/magparser_nvf_profile
+STRICT ?= 0
 ifeq ($(DEBUG),1)
    FCFLAGS = -cuda -O0 -Mbounds -g -traceback -Mchkptr -Mpreprocess -mp=gpu -gpu=$(GPU_CC) -fopenmp -Minfo=accel,mp
 else
    FCFLAGS = -cuda -O3 -g -fno-strict-aliasing -Mpreprocess -mp=gpu -gpu=$(GPU_CC) -fopenmp -Minfo=accel,mp
+endif
+ifeq ($(STRICT),1)
+   FCFLAGS += -Mstandard -Mbounds -Mchkptr -Minform=inform -traceback
 endif
 #FCFLAGS = -g -O3 -Mpreprocess -Minfo=accel -fopenmp -mp=gpu
 # --- Linker Variables ---
@@ -107,6 +111,12 @@ test_repetition.exe:	test_repetition.f90 $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 BOOST_XOR_CHECKER.exe: boost_xor_checker.cpp
 		       g++ -O3 -funroll-loops -I /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost boost_xor_checker.cpp -o BOOST_XOR_CHECKER.exe
+systeminfo_macos.o: systeminfo_macos.c
+		       $(CC) -O3 -Wall -c systeminfo_macos.c -o $@
+snappy_api.o:	       snappy_api.cpp
+		       g++ -O3 -Wall -c snappy_api.cpp -o snappy_api.o
+systeminfo_macos.o: systeminfo_macos.c
+		       $(CC) -O3 -Wall -c systeminfo_macos.c -o $@
 boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost boost_polygon_api.cpp -c
 event_sorter.o:	       event_sorter.cu

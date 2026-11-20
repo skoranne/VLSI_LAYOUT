@@ -812,7 +812,7 @@ contains
 
     type(XYTracker), allocatable :: events(:)
     integer :: i
-    integer(kind=int64) :: n, output_tracker_count
+    integer(kind=int64) :: n
     integer(kind=K_COORDINATE_KIND) :: current_x, y_start, y_end, min_y, max_y, min_x, max_x
     integer(kind=int64) :: current_lap
     integer(kind=int8)                 :: winding_sign
@@ -968,18 +968,9 @@ contains
 
     call destroy_skiplist(active_edges)
 
-    if (output_box_count > 0 .and. output_box_count < size(boxes)) then
-       block
-         type(Box), allocatable :: temp(:)
-         temp = temp_boxes(1:output_box_count)
-         boxes = temp
-       end block ! Temp is automatically cleaned up here
-       !boxes(1:output_box_count) = temp_boxes(1:output_box_count)
-    else
-       allocate(resized_boxes(output_box_count))
-       if (output_box_count > 0) resized_boxes(1:output_box_count) = temp_boxes(1:output_box_count)
-       call move_alloc(from=resized_boxes, to=boxes)
-    end if
+    allocate(resized_boxes(output_box_count))
+    if (output_box_count > 0) resized_boxes(1:output_box_count) = temp_boxes(1:output_box_count)
+    call move_alloc(from=resized_boxes, to=boxes)
 
   contains
 
@@ -1076,7 +1067,7 @@ contains
     type(XYTracker), allocatable :: work(:)   ! temporary workspace
     integer(kind=int64)                      :: n      ! original size
     integer(kind=int64)                      :: write_index  ! next free slot in work
-    integer(kind=int64)                      :: i, improved
+    integer(kind=int64)                      :: i
 
     !----------------------------------------------------------------
     !  Guard against empty or not‑allocated input

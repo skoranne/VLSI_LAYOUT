@@ -32,13 +32,24 @@ struct LdbInstance {
     LdbTransform tr;
 };
 
+struct LdbProperty {
+    int target_kind = 0; // 0=file,1=cell,2=element,3=instance
+    std::string cell;
+    std::string name;
+    std::string value;
+};
+
 struct LdbCell {
     std::string name;
     std::map<std::pair<int,int>, ldb_extent_t> layer_ext;
     ldb_extent_t cell_ext{0,0,0,0,0};
     std::set<std::string> refs;
-    std::vector<LdbBoxElem> boxes; // element bboxes (local)
-    std::vector<LdbInstance> instances; // hierarchical placements
+    std::vector<LdbBoxElem> boxes; // element bboxes (local), may be cleared after compaction
+    std::vector<uint8_t> boxes_compact; // delta+varint entropy-encoded box stream
+    std::string boxes_spill_path;       // low-memory mode: disk-backed compact box storage
+    bool boxes_on_disk = false;
+    std::vector<LdbInstance> instances; // hierarchical placements (repeated layout preserved)
+    std::vector<LdbProperty> properties;
 };
 
 struct LdbFile {
@@ -46,11 +57,16 @@ struct LdbFile {
     void* map = nullptr;
     size_t size = 0;
     int fd = -1;
+    bool strict_mode = false;   // OASIS START strict flag or strict parsing requested
+    uint32_t open_flags = 0;
+    uint64_t large_cell_box_threshold = 0;
     std::vector<LdbCell> cells;
     std::unordered_map<std::string, size_t> cell_index;
     std::map<int, std::string> propnames;
+    std::map<int, std::string> propstrings;
     std::vector<LdbRawRecord> gds_records; // lossless GDSII stream
     std::vector<uint8_t> oasis_raw; // captured/constructed for roundtrip experiments
+    std::vector<LdbProperty> file_properties;
     std::string error;
     size_t mem_bytes_extra = 0;
 };

@@ -30,10 +30,11 @@ module DesignModule
        RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer,&
        CalculateFrameNOT, CalculateBoostOperation, FilterLayer, push_box, FinalizeLayer,&
        DeleteDesign, SaveLayerToSnap, RestoreSnapToLayer, RestoreSnapToDLayer, BuildTree, PerformOperation,&
-       CalculateXOR, CalculateFrameAND, MergeHealLayer, swap_layer, CertifyHealing, PerformMergeLayer
+       CalculateXOR, CalculateFrameAND, MergeHealLayer, swap_layer, CertifyHealing, PerformMergeLayer,&
+       CalculateTopologicalSelect
 
   type :: LayerTree
-     integer(kind=int64) :: root_index
+     integer(kind=int64) :: root_index = 0
      type(RTreeNode), allocatable :: tree_nodes(:)
   end type LayerTree
   enum, bind(C)                     ! bind(C) makes the values C‑compatible
@@ -57,24 +58,26 @@ module DesignModule
   end enum
 
   type :: ConjugateLayer
-     integer :: conjugate_lid
+     integer :: conjugate_lid = 0
      integer(kind=c_int) :: purpose = CONJUGATE_LAYER_PURPOSE_NONE
   end type ConjugateLayer
   type :: Repetition
-     integer(kind=K_COORDINATE_KIND) :: num_rows, num_cols, dx, dy
+     integer(kind=K_COORDINATE_KIND) :: num_rows = 0, num_cols = 0, dx = 0, dy = 0
   end type Repetition
 
   type :: Layer
-     integer(kind=int64)    :: n_used   = 0   ! how many slots are filled
-     integer(kind=int64)    :: n_alloc  = 0   ! current allocation size
+     integer(kind=int64)    :: n_used   = 0          ! how many slots are filled
+     integer(kind=int64)    :: n_alloc  = 0          ! current allocation size
      type(Box), allocatable :: layer_boxes(:)
-     integer(kind=c_int)    :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
+     integer(kind=c_int)    :: layerState = 0        ! HEAL, SORT, PNUM, RTREE
      type(LayerTree)        :: tree
      type(UnionFind)        :: pnumtable
-     real(kind=real64)      :: area, perimeter
+     real(kind=real64)      :: area = 0.0_real64
+     real(kind=real64)      :: perimeter = 0.0_real64
      character(len=:), allocatable :: fileName
      type(ConjugateLayer)   :: paired_layer
-     integer                :: iunit
+     integer                :: iunit = -1
+     logical                :: device_resident = .false.
   end type Layer
   type, extends(Layer) :: GridLayer
      integer(kind=int64)          :: rows = 0
@@ -168,7 +171,8 @@ module DesignModule
        type(Layer), intent( inout ) :: input_layer
      end subroutine MergeHealLayer
      
-     module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, functype, control_opcode, control_parameter )
+     module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, &
+          functype, control_opcode, control_parameter )
        type(Layer), intent(inout) :: input_layer_A, input_layer_B
        type(Layer), intent(inout) :: output_layer
        type(CGFunction) :: functype
@@ -311,6 +315,27 @@ module DesignModule
        type(Box), allocatable, intent(inout) :: boxes(:)
        integer(kind=int64), intent(out) :: output_N
      end subroutine MergeBoxes
+
+     module subroutine CalculateOR( input_layer_A, input_layer_B, output_layer )
+       type(Layer), intent(inout) :: input_layer_A, input_layer_B
+       type(Layer), intent(inout) :: output_layer
+     end subroutine CalculateOR
+
+     module subroutine CalculateAND( input_layer_A, input_layer_B, output_layer )
+       type(Layer), intent(inout) :: input_layer_A, input_layer_B
+       type(Layer), intent(inout) :: output_layer
+     end subroutine CalculateAND
+
+     module subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer )
+       type(Layer), intent(inout) :: input_layer_A, input_layer_B
+       type(Layer), intent(inout) :: output_layer
+     end subroutine CalculateNOT
+
+     module subroutine CalculateTopologicalSelect( input_layer_A, input_layer_B, output_layer, topo_op )
+       type(Layer), intent(inout) :: input_layer_A, input_layer_B
+       type(Layer), intent(inout) :: output_layer
+       integer(kind=int64), intent(in) :: topo_op
+     end subroutine CalculateTopologicalSelect
 
   end interface
 
@@ -632,7 +657,7 @@ contains
        end if
 
        if( box_count > size( current_polygon_boxes ) ) then
-          !write(*,'(4(A,I0),A)') 'Processing polygon number: ', polygon_number, ' with ', box_count, ' rects, |cpb| = ', size( current_polygon_boxes ), ' |FC| = ', final_capacity, ' '
+          !write(*,'(4(A,I0),A)') 'Processing polygon: ', polygon_number, ' rects ', box_count
           deallocate( current_polygon_boxes )
           allocate( current_polygon_boxes( 2*box_count ) )
        end if
@@ -845,7 +870,7 @@ contains
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
-    input_layer%layerState = iand( input_layer%layerState, .not. LAYER_STATE_PNUM )
+    input_layer%layerState = iand( input_layer%layerState, not(LAYER_STATE_PNUM) )
     !call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
     !     input_layer%tree%root_index, overlap_area, overlap_perimeter)
     !input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )
@@ -1054,7 +1079,8 @@ contains
        input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
     end if
     if( NeedsPNum( input_layer ) ) then
-       call PerformMergeWithOverlapDetection( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
+       call PerformMergeWithOverlapDetection( input_layer%pnumtable, input_layer%layer_boxes, &
+            K_LEAF_CAPACITY, input_layer%tree%tree_nodes, &
             input_layer%tree%root_index, overlap_area, overlap_perimeter, area_overlap_roots)
        if( overlap_area /= 0 ) then
           !> wipe HEALING state
@@ -1072,7 +1098,7 @@ contains
     implicit none
     type(Layer), intent(inout) :: input_layer
     integer            :: env_len, env_status
-    real(kind=real64)  :: t_start, t_end
+    real(kind=real64)  :: t_start
 
     if (profiling_enabled) t_start = get_cpu_time()
 
@@ -1090,26 +1116,6 @@ contains
     if (profiling_enabled) call RecordTime("PreprocessLayer", get_cpu_time() - t_start)
   end subroutine PreprocessLayer
 
-  subroutine CalculateOR( input_layer_A, input_layer_B, output_layer )
-    type(Layer), intent(inout) :: input_layer_A, input_layer_B
-    type(Layer), intent(inout)   :: output_layer
-    integer             :: alloc_status
-    !> we can create the RTree for A and B if needed
-    !call PreprocessLayer( input_layer_A )
-    !call PreprocessLayer( input_layer_B )
-    if( allocated( output_layer%layer_boxes ) ) then
-       deallocate( output_layer%layer_boxes ) !> since we are now doing inout,
-    end if
-    allocate( output_layer%layer_boxes( size(input_layer_A%layer_boxes) + size( input_layer_B%layer_boxes) ), stat=alloc_status )
-    if( alloc_status /= 0 ) then
-       error stop "ALLOCATION FAILED: "
-    end if
-    output_layer%layer_boxes(1:input_layer_A%n_used) = input_layer_A%layer_boxes
-    output_layer%layer_boxes(1+input_layer_A%n_used:) = input_layer_B%layer_boxes
-    output_layer%n_used = input_layer_A%n_used + input_layer_B%n_used
-    call PreprocessLayer( output_layer )
-  end subroutine CalculateOR
-
   !> utility subroutine, should move to more common place
   subroutine push_box( xbox, th_layer )
     type(Box), intent(in) :: xbox
@@ -1119,12 +1125,13 @@ contains
     if( th_layer%n_used == th_layer%n_alloc ) then
        block
          type(Box), allocatable :: temp(:)
-         integer :: i ! Explicitly scoped loop index
-         allocate( temp( th_layer%n_alloc*K_GROWTH_FACTOR ), stat=alloc_status )
+         integer(kind=int64) :: i, new_alloc
+         new_alloc = max(1_int64, th_layer%n_alloc * K_GROWTH_FACTOR)
+         allocate( temp( new_alloc ), stat=alloc_status )
          if( alloc_status /= 0 ) then
             error stop "Memory allocation failed"
          end if
-         th_layer%n_alloc = th_layer%n_alloc*K_GROWTH_FACTOR
+         th_layer%n_alloc = new_alloc
          ! Element-by-element copy guarantees no hidden stack allocations
          do i = 1, th_layer%n_used
             temp(i) = th_layer%layer_boxes(i)
@@ -1136,205 +1143,16 @@ contains
     th_layer%layer_boxes( th_layer%n_used ) = xbox
   end subroutine push_box
 
-  subroutine CalculateAND( input_layer_A, input_layer_B, output_layer )
-    character(len=*), parameter :: functionName = "CalculateAND"
-    type(Layer), intent(inout) :: input_layer_A, input_layer_B
-    type(Layer), intent(inout)   :: output_layer
-    real(kind=real64) :: t_start, t_end
-    integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC, numNodesB
-    integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
-    integer(kind=int64) :: number_leaves
-    integer(kind=int64) :: i, j, k
-    type(Layer), allocatable :: buffers(:)
-    type(Box) :: tempBox
-    integer :: nthreads, tid, alloc_status
-    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-    integer(kind=int64), allocatable :: andCounts(:), andOffsets(:)
-    logical :: use_gpu
-    character(len=32) :: offload_env
-    integer :: offload_len, offload_stat
-
-    !if (profiling_enabled) t_start = get_cpu_time()
-
-    !> preprocess A,B (builds RTrees/sorting as needed)
-    !$omp parallel default(shared)
-    !$omp single nowait
-    !$omp task
-    call PreprocessLayer( input_layer_A )
-    !$omp end task
-    !$omp task
-    call PreprocessLayer( input_layer_B )
-    !$omp end task
-    !$omp taskwait
-    !$omp end single
-    !$omp end parallel
-
-    num_boxesA = input_layer_A%n_used
-    num_boxesB = input_layer_B%n_used
-    use_gpu = .false.
-#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
-    if (num_boxesA > 0 .and. num_boxesB > 0 .and. allocated(input_layer_B%tree%tree_nodes)) then
-       numNodesB = size(input_layer_B%tree%tree_nodes, kind=int64)
-       if (numNodesB > 0 .and. input_layer_B%tree%root_index > 0) then
-          use_gpu = (omp_get_num_devices() > 0)
-          call get_environment_variable('OMP_TARGET_OFFLOAD', offload_env, length=offload_len, status=offload_stat)
-          if (offload_stat == 0 .and. offload_len > 0) then
-             if (trim(offload_env) == 'DISABLED' .or. trim(offload_env) == 'disabled') use_gpu = .false.
-          end if
-       end if
-    end if
-#else
-    use_gpu = .false.
-#endif
-
-    if (use_gpu) then
-       allocate(andCounts(num_boxesA), andOffsets(num_boxesA), stat=alloc_status)
-       if (alloc_status == 0) then
-          call ComputeANDPairsCountGPU(input_layer_B%tree%tree_nodes, numNodesB, &
-               input_layer_B%layer_boxes, num_boxesB, input_layer_B%tree%root_index, &
-               input_layer_A%layer_boxes, num_boxesA, andCounts, num_boxesC)
-          andOffsets(1) = 0_int64
-          do i = 2, num_boxesA
-             andOffsets(i) = andOffsets(i-1) + andCounts(i-1)
-          end do
-          if (allocated(output_layer%layer_boxes)) deallocate(output_layer%layer_boxes)
-          allocate(output_layer%layer_boxes(max(num_boxesC, 1_int64)), stat=alloc_status)
-          if (alloc_status == 0 .and. num_boxesC > 0) then
-             call ComputeANDPairsFillGPU(input_layer_B%tree%tree_nodes, numNodesB, &
-                  input_layer_B%layer_boxes, num_boxesB, input_layer_B%tree%root_index, &
-                  input_layer_A%layer_boxes, num_boxesA, andOffsets, output_layer%layer_boxes, num_boxesC)
-          end if
-          output_layer%n_used = num_boxesC
-          output_layer%layerState = ior(output_layer%layerState, LAYER_STATE_HEAL)
-          if (allocated(andCounts)) deallocate(andCounts)
-          if (allocated(andOffsets)) deallocate(andOffsets)
-          call PreprocessLayer(output_layer)
-          return
-       end if
-       if (allocated(andCounts)) deallocate(andCounts)
-       if (allocated(andOffsets)) deallocate(andOffsets)
-    end if
-
-    !> CPU fallback (original multithreaded RTree search)
-    nthreads = omp_get_max_threads()
-    allocate(buffers(nthreads))
-    do i=1,nthreads
-       !> we may still need some setup
-       allocate(buffers(i)%layer_boxes(K_INIT_BOX_COUNT))
-       buffers(i)%n_alloc = K_INIT_BOX_COUNT
-    end do
-    !write(*,*) 'DBG: ', num_boxesA, ' ', num_boxesB, ' RTB ', size(input_layer_B%tree%tree_nodes)
-    !> we may have to do schedule dynamic:     !$omp do schedule(dynamic)
-    !$omp parallel do private(leafboxes, number_leaves, i, j, k, tid, tempBox)
-    over_all_boxes: do i=1,num_boxesA
-       number_leaves = 0
-       leafboxes = 0
-       tid = omp_get_thread_num()+1
-       call SearchTree( input_layer_B%tree%tree_nodes, input_layer_B%tree%root_index, &
-            input_layer_A%layer_boxes(i), leafboxes, number_leaves )
-       !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
-       if( number_leaves > 0 ) then
-          !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
-          outer: do j=1,number_leaves
-             over_leaves: do k=leafboxes(j),min(leafboxes(j)+K_LEAF_CAPACITY-1, num_boxesB)
-                if( box_interact( input_layer_A%layer_boxes(i), input_layer_B%layer_boxes(k)) ) then
-                   tempBox = input_layer_A%layer_boxes(i) * input_layer_B%layer_boxes(k)
-                   !$komp critical (console_io)
-                   !write(*,*) 'Index ',i, ' ', input_layer_A%layer_boxes(i), ' interacts with ',&
-                   !     k, ' ', input_layer_B%layer_boxes(k), &
-                   !     ' * ', tempBox, box_area( tempBox )
-                   !$komp end critical (console_io)
-                   if( box_area( tempBox ) > 0.0 ) then
-                      call push_box(tempBox, buffers(tid)) ! Reallocates if capacity exceeded, and here i is very important
-                   end if
-                end if
-             end do over_leaves
-          end do outer
-       end if
-    end do over_all_boxes
-
-    !print *, "DEBUG: Is this loop in a parallel region? ", omp_in_parallel()
-    ! The global Union-Find array is updated strictly sequentially
-    num_boxesC = sum([ (buffers(i)%n_used, i=1,nthreads) ])
-    !write(*,*) 'OUTPUT_COUNT =', num_boxesC
-    if( allocated( output_layer%layer_boxes ) ) then
-       deallocate( output_layer%layer_boxes ) !> since we are now doing inout,
-    end if
-    allocate( output_layer%layer_boxes( num_boxesC ), stat=alloc_status )
-    if( alloc_status /= 0 ) then
-       error stop "ALLOCATION FAILED: "
-    end if
-    i = 1
-    do tid = 1, nthreads
-       if( buffers(tid)%n_used == 0 ) cycle
-       ! 2. Check if we are writing out of bounds on the destination
-       if (i + buffers(tid)%n_used - 1 > size(output_layer%layer_boxes)) then
-          print *, "FATAL: Output layer capacity exceeded by thread ", tid
-          print *, "Current index: ", i, " Trying to add: ", buffers(tid)%n_used
-          print *, "Max capacity: ", size(output_layer%layer_boxes)
-          error stop
-       end if
-
-       ! 3. Check if we are reading out of bounds on the source
-       if (buffers(tid)%n_used > size(buffers(tid)%layer_boxes)) then
-          print *, "FATAL: Thread ", tid, " over-reported its used size!"
-          print *, "Claimed used: ", buffers(tid)%n_used
-          print *, "Actual buffer size: ", size(buffers(tid)%layer_boxes)
-          error stop
-       end if
-       ! Explicit loop strictly prevents temporary stack allocations
-       do j = 1, buffers(tid)%n_used
-          output_layer%layer_boxes(i + j - 1) = buffers(tid)%layer_boxes(j)
-       end do
-       i = i + buffers(tid)%n_used
-    end do
-    output_layer%n_used = num_boxesC
-    !> we can use the optimization that by construction the output is HEALED
-    output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
-    call PreprocessLayer( output_layer )
-
-    if (profiling_enabled) call RecordTime("CalculateAND", get_cpu_time() - t_start)
-  end subroutine CalculateAND
-
-  !> Multiple algorithms for A NOT B
-  subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer )
-    type(Layer), intent(inout) :: input_layer_A, input_layer_B
-    type(Layer), intent(inout)   :: output_layer
-    type(XYTracker), allocatable :: trackers(:)
-    type(Box) :: bboxA
-    type(Layer) :: temp_layer
-    integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-
-    !> we can create the RTree for A and B if needed
-    !> since the SkipList is not re-entrant, we cannot do parallel here (yet)
-    !$komp parallel
-    !$komp single
-    !$komp task
-    call PreprocessLayer( input_layer_A )
-    !$komp end task
-    !$komp task
-    call PreprocessLayer( input_layer_B )
-    !$komp end task
-    !$komp taskwait
-    !$komp end single
-    !$komp end parallel
-
-    !> Step 1
-    !write(*,*) 'Executing Scanline Fracturing of COMPLEMENT LAYER with Skip List...'
-    bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
-    call generate_trackers( input_layer_B%layer_boxes, bboxA, trackers ) !> this does CW ordering of inner contours
-    call scanline_fracture(trackers, temp_layer%layer_boxes)
-    temp_layer%layerState = ior( temp_layer%layerState, LAYER_STATE_HEAL )
-    temp_layer%n_used = size( temp_layer%layer_boxes)
-    call CalculateAND( input_layer_A, temp_layer, output_layer )
-  end subroutine CalculateNOT
-
   subroutine DeleteLayer( input_layer_A )
     type(Layer), intent(inout) :: input_layer_A
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
+    if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
+    if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
     if( allocated( input_layer_A%fileName ) ) deallocate( input_layer_A%fileName )
     input_layer_A%n_used = 0
     input_layer_A%n_alloc = 0
+    input_layer_A%tree%root_index = 0
+    input_layer_A%device_resident = .false.
     input_layer_A%layerState = LAYER_STATE_EVERYTHING
   end subroutine DeleteLayer
 
@@ -1343,33 +1161,45 @@ contains
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
     if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
     if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
-    input_layer_A%tree%root_index = 0
     input_layer_A%n_used = 0
     input_layer_A%n_alloc = 0
+    input_layer_A%tree%root_index = 0
+    input_layer_A%device_resident = .false.
     input_layer_A%layerState = LAYER_STATE_EVERYTHING
   end subroutine ClearLayer
 
-   subroutine CopyLayer( output_layer, input_layer_A )
-     type(Layer), intent(inout) :: output_layer
-     type(Layer), intent(in) :: input_layer_A
-     character(len=*), parameter :: K_COPY_PREFIX = "MTL_COPY_"
-     if( input_layer_A%n_used == 0 ) then
-        call ClearLayer( output_layer )
-        return
-     end if
-     ! Deallocate output arrays first since they might be pre-allocated
-     if( allocated( output_layer%layer_boxes ) ) then
-        deallocate( output_layer%layer_boxes )
-     end if
-     if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )
-     if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
-     output_layer%layer_boxes = input_layer_A%layer_boxes
-     output_layer%n_used = input_layer_A%n_used
-     output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
-     output_layer%layerState = input_layer_A%layerState
-     output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
-     output_layer%tree%root_index = input_layer_A%tree%root_index
-   end subroutine CopyLayer
+  subroutine CopyLayer( output_layer, input_layer_A )
+    type(Layer), intent(inout) :: output_layer
+    type(Layer), intent(in) :: input_layer_A
+    character(len=*), parameter :: K_COPY_PREFIX = "MTL_COPY_"
+    integer(kind=int64) :: n
+    if( input_layer_A%n_used == 0 ) then
+       call ClearLayer( output_layer )
+       return
+    end if
+    n = input_layer_A%n_used
+    if( allocated( output_layer%layer_boxes ) ) deallocate( output_layer%layer_boxes )
+    allocate( output_layer%layer_boxes(n) )
+    output_layer%layer_boxes(1:n) = input_layer_A%layer_boxes(1:n)
+    output_layer%n_used = n
+    output_layer%n_alloc = n
+    output_layer%device_resident = .false.
+    if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )
+    if( allocated( input_layer_A%pnumtable%arr ) ) then
+       allocate( output_layer%pnumtable%arr(size(input_layer_A%pnumtable%arr, kind=int64)) )
+       output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
+    end if
+    output_layer%layerState = input_layer_A%layerState
+    if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
+    if( allocated( input_layer_A%tree%tree_nodes ) ) then
+       allocate( output_layer%tree%tree_nodes(size(input_layer_A%tree%tree_nodes, kind=int64)) )
+       output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
+       output_layer%tree%root_index = input_layer_A%tree%root_index
+    else
+       output_layer%tree%root_index = 0
+    end if
+    !if(allocated(input_layer_A%fileName)) output_layer%fileName = K_COPY_PREFIX//input_layer_A%fileName
+  end subroutine CopyLayer
 
   subroutine DeleteDesign( input_design )
     type(Design), intent(inout) :: input_design
@@ -1396,15 +1226,14 @@ contains
     integer(kind=c_int) :: temp_c_int
     real(kind=real64)   :: temp_real64
     integer             :: temp_int
+    logical             :: temp_logical
 
-    ! 2. Temporaries for Allocatables (Must explicitly be declared allocatable)
+    ! 2. Temporaries for Allocatables (O(1) pointer swap via move_alloc)
     type(Box), allocatable        :: temp_boxes(:)
+    type(RTreeNode), allocatable  :: temp_nodes(:)
+    integer(kind=int64), allocatable :: temp_pnum(:)
     character(len=:), allocatable :: temp_fileName
-
-    ! 3. Temporaries for Nested Derived Types
-    type(LayerTree)      :: temp_tree
-    type(UnionFind)      :: temp_pnumtable
-    type(ConjugateLayer) :: temp_paired_layer
+    type(ConjugateLayer)          :: temp_paired_layer
 
     ! --- Swap Scalars (Standard swap) ---
     temp_int64 = a%n_used;   a%n_used = b%n_used;   b%n_used = temp_int64
@@ -1416,10 +1245,9 @@ contains
     temp_real64 = a%perimeter;      a%perimeter = b%perimeter; b%perimeter = temp_real64
 
     temp_int = a%iunit; a%iunit = b%iunit; b%iunit = temp_int
-
+    temp_logical = a%device_resident; a%device_resident = b%device_resident; b%device_resident = temp_logical
 
     ! --- Swap Allocatables (O(1) Pointer Swap via move_alloc) ---
-    ! move_alloc transfers the allocation status and bounds from arg1 to arg2
     call move_alloc(a%layer_boxes, temp_boxes)
     call move_alloc(b%layer_boxes, a%layer_boxes)
     call move_alloc(temp_boxes,    b%layer_boxes)
@@ -1428,13 +1256,19 @@ contains
        call move_alloc(b%fileName, a%fileName)
        call move_alloc(temp_fileName, b%fileName)
     end if
-    ! --- Swap Nested Derived Types ---
-    temp_tree = a%tree; a%tree = b%tree; b%tree = temp_tree
+    ! --- Swap Tree & UnionFind in O(1) without deep array copy ---
+    temp_int64 = a%tree%root_index; a%tree%root_index = b%tree%root_index; b%tree%root_index = temp_int64
+    call move_alloc(a%tree%tree_nodes, temp_nodes)
+    call move_alloc(b%tree%tree_nodes, a%tree%tree_nodes)
+    call move_alloc(temp_nodes,        b%tree%tree_nodes)
 
-    temp_pnumtable = a%pnumtable; a%pnumtable = b%pnumtable; b%pnumtable = temp_pnumtable
+    call move_alloc(a%pnumtable%arr, temp_pnum)
+    call move_alloc(b%pnumtable%arr, a%pnumtable%arr)
+    call move_alloc(temp_pnum,       b%pnumtable%arr)
 
     temp_paired_layer = a%paired_layer; a%paired_layer = b%paired_layer; b%paired_layer = temp_paired_layer
 
   end subroutine swap_layer
 end module DesignModule
+
 

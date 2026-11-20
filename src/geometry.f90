@@ -47,11 +47,11 @@ module GeometryModule
      integer(int32), allocatable :: X(:), Y(:)
      integer(int32), allocatable :: poly_start(:), poly_end(:)
   end type ShapeCollection
-  ! Auxiliary data structure for the sweep-line
+  ! Auxiliary data structure for the sweep-line (4-byte fields grouped before 1-byte flag)
   type :: Event
-     integer(kind=K_COORDINATE_KIND) :: x, y1, y2
-     integer(kind=int8) :: lap_change ! +1 for left edge, -1 for right edge
-     integer :: owner ! 1 for Shape A, 2 for Shape B     
+     integer(kind=K_COORDINATE_KIND) :: x = 0, y1 = 0, y2 = 0
+     integer(kind=int32)             :: owner = 0      ! 1 for Shape A, 2 for Shape B
+     integer(kind=int8)              :: lap_change = 0 ! +1 for left edge, -1 for right edge
   end type Event
 
 contains
@@ -69,11 +69,12 @@ contains
     is_valid = (this%x1 < this%x2 .and. this%y1 < this%y2)
   end function is_valid
   pure elemental logical function is_square(this)
-    class(Box), intent(in) :: this
-    is_square = (is_valid(this) .and. ( (this%x2 - this%x1) == (this%y2 - this%y1) ) )
+    type(Box), intent(in) :: this
+    is_square = ( (this%x1 < this%x2) .and. (this%y1 < this%y2) .and. &
+                  ((this%x2 - this%x1) == (this%y2 - this%y1)) )
   end function is_square
-  pure logical function MBRValid(this)
-    class(Box), intent(in) :: this
+  pure elemental logical function MBRValid(this)
+    type(Box), intent(in) :: this
     !box is valid if x1 <= x2 and y1 <= y2
     MBRValid = (this%x1 <= this%x2 .and. this%y1 <= this%y2)
   end function MBRValid
@@ -92,9 +93,9 @@ contains
     logical :: is_eq
     is_eq = .not. box_equal( this, other )
   end function box_not_equal  
-  !> Topological functions
+  !> Topological functions (non-polymorphic type(Box) for zero descriptor overhead & vectorization)
   pure elemental function box_not_interact(this, other) result(retval)
-    class(Box), intent(in) :: this, other
+    type(Box), intent(in) :: this, other
     logical :: retval
     retval = ( ( this%x1 > other%x2) .or. ( this%y1 > other%y2) .or. &
          ( this%x2 < other%x1) .or. ( this%y2 < other%y1) )
@@ -102,31 +103,33 @@ contains
   pure function box_interact(this, other) result(retval)
     type(Box), intent(in),value :: this, other
     logical                     :: retval
-    type(Box)              :: tempBox
-    retval = .false.
-    if( box_not_interact(this, other) ) then
+    integer(kind=K_COORDINATE_KIND) :: ix1, iy1, ix2, iy2
+    if( (this%x1 > other%x2) .or. (this%y1 > other%y2) .or. &
+        (this%x2 < other%x1) .or. (this%y2 < other%y1) ) then
        retval = .false.
        return
-    else !> its possible that there is a corner to corner touch
-       tempBox  = box_intersection(this, other)
-       if( tempBox%x1 == tempBox%x2 .and. tempBox%y1 == tempBox%y2 ) then
-          retval = .false. ! point intersection
-       else
-          retval = MBRValid( tempBox )
-       end if
+    end if
+    ix1 = max(this%x1, other%x1)
+    iy1 = max(this%y1, other%y1)
+    ix2 = min(this%x2, other%x2)
+    iy2 = min(this%y2, other%y2)
+    if( ix1 == ix2 .and. iy1 == iy2 ) then
+       retval = .false. ! point intersection
+    else
+       retval = (ix1 <= ix2 .and. iy1 <= iy2)
     end if
   end function box_interact
   pure elemental function box_not_overlap(this, other) result(retval)
-    class(Box), intent(in) :: this, other
+    type(Box), intent(in) :: this, other
     logical :: retval
     retval = ( ( this%x1 >= other%x2) .or. ( this%y1 >= other%y2) .or. &
          ( this%x2 <= other%x1) .or. ( this%y2 <= other%y1) )
   end function box_not_overlap
-  pure function box_overlap(this, other) result(retval)
-    type(Box), intent(in),value :: this, other
-    logical                     :: retval
-    type(Box)              :: tempBox
-    retval = .not. box_not_overlap( this, other )
+  pure elemental function box_overlap(this, other) result(retval)
+    type(Box), intent(in) :: this, other
+    logical               :: retval
+    retval = ( (this%x1 < other%x2) .and. (this%x2 > other%x1) .and. &
+               (this%y1 < other%y2) .and. (this%y2 > other%y1) )
   end function box_overlap
 
   ! Type procedure for union of two boxes
@@ -141,15 +144,18 @@ contains
   end function box_union
   pure function mbr_of_array(arr,n) result(mbr)
     type(Box), intent(in), dimension(:) :: arr
-    integer(kind=8), intent(in) :: n
+    integer(kind=int64), intent(in) :: n
     type(Box)  :: mbr
-    integer(kind=8)    :: i
+    integer(kind=int64) :: i, lim
     call mbr%reset_to_infinity()
-    if( size(arr) == 0 ) then
-       return
-    end if
-    do i = 1,n
-       mbr = mbr + arr(i)
+    lim = min(n, size(arr, kind=int64))
+    if( lim <= 0_int64 ) return
+    mbr = arr(1)
+    do i = 2_int64, lim
+       if (arr(i)%x1 < mbr%x1) mbr%x1 = arr(i)%x1
+       if (arr(i)%y1 < mbr%y1) mbr%y1 = arr(i)%y1
+       if (arr(i)%x2 > mbr%x2) mbr%x2 = arr(i)%x2
+       if (arr(i)%y2 > mbr%y2) mbr%y2 = arr(i)%y2
     end do
   end function mbr_of_array
 
@@ -716,7 +722,7 @@ contains
     ! during the recursive splitting steps.
     allocate(workspace(size(arr)))
     !$omp parallel default(none) shared(arr,workspace) firstprivate(node_capacity)
-    !$omp single nowait
+    !$omp single
     call omt_pack_recursive(arr, 1_int64, int(size(arr),kind=int64), node_capacity, workspace)
     !$omp end single
     !$omp end parallel
@@ -724,7 +730,7 @@ contains
     deallocate(workspace)
   end subroutine omt_pack
   !#define OLD_WORKING_OMT
-  #ifdef OLD_WORKING_OMT
+#ifdef OLD_WORKING_OMT
   ! Recursive Top-Down Partitioning
   recursive subroutine omt_pack_recursive(arr, start_idx, end_idx, node_capacity, workspace)
     type(Box), intent(inout), dimension(:) :: arr
@@ -880,7 +886,7 @@ contains
     end if
 
   end subroutine omt_pack_recursive
-  #endif
+#endif
   ! Helper Subroutine: Computes the cost (Overlap and Area) of a proposed split
   subroutine evaluate_split(arr, start_idx, split_idx, end_idx, overlap, total_area)
     type(Box), intent(in), dimension(:) :: arr
@@ -893,23 +899,23 @@ contains
     integer(kind=int64) :: i
 
     ! Initialize left MBR
-    l_xmin = arr(start_idx)%x1; l_xmax = arr(start_idx)%x2
-    l_ymin = arr(start_idx)%y1; l_ymax = arr(start_idx)%y2
+    l_xmin = int(arr(start_idx)%x1, kind=int64); l_xmax = int(arr(start_idx)%x2, kind=int64)
+    l_ymin = int(arr(start_idx)%y1, kind=int64); l_ymax = int(arr(start_idx)%y2, kind=int64)
     do i = start_idx + 1, split_idx
-       l_xmin = min(l_xmin, arr(i)%x1)
-       l_xmax = max(l_xmax, arr(i)%x2)
-       l_ymin = min(l_ymin, arr(i)%y1)
-       l_ymax = max(l_ymax, arr(i)%y2)
+       l_xmin = min(l_xmin, int(arr(i)%x1, kind=int64))
+       l_xmax = max(l_xmax, int(arr(i)%x2, kind=int64))
+       l_ymin = min(l_ymin, int(arr(i)%y1, kind=int64))
+       l_ymax = max(l_ymax, int(arr(i)%y2, kind=int64))
     end do
 
     ! Initialize right MBR
-    r_xmin = arr(split_idx + 1)%x1; r_xmax = arr(split_idx + 1)%x2
-    r_ymin = arr(split_idx + 1)%y1; r_ymax = arr(split_idx + 1)%y2
+    r_xmin = int(arr(split_idx + 1)%x1, kind=int64); r_xmax = int(arr(split_idx + 1)%x2, kind=int64)
+    r_ymin = int(arr(split_idx + 1)%y1, kind=int64); r_ymax = int(arr(split_idx + 1)%y2, kind=int64)
     do i = split_idx + 2, end_idx
-       r_xmin = min(r_xmin, arr(i)%x1)
-       r_xmax = max(r_xmax, arr(i)%x2)
-       r_ymin = min(r_ymin, arr(i)%y1)
-       r_ymax = max(r_ymax, arr(i)%y2)
+       r_xmin = min(r_xmin, int(arr(i)%x1, kind=int64))
+       r_xmax = max(r_xmax, int(arr(i)%x2, kind=int64))
+       r_ymin = min(r_ymin, int(arr(i)%y1, kind=int64))
+       r_ymax = max(r_ymax, int(arr(i)%y2, kind=int64))
     end do
 
     ! Compute total area of both bounding boxes
@@ -917,8 +923,8 @@ contains
          (r_xmax - r_xmin) * (r_ymax - r_ymin)
 
     ! Compute physical overlap area
-    over_x = max(0, min(l_xmax, r_xmax) - max(l_xmin, r_xmin))
-    over_y = max(0, min(l_ymax, r_ymax) - max(l_ymin, r_ymin))
+    over_x = max(0_int64, min(l_xmax, r_xmax) - max(l_xmin, r_xmin))
+    over_y = max(0_int64, min(l_ymax, r_ymax) - max(l_ymin, r_ymin))
     overlap = over_x * over_y
 
   end subroutine evaluate_split
@@ -928,7 +934,7 @@ contains
     type(Box), intent(in) :: boxes(:)
     integer(kind=real64) :: area
 
-    integer :: n, num_events, num_y, i, j
+    integer :: n, num_y, i, j
     type(Event), allocatable :: events(:)
     integer(kind=K_COORDINATE_KIND), allocatable :: y_vals(:), unique_y(:)
     integer, allocatable :: lap(:)

@@ -27,7 +27,8 @@ module SnappyCompressionModule
        integer(c_size_t), intent(inout) :: output_length
      end subroutine c_compress_bytes
 
-     function c_get_uncompressed_length(compressed_data, compressed_length, result_bytes) bind(C, name="snappy_get_uncompressed_length")
+     function c_get_uncompressed_length(compressed_data, compressed_length, result_bytes) &
+          bind(C, name="snappy_get_uncompressed_length")
        import :: c_char, c_size_t, c_bool
        character(kind=c_char), intent(in) :: compressed_data(*)
        integer(c_size_t), value :: compressed_length
