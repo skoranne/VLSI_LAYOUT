@@ -3,8 +3,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SRC="$ROOT/src"
 EXE="$SRC/MAGPARSER.exe"
-export DYLD_LIBRARY_PATH=/opt/intel/oneapi/intelpython/python3.9/envs/2022.2.1/lib:/usr/local/opt/zstd/lib:/opt/intel/oneapi/compiler/2022.2.1/mac/compiler/lib:/usr/lib
-export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$(sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-/opt/intel/oneapi/intelpython/python3.9/envs/2022.2.1/lib:/usr/local/opt/zstd/lib:/opt/intel/oneapi/compiler/2022.2.1/mac/compiler/lib:/usr/lib}"
+fi
+detect_ncpu() {
+  sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4
+}
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$(detect_ncpu)}"
 CTR_DIR="$SRC/topo_regressions/ctrs_working"
 pass=0; fail=0; total=0
 start=$(date +%s)

@@ -17,6 +17,7 @@ submodule (DesignModule) DiskDesignImplModule
   use KLDataModule
   use BoxCodecModule
   use Utilities
+  use ProfilerModule, only: get_cpu_time, RecordTime
   implicit none
 
   !> Disk based OOC (out of code) loading system
@@ -36,24 +37,40 @@ contains
        return
     end if
     if( NeedsSorting( input_layer ) ) then
-       num_squares = count( is_square( input_layer%layer_boxes ) )
-       if( num_squares*1.0_real64 / (input_layer%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
-          dominated_by_squares = .true.
-       end if
-       if( dominated_by_squares ) then       
+       block
+         type(Box), allocatable :: sort_boxes(:)
+         integer(kind=int64) :: saved_n_alloc
+         saved_n_alloc = input_layer%n_alloc
+         ! Sort only used boxes to avoid corrupting tail slots
+         allocate(sort_boxes(input_layer%n_used))
+         sort_boxes = input_layer%layer_boxes(1:input_layer%n_used)
+         num_squares = count( is_square( sort_boxes ) )
+         if( num_squares*1.0_real64 / (input_layer%n_used*1.0_real64) > K_SQUARE_DOMINATION_THRESHOLD ) then
+            dominated_by_squares = .true.
+         end if
+         if( dominated_by_squares ) then       
 #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
-         call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
+           ! keep original array for CUDA path (expects full array + n_used)
+           deallocate(sort_boxes)
 #else
-         call MortonSort( input_layer%layer_boxes )
+           call MortonSort( sort_boxes )
+           input_layer%layer_boxes(1:input_layer%n_used) = sort_boxes
+           deallocate(sort_boxes)
 #endif
-       else
+         else
+#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+           deallocate(sort_boxes)
+#else
+           call omt_pack( sort_boxes , K_LEAF_CAPACITY )
+           input_layer%layer_boxes(1:input_layer%n_used) = sort_boxes
+           deallocate(sort_boxes)
+#endif         
+         end if
 #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
          call SortBoxesDirect( input_layer%layer_boxes, int( input_layer%n_used, kind=int64 ) )
-#else
-         call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
-#endif         
-      end if
-      input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
+#endif
+       end block
+       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     end if
     total_nodes = CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY )
     allocate( input_layer%tree%tree_nodes( total_nodes ) )

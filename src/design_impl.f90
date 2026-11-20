@@ -16,6 +16,7 @@ submodule (DesignModule) DesignImplModule
    use PNumMergeModule
    use KLDataModule
    use BoostPolygonAPIModule
+   use ProfilerModule, only: get_cpu_time, RecordTime
    use omp_lib
    implicit none
 
@@ -50,7 +51,7 @@ contains
        return
     end if
     interaction_count_gpu = 0
-    call ComputeInteractionsGPU( input_layer%tree%tree_nodes,size(input_layer%tree%tree_nodes,kind=int64),&
+    call ComputeInteractionsCPU( input_layer%tree%tree_nodes, int(size(input_layer%tree%tree_nodes,kind=int64)),&
          input_layer%layer_boxes, input_layer%n_used, input_layer%tree%root_index, interaction_count_gpu)
     
     retval = interaction_count_gpu == 0
