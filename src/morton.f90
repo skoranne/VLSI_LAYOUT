@@ -35,12 +35,14 @@ contains
     allocate(temp_boxes(size(boxes)))
     ! 3. The "Gather" step using vector subscripts
     !temp_boxes = boxes(sorted_aux(:)%boxId)
-    n = size(boxes)
-    do i = 1, n
-       ! sorted_aux(i)%boxId is the original 1‑based index of the box that
+    n = size(boxes, kind=int64)
+    !$omp parallel do default(none) shared(temp_boxes, boxes, sorted_aux, n) private(i)
+    do i = 1_int64, n
+       ! sorted_aux(i)%boxId is the original 1-based index of the box that
        ! must appear at position i in the sorted order.
        temp_boxes(i) = boxes( sorted_aux(i)%boxId )
     end do
+    !$omp end parallel do
     ! 4. The "Move" step (transfers allocation status and data instantly)
     call move_alloc(from=temp_boxes, to=boxes)
   end subroutine MortonSort
@@ -72,19 +74,22 @@ contains
     type(Box),               intent(in)  :: boxes(:)
     type(BoxWithMortonCode), intent(out) :: aux(:)
 
-    integer :: i
+    integer :: i, n_boxes
     integer(kind=int32) :: cx, cy               ! centre coordinates
     integer(kind=int64) :: mc
 
-    do i = 1, size(boxes)
+    n_boxes = size(boxes)
+    !$omp parallel do default(none) shared(boxes, aux, n_boxes) private(i, cx, cy, mc)
+    do i = 1, n_boxes
        ! centre of the rectangle (integer division, truncates toward zero)
        cx = (boxes(i)%x1 + boxes(i)%x2) / 2
        cy = (boxes(i)%y1 + boxes(i)%y2) / 2
 
-       mc = morton2D(cx, cy)                  ! 64‑bit Morton code
+       mc = morton2D(cx, cy)                  ! 64-bit Morton code
        aux(i)%mortonCode = mc
        aux(i)%boxId      = i
     end do
+    !$omp end parallel do
   end subroutine build_aux_array
 
      !--------------------------------------------------------------------

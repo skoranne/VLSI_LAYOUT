@@ -103,41 +103,70 @@ contains
       type(Layer), intent(in)    :: input_layer
       type(Layer), intent(inout) :: output_layer
       type(Box),   intent(in)    :: input_box
-      type(Box)                  :: tempBox
-      integer(kind=int64) :: K_INIT_BOX_COUNT = 1024
-      integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
-      integer(kind=int64) :: number_leaves, num_boxes
-      integer(kind=int64) :: j, k
+      type(Box)                  :: tempBox, boxK
+      type(RTreeNode)            :: currNode, childNode
+      integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 1024
+      integer(kind=int64), parameter :: K_DFS_STACK = 256
+      integer(kind=int64) :: dfs_stack(K_DFS_STACK)
+      integer(kind=int64) :: sp, curr_idx, child_idx, c_end, root_idx, num_boxes, k
       num_boxes = input_layer%n_used
       if( num_boxes == 0 ) then
          call ClearLayer( output_layer )
          return
       end if
-      allocate(  output_layer%layer_boxes( K_INIT_BOX_COUNT ) )
-      output_layer%n_alloc = K_INIT_BOX_COUNT
       if( NeedsRTree( input_layer ) ) error stop "ERROR: Construct RTRee before this step"
-      number_leaves = 0
-      leafboxes = 0
-      call SearchTree( input_layer%tree%tree_nodes, input_layer%tree%root_index, &
-         input_box, leafboxes, number_leaves )
-      !write(*,'(A,4I8,A,I8)') 'Input Box = ', input_box, ' NL ', number_leaves
-      !write(*,'(A,4I8)') 'Input Tree ', input_layer%tree%tree_nodes( input_layer%tree%root_index )%mbr
-      if( number_leaves == 0 ) then
-         !> highly unlikely that a non-empty layer has 0 intersection in a FRAME, but its possible
+      if( allocated( output_layer%layer_boxes ) ) deallocate( output_layer%layer_boxes )
+      allocate( output_layer%layer_boxes( K_INIT_BOX_COUNT ) )
+      output_layer%n_alloc = K_INIT_BOX_COUNT
+      output_layer%n_used  = 0
+
+      if( size(input_layer%tree%tree_nodes) == 0 ) then
+         do k = 1, num_boxes
+            boxK = input_layer%layer_boxes(k)
+            if( box_interact( input_box, boxK ) ) then
+               tempBox = input_box * boxK
+               if( tempBox%is_valid() ) call push_box( tempBox, output_layer )
+            end if
+         end do
+      else
+         root_idx = input_layer%tree%root_index
+         childNode = input_layer%tree%tree_nodes(root_idx)
+         if( input_box%x1 <= childNode%mbr%x2 .and. input_box%x2 >= childNode%mbr%x1 .and. &
+             input_box%y1 <= childNode%mbr%y2 .and. input_box%y2 >= childNode%mbr%y1 ) then
+            sp = 1
+            dfs_stack(1) = root_idx
+            do while( sp > 0 )
+               curr_idx = dfs_stack(sp)
+               sp = sp - 1
+               currNode = input_layer%tree%tree_nodes(curr_idx)
+               if( currNode%IsLeaf ) then
+                  c_end = min( currNode%ChildStart + int(currNode%NumChildren, kind=int64) - 1_int64, num_boxes )
+                  do k = currNode%ChildStart, c_end
+                     boxK = input_layer%layer_boxes(k)
+                     if( box_interact( input_box, boxK ) ) then
+                        tempBox = input_box * boxK
+                        if( tempBox%is_valid() ) call push_box( tempBox, output_layer )
+                     end if
+                  end do
+               else
+                  c_end = currNode%ChildStart + int(currNode%NumChildren, kind=int64) - 1_int64
+                  do child_idx = currNode%ChildStart, c_end
+                     childNode = input_layer%tree%tree_nodes(child_idx)
+                     if( input_box%x1 <= childNode%mbr%x2 .and. input_box%x2 >= childNode%mbr%x1 .and. &
+                         input_box%y1 <= childNode%mbr%y2 .and. input_box%y2 >= childNode%mbr%y1 ) then
+                        if( sp < K_DFS_STACK ) then
+                           sp = sp + 1
+                           dfs_stack(sp) = child_idx
+                        end if
+                     end if
+                  end do
+               end if
+            end do
+         end if
+      end if
+      if( output_layer%n_used == 0 ) then
          call ClearLayer( output_layer )
          return
-         !error stop "ERROR: NUMBER_LEAVES == 0, while layer not empty"
-      end if
-      if( number_leaves > 0 ) then
-         outer: do j=1,number_leaves
-            over_leaves: do k=leafboxes(j),min(leafboxes(j)+K_LEAF_CAPACITY-1, num_boxes)
-               if( box_interact( input_box, input_layer%layer_boxes(k)) ) then
-                  tempBox = input_box * input_layer%layer_boxes(k)
-                  if( .not. tempBox%is_valid() ) cycle
-                  call push_box( tempBox, output_layer )
-               end if
-            end do over_leaves
-         end do outer
       end if
       !> we can choose not to perform some operations later
       call FinalizeLayer( output_layer )
@@ -1139,6 +1168,7 @@ contains
                !$omp end critical(print_lock)
             end if
             if( allocated( AinGrid(rows,cols)%layer_boxes )) call ClearLayer( AinGrid( rows, cols ) )
+            if( allocated( BinGrid(rows,cols)%layer_boxes )) call ClearLayer( BinGrid( rows, cols ) )
             !$omp end task
          end do
       end do

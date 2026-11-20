@@ -205,15 +205,23 @@ module BoxCodecModule
   public :: CompressedChunk, CompressedStream
   public :: CompressBoxesToStream, DecompressStreamToBoxes
   public :: COMPRESSION_METHOD_NONE, COMPRESSION_METHOD_SNAPPY, COMPRESSION_METHOD_ZLIB, COMPRESSION_METHOD_ZSTD
+  ! L1-resident open-addressed hash table size (power of 2) for O(1) W/H lookup
+  integer(int32), parameter :: K_CODEC_HASH_SIZE = 4096_int32
+  integer(int32), parameter :: K_CODEC_HASH_MASK = 4095_int32
+
   type :: BoxCodec
      integer(K_COORDINATE_KIND), allocatable :: unique_w(:)
      integer(K_COORDINATE_KIND), allocatable :: unique_h(:)
+     integer(int32), allocatable :: w_hash(:)
+     integer(int32), allocatable :: h_hash(:)
      integer(int64) :: num_w = 0
      integer(int64) :: num_h = 0
      integer(int64) :: current_w_index = 0
      integer(int64) :: current_h_index = 0
      integer(K_COORDINATE_KIND) :: current_x = 0
      integer(K_COORDINATE_KIND) :: current_y = 0
+     logical :: w_hash_valid = .true.
+     logical :: h_hash_valid = .true.
    contains
      procedure :: init => codec_init
      procedure :: get_w_index => codec_get_w_index
@@ -264,46 +272,86 @@ contains
     ! This makes calling init() on subsequent chunks extremely fast.
     if (.not. allocated(this%unique_w)) allocate(this%unique_w(cap))
     if (.not. allocated(this%unique_h)) allocate(this%unique_h(cap))
+    if (.not. allocated(this%w_hash)) allocate(this%w_hash(0:K_CODEC_HASH_MASK))
+    if (.not. allocated(this%h_hash)) allocate(this%h_hash(0:K_CODEC_HASH_MASK))
 
     ! Reset the state variables so the new chunk starts fresh
-    this%unique_w = 0
-    this%unique_h = 0    
+    this%w_hash = 0_int32
+    this%h_hash = 0_int32
+    this%w_hash_valid = .true.
+    this%h_hash_valid = .true.
     this%num_w = 0
     this%num_h = 0
     this%current_w_index = 0
     this%current_h_index = 0
 
-    ! Don't forget to reset the anchor states we added for the delta optimization!
+    ! Reset the anchor states for the delta optimization
     this%current_x = 0
     this%current_y = 0
   end subroutine codec_init
 
-  ! Because quantization makes unique W/H sparse, a linear search over a
-  ! tiny array is often faster than hashing due to L1 cache proximity.
+  pure function codec_hash_slot(val) result(slot)
+    integer(K_COORDINATE_KIND), intent(in) :: val
+    integer(int32) :: slot
+    integer(int64) :: h
+    h = int(val, int64) * 2654435761_int64
+    h = ieor(h, shiftr(h, 16))
+    slot = int(iand(h, int(K_CODEC_HASH_MASK, int64)), int32)
+  end function codec_hash_slot
+
+  ! O(1) open-addressed L1 hash lookup (falls back to linear scan only if >2048 unique values)
   function codec_get_w_index(this, w) result(idx)
     class(BoxCodec), intent(in) :: this
     integer(K_COORDINATE_KIND), intent(in) :: w
     integer(int64) :: idx, i
+    integer(int32) :: slot, entry_idx
     idx = -1_int64
-    do i = 1, this%num_w
-       if (this%unique_w(i) == w) then
-          idx = i
-          return
-       end if
-    end do
+    if (this%w_hash_valid .and. allocated(this%w_hash)) then
+       slot = codec_hash_slot(w)
+       do
+          entry_idx = this%w_hash(slot)
+          if (entry_idx == 0_int32) return
+          if (this%unique_w(entry_idx) == w) then
+             idx = int(entry_idx, int64)
+             return
+          end if
+          slot = iand(slot + 1_int32, K_CODEC_HASH_MASK)
+       end do
+    else
+       do i = 1, this%num_w
+          if (this%unique_w(i) == w) then
+             idx = i
+             return
+          end if
+       end do
+    end if
   end function codec_get_w_index
 
   function codec_get_h_index(this, h) result(idx)
     class(BoxCodec), intent(in) :: this
     integer(K_COORDINATE_KIND), intent(in) :: h
     integer(int64) :: idx, i
+    integer(int32) :: slot, entry_idx
     idx = -1_int64
-    do i = 1, this%num_h
-       if (this%unique_h(i) == h) then
-          idx = i
-          return
-       end if
-    end do
+    if (this%h_hash_valid .and. allocated(this%h_hash)) then
+       slot = codec_hash_slot(h)
+       do
+          entry_idx = this%h_hash(slot)
+          if (entry_idx == 0_int32) return
+          if (this%unique_h(entry_idx) == h) then
+             idx = int(entry_idx, int64)
+             return
+          end if
+          slot = iand(slot + 1_int32, K_CODEC_HASH_MASK)
+       end do
+    else
+       do i = 1, this%num_h
+          if (this%unique_h(i) == h) then
+             idx = i
+             return
+          end if
+       end do
+    end if
   end function codec_get_h_index
 
   subroutine codec_add_w(this, w, idx)
@@ -311,6 +359,7 @@ contains
     integer(K_COORDINATE_KIND), intent(in) :: w
     integer(int64), intent(out) :: idx
     integer(K_COORDINATE_KIND), allocatable :: temp(:)
+    integer(int32) :: slot
 
     if (this%num_w >= size(this%unique_w, kind=int64)) then
        ! Reallocate double capacity
@@ -321,6 +370,17 @@ contains
     this%num_w = this%num_w + 1_int64
     this%unique_w(this%num_w) = w
     idx = this%num_w
+    if (this%w_hash_valid .and. allocated(this%w_hash)) then
+       if (this%num_w > int(K_CODEC_HASH_SIZE / 2, int64)) then
+          this%w_hash_valid = .false.
+       else
+          slot = codec_hash_slot(w)
+          do while (this%w_hash(slot) /= 0_int32)
+             slot = iand(slot + 1_int32, K_CODEC_HASH_MASK)
+          end do
+          this%w_hash(slot) = int(idx, int32)
+       end if
+    end if
   end subroutine codec_add_w
 
   subroutine codec_add_h(this, h, idx)
@@ -328,6 +388,7 @@ contains
     integer(K_COORDINATE_KIND), intent(in) :: h
     integer(int64), intent(out) :: idx
     integer(K_COORDINATE_KIND), allocatable :: temp(:)
+    integer(int32) :: slot
 
     if (this%num_h >= size(this%unique_h, kind=int64)) then
        allocate(temp(size(this%unique_h, kind=int64) * 2))
@@ -337,6 +398,17 @@ contains
     this%num_h = this%num_h + 1_int64
     this%unique_h(this%num_h) = h
     idx = this%num_h
+    if (this%h_hash_valid .and. allocated(this%h_hash)) then
+       if (this%num_h > int(K_CODEC_HASH_SIZE / 2, int64)) then
+          this%h_hash_valid = .false.
+       else
+          slot = codec_hash_slot(h)
+          do while (this%h_hash(slot) /= 0_int32)
+             slot = iand(slot + 1_int32, K_CODEC_HASH_MASK)
+          end do
+          this%h_hash(slot) = int(idx, int32)
+       end if
+    end if
   end subroutine codec_add_h
 
   pure function zigzag_encode(val) result(res)
@@ -749,7 +821,7 @@ contains
        allocate(stream%chunks(i)%data(actual_comp_len))
 
        ! Slice copy from the thread buffer into the permanent stream structure
-       stream%chunks(i)%data = thread_comp_buf(1:actual_comp_len)
+       stream%chunks(i)%data(1:actual_comp_len) = thread_comp_buf(1:actual_comp_len)
 
     end do
     !$omp end do
@@ -759,6 +831,8 @@ contains
     deallocate(thread_comp_buf)
     if (allocated(local_codec%unique_w)) deallocate(local_codec%unique_w)
     if (allocated(local_codec%unique_h)) deallocate(local_codec%unique_h)
+    if (allocated(local_codec%w_hash)) deallocate(local_codec%w_hash)
+    if (allocated(local_codec%h_hash)) deallocate(local_codec%h_hash)
 
     !$omp end parallel
   end subroutine CompressBoxesToStream
@@ -772,21 +846,14 @@ contains
 
     integer(int64) :: i, current_start, current_end, max_raw_size
 
-    ! Thread-local variables
+    ! Thread-local variables (zero-copy directly into boxes slice; no temp_boxes needed)
     integer(int8), allocatable :: uncompressed_bytes(:)
-    type(Box), allocatable :: temp_boxes(:)
     integer :: status
     integer :: compression_method
-    ! ADDED: The thread-local codec state
-    type(BoxCodec) :: local_codec 
+    type(BoxCodec) :: local_codec
     compression_method = stream%compression_method
     allocate(boxes(stream%total_boxes))
 
-    ! ---------------------------------------------------------
-    ! PRE-COMPUTE MAXIMUM BUFFER SIZE
-    ! Find the largest uncompressed chunk size to guarantee our 
-    ! thread-local buffers are always large enough.
-    ! ---------------------------------------------------------
     max_raw_size = 0
     do i = 1_int64, stream%num_chunks
        if (stream%chunks(i)%raw_byte_size > max_raw_size) then
@@ -795,17 +862,10 @@ contains
     end do
 
     !$omp parallel default(none) &
-    !$omp shared(stream, boxes, max_raw_size,compression_method) &
-    !$omp private(i, current_start, current_end, uncompressed_bytes, temp_boxes, status, local_codec)
-    ! Note: local_codec MUST be in the private() list above ^
+    !$omp shared(stream, boxes, max_raw_size, compression_method) &
+    !$omp private(i, current_start, current_end, uncompressed_bytes, status, local_codec)
 
-    ! ---------------------------------------------------------
-    ! THREAD-LOCAL ALLOCATION (Executes exactly once per thread)
-    ! ---------------------------------------------------------
-    allocate(temp_boxes(BOXES_PER_CHUNK))
-    allocate(uncompressed_bytes(max_raw_size)) 
-
-    ! ADDED: Initialize the dictionary exactly ONCE per thread
+    allocate(uncompressed_bytes(max_raw_size))
     call local_codec%init()
 
     !$omp do
@@ -860,31 +920,23 @@ contains
           end select
           
 
-       ! 2. Step 2 Decompression: Bytes to Geometry
-       ! ADDED: Passing local_codec as the 5th argument
+       ! 2. Step 2 Decompression: Bytes directly into final boxes slice (zero-copy)
        call DecompressBoxesUsingCodec( &
             uncompressed_bytes(1 : stream%chunks(i)%raw_byte_size), &
             stream%chunks(i)%raw_byte_size, &
             stream%chunks(i)%num_boxes, &
-            temp_boxes, &
-            local_codec &    
+            boxes(current_start:current_end), &
+            local_codec &
             )
-
-       ! 3. Copy out to the globally shared array
-       boxes(current_start:current_end) = temp_boxes(1:stream%chunks(i)%num_boxes)
 
     end do
     !$omp end do
 
-    ! ---------------------------------------------------------
-    ! THREAD-LOCAL DEALLOCATION (Executes exactly once per thread)
-    ! ---------------------------------------------------------
     deallocate(uncompressed_bytes)
-    deallocate(temp_boxes)
-
-    ! ADDED: Safely clean up the thread's dictionary memory
     if (allocated(local_codec%unique_w)) deallocate(local_codec%unique_w)
     if (allocated(local_codec%unique_h)) deallocate(local_codec%unique_h)
+    if (allocated(local_codec%w_hash)) deallocate(local_codec%w_hash)
+    if (allocated(local_codec%h_hash)) deallocate(local_codec%h_hash)
 
     !$omp end parallel
 
