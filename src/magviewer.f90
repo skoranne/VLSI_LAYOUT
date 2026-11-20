@@ -1,22 +1,22 @@
-! File    : magparser_display.f90
+! File    : magviewer.f90
 ! Author  : Sandeep Koranne (C) 2026
-! Purpose : OpenGL display of MAGIC VLSI rectangles
+! Purpose : Idiomatic OpenGL/GLFW viewer for Magic, GDSII, OASIS, KLBIN, and SNAP layouts
+
 module DrawUsingOpenGL
+  use, intrinsic :: iso_fortran_env, only: int32, int64, real64
+  use, intrinsic :: iso_c_binding
   use CommonModule
   use GeometryModule
-  use hash_mod
   use DesignModule
-  use MagicVLSILayoutParser
   use RTreeBuilder
-  use MortonSortModule
-  use KLDataModule
   use glf90w
-  use iso_fortran_env, only: int32, int64, real64, c_funloc
-  use iso_c_binding
   implicit none
+  private
+
   integer, parameter :: K_MAX_OPENGL_CAPACITY = 500000
+  integer, parameter :: K_DFS_STACK_SIZE      = 256
+
   interface
-     ! --- OpenGL Core Functions ---
      subroutine glClear(mask) bind(C, name="glClear")
        import :: c_int
        integer(c_int), value :: mask
@@ -39,67 +39,31 @@ module DrawUsingOpenGL
        import :: c_float
        real(c_float), value :: red, green, blue
      end subroutine glColor3f
-     
+
      subroutine glColor4f(red, green, blue, alpha) bind(C, name="glColor4f")
        import :: c_float
        real(c_float), value :: red, green, blue, alpha
      end subroutine glColor4f
-     
+
      subroutine glBlendFunc(sfactor, dfactor) bind(C, name="glBlendFunc")
        import :: c_int
        integer(c_int), value :: sfactor, dfactor
      end subroutine glBlendFunc
-     
+
      subroutine glVertex2f(x, y) bind(C, name="glVertex2f")
        import :: c_float
        real(c_float), value :: x, y
      end subroutine glVertex2f
 
-     ! --- glShadeModel(GLenum mode) ---
-     subroutine glShadeModel(mode) bind(C, name="glShadeModel")
-       import :: c_int
-       integer(c_int), value :: mode
-     end subroutine glShadeModel
-
-     ! --- glNormal3f(GLfloat nx, GLfloat ny, GLfloat nz) ---
-     subroutine glNormal3f(nx, ny, nz) bind(C, name="glNormal3f")
-       import :: c_float
-       real(c_float), value :: nx, ny, nz
-     end subroutine glNormal3f
-
-     ! --- glEnable(GLenum cap) ---
      subroutine glEnable(cap) bind(C, name="glEnable")
        import :: c_int
        integer(c_int), value :: cap
      end subroutine glEnable
 
-     ! --- glDisable(GLenum cap) ---
      subroutine glDisable(cap) bind(C, name="glDisable")
        import :: c_int
        integer(c_int), value :: cap
      end subroutine glDisable
-
-     ! --- glLightfv(GLenum light, GLenum pname, const GLfloat *params) ---
-     ! Note: params is passed by reference (no VALUE attribute) because it is a C pointer/array
-     subroutine glLightfv(light, pname, params) bind(C, name="glLightfv")
-       import :: c_int, c_float
-       integer(c_int), value :: light, pname
-       real(c_float), intent(in) :: params(*)
-     end subroutine glLightfv
-
-     ! --- glMaterialfv(GLenum face, GLenum pname, const GLfloat *params) ---
-     subroutine glMaterialfv(face, pname, params) bind(C, name="glMaterialfv")
-       import :: c_int, c_float
-       integer(c_int), value :: face, pname
-       real(c_float), intent(in) :: params(*)
-     end subroutine glMaterialfv
-
-     ! --- glMaterialf(GLenum face, GLenum pname, GLfloat param) ---
-     subroutine glMaterialf(face, pname, param) bind(C, name="glMaterialf")
-       import :: c_int, c_float
-       integer(c_int), value :: face, pname
-       real(c_float), value :: param
-     end subroutine glMaterialf
 
      subroutine glViewport(x, y, width, height) bind(C, name="glViewport")
        import :: c_int
@@ -135,1349 +99,891 @@ module DrawUsingOpenGL
        type(c_ptr), value :: pointer
      end subroutine glVertexPointer
 
-     ! Overloaded variation for multi-element array drawing
      subroutine glDrawArrays(mode, first, count) bind(C, name="glDrawArrays")
        import :: c_int
        integer(c_int), value :: mode, first, count
      end subroutine glDrawArrays
+
      subroutine glPolygonMode(face, mode) bind(C, name="glPolygonMode")
        import :: c_int
        integer(c_int), value :: face, mode
      end subroutine glPolygonMode
-
-     ! Optional: If you want to make the lines thicker
-     subroutine glLineWidth(width) bind(C, name="glLineWidth")
-       import :: c_float
-       real(c_float), value :: width
-     end subroutine glLineWidth
-     ! Add this to your module (must be a BIND(C) procedure)
-     subroutine scroll_callback(window, xoffset, yoffset) bind(C)
-       import :: c_ptr, c_double
-       type(c_ptr), value :: window
-       real(c_double), value :: xoffset, yoffset
-     end subroutine scroll_callback
   end interface
-  
-  ! OpenGL Constants
-  integer(c_int), parameter :: GL_COLOR_BUFFER_BIT = z'00004000'
-  integer(c_int), parameter :: GL_QUADS            = z'00000007'
-  integer(c_int), parameter :: GL_FLAT = z'1D00'
-  integer(c_int), parameter :: GL_LIGHTING   = z'0B50'
-  integer(c_int), parameter :: GL_LIGHT0     = z'4000'
-  integer(c_int), parameter :: GL_POSITION   = z'1203'
-  integer(c_int), parameter :: GL_DIFFUSE    = z'1201'
-  integer(c_int), parameter :: GL_COLOR_MATERIAL   = z'0B57'
-  integer(c_int), parameter :: GL_FRONT          = z'0404'
-  integer(c_int), parameter :: GL_AMBIENT        = z'1200'
-  integer(c_int), parameter :: GL_SPECULAR       = z'1202'
-  integer(c_int), parameter :: GL_SHININESS      = z'1204'
-  integer(c_int), parameter :: GL_AMBIENT_AND_DIFFUSE = z'1602'
-  integer(c_int), parameter :: GL_PROJECTION = z'1701'
-  integer(c_int), parameter :: GL_MODELVIEW  = z'1700'
-  integer(c_int), parameter :: GL_VERTEX_ARRAY = z'8074'
-  ! Blending Constants
-  integer(c_int), parameter :: GL_BLEND               = z'0BE2'
-  integer(c_int), parameter :: GL_SRC_ALPHA           = z'0302'
-  integer(c_int), parameter :: GL_ONE_MINUS_SRC_ALPHA = z'0303'
-  integer(c_int), parameter :: GL_DEPTH_TEST = z'0B71'  
-  ! Replace your GL_INT line with these:
-  integer(c_int), parameter :: GL_SHORT = z'1402'
-  integer(c_int), parameter :: GL_INT   = z'1404'
-  integer(c_int), parameter :: GL_FLOAT = z'1406'
-  integer(c_int), parameter :: GL_FRONT_AND_BACK = z'0408'
-  integer(c_int), parameter :: GL_LINE           = z'1B01'
-  integer(c_int), parameter :: GL_FILL           = z'1B02'
 
-  ! A generic 2D coordinate (can be used for Screen pixels OR World coordinates)
+  ! OpenGL constants
+  integer(c_int), parameter :: GL_COLOR_BUFFER_BIT    = int(z'00004000', c_int)
+  integer(c_int), parameter :: GL_QUADS               = int(z'00000007', c_int)
+  integer(c_int), parameter :: GL_PROJECTION          = int(z'1701', c_int)
+  integer(c_int), parameter :: GL_MODELVIEW           = int(z'1700', c_int)
+  integer(c_int), parameter :: GL_VERTEX_ARRAY        = int(z'8074', c_int)
+  integer(c_int), parameter :: GL_BLEND               = int(z'0BE2', c_int)
+  integer(c_int), parameter :: GL_SRC_ALPHA           = int(z'0302', c_int)
+  integer(c_int), parameter :: GL_ONE_MINUS_SRC_ALPHA = int(z'0303', c_int)
+  integer(c_int), parameter :: GL_DEPTH_TEST          = int(z'0B71', c_int)
+  integer(c_int), parameter :: GL_INT                 = int(z'1404', c_int)
+  integer(c_int), parameter :: GL_FRONT_AND_BACK      = int(z'0408', c_int)
+  integer(c_int), parameter :: GL_LINE                = int(z'1B01', c_int)
+  integer(c_int), parameter :: GL_FILL                = int(z'1B02', c_int)
+
+  ! GLFW key and mouse constants
+  integer(c_int), parameter :: GLFW_PRESS             = 1_c_int
+  integer(c_int), parameter :: GLFW_MOUSE_BUTTON_LEFT = 0_c_int
+  integer(c_int), parameter :: GLFW_KEY_MINUS         = 45_c_int
+  integer(c_int), parameter :: GLFW_KEY_SLASH         = 47_c_int
+  integer(c_int), parameter :: GLFW_KEY_EQUAL         = 61_c_int
+  integer(c_int), parameter :: GLFW_KEY_A             = 65_c_int
+  integer(c_int), parameter :: GLFW_KEY_R             = 82_c_int
+  integer(c_int), parameter :: GLFW_KEY_S             = 83_c_int
+  integer(c_int), parameter :: GLFW_KEY_T             = 84_c_int
+  integer(c_int), parameter :: GLFW_KEY_X             = 88_c_int
+  integer(c_int), parameter :: GLFW_KEY_Z             = 90_c_int
+  integer(c_int), parameter :: GLFW_KEY_ESCAPE        = 256_c_int
+  integer(c_int), parameter :: GLFW_KEY_RIGHT         = 262_c_int
+  integer(c_int), parameter :: GLFW_KEY_LEFT          = 263_c_int
+  integer(c_int), parameter :: GLFW_KEY_DOWN          = 264_c_int
+  integer(c_int), parameter :: GLFW_KEY_UP            = 265_c_int
+  integer(c_int), parameter :: GLFW_KEY_LEFT_CONTROL  = 341_c_int
+  integer(c_int), parameter :: GLFW_KEY_RIGHT_CONTROL = 345_c_int
+
   type :: Point2D
-     real(c_double) :: x
-     real(c_double) :: y
+     real(c_double) :: x = 0.0_c_double
+     real(c_double) :: y = 0.0_c_double
   end type Point2D
 
-  ! Holds all the data about our current view and screen dimensions
   type :: CameraState
-     real(c_double) :: win_w, win_h
-     real(c_double) :: left, right, bottom, top
+     real(c_double) :: win_w  = 1.0_c_double
+     real(c_double) :: win_h  = 1.0_c_double
+     real(c_double) :: pan_x  = 0.0_c_double
+     real(c_double) :: pan_y  = 0.0_c_double
+     real(c_double) :: zoom   = 1.0_c_double
+     real(c_double) :: left   = 0.0_c_double
+     real(c_double) :: right  = 1.0_c_double
+     real(c_double) :: bottom = 0.0_c_double
+     real(c_double) :: top    = 1.0_c_double
   end type CameraState
 
-  !> We need to create a type which contains the Layer and other OpenGL info
+  type :: InputState
+     logical :: r_was_down     = .false.
+     logical :: s_was_down     = .false.
+     logical :: t_was_down     = .false.
+     logical :: slash_was_down = .false.
+     logical :: mouse_was_down = .false.
+  end type InputState
+
   type :: DrawnLayer
-     type(Layer),pointer :: input_layer
-     logical :: visible = .true.
-     real(c_float) :: color(3) ! RGB
-     real(c_float) :: alpha = 0.5_c_float ! Transparency
+     type(Layer), pointer        :: input_layer => null()
+     logical                     :: visible     = .true.
+     real(c_float)               :: color(3)    = [0.8_c_float, 0.3_c_float, 0.3_c_float]
+     real(c_float)               :: alpha       = 0.5_c_float
+     integer(c_int), allocatable :: vbo_verts(:)
+     integer                     :: vbo_count   = 0
+     logical                     :: cache_valid = .false.
   end type DrawnLayer
-  public:: DrawnLayer, SimpleWindow
+
+  public :: DrawnLayer, SimpleWindow, FillLayerBoxesDirect, FillLayerMBRsDirect
+
 contains
-  ! ---------------------------------------------------------
-  ! Convert Screen Pixels (Viewport) to Application (World) Space
-  ! ---------------------------------------------------------
+
   pure subroutine ScreenToWorld(screen, cam, world)
-    implicit none
     type(Point2D), intent(in)     :: screen
     type(CameraState), intent(in) :: cam
     type(Point2D), intent(out)    :: world
-
-    world%x = cam%left + (screen%x / cam%win_w) * (cam%right - cam%left)
-    world%y = cam%top - (screen%y / cam%win_h) * (cam%top - cam%bottom)
+    world%x = cam%left + (screen%x / max(1.0_c_double, cam%win_w)) * (cam%right - cam%left)
+    world%y = cam%top  - (screen%y / max(1.0_c_double, cam%win_h)) * (cam%top - cam%bottom)
   end subroutine ScreenToWorld
 
-  ! ---------------------------------------------------------
-  ! Convert Application (World) Space to Screen Pixels (Viewport)
-  ! ---------------------------------------------------------
-  pure subroutine WorldToScreen(world, cam, screen)
-    implicit none
-    type(Point2D), intent(in)     :: world
-    type(CameraState), intent(in) :: cam
-    type(Point2D), intent(out)    :: screen
-
-    screen%x = ((world%x - cam%left) / (cam%right - cam%left)) * cam%win_w
-    screen%y = cam%win_h - (((world%y - cam%bottom) / (cam%top - cam%bottom)) * cam%win_h)
-  end subroutine WorldToScreen
   subroutine handle_error(code, desc)
-    implicit none
-    integer, intent(in) :: code
+    integer, intent(in)      :: code
     character(*), intent(in) :: desc
-
-    print '(''Error '', I8,'' : '',A)', code, desc
+    write(*, '(A,I8,A,A)') 'GLFW Error ', code, ' : ', desc
   end subroutine handle_error
-  ! ---------------------------------------------------------
-  ! Calculates the World-Space Bounding Box of the Current View
-  ! ---------------------------------------------------------
-  pure function GetCurrentViewportWorld(win_x, win_y, pan_x, pan_y, zoom) result(view_box)
-    implicit none
-    real(c_double), intent(in) :: win_x, win_y   ! Live window dimensions
-    real(c_double), intent(in) :: pan_x, pan_y   ! Current pan offsets
-    real(c_double), intent(in) :: zoom           ! Current zoom level
-    type(Box)                  :: view_box       ! The resulting world boundary
 
-    real(c_double) :: center_x, center_y, half_w, half_h
+  pure subroutine UpdateCameraBounds(cam)
+    type(CameraState), intent(inout) :: cam
+    real(c_double) :: cx, cy, half_w, half_h
+    cx = (cam%win_w * 0.5_c_double) + cam%pan_x
+    cy = (cam%win_h * 0.5_c_double) + cam%pan_y
+    half_w = (cam%win_w * 0.5_c_double) * cam%zoom
+    half_h = (cam%win_h * 0.5_c_double) * cam%zoom
+    cam%left   = cx - half_w
+    cam%right  = cx + half_w
+    cam%bottom = cy - half_h
+    cam%top    = cy + half_h
+  end subroutine UpdateCameraBounds
 
-    ! 1. Calculate the true world center of the camera
-    center_x = (win_x / 2.0_c_double) + pan_x
-    center_y = (win_y / 2.0_c_double) + pan_y
+  pure subroutine FitCameraToMBR(cam, mbr)
+    type(CameraState), intent(inout) :: cam
+    type(Box), intent(in)            :: mbr
+    real(c_double) :: w, h, cx, cy, zx, zy
+    w  = max(1.0_c_double, real(mbr%x2, c_double) - real(mbr%x1, c_double))
+    h  = max(1.0_c_double, real(mbr%y2, c_double) - real(mbr%y1, c_double))
+    cx = 0.5_c_double * (real(mbr%x1, c_double) + real(mbr%x2, c_double))
+    cy = 0.5_c_double * (real(mbr%y1, c_double) + real(mbr%y2, c_double))
+    zx = w / max(1.0_c_double, cam%win_w)
+    zy = h / max(1.0_c_double, cam%win_h)
+    cam%zoom  = max(zx, zy) * 1.1_c_double
+    cam%pan_x = cx - (cam%win_w * 0.5_c_double)
+    cam%pan_y = cy - (cam%win_h * 0.5_c_double)
+    call UpdateCameraBounds(cam)
+  end subroutine FitCameraToMBR
 
-    ! 2. Calculate the scaled half-dimensions of the view
-    half_w = (win_x / 2.0_c_double) * zoom
-    half_h = (win_y / 2.0_c_double) * zoom
+  pure function CameraToViewBox(cam) result(v)
+    type(CameraState), intent(in) :: cam
+    type(Box) :: v
+    real(c_double) :: lo, hi
+    lo = -real(huge(v%x1) - 1, c_double)
+    hi =  real(huge(v%x1) - 1, c_double)
+    v%x1 = floor(max(lo, min(hi, cam%left)),   kind=K_COORDINATE_KIND)
+    v%y1 = floor(max(lo, min(hi, cam%bottom)), kind=K_COORDINATE_KIND)
+    v%x2 = ceiling(max(lo, min(hi, cam%right)), kind=K_COORDINATE_KIND)
+    v%y2 = ceiling(max(lo, min(hi, cam%top)),   kind=K_COORDINATE_KIND)
+  end function CameraToViewBox
 
-    ! 3. Map the boundaries to your Box structure
-    ! Note: Using int() because standard VLSI Box coordinates are typically integers.
-    ! If your GeometryModule Box uses real/float, simply remove the int() casts.
-    view_box%x1 = int(center_x - half_w)   ! Left boundary
-    view_box%y1 = int(center_y - half_h)   ! Bottom boundary
-    view_box%x2 = int(center_x + half_w)   ! Right boundary
-    view_box%y2 = int(center_y + half_h)   ! Top boundary
-
-  end function GetCurrentViewportWorld
-  pure recursive subroutine SearchTreeMBRsRecursive(tree_nodes, index, qbox, &
-       max_depth, current_depth, out_mbrs, num_mbrs, max_capacity)
-
-    type(RTreeNode), intent(in)        :: tree_nodes(:)
-    integer(kind=int64), intent(in)    :: index
-    type(Box), intent(in)              :: qbox
-    integer, intent(in)                :: max_depth
-    integer, intent(in)                :: current_depth
-    type(Box), intent(inout)           :: out_mbrs(:)
-    integer, intent(inout)             :: num_mbrs
-    integer, intent(in)                :: max_capacity
-
-    integer(kind=int64) :: child_idx
-    logical             :: overlapx, overlapy
-    type(RTreeNode)     :: childNode
-
-    ! Safeguard: If the tree is empty or buffer is full, exit immediately
-    if (size(tree_nodes) == 0 .or. num_mbrs >= max_capacity) return
-
-    ! 1. Initial check on the current node
-    overlapx = max(tree_nodes(index)%mbr%x1, qbox%x1) <= min(tree_nodes(index)%mbr%x2, qbox%x2)
-    if (overlapx) then
-       overlapy = max(tree_nodes(index)%mbr%y1, qbox%y1) <= min(tree_nodes(index)%mbr%y2, qbox%y2)
-    else
-       overlapy = .false.
+  subroutine EnsureVertexCapacity(vbuf, needed_ints)
+    integer(c_int), allocatable, intent(inout) :: vbuf(:)
+    integer, intent(in) :: needed_ints
+    integer(c_int), allocatable :: tmp(:)
+    integer :: new_cap
+    if (.not. allocated(vbuf)) then
+       allocate(vbuf(max(needed_ints, 1024)))
+    else if (size(vbuf) < needed_ints) then
+       new_cap = max(needed_ints, size(vbuf) * 2)
+       allocate(tmp(new_cap))
+       tmp(1:size(vbuf)) = vbuf
+       call move_alloc(from=tmp, to=vbuf)
     end if
+  end subroutine EnsureVertexCapacity
 
-    if (.not. (overlapx .and. overlapy)) return
+  !> Single-pass iterative R-Tree traversal writing visible boxes directly into the GL quad buffer.
+  !> Eliminates intermediate visible_boxes buffer and recursive call overhead, with optional sub-pixel culling.
+  subroutine FillLayerBoxesDirect(input_layer, current_view, min_span, vertex_buffer, num_visible)
+    type(Layer), intent(in)                    :: input_layer
+    type(Box), intent(in)                      :: current_view
+    integer(kind=K_COORDINATE_KIND), intent(in):: min_span
+    integer(c_int), allocatable, intent(inout) :: vertex_buffer(:)
+    integer, intent(out)                       :: num_visible
 
-    ! 2. Check if we should stop recursing (either reached max depth or hit a leaf)
-    if (current_depth == max_depth .or. tree_nodes(index)%IsLeaf) then
-       num_mbrs = num_mbrs + 1
-       out_mbrs(num_mbrs) = tree_nodes(index)%mbr
-       return
-    end if
+    integer(kind=int64) :: stack(K_DFS_STACK_SIZE)
+    integer :: sp, vidx
+    integer(kind=int64) :: curr_idx, child_idx, c_end, k, n_used, root_idx
+    type(RTreeNode) :: currNode, childNode
+    type(Box) :: b
 
-    ! 3. Internal Node: Iterate over contiguous children
-    do child_idx = tree_nodes(index)%ChildStart, tree_nodes(index)%ChildStart + tree_nodes(index)%NumChildren - 1
+    num_visible = 0
+    n_used = input_layer%n_used
+    if (n_used <= 0_int64 .or. .not. allocated(input_layer%layer_boxes)) return
 
-       ! Stop processing siblings if capacity was hit in a previous recursive call
-       if (num_mbrs >= max_capacity) return 
+    if (.not. allocated(vertex_buffer)) allocate(vertex_buffer(min(int(n_used), 4096) * 8))
 
-       childNode = tree_nodes(child_idx)
-
-       ! Inline short-circuit overlap check for the child
-       overlapx = max(childNode%mbr%x1, qbox%x1) <= min(childNode%mbr%x2, qbox%x2)
-       if (overlapx) then
-          overlapy = max(childNode%mbr%y1, qbox%y1) <= min(childNode%mbr%y2, qbox%y2)
-
-          ! Recurse deeper if bounding boxes overlap
-          if (overlapy) then
-             call SearchTreeMBRsRecursive(tree_nodes, child_idx, qbox, &
-                  max_depth, current_depth + 1, out_mbrs, num_mbrs, max_capacity)
-          end if
-       end if
-    end do
-
-  end subroutine SearchTreeMBRsRecursive
-  pure recursive subroutine SearchTreeBoxesRecursive(tree_nodes, index, qbox, &
-       layer_boxes, n_used, out_boxes, num_boxes, max_capacity)
-
-    type(RTreeNode), intent(in)        :: tree_nodes(:)
-    integer(kind=int64), intent(in)    :: index
-    type(Box), intent(in)              :: qbox
-    type(Box), intent(in)              :: layer_boxes(:)  ! The global array of actual boxes
-    integer(kind=int64), intent(in)    :: n_used          ! Total number of valid boxes
-    type(Box), intent(inout)           :: out_boxes(:)    ! GPU Rendering buffer
-    integer, intent(inout)             :: num_boxes
-    integer, intent(in)                :: max_capacity
-
-    integer(kind=int64) :: child_idx, k, leaf_end
-    logical             :: overlapx, overlapy
-    type(RTreeNode)     :: childNode
-
-    ! Safeguard: If the tree is empty or rendering buffer is full, exit immediately
-    if (size(tree_nodes) == 0 .or. num_boxes >= max_capacity) return
-
-    ! 1. Initial check on the current node's MBR
-    overlapx = max(tree_nodes(index)%mbr%x1, qbox%x1) <= min(tree_nodes(index)%mbr%x2, qbox%x2)
-    if (overlapx) then
-       overlapy = max(tree_nodes(index)%mbr%y1, qbox%y1) <= min(tree_nodes(index)%mbr%y2, qbox%y2)
-    else
-       overlapy = .false.
-    end if
-
-    if (.not. (overlapx .and. overlapy)) return
-
-    ! 2. Check if we hit a leaf node
-    if (tree_nodes(index)%IsLeaf) then
-
-       ! We reached a leaf. Iterate through the actual boxes stored in layer_boxes
-       leaf_end = min(tree_nodes(index)%ChildStart + K_LEAF_CAPACITY - 1, n_used)
-
-       do k = tree_nodes(index)%ChildStart, leaf_end
-
-          ! Strict capacity check before adding a new box
-          if (num_boxes >= max_capacity) return
-
-          ! Fine-grained inline check: Does the actual box overlap with the query view?
-          overlapx = max(layer_boxes(k)%x1, qbox%x1) <= min(layer_boxes(k)%x2, qbox%x2)
-          if (overlapx) then
-             overlapy = max(layer_boxes(k)%y1, qbox%y1) <= min(layer_boxes(k)%y2, qbox%y2)
-
-             if (overlapy) then
-                num_boxes = num_boxes + 1
-                out_boxes(num_boxes) = layer_boxes(k)
-             end if
-          end if
+    if (.not. allocated(input_layer%tree%tree_nodes) .or. input_layer%tree%root_index <= 0_int64) then
+       ! Linear fallback if no R-Tree exists
+       vidx = 1
+       do k = 1_int64, n_used
+          if (num_visible >= K_MAX_OPENGL_CAPACITY) exit
+          b = input_layer%layer_boxes(k)
+          if (b%x2 < current_view%x1 .or. b%x1 > current_view%x2 .or. &
+              b%y2 < current_view%y1 .or. b%y1 > current_view%y2) cycle
+          if (min_span > 0 .and. (b%x2 - b%x1) < min_span .and. (b%y2 - b%y1) < min_span) cycle
+          if (vidx + 7 > size(vertex_buffer)) call EnsureVertexCapacity(vertex_buffer, vidx + 7)
+          vertex_buffer(vidx)   = b%x1; vertex_buffer(vidx+1) = b%y1
+          vertex_buffer(vidx+2) = b%x2; vertex_buffer(vidx+3) = b%y1
+          vertex_buffer(vidx+4) = b%x2; vertex_buffer(vidx+5) = b%y2
+          vertex_buffer(vidx+6) = b%x1; vertex_buffer(vidx+7) = b%y2
+          vidx = vidx + 8
+          num_visible = num_visible + 1
        end do
-
        return
     end if
 
-    ! 3. Internal Node: Iterate over contiguous children
-    do child_idx = tree_nodes(index)%ChildStart, tree_nodes(index)%ChildStart + tree_nodes(index)%NumChildren - 1
+    root_idx = input_layer%tree%root_index
+    childNode = input_layer%tree%tree_nodes(root_idx)
+    if (childNode%mbr%x2 < current_view%x1 .or. childNode%mbr%x1 > current_view%x2 .or. &
+        childNode%mbr%y2 < current_view%y1 .or. childNode%mbr%y1 > current_view%y2) return
 
-       ! Stop processing siblings if capacity was hit in a previous recursive call
-       if (num_boxes >= max_capacity) return 
+    sp = 1
+    stack(1) = root_idx
+    vidx = 1
 
-       childNode = tree_nodes(child_idx)
+    do while (sp > 0 .and. num_visible < K_MAX_OPENGL_CAPACITY)
+       curr_idx = stack(sp)
+       sp = sp - 1
+       currNode = input_layer%tree%tree_nodes(curr_idx)
 
-       ! Inline short-circuit overlap check for the child's MBR
-       overlapx = max(childNode%mbr%x1, qbox%x1) <= min(childNode%mbr%x2, qbox%x2)
-       if (overlapx) then
-          overlapy = max(childNode%mbr%y1, qbox%y1) <= min(childNode%mbr%y2, qbox%y2)
-
-          ! Recurse deeper if bounding boxes overlap
-          if (overlapy) then
-             call SearchTreeBoxesRecursive(tree_nodes, child_idx, qbox, &
-                  layer_boxes, n_used, out_boxes, num_boxes, max_capacity)
-          end if
+       if (currNode%IsLeaf) then
+          c_end = min(currNode%ChildStart + int(currNode%NumChildren, kind=int64) - 1_int64, n_used)
+          do k = currNode%ChildStart, c_end
+             if (num_visible >= K_MAX_OPENGL_CAPACITY) exit
+             b = input_layer%layer_boxes(k)
+             if (b%x2 < current_view%x1 .or. b%x1 > current_view%x2 .or. &
+                 b%y2 < current_view%y1 .or. b%y1 > current_view%y2) cycle
+             if (min_span > 0 .and. (b%x2 - b%x1) < min_span .and. (b%y2 - b%y1) < min_span) cycle
+             if (vidx + 7 > size(vertex_buffer)) call EnsureVertexCapacity(vertex_buffer, vidx + 7)
+             vertex_buffer(vidx)   = b%x1; vertex_buffer(vidx+1) = b%y1
+             vertex_buffer(vidx+2) = b%x2; vertex_buffer(vidx+3) = b%y1
+             vertex_buffer(vidx+4) = b%x2; vertex_buffer(vidx+5) = b%y2
+             vertex_buffer(vidx+6) = b%x1; vertex_buffer(vidx+7) = b%y2
+             vidx = vidx + 8
+             num_visible = num_visible + 1
+          end do
+       else
+          c_end = currNode%ChildStart + int(currNode%NumChildren, kind=int64) - 1_int64
+          do child_idx = currNode%ChildStart, c_end
+             childNode = input_layer%tree%tree_nodes(child_idx)
+             if (childNode%mbr%x2 < current_view%x1 .or. childNode%mbr%x1 > current_view%x2 .or. &
+                 childNode%mbr%y2 < current_view%y1 .or. childNode%mbr%y1 > current_view%y2) cycle
+             if (min_span > 0 .and. (childNode%mbr%x2 - childNode%mbr%x1) < min_span .and. &
+                 (childNode%mbr%y2 - childNode%mbr%y1) < min_span) cycle
+             if (sp < K_DFS_STACK_SIZE) then
+                sp = sp + 1
+                stack(sp) = child_idx
+             end if
+          end do
        end if
     end do
+  end subroutine FillLayerBoxesDirect
 
-  end subroutine SearchTreeBoxesRecursive
-  !> Recursively searches the Macro R-Tree using OpenMP Tasks
-  recursive subroutine SearchTreeForChunks(tree_nodes, index, qbox, layer_boxes, n_used, hit_chunks, num_hits, max_hits)
-    type(RTreeNode), intent(in)        :: tree_nodes(:)
-    integer(kind=int64), intent(in)    :: index
-    type(Box), intent(in)              :: qbox
-    type(Box), intent(in)              :: layer_boxes(:)
-    integer(kind=int64), intent(in)    :: n_used
-    integer(kind=int64), intent(inout) :: hit_chunks(:)
-    integer, intent(inout)             :: num_hits
-    integer, intent(in)                :: max_hits
+  !> Single-pass iterative R-Tree MBR traversal at target_depth writing directly into the GL quad buffer.
+  subroutine FillLayerMBRsDirect(input_layer, current_view, target_depth, vertex_buffer, num_visible)
+    type(Layer), intent(in)                    :: input_layer
+    type(Box), intent(in)                      :: current_view
+    integer, intent(in)                        :: target_depth
+    integer(c_int), allocatable, intent(inout) :: vertex_buffer(:)
+    integer, intent(out)                       :: num_visible
 
-    integer(kind=int64) :: child_idx, k, leaf_end
-    logical             :: overlapx, overlapy
-    type(RTreeNode)     :: childNode
+    integer(kind=int64) :: node_stack(K_DFS_STACK_SIZE)
+    integer             :: depth_stack(K_DFS_STACK_SIZE)
+    integer             :: sp, cur_d, max_d, vidx
+    integer(kind=int64) :: curr_idx, child_idx, c_end, root_idx
+    type(RTreeNode)     :: currNode, childNode
+    type(Box)           :: b
 
-    if (size(tree_nodes) == 0 .or. num_hits >= max_hits) return
-
-    overlapx = max(tree_nodes(index)%mbr%x1, qbox%x1) <= min(tree_nodes(index)%mbr%x2, qbox%x2)
-    if (overlapx) then
-       overlapy = max(tree_nodes(index)%mbr%y1, qbox%y1) <= min(tree_nodes(index)%mbr%y2, qbox%y2)
-    else
-       overlapy = .false.
-    end if
-    if (.not. (overlapx .and. overlapy)) return
-
-    ! Leaf Node: Safely append hits
-    if (tree_nodes(index)%IsLeaf) then
-       leaf_end = min(tree_nodes(index)%ChildStart + K_LEAF_CAPACITY - 1, n_used)
-
-       !$omp critical (chunk_append)
-       do k = tree_nodes(index)%ChildStart, leaf_end
-          if (num_hits >= max_hits) exit
-          overlapx = max(layer_boxes(k)%x1, qbox%x1) <= min(layer_boxes(k)%x2, qbox%x2)
-          if (overlapx) then
-             overlapy = max(layer_boxes(k)%y1, qbox%y1) <= min(layer_boxes(k)%y2, qbox%y2)
-             if (overlapy) then
-                num_hits = num_hits + 1
-                hit_chunks(num_hits) = k
-             end if
-          end if
-       end do
-       !$omp end critical (chunk_append)
+    num_visible = 0
+    if (input_layer%n_used <= 0_int64) return
+    if (.not. allocated(input_layer%tree%tree_nodes) .or. input_layer%tree%root_index <= 0_int64) then
+       call FillLayerBoxesDirect(input_layer, current_view, 0_K_COORDINATE_KIND, vertex_buffer, num_visible)
        return
     end if
 
-    ! Internal Node: Spawn an OpenMP task for each child
-    do child_idx = tree_nodes(index)%ChildStart, tree_nodes(index)%ChildStart + tree_nodes(index)%NumChildren - 1
-       childNode = tree_nodes(child_idx)
-       overlapx = max(childNode%mbr%x1, qbox%x1) <= min(childNode%mbr%x2, qbox%x2)
-       if (overlapx) then
-          overlapy = max(childNode%mbr%y1, qbox%y1) <= min(childNode%mbr%y2, qbox%y2)
-          if (overlapy) then
-             !$omp task shared(hit_chunks, num_hits, tree_nodes, layer_boxes) firstprivate(child_idx, qbox)
-             call SearchTreeForChunks(tree_nodes, child_idx, qbox, layer_boxes, n_used, &
-                  hit_chunks, num_hits, max_hits)
-             !$omp end task
-          end if
-       end if
-    end do
-    !$omp taskwait
+    if (.not. allocated(vertex_buffer)) allocate(vertex_buffer(4096 * 8))
+    max_d = max(0, target_depth)
+    root_idx = input_layer%tree%root_index
+    childNode = input_layer%tree%tree_nodes(root_idx)
+    if (childNode%mbr%x2 < current_view%x1 .or. childNode%mbr%x1 > current_view%x2 .or. &
+        childNode%mbr%y2 < current_view%y1 .or. childNode%mbr%y1 > current_view%y2) return
 
-  end subroutine SearchTreeForChunks
-  !> Parallel expansion of requested chunks into the vertex buffer
-  ! #ifdef MAYBE_USE_THIS (disabled: requires CompressedStream type not in scope)
-!!  subroutine PerformLODCoordinateFilling(input_layer, snappy_stream, current_view, visible_boxes, num_visible)
-!     type(Layer), intent(in)               :: input_layer
-!     type(CompressedStream), intent(in)    :: snappy_stream
-!     type(Box), intent(in)                 :: current_view
-!     type(Box), intent(inout)              :: visible_boxes(:)
-!     integer, intent(out)                  :: num_visible
+    sp = 1
+    node_stack(1)  = root_idx
+    depth_stack(1) = 0
+    vidx = 1
 
-!     integer(kind=int64), allocatable :: hit_chunks(:)
-!     integer :: num_hits, max_capacity
-!     integer(kind=int64) :: i, k, chunk_id, local_count, space_left
-!     type(Box), allocatable :: temp_boxes(:)
-!     logical :: overlapx, overlapy
+    do while (sp > 0 .and. num_visible < K_MAX_OPENGL_CAPACITY)
+       curr_idx = node_stack(sp)
+       cur_d    = depth_stack(sp)
+       sp = sp - 1
+       currNode = input_layer%tree%tree_nodes(curr_idx)
 
-!     max_capacity = size(visible_boxes)
-!     num_visible = 0
-!     num_hits = 0
-
-!     allocate(hit_chunks(min(10000_int64, snappy_stream%num_chunks)))
-
-!     ! Boot up the OpenMP Task pool for the tree traversal
-!     !$omp parallel
-!     !$omp single
-!     call SearchTreeForChunks(input_layer%tree%tree_nodes, input_layer%tree%root_index, &
-!          current_view, input_layer%layer_boxes, input_layer%n_used, &
-!          hit_chunks, num_hits, size(hit_chunks))
-!     !$omp end single
-!     !$omp end parallel
-
-!     if (num_hits > 0) then
-!        ! Parallelize chunk decompression and culling
-!        !$omp parallel do private(chunk_id, temp_boxes, local_count, k, overlapx, overlapy, space_left) &
-!        !$omp shared(num_visible, visible_boxes, max_capacity, hit_chunks) schedule(dynamic)
-!        do i = 1, num_hits
-
-!           ! Early exit if the buffer was filled by other threads
-!           if (num_visible >= max_capacity) cycle
-
-!           chunk_id = hit_chunks(i)
-!           allocate(temp_boxes(snappy_stream%chunks(chunk_id)%num_boxes))
-!           call DecompressSingleChunk(snappy_stream%chunks(chunk_id), snappy_stream%compression_method, temp_boxes)
-
-!           ! Filter and Pack IN-PLACE locally to avoid locking the shared buffer
-!           local_count = 0
-!           do k = 1, size(temp_boxes)
-!              overlapx = max(temp_boxes(k)%x1, current_view%x1) <= min(temp_boxes(k)%x2, current_view%x2)
-!              if (overlapx) then
-!                 overlapy = max(temp_boxes(k)%y1, current_view%y1) <= min(temp_boxes(k)%y2, current_view%y2)
-!                 if (overlapy) then
-!                    local_count = local_count + 1
-!                    temp_boxes(local_count) = temp_boxes(k)
-!                 end if
-!              end if
-!           end do
-
-!           ! Lock briefly to push the entire local batch to the global OpenGL buffer
-!           if (local_count > 0) then
-!              !$omp critical (vbo_append)
-!              space_left = max_capacity - num_visible
-!              if (space_left > 0) then
-!                 local_count = min(local_count, space_left)
-!                 visible_boxes(num_visible + 1 : num_visible + local_count) = temp_boxes(1 : local_count)
-!                 num_visible = num_visible + local_count
-!              end if
-!              !$omp end critical
-!           end if
-
-!           deallocate(temp_boxes)
-!        end do
-!        !$omp end parallel do
-!     end if
-
-!     deallocate(hit_chunks)
-!   end subroutine PerformLODCoordinateFilling
-  ! #endif
-  subroutine PerformBoxFilling(input_layer, current_view, visible_mbrs, vertex_buffer, num_visible)
-    type(Layer), intent(in)               :: input_layer
-    type(Box), intent(in)                 :: current_view
-    type(Box), allocatable, intent(inout) :: visible_mbrs(:)
-    integer, intent(out)                  :: num_visible
-    integer(c_int), allocatable, intent(inout) :: vertex_buffer(:)
-    integer :: max_render_capacity, i, idx
-
-    ! Define a safe upper limit for OpenGL rendering to prevent memory blowouts
-    max_render_capacity = K_MAX_OPENGL_CAPACITY
-
-    if (.not. allocated(visible_mbrs)) then
-       allocate(visible_mbrs(max_render_capacity))
-    else if (size(visible_mbrs) < max_render_capacity) then
-       deallocate(visible_mbrs)
-       allocate(visible_mbrs(max_render_capacity))
-    end if
-
-    num_visible = 0
-
-    ! Start recursive search from the root (assuming root_index is valid, usually 1)
-    call SearchTreeBoxesRecursive( &
-         tree_nodes    = input_layer%tree%tree_nodes, &
-         index         = input_layer%tree%root_index, &
-         qbox          = current_view, &
-         layer_boxes   = input_layer%layer_boxes,&
-         n_used        = input_layer%n_used,&
-         out_boxes      = visible_mbrs, &
-         num_boxes      = num_visible, &
-         max_capacity  = max_render_capacity &
-         )
-
-    ! write(*,*) 'Found ', num_visible, ' MBRs for OpenGL rendering at depth ', target_depth
-    if( allocated( vertex_buffer ) ) then
-       if( size( vertex_buffer ) < ( num_visible*8) ) then
-          deallocate( vertex_buffer )
-          allocate( vertex_buffer( num_visible*8) )
-       end if
-    else
-       allocate( vertex_buffer( num_visible*8) )
-    end if
-    idx = 1
-    do i = 1, num_visible
-       ! Vertex 1: Top-Left
-       vertex_buffer(idx)   = visible_mbrs(i)%x1
-       vertex_buffer(idx+1) = visible_mbrs(i)%y1
-       ! Vertex 2: Top-Right
-       vertex_buffer(idx+2) = visible_mbrs(i)%x2
-       vertex_buffer(idx+3) = visible_mbrs(i)%y1
-       ! Vertex 3: Bottom-Right
-       vertex_buffer(idx+4) = visible_mbrs(i)%x2
-       vertex_buffer(idx+5) = visible_mbrs(i)%y2
-       ! Vertex 4: Bottom-Left
-       vertex_buffer(idx+6) = visible_mbrs(i)%x1
-       vertex_buffer(idx+7) = visible_mbrs(i)%y2
-       idx = idx + 8
-    end do
-
-  end subroutine PerformBoxFilling
-  subroutine PerformMBRFilling(input_layer, current_view, target_depth, visible_mbrs, vertex_buffer, num_visible)
-    type(Layer), intent(in)               :: input_layer
-    type(Box), intent(in)                 :: current_view
-    integer, intent(in)                   :: target_depth
-    type(Box), allocatable, intent(inout) :: visible_mbrs(:)
-    integer, intent(out)                  :: num_visible
-    integer(c_int), allocatable, intent(inout) :: vertex_buffer(:)
-    integer :: max_render_capacity, i, idx
-
-    ! Define a safe upper limit for OpenGL rendering to prevent memory blowouts
-    max_render_capacity = K_MAX_OPENGL_CAPACITY
-
-    if (.not. allocated(visible_mbrs)) then
-       allocate(visible_mbrs(max_render_capacity))
-    else if (size(visible_mbrs) < max_render_capacity) then
-       deallocate(visible_mbrs)
-       allocate(visible_mbrs(max_render_capacity))
-    end if
-
-    num_visible = 0
-
-    ! Start recursive search from the root (assuming root_index is valid, usually 1)
-    call SearchTreeMBRsRecursive( &
-         tree_nodes    = input_layer%tree%tree_nodes, &
-         index         = input_layer%tree%root_index, &
-         qbox          = current_view, &
-         max_depth     = target_depth, &
-         current_depth = 0, &
-         out_mbrs      = visible_mbrs, &
-         num_mbrs      = num_visible, &
-         max_capacity  = max_render_capacity &
-         )
-
-    ! write(*,*) 'Found ', num_visible, ' MBRs for OpenGL rendering at depth ', target_depth
-    if( allocated( vertex_buffer ) ) then
-       if( size( vertex_buffer ) < ( num_visible*8) ) then
-          deallocate( vertex_buffer )
-          allocate( vertex_buffer( num_visible*8) )
-       end if
-    else
-       allocate( vertex_buffer( num_visible*8) )
-    end if
-    idx = 1
-    do i = 1, num_visible
-       ! Vertex 1: Top-Left
-       vertex_buffer(idx)   = visible_mbrs(i)%x1
-       vertex_buffer(idx+1) = visible_mbrs(i)%y1
-       ! Vertex 2: Top-Right
-       vertex_buffer(idx+2) = visible_mbrs(i)%x2
-       vertex_buffer(idx+3) = visible_mbrs(i)%y1
-       ! Vertex 3: Bottom-Right
-       vertex_buffer(idx+4) = visible_mbrs(i)%x2
-       vertex_buffer(idx+5) = visible_mbrs(i)%y2
-       ! Vertex 4: Bottom-Left
-       vertex_buffer(idx+6) = visible_mbrs(i)%x1
-       vertex_buffer(idx+7) = visible_mbrs(i)%y2
-       idx = idx + 8
-    end do
-
-  end subroutine PerformMBRFilling
-
-  subroutine PerformCoordinateFilling( input_layer, current_view, visible_boxes, vertex_buffer, num_visible)
-    type(Layer), intent(in) :: input_layer
-    type(Box), intent(in)   :: current_view
-    type(Box), allocatable, intent(inout) :: visible_boxes(:)
-    integer(c_int), allocatable, intent(inout) :: vertex_buffer(:)
-    integer, intent(out) :: num_visible
-    integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
-    integer(kind=int64) :: number_leaves
-    integer(kind=int64) :: i, idx, j, k
-    !write(*,*) 'Searching for current_view = ', current_view
-    !if( NeedsRTree( input_layer ) ) error stop "ERROR: Layer needs to have an RTree established."
-    call SearchTree( input_layer%tree%tree_nodes, input_layer%tree%root_index, &
-         current_view, leafboxes, number_leaves )
-    if( allocated( visible_boxes ) ) then
-       if( size( visible_boxes ) < number_leaves*K_LEAF_CAPACITY ) then
-          deallocate( visible_boxes )
-          allocate( visible_boxes( number_leaves*K_LEAF_CAPACITY ) )
-       end if
-    else
-       allocate( visible_boxes( number_leaves*K_LEAF_CAPACITY ) )
-    end if
-
-    !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
-    num_visible = 0
-    if( number_leaves > 0 ) then
-       !write(*,*) 'i=',i,' |Q| = ', number_leaves, ' ', leafboxes(1:number_leaves)
-       outer: do j=1,number_leaves
-          over_leaves: do k=leafboxes(j),min(leafboxes(j)+K_LEAF_CAPACITY-1, input_layer%n_used)
-             if( box_interact( current_view, input_layer%layer_boxes(k)) ) then
-                num_visible = num_visible + 1
-                visible_boxes(num_visible) = input_layer%layer_boxes(k)
+       if (cur_d >= max_d .or. currNode%IsLeaf) then
+          b = currNode%mbr
+          if (vidx + 7 > size(vertex_buffer)) call EnsureVertexCapacity(vertex_buffer, vidx + 7)
+          vertex_buffer(vidx)   = b%x1; vertex_buffer(vidx+1) = b%y1
+          vertex_buffer(vidx+2) = b%x2; vertex_buffer(vidx+3) = b%y1
+          vertex_buffer(vidx+4) = b%x2; vertex_buffer(vidx+5) = b%y2
+          vertex_buffer(vidx+6) = b%x1; vertex_buffer(vidx+7) = b%y2
+          vidx = vidx + 8
+          num_visible = num_visible + 1
+       else
+          c_end = currNode%ChildStart + int(currNode%NumChildren, kind=int64) - 1_int64
+          do child_idx = currNode%ChildStart, c_end
+             childNode = input_layer%tree%tree_nodes(child_idx)
+             if (childNode%mbr%x2 < current_view%x1 .or. childNode%mbr%x1 > current_view%x2 .or. &
+                 childNode%mbr%y2 < current_view%y1 .or. childNode%mbr%y1 > current_view%y2) cycle
+             if (sp < K_DFS_STACK_SIZE) then
+                sp = sp + 1
+                node_stack(sp)  = child_idx
+                depth_stack(sp) = cur_d + 1
              end if
-          end do over_leaves
-       end do outer
-    end if
-    !write(*,*) 'Found ', num_visible, ' boxes in FRUSTUM'
-    if( allocated( vertex_buffer ) ) then
-       if( size( vertex_buffer ) < ( num_visible*8) ) then
-          deallocate( vertex_buffer )
-          allocate( vertex_buffer( num_visible*8) )
+          end do
        end if
-    else
-       allocate( vertex_buffer( num_visible*8) )
-    end if
-    idx = 1
-    do i = 1, num_visible
-       ! Vertex 1: Top-Left
-       vertex_buffer(idx)   = visible_boxes(i)%x1
-       vertex_buffer(idx+1) = visible_boxes(i)%y1
-       ! Vertex 2: Top-Right
-       vertex_buffer(idx+2) = visible_boxes(i)%x2
-       vertex_buffer(idx+3) = visible_boxes(i)%y1
-       ! Vertex 3: Bottom-Right
-       vertex_buffer(idx+4) = visible_boxes(i)%x2
-       vertex_buffer(idx+5) = visible_boxes(i)%y2
-       ! Vertex 4: Bottom-Left
-       vertex_buffer(idx+6) = visible_boxes(i)%x1
-       vertex_buffer(idx+7) = visible_boxes(i)%y2
-       idx = idx + 8
     end do
-  end subroutine PerformCoordinateFilling
+  end subroutine FillLayerMBRsDirect
 
-  ! We have a snappy compressed file on disk which contains the
-  ! boxes in sorted order (same order as RTree).
-  ! Thererfore it seems we dont have to load the whole file in
-  ! memory to display the MBR of the RTree. We can load the
-  ! chunks, decompress them, and construct the MBR filling. Then
-  ! when an appropriate LOD is needed we will expand the
-  ! requested chunks which lie within our view port. Devise a
-  ! careful and well thought out plan to perform this task and
-  ! generate idiomatic modern Fortran for this task. The goal is
-  ! to write a series of functions and subroutines which take
-  ! the SNAPPY compressed file as input and the current view
-  ! port as we did in
-  ! Step 1: build the RTree MBR to file level chunk index map
-  ! Step 2: in Tree Mode this is sufficient to render the tree
-  ! bbox MBR
-  ! Step 3: after a LOD is requested, load the chunks from file
-  ! in memory, decompress and return VERTEX BUFFER using
-  ! visible_boxes using the code inside this
-  ! Which is simply a RTree traversal
-
-
-  !> The main rendering window stuff follows
-
-
-  subroutine SimpleWindow(N,input_layers, WIN_X, WIN_Y)
-    integer, intent(in)          :: N
-    type(DrawnLayer), intent(inout) :: input_layers(N)
-    real, intent(in) :: WIN_X, WIN_Y
-    type(Box) :: MBR
-    type(GLFWwindow) :: window
-    integer :: ierr
-    integer(c_int), allocatable, target :: vertex_buffer(:)
-    integer :: num_visible, i, idx
-    type(Box),allocatable :: visible_boxes(:)
-    integer(c_int) :: ui_width = 200   ! The width of the left panel in pixels
-    integer(c_int) :: main_width       ! The remaining width for the main view
-    type(Box)      :: current_view     ! The camera's current bounds
-    real(c_double) :: mbr_pad          ! Padding so the minimap isn't touching the edges
-    
-    integer, parameter :: GLFW_KEY_KP_ADD      = 334
-    integer, parameter :: GLFW_KEY_KP_SUBTRACT = 333
-
-    ! --- ADD THESE MISSING GLFW CONSTANTS ---
-    integer(c_int), parameter :: GLFW_KEY_MINUS = 45
-    integer(c_int), parameter :: GLFW_KEY_EQUAL = 61
-    integer(c_int), parameter :: GLFW_KEY_RIGHT = 262
-    integer(c_int), parameter :: GLFW_KEY_LEFT  = 263
-    integer(c_int), parameter :: GLFW_KEY_DOWN  = 264
-    integer(c_int), parameter :: GLFW_KEY_UP    = 265
-    integer(c_int), parameter :: GLFW_PRESS     = 1
-    integer(c_int), parameter :: GLFW_KEY_A             = 65
-    integer(c_int), parameter :: GLFW_KEY_B             = 66
-    integer(c_int), parameter :: GLFW_KEY_R             = 82
-    integer(c_int), parameter :: GLFW_KEY_S             = 83
-    integer(c_int), parameter :: GLFW_KEY_T             = 84
-    integer(c_int), parameter :: GLFW_KEY_U             = 85    
-    integer(c_int), parameter :: GLFW_KEY_V             = 86    
-    integer(c_int), parameter :: GLFW_KEY_W             = 87    
-    integer(c_int), parameter :: GLFW_KEY_X             = 88    
-    integer(c_int), parameter :: GLFW_KEY_Y             = 89    
-    integer(c_int), parameter :: GLFW_KEY_Z             = 90
-    integer(c_int), parameter :: GLFW_KEY_LEFT_CONTROL  = 341
-    integer(c_int), parameter :: GLFW_KEY_RIGHT_CONTROL = 345
-    integer(c_int), parameter :: GLFW_KEY_ESCAPE = 256
-    integer(c_int), parameter :: GLFW_KEY_SLASH = 47
-    ! ----------------------------------------       
-    ! Navigation Variables
-    real(c_double) :: zoom  = 1.0_c_double    
-    real(c_double) :: pan_x = 0.0_c_double
-    real(c_double) :: pan_y = 0.0_c_double
-    real(c_double) :: current_left, current_right, current_bottom, current_top
-    real(c_double) :: center_x, center_y, half_w, half_h
-    real(c_double) :: mbr_min_x, mbr_max_x, mbr_min_y, mbr_max_y
-    real(c_double) :: mbr_center_x, mbr_center_y, zoom_x, zoom_y
-    real(c_double) :: mouse_x_screen, mouse_y_screen
-    real(c_double) :: mouse_x_world,  mouse_y_world
-    integer(c_int) :: live_win_x, live_win_y
-    real(c_double) :: real_win_x, real_win_y
-    ! Replace your old coordinate and boundary variables with these:
-    type(CameraState) :: cam
-    type(Point2D)     :: mouse_screen
-    type(Point2D)     :: mouse_world
-    integer           :: target_depth 
-    logical           :: tree_mode
-    logical :: key_was_down = .false.
-    real(c_double) :: last_toggle_time = 0.0
-    real(c_double) :: current_time
-    logical        :: needs_buffer_update = .true.
-    real(c_double) :: max_zoom    
-    !> left panel color/layer click stuff
-    ! GLFW Mouse Button Constant
-    integer(c_int), parameter :: GLFW_MOUSE_BUTTON_LEFT = 0
-    logical, save :: mouse_was_down = .false.
-    logical       :: mouse_is_down
-    ! UI Panel Variables
-    integer(c_int) :: top_h, bot_h        ! Heights of the top and bottom left panels
-    real(c_double) :: bw, bh              ! Button Width and Button Height
-    integer :: r, col                ! Grid iterators
-    integer :: active_layer = 1           ! The currently selected layer (1 to 60)
-    real(c_float)  :: layer_colors(3, 60) ! RGB colors for the 60 buttons
-    real(c_double) :: bx1, by1, bx2, by2  ! Button drawing coordinates
-    logical, save :: show_coords = .false.
-    logical, save :: question_key_was_pressed = .false.
-    logical :: question_key_is_pressed
-    num_visible = 0
-    target_depth = 1
-    tree_mode = .true.
-    call cpu_time( last_toggle_time )
-    call MBR%reset_to_infinity()
-    do idx=1,N
-       MBR = MBR + mbr_of_array( input_layers(idx)%input_layer%layer_boxes, input_layers(idx)%input_layer%n_used )
+  subroutine InvalidateLayerCaches(N, input_layers)
+    integer, intent(in)             :: N
+    type(DrawnLayer), intent(inout) :: input_layers(:)
+    integer :: i
+    do i = 1, N
+       input_layers(i)%cache_valid = .false.
     end do
-    !> pad MBR by 10% for aesthetic
-    mbr_max_x = MBR%x2 - MBR%x1
-    mbr_max_y = MBR%y2 - MBR%y1
-    mbr_max_x = max( mbr_max_x, mbr_max_y )
-    mbr_max_y = 0.5*mbr_max_x
-    call box_grow( MBR, int(mbr_max_y,kind=K_COORDINATE_KIND), int(mbr_max_y,kind=K_COORDINATE_KIND) )
+  end subroutine InvalidateLayerCaches
 
-    call glfwSetErrorCallback(handle_error)
+  subroutine UpdateVisibleLayerCaches(N, input_layers, current_view, tree_mode, target_depth, min_span)
+    integer, intent(in)                        :: N, target_depth
+    type(DrawnLayer), intent(inout)            :: input_layers(:)
+    type(Box), intent(in)                      :: current_view
+    logical, intent(in)                        :: tree_mode
+    integer(kind=K_COORDINATE_KIND), intent(in):: min_span
+    integer :: i
 
-    call glfwInit(ierr)
-    if (ierr /= 0) then
-       stop 'Error whilst initialising GLFW'
-    end if
+    do i = 1, N
+       if (.not. input_layers(i)%visible) cycle
+       if (input_layers(i)%cache_valid) cycle
+       if (.not. associated(input_layers(i)%input_layer)) then
+          input_layers(i)%vbo_count = 0
+          input_layers(i)%cache_valid = .true.
+          cycle
+       end if
+       if (tree_mode) then
+          call FillLayerMBRsDirect(input_layers(i)%input_layer, current_view, target_depth, &
+               input_layers(i)%vbo_verts, input_layers(i)%vbo_count)
+       else
+          call FillLayerBoxesDirect(input_layers(i)%input_layer, current_view, min_span, &
+               input_layers(i)%vbo_verts, input_layers(i)%vbo_count)
+       end if
+       input_layers(i)%cache_valid = .true.
+    end do
+  end subroutine UpdateVisibleLayerCaches
 
-    window = glfwCreateWindow(int(WIN_X), int(WIN_Y), 'MAGPARSER DISPLAY')
-    if (.not. associated(window)) then
-       call glfwTerminate()
-       stop 'Error whilst creating window'
-    end if
+  subroutine RenderMainViewport(N, input_layers, ui_width, main_width, win_h, cam, tree_mode)
+    integer, intent(in)                    :: N
+    type(DrawnLayer), intent(in), target   :: input_layers(:)
+    integer(c_int), intent(in)             :: ui_width, main_width, win_h
+    type(CameraState), intent(in)          :: cam
+    logical, intent(in)                    :: tree_mode
+    integer :: i
 
-    call glfwMakeContextCurrent(window)
-    !call glfwSetScrollCallback(window, c_funloc(scroll_callback))
-    call glClearColor(0.2_c_float, 0.3_c_float, 0.3_c_float, 1.0_c_float)
-    call glDisable(GL_DEPTH_TEST) ! Ensures transparent layers blend correctly
-    call glEnable(GL_BLEND)
-    call glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-    call glViewport(0, 0, int(WIN_X), int(WIN_Y))
-
-    ! 2. Configure projection matrix (World space to Screen space)
+    call glViewport(ui_width, 0_c_int, main_width, win_h)
     call glMatrixMode(GL_PROJECTION)
     call glLoadIdentity()
-
-    ! 3. Map pixel boundaries: Left=0, Right=WIN_X, Bottom=WIN_Y, Top=0, Near=-1, Far=1
-    ! Note: Switching Bottom and Top changes whether (0,0) is Top-Left or Bottom-Left.
-    call glOrtho(0.0_c_double, real(WIN_X, c_double), 0.0_c_double, real(WIN_Y, c_double), -1.0_c_double, 1.0_c_double)
-
-    ! 4. Switch back to Modelview matrix for actual object drawing
+    call glOrtho(cam%left, cam%right, cam%bottom, cam%top, -1.0_c_double, 1.0_c_double)
     call glMatrixMode(GL_MODELVIEW)
     call glLoadIdentity()
 
-    ! 1. Define your MBR limits (Replace with your actual collection MBR)
-    mbr_min_x = real(MBR%x1)
-    mbr_max_x = real(MBR%x2)
-    mbr_min_y = real(MBR%y1)
-    mbr_max_y = real(MBR%y2)
+    call glEnableClientState(GL_VERTEX_ARRAY)
+    do i = 1, N
+       if (.not. input_layers(i)%visible) cycle
+       if (input_layers(i)%vbo_count <= 0 .or. .not. allocated(input_layers(i)%vbo_verts)) cycle
 
-    ! 2. Find the exact center of the MBR
-    mbr_center_x = (mbr_min_x + mbr_max_x) / 2.0_c_double
-    mbr_center_y = (mbr_min_y + mbr_max_y) / 2.0_c_double
+       call glVertexPointer(2_c_int, GL_INT, 0_c_int, c_loc(input_layers(i)%vbo_verts(1)))
 
-    ! 3. Shift the pan so the camera's center matches the MBR's center.
-    ! (Because our camera center is WIN / 2 + pan, we subtract WIN / 2 from the target)
-    pan_x = mbr_center_x - (real(WIN_X, c_double) / 2.0_c_double)
-    pan_y = mbr_center_y - (real(WIN_Y, c_double) / 2.0_c_double)
+       ! Filled pass
+       call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+       if (tree_mode) then
+          call glColor4f(0.8_c_float, 0.3_c_float, 0.3_c_float, 0.85_c_float)
+       else
+          call glColor4f(input_layers(i)%color(1), input_layers(i)%color(2), &
+               input_layers(i)%color(3), input_layers(i)%alpha)
+       end if
+       call glDrawArrays(GL_QUADS, 0_c_int, int(input_layers(i)%vbo_count * 4, c_int))
 
-    ! 4. Calculate required scale for both axes
-    zoom_x = (mbr_max_x - mbr_min_x) / real(WIN_X, c_double)
-    zoom_y = (mbr_max_y - mbr_min_y) / real(WIN_Y, c_double)
+       ! Outline pass
+       call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+       call glColor4f(0.0_c_float, 0.0_c_float, 0.0_c_float, 1.0_c_float)
+       call glDrawArrays(GL_QUADS, 0_c_int, int(input_layers(i)%vbo_count * 4, c_int))
+    end do
+    call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+    call glDisableClientState(GL_VERTEX_ARRAY)
+  end subroutine RenderMainViewport
 
-    ! 5. Use the LARGEST zoom ratio so nothing gets cut off, 
-    ! and multiply by 1.1 to add a nice 10% padding margin around the edges.
-    zoom = max(zoom_x, zoom_y) * 1.1_c_double
-    ! --- GENERATE 60 UNIQUE LAYER COLORS ---
-    do idx = 1, 60
-       ! Spread the colors across the color wheel using phase offsets
+  subroutine RenderMinimap(mbr, current_view, ui_width, bot_h)
+    type(Box), intent(in)      :: mbr, current_view
+    integer(c_int), intent(in) :: ui_width, bot_h
+    integer(c_int) :: side
+    real(c_double) :: mbr_w, mbr_h, mbr_cx, mbr_cy, half_dim
+    real(c_double) :: cur_w, cur_h, min_sz, cx, cy, draw_w, draw_h
+    real(c_double) :: ix1, iy1, ix2, iy2
+
+    side = max(1_c_int, min(ui_width / 2_c_int, bot_h / 2_c_int))
+    call glViewport(0_c_int, 0_c_int, side, side)
+    call glMatrixMode(GL_PROJECTION)
+    call glLoadIdentity()
+
+    mbr_w    = max(1.0_c_double, real(mbr%x2, c_double) - real(mbr%x1, c_double))
+    mbr_h    = max(1.0_c_double, real(mbr%y2, c_double) - real(mbr%y1, c_double))
+    mbr_cx   = 0.5_c_double * (real(mbr%x1, c_double) + real(mbr%x2, c_double))
+    mbr_cy   = 0.5_c_double * (real(mbr%y1, c_double) + real(mbr%y2, c_double))
+    half_dim = 0.5_c_double * max(mbr_w, mbr_h) * 1.05_c_double
+    call glOrtho(mbr_cx - half_dim, mbr_cx + half_dim, &
+         mbr_cy - half_dim, mbr_cy + half_dim, -1.0_c_double, 1.0_c_double)
+
+    call glMatrixMode(GL_MODELVIEW)
+    call glLoadIdentity()
+
+    call glColor3f(0.1_c_float, 0.1_c_float, 0.1_c_float)
+    call glBegin(GL_QUADS)
+    call glVertex2f(real(mbr%x1, c_float), real(mbr%y1, c_float))
+    call glVertex2f(real(mbr%x2, c_float), real(mbr%y1, c_float))
+    call glVertex2f(real(mbr%x2, c_float), real(mbr%y2, c_float))
+    call glVertex2f(real(mbr%x1, c_float), real(mbr%y2, c_float))
+    call glEnd()
+
+    cur_w  = real(current_view%x2, c_double) - real(current_view%x1, c_double)
+    cur_h  = real(current_view%y2, c_double) - real(current_view%y1, c_double)
+    min_sz = (mbr_w + mbr_h) * 0.025_c_double
+    cx     = 0.5_c_double * (real(current_view%x1, c_double) + real(current_view%x2, c_double))
+    cy     = 0.5_c_double * (real(current_view%y1, c_double) + real(current_view%y2, c_double))
+    draw_w = max(cur_w, min_sz)
+    draw_h = max(cur_h, min_sz)
+    ix1 = cx - 0.5_c_double * draw_w; ix2 = cx + 0.5_c_double * draw_w
+    iy1 = cy - 0.5_c_double * draw_h; iy2 = cy + 0.5_c_double * draw_h
+
+    call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+    call glColor3f(1.0_c_float, 1.0_c_float, 0.0_c_float)
+    call glBegin(GL_QUADS)
+    call glVertex2f(real(ix1, c_float), real(iy1, c_float))
+    call glVertex2f(real(ix2, c_float), real(iy1, c_float))
+    call glVertex2f(real(ix2, c_float), real(iy2, c_float))
+    call glVertex2f(real(ix1, c_float), real(iy2, c_float))
+    call glEnd()
+    call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+  end subroutine RenderMinimap
+
+  subroutine RenderLayerPanel(N, input_layers, layer_colors, active_layer, ui_width, bot_h, top_h)
+    integer, intent(in)          :: N, active_layer
+    type(DrawnLayer), intent(in) :: input_layers(:)
+    real(c_float), intent(in)    :: layer_colors(:,:)
+    integer(c_int), intent(in)   :: ui_width, bot_h, top_h
+    integer :: r, col, idx, total_btns, num_rows
+    real(c_double) :: bw, bh, bx1, by1, bx2, by2
+
+    call glViewport(0_c_int, bot_h, ui_width, top_h)
+    call glMatrixMode(GL_PROJECTION)
+    call glLoadIdentity()
+    call glOrtho(0.0_c_double, real(ui_width, c_double), 0.0_c_double, &
+         real(top_h, c_double), -1.0_c_double, 1.0_c_double)
+    call glMatrixMode(GL_MODELVIEW)
+    call glLoadIdentity()
+
+    total_btns = N + 2
+    num_rows   = max(12, (total_btns + 4) / 5)
+    bw = real(ui_width, c_double) / 5.0_c_double
+    bh = real(top_h, c_double) / real(num_rows, c_double)
+
+    idx = 1
+    do r = 0, num_rows - 1
+       do col = 0, 4
+          if (idx > total_btns) exit
+          bx1 = real(col, c_double) * bw + 2.0_c_double
+          bx2 = bx1 + bw - 4.0_c_double
+          by2 = real(top_h, c_double) - real(r, c_double) * bh - 2.0_c_double
+          by1 = by2 - bh + 4.0_c_double
+
+          if (idx <= N) then
+             if (input_layers(idx)%visible) then
+                call glColor3f(layer_colors(1, idx), layer_colors(2, idx), layer_colors(3, idx))
+             else
+                call glColor3f(0.25_c_float * layer_colors(1, idx), &
+                     0.25_c_float * layer_colors(2, idx), 0.25_c_float * layer_colors(3, idx))
+             end if
+          else if (idx == N + 1) then
+             call glColor3f(0.35_c_float, 0.35_c_float, 0.35_c_float) ! All OFF button
+          else
+             call glColor3f(0.75_c_float, 0.75_c_float, 0.75_c_float) ! All ON button
+          end if
+
+          call glBegin(GL_QUADS)
+          call glVertex2f(real(bx1, c_float), real(by1, c_float))
+          call glVertex2f(real(bx2, c_float), real(by1, c_float))
+          call glVertex2f(real(bx2, c_float), real(by2, c_float))
+          call glVertex2f(real(bx1, c_float), real(by2, c_float))
+          call glEnd()
+
+          if (idx == active_layer .or. idx == N + 1 .or. idx == N + 2) then
+             call glColor4f(1.0_c_float, 1.0_c_float, 1.0_c_float, 1.0_c_float)
+             call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+             call glBegin(GL_QUADS)
+             if (idx > N) then
+                call glVertex2f(real(bx1 + 4.0_c_double, c_float), real(by1 + 4.0_c_double, c_float))
+                call glVertex2f(real(bx2 - 4.0_c_double, c_float), real(by1 + 4.0_c_double, c_float))
+                call glVertex2f(real(bx2 - 4.0_c_double, c_float), real(by2 - 4.0_c_double, c_float))
+                call glVertex2f(real(bx1 + 4.0_c_double, c_float), real(by2 - 4.0_c_double, c_float))
+             else
+                call glVertex2f(real(bx1, c_float), real(by1, c_float))
+                call glVertex2f(real(bx2, c_float), real(by1, c_float))
+                call glVertex2f(real(bx2, c_float), real(by2, c_float))
+                call glVertex2f(real(bx1, c_float), real(by2, c_float))
+             end if
+             call glEnd()
+             call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+          end if
+          idx = idx + 1
+       end do
+    end do
+  end subroutine RenderLayerPanel
+
+  subroutine SimpleWindow(N, input_layers, win_x_in, win_y_in)
+    integer, intent(in)             :: N
+    type(DrawnLayer), intent(inout) :: input_layers(:)
+    real, intent(in)                :: win_x_in, win_y_in
+
+    type(Box)         :: mbr, current_view
+    type(GLFWwindow)  :: window
+    type(CameraState) :: cam
+    type(InputState)  :: inp
+    type(Point2D)     :: mouse_screen, mouse_world
+
+    integer :: ierr, idx, active_layer, target_depth, num_rows, col, r
+    integer(c_int) :: live_win_x, live_win_y, prev_win_x, prev_win_y
+    integer(c_int) :: ui_width, main_width, top_h, bot_h
+    real(c_double) :: mbr_span, max_zoom, bw, bh
+    real(c_float), allocatable :: layer_colors(:,:)
+    logical :: tree_mode, dirty, should_quit, is_down, any_input
+    integer(kind=K_COORDINATE_KIND) :: min_span
+
+    if (N <= 0) then
+       write(*,*) 'INFO: MAGVIEWER has 0 layers to display.'
+       return
+    end if
+
+    ui_width     = 200_c_int
+    active_layer = 1
+    target_depth = 1
+    tree_mode    = .true.
+    prev_win_x   = -1_c_int
+    prev_win_y   = -1_c_int
+
+    ! Compute global design MBR across all non-empty layers
+    call mbr%reset_to_infinity()
+    do idx = 1, N
+       if (associated(input_layers(idx)%input_layer)) then
+          if (input_layers(idx)%input_layer%n_used > 0_int64) then
+             mbr = mbr + mbr_of_array(input_layers(idx)%input_layer%layer_boxes, &
+                  input_layers(idx)%input_layer%n_used)
+          end if
+       end if
+    end do
+    if (.not. mbr%is_valid()) then
+       mbr%x1 = 0; mbr%y1 = 0; mbr%x2 = 1000; mbr%y2 = 1000
+    else
+       mbr_span = max(real(mbr%x2 - mbr%x1, c_double), real(mbr%y2 - mbr%y1, c_double)) * 0.1_c_double
+       call box_grow(mbr, int(max(1.0_c_double, mbr_span), kind=K_COORDINATE_KIND), &
+            int(max(1.0_c_double, mbr_span), kind=K_COORDINATE_KIND))
+    end if
+
+    ! Dynamic palette supporting any number of layers
+    allocate(layer_colors(3, max(60, N + 2)))
+    do idx = 1, size(layer_colors, 2)
        layer_colors(1, idx) = 0.5_c_float + 0.5_c_float * sin(real(idx, c_float) * 0.3_c_float)
        layer_colors(2, idx) = 0.5_c_float + 0.5_c_float * sin(real(idx, c_float) * 0.3_c_float + 2.09_c_float)
        layer_colors(3, idx) = 0.5_c_float + 0.5_c_float * sin(real(idx, c_float) * 0.3_c_float + 4.18_c_float)
     end do
-
-    ! Initialize layer colors and properties
     do idx = 1, N
-       input_layers(idx)%color = [layer_colors(1, idx), layer_colors(2, idx), layer_colors(3, idx)]
-       input_layers(idx)%visible = .true.
+       input_layers(idx)%color       = layer_colors(:, idx)
+       input_layers(idx)%visible     = .true.
+       input_layers(idx)%cache_valid = .false.
     end do
+
+    call glfwSetErrorCallback(handle_error)
+    call glfwInit(ierr)
+    if (ierr /= 0) error stop 'Error whilst initialising GLFW'
+
+    window = glfwCreateWindow(int(win_x_in, c_int), int(win_y_in, c_int), 'MAGVIEWER')
+    if (.not. associated(window)) then
+       call glfwTerminate()
+       error stop 'Error whilst creating GLFW window'
+    end if
+
+    call glfwMakeContextCurrent(window)
+    call glDisable(GL_DEPTH_TEST)
     call glEnable(GL_BLEND)
     call glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-    
-    do while (glfwWindowShouldClose(window) == 0)
-       ! 1. Get the ACTUAL live window size from the OS
+
+    cam%win_w = max(1.0_c_double, real(win_x_in, c_double) - real(ui_width, c_double))
+    cam%win_h = max(1.0_c_double, real(win_y_in, c_double))
+    call FitCameraToMBR(cam, mbr)
+    dirty = .true.
+
+    do while (.not. glfwWindowShouldClose(window))
        call glfwGetWindowSize(window, live_win_x, live_win_y)
-       main_width = live_win_x - ui_width
-
-       ! 2. Clear the ENTIRE screen once
-       call glViewport(0, 0, live_win_x, live_win_y)
-       call glClearColor(0.2_c_float, 0.2_c_float, 0.2_c_float, 1.0_c_float) ! Dark Gray UI background
-       call glClear(GL_COLOR_BUFFER_BIT)
-       
-       ! Convert to real(c_double) once to keep the math clean
-       real_win_x = real(live_win_x, c_double)
-       real_win_y = real(live_win_y, c_double)
-
-       ! 2. Update Viewport dynamically (prevents stretching if window is resized)
-       call glViewport(0, 0, live_win_x, live_win_y)
-       ! --- 1. Update Camera State ---
-       cam%win_w = real_win_x
-       cam%win_h = real_win_y
-
-       cam%left   = center_x - half_w
-       cam%right  = center_x + half_w
-       cam%bottom = center_y - half_h
-       cam%top    = center_y + half_h
-       ! 1. Handle Key Inputs for Real-Time Pan and Zoom
-       if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)    pan_y = pan_y + (5.0_c_double * zoom)
-       if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)  pan_y = pan_y - (5.0_c_double * zoom)
-       if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)  pan_x = pan_x - (5.0_c_double * zoom) 
-       if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) pan_x = pan_x + (5.0_c_double * zoom)
-       if ( (glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS) .or. &
-            (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS) ) then
-          zoom  = zoom * 1.02_c_double 
-          !write(*,*) 'Current ZOOM level = ', zoom          
-       end if
-       if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) zoom = zoom / 1.02_c_double
-       ! --- Check for '?' key (usually Shift + /) ---
-       question_key_is_pressed = (glfwGetKey(window, GLFW_KEY_SLASH) == GLFW_PRESS)
-       
-       ! Edge detection: only toggle when key goes from UP to DOWN
-       if (question_key_is_pressed .and. .not. question_key_was_pressed) then
-          show_coords = .not. show_coords
-       end if
-       question_key_was_pressed = question_key_is_pressed
-       
-       ! --- Print if enabled ---
-       if (show_coords) then
-          print *, "World X: ", mouse_world%x, " | World Y: ", mouse_world%y
-          show_coords = .not. show_coords
-       end if
-       if (glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS) zoom  = zoom / 1.02_c_double ! '=' key (Zoom In)
-       call cpu_time( current_time )
-       if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) then
-          if (.not. key_was_down .and. (current_time - last_toggle_time > 0.02)) then
-             ! State is safe to toggle
-             TREE_MODE = .not. TREE_MODE
-             last_toggle_time = current_time
-             ! Force a re-evaluation of the buffers on the NEXT frame
-             needs_buffer_update = .true. 
-          end if
-          key_was_down = .true.
-       else
-          key_was_down = .false.
-       end if
-       if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) then
-          if (.not. key_was_down .and. (current_time - last_toggle_time > 0.02)) then
-             ! State is safe to toggle
-             target_depth = target_depth - 1
-             write(*,*) 'TARGET DEPTH = ', target_depth
-             last_toggle_time = current_time
-             ! Force a re-evaluation of the buffers on the NEXT frame
-             needs_buffer_update = .true. 
-          end if
-          key_was_down = .true.
-       else
-          key_was_down = .false.
-       end if
-       if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) then
-          if (.not. key_was_down .and. (current_time - last_toggle_time > 0.02)) then
-             ! State is safe to toggle
-             target_depth = target_depth + 1
-             last_toggle_time = current_time
-             ! Force a re-evaluation of the buffers on the NEXT frame
-             needs_buffer_update = .true. 
-          end if
-          key_was_down = .true.
-       else
-          key_was_down = .false.
-       end if
-
-       ! --- QUIT ON ESCAPE ---
-       if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) then
-          exit
-          !call glfwSetWindowShouldClose(window, 1)
-       end if
-
-       ! --- ZOOM TO FIT (CTRL + A) ---
-       if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS .and. &
-            (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS .or. &
-            glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS)) then
-
-          ! Assuming ui_width = 400
-          main_width = live_win_x - ui_width
-          ! Current height is live_win_y
-
-          ! 1. Calculate required zoom to fit the MBR into the NEW main_width x live_win_y area
-          zoom_x = 2*(real(MBR%x2 - MBR%x1, c_double)) / real(main_width, c_double)
-          zoom_y = 2*(real(MBR%y2 - MBR%y1, c_double)) / real(live_win_y, c_double)
-
-          ! Pick the larger zoom to ensure nothing is clipped
-          zoom = max(zoom_x, zoom_y) * 1.1_c_double 
-
-          ! 2. Center the camera exactly on the MBR center
-          pan_x = ((real(MBR%x1 + MBR%x2, c_double) / 2.0_c_double) - (real(main_width, c_double) / 2.0_c_double))
-          pan_y = ((real(MBR%y1 + MBR%y2, c_double) / 2.0_c_double) - (real(live_win_y, c_double) / 2.0_c_double))
-       end if
-       ! Define the maximum zoom (fit entire MBR in window)
-
-       max_zoom = min(1.2*(MBR%x2 - MBR%x1) / real(main_width, c_double), &
-                      1.2*(MBR%y2 - MBR%y1) / real(live_win_y, c_double))
-
-       if (zoom > max_zoom) zoom = max_zoom
-       ! --- PRE-CALCULATE DIMENSIONS ---
-       ! live_win_x and live_win_y should be fetched from glfwGetWindowSize at the top of the loop
-       main_width = live_win_x - ui_width
-
-       ! --- UPDATE MAIN CAMERA STATE ---
-       ! Use main_width instead of real_win_x to prevent stretching!
-       center_x = (real(main_width, c_double) / 2.0_c_double) + pan_x
-       center_y = (real_win_y / 2.0_c_double) + pan_y
-
-       half_w = (real(main_width, c_double) / 2.0_c_double) * zoom
-       half_h = (real_win_y / 2.0_c_double) * zoom
-
-       ! Update the cam object for the ScreenToWorld subroutine
-       cam%win_w  = real(main_width, c_double)
-       cam%win_h  = real_win_y
-       cam%left   = center_x - half_w
-       cam%right  = center_x + half_w
-       cam%bottom = center_y - half_h
-       cam%top    = center_y + half_h
-
-       ! Update local variables (if still needed elsewhere)
-       current_left   = cam%left
-       current_right  = cam%right
-       current_bottom = cam%bottom
-       current_top    = cam%top
-       ! --- CLAMP PAN ---
-       ! If the camera's left edge is to the left of the MBR, snap it
-       if (current_right < real(MBR%x1, c_double)) then
-           pan_x = real(MBR%x1, c_double) + (half_w) - (real(main_width, c_double) / 2.0_c_double)
-           call beep() ! Trigger the warning
-       else if (current_left > real(MBR%x2, c_double)) then
-           pan_x = real(MBR%x2, c_double) - (half_w) - (real(main_width, c_double) / 2.0_c_double)
-           call beep()
-       end if
-
-       if (current_top < real(MBR%y1, c_double)) then
-           pan_y = real(MBR%y1, c_double) + (half_h) - (real(live_win_y, c_double) / 2.0_c_double)
-           call beep()
-       else if (current_bottom > real(MBR%y2, c_double)) then
-           pan_y = real(MBR%y2, c_double) - (half_h) - (real(live_win_y, c_double) / 2.0_c_double)
-           call beep()
-       end if
-
-       ! --- TRACK AND CONVERT MOUSE CURSOR ---
-       call glfwGetCursorPos(window, mouse_screen%x, mouse_screen%y)       
-       ! --- TRACK MOUSE & LAYER SELECTION LOGIC ---
-       bot_h = live_win_y / 2
+       main_width = max(1_c_int, live_win_x - ui_width)
+       bot_h = live_win_y / 2_c_int
        top_h = live_win_y - bot_h
-       
-       ! 1. Grab the raw screen coordinates from GLFW into our standard Point2D object
+       any_input = .false.
+       should_quit = .false.
+
+       if (live_win_x /= prev_win_x .or. live_win_y /= prev_win_y) then
+          cam%win_w = real(main_width, c_double)
+          cam%win_h = real(max(1_c_int, live_win_y), c_double)
+          prev_win_x = live_win_x
+          prev_win_y = live_win_y
+          dirty = .true.
+       end if
+
+       ! --- Keyboard navigation ---
+       if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) then
+          cam%pan_y = cam%pan_y + 5.0_c_double * cam%zoom; dirty = .true.; any_input = .true.
+       end if
+       if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS) then
+          cam%pan_y = cam%pan_y - 5.0_c_double * cam%zoom; dirty = .true.; any_input = .true.
+       end if
+       if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) then
+          cam%pan_x = cam%pan_x - 5.0_c_double * cam%zoom; dirty = .true.; any_input = .true.
+       end if
+       if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) then
+          cam%pan_x = cam%pan_x + 5.0_c_double * cam%zoom; dirty = .true.; any_input = .true.
+       end if
+       if (glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS .or. &
+           glfwGetKey(window, GLFW_KEY_X)     == GLFW_PRESS) then
+          cam%zoom = cam%zoom * 1.02_c_double; dirty = .true.; any_input = .true.
+       end if
+       if (glfwGetKey(window, GLFW_KEY_Z)     == GLFW_PRESS .or. &
+           glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS) then
+          cam%zoom = max(1.0e-4_c_double, cam%zoom / 1.02_c_double); dirty = .true.; any_input = .true.
+       end if
+
+       ! Edge-triggered toggles (independent per key)
+       is_down = (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+       if (is_down .and. .not. inp%r_was_down) then
+          tree_mode = .not. tree_mode
+          dirty = .true.
+          write(*,'(A,L1)') 'MAGVIEWER: tree_mode = ', tree_mode
+       end if
+       inp%r_was_down = is_down
+
+       is_down = (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+       if (is_down .and. .not. inp%s_was_down) then
+          target_depth = max(0, target_depth - 1)
+          dirty = .true.
+          write(*,'(A,I0)') 'MAGVIEWER: target_depth = ', target_depth
+       end if
+       inp%s_was_down = is_down
+
+       is_down = (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
+       if (is_down .and. .not. inp%t_was_down) then
+          target_depth = target_depth + 1
+          dirty = .true.
+          write(*,'(A,I0)') 'MAGVIEWER: target_depth = ', target_depth
+       end if
+       inp%t_was_down = is_down
+
+       if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS .and. &
+           (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL)  == GLFW_PRESS .or. &
+            glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS)) then
+          call FitCameraToMBR(cam, mbr)
+          dirty = .true.
+       end if
+
+       if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) should_quit = .true.
+       if (should_quit) exit
+
+       ! Clamp zoom and update camera bounds
+       max_zoom = max(1.0_c_double, &
+            max(1.2_c_double * real(mbr%x2 - mbr%x1, c_double) / max(1.0_c_double, cam%win_w), &
+                1.2_c_double * real(mbr%y2 - mbr%y1, c_double) / max(1.0_c_double, cam%win_h)))
+       if (cam%zoom > max_zoom) cam%zoom = max_zoom
+       call UpdateCameraBounds(cam)
+
+       ! Mouse tracking (single query per frame)
        call glfwGetCursorPos(window, mouse_screen%x, mouse_screen%y)
-       mouse_is_down = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS
-       ! 2. Check UI Panel interactions FIRST (using the raw screen%x)
-       ! --- 2. ONLY TRIGGER ON THE "RISING EDGE" (Up to Down transition) ---
-       if (mouse_is_down .and. .not. mouse_was_down) then
-       !if (mouse_is_down) then
-          mouse_was_down = mouse_is_down
-          ! If X is in the UI width, and Y is in the top half:
+       is_down = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+       if (is_down .and. .not. inp%mouse_was_down) then
           if (mouse_screen%x < real(ui_width, c_double) .and. &
-               mouse_screen%y < real(top_h, c_double)) then
-
-             ! Calculate which button was clicked
+              mouse_screen%y < real(top_h, c_double)) then
+             num_rows = max(12, (N + 6) / 5)
              bw = real(ui_width, c_double) / 5.0_c_double
-             bh = real(top_h, c_double) / 12.0_c_double
-
-             ! integer division determines the column (0 to 4) and row (0 to 11)
+             bh = real(top_h, c_double) / real(num_rows, c_double)
              col = int(mouse_screen%x / bw)
              r   = int(mouse_screen%y / bh)
-
-             ! Calculate 1D index (1 to 60)
-             idx = (r * 5) + col + 1
-             if ( idx == N+1 ) input_layers(:)%visible = .false.
-             if ( idx == N+2 ) input_layers(:)%visible = .true.             
-                
-             if (idx >= 1 .and. idx <= N+2) then
+             idx = r * 5 + col + 1
+             if (idx >= 1 .and. idx <= N) then
                 active_layer = idx
-                input_layers( active_layer )%visible = .not. input_layers( active_layer )%visible                
-                !print *, "Selected Layer: ", active_layer
+                input_layers(idx)%visible = .not. input_layers(idx)%visible
+             else if (idx == N + 1) then
+                input_layers(1:N)%visible = .false.
+             else if (idx == N + 2) then
+                input_layers(1:N)%visible = .true.
              end if
           end if
        end if
-       mouse_was_down = mouse_is_down
-       ! 3. NOW shift X for the Main Viewport World calculation
-       mouse_screen%x = mouse_screen%x - real(ui_width, c_double)
-       
-       ! If the adjusted X is >= 0, they are hovering over the VLSI layout
-       if (mouse_screen%x >= 0.0_c_double) then
-           call ScreenToWorld(mouse_screen, cam, mouse_world)
-        end if
-        ! Inside your loop, after calculating mouse_world
-        !print *, "World X: ", mouse_world%x, " | World Y: ", mouse_world%y         
-        !write(*, '("Mouse World: X=", F10.2, " Y=", F10.2, A)')  mouse_world%x, mouse_world%y, achar(13) ! Achar(13) is Carriage Return
-        ! \033[s   = Save cursor position
-        ! \033[u   = Restore cursor position
-        ! \033[K   = Clear to end of line
-        !write(*, '(A, F10.2, A, F10.2, A)', advance='no') achar(27)//'[s', mouse_world%x, ', ', mouse_world%y, achar(27)//'[u'// achar(27)//'[K'
-        !call flush(6)
-       ! ==========================================
-       ! GLOBAL CLEAR
-       ! ==========================================
-       call glViewport(0, 0, live_win_x, live_win_y)
-       call glClearColor(0.2_c_float, 0.2_c_float, 0.2_c_float, 1.0_c_float) ! Dark gray backdrop
+       inp%mouse_was_down = is_down
+
+       is_down = (glfwGetKey(window, GLFW_KEY_SLASH) == GLFW_PRESS)
+       if (is_down .and. .not. inp%slash_was_down) then
+          if (mouse_screen%x >= real(ui_width, c_double)) then
+             mouse_screen%x = mouse_screen%x - real(ui_width, c_double)
+             call ScreenToWorld(mouse_screen, cam, mouse_world)
+             write(*,'(A,F12.2,A,F12.2)') 'World X: ', mouse_world%x, ' | World Y: ', mouse_world%y
+          end if
+       end if
+       inp%slash_was_down = is_down
+
+       ! Only rebuild per-layer vertex buffers when camera or LOD mode changes
+       current_view = CameraToViewBox(cam)
+       if (dirty) then
+          call InvalidateLayerCaches(N, input_layers)
+          dirty = .false.
+       end if
+       min_span = int(max(0.0_c_double, cam%zoom * 0.5_c_double), kind=K_COORDINATE_KIND)
+       call UpdateVisibleLayerCaches(N, input_layers, current_view, tree_mode, target_depth, min_span)
+
+       ! Single global clear + 3 clean render passes
+       call glViewport(0_c_int, 0_c_int, live_win_x, live_win_y)
+       call glClearColor(0.2_c_float, 0.2_c_float, 0.2_c_float, 1.0_c_float)
        call glClear(GL_COLOR_BUFFER_BIT)
 
-       ! --- DATA FETCHING (RTree Lookup) ---
-       ! Note: We use main_width here so the culling perfectly matches the visual area
-       current_view = GetCurrentViewportWorld(real(main_width, c_double), real_win_y, pan_x, pan_y, zoom)
+       call RenderMainViewport(N, input_layers, ui_width, main_width, live_win_y, cam, tree_mode)
+       call RenderMinimap(mbr, current_view, ui_width, bot_h)
+       call RenderLayerPanel(N, input_layers, layer_colors, active_layer, ui_width, bot_h, top_h)
 
-       ! ==========================================
-       ! PASS 1: MAIN VIEWPORT (Right Side)
-       ! ==========================================
-       call glViewport(ui_width, 0, main_width, live_win_y)
-       
-       call glMatrixMode(GL_PROJECTION)
-       call glLoadIdentity()
-       call glOrtho(cam%left, cam%right, cam%bottom, cam%top, -1.0_c_double, 1.0_c_double)
-
-       call glMatrixMode(GL_MODELVIEW)
-       call glLoadIdentity()
-
-       ! ==========================================
-       ! RENDER PASS: DRAW ALL VISIBLE LAYERS
-       ! ==========================================
-       do idx = 1, N
-          if (input_layers(idx)%visible) then
-             if( .not. tree_mode ) then
-                call PerformBoxFilling( input_layers(idx)%input_layer, current_view, visible_boxes, vertex_buffer, num_visible)
-             else
-                call PerformMBRFilling( input_layers(idx)%input_layer, current_view, target_depth, visible_boxes, vertex_buffer, num_visible)         
-             end if
-             if (num_visible > 0) then
-                call glEnableClientState(GL_VERTEX_ARRAY)
-                call glVertexPointer(2, GL_INT, 0, c_loc(vertex_buffer(1)))
-
-                ! Draw Fill
-                call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-                ! 2. Set color with transparency (alpha)
-                if( tree_mode ) then
-                   call glColor4f(0.8_c_float, 0.3_c_float, 0.3_c_float,1.0_c_float) ! Coral Red
-                else
-                   call glColor4f(input_layers(idx)%color(1), &
-                        input_layers(idx)%color(2), &
-                        input_layers(idx)%color(3),input_layers(idx)%alpha)
-                end if
-                call glDrawArrays(GL_QUADS, 0, num_visible * 4)
-
-                ! Draw Outline (Keep outlines opaque for visibility)
-                call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)                
-                call glColor4f(0.0_c_float, 0.0_c_float, 0.0_c_float, 1.0_c_float)
-                call glDrawArrays(GL_QUADS, 0, num_visible * 4)
-
-                call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-                call glDisableClientState(GL_VERTEX_ARRAY)
-             end if
-          end if
-       end do
-       ! ==========================================
-       ! PASS 2: MBR MINIMAP
-       ! ==========================================
-       call glViewport(0, 0, min(ui_width/2, bot_h/2), min(ui_width/2, bot_h/2))
-       call glMatrixMode(GL_PROJECTION)
-       call glLoadIdentity()
-       
-       ! Calculate the same square projection used for the MBR background
-       block
-           real(c_double) :: mbr_w, mbr_h, mbr_cx, mbr_cy, max_dim, half_dim
-           mbr_w  = real(MBR%x2 - MBR%x1, c_double)
-           mbr_h  = real(MBR%y2 - MBR%y1, c_double)
-           mbr_cx = real(MBR%x1 + MBR%x2, c_double) / 2.0_c_double
-           mbr_cy = real(MBR%y1 + MBR%y2, c_double) / 2.0_c_double
-           
-           max_dim  = max(mbr_w, mbr_h)
-           half_dim = (max_dim / 2.0_c_double) * 1.05_c_double
-           
-           ! THIS is the exact projection matrix
-           call glOrtho(mbr_cx - half_dim, mbr_cx + half_dim, &
-                        mbr_cy - half_dim, mbr_cy + half_dim, &
-                        -1.0_c_double, 1.0_c_double)
-       end block
-
-       call glMatrixMode(GL_MODELVIEW)
-       call glLoadIdentity()
-
-       ! 1. Draw MBR background
-       call glColor3f(0.1_c_float, 0.1_c_float, 0.1_c_float)
-       call glBegin(GL_QUADS)
-         call glVertex2f(real(MBR%x1, c_float), real(MBR%y1, c_float))
-         call glVertex2f(real(MBR%x2, c_float), real(MBR%y1, c_float))
-         call glVertex2f(real(MBR%x2, c_float), real(MBR%y2, c_float))
-         call glVertex2f(real(MBR%x1, c_float), real(MBR%y2, c_float))
-       call glEnd()
-
-       ! 2. Draw the Current View Indicator
-       ! Get the current camera boundary from the view logic
-       current_view = GetCurrentViewportWorld(real(main_width, c_double), real(live_win_y, c_double), pan_x, pan_y, zoom)
-
-       ! --- CLAMPED INDICATOR LOGIC ---
-       block
-           real(c_double) :: ind_x1, ind_y1, ind_x2, ind_y2
-           real(c_double) :: min_size, current_w, current_h
-           real(c_double) :: cx, cy
-           real(c_double) :: draw_w, draw_h           
-           ! Calculate the current width/height of the view
-           current_w = current_view%x2 - current_view%x1
-           current_h = current_view%y2 - current_view%y1
-           
-           ! Set a minimum size (e.g., 5% of the total MBR dimension)
-           ! This ensures the box is always big enough to see
-           min_size = (real(MBR%x2 - MBR%x1, c_double) + real(MBR%y2 - MBR%y1, c_double)) * 0.025_c_double
-           
-           ! Calculate center
-
-           cx = (current_view%x1 + current_view%x2) / 2.0_c_double
-           cy = (current_view%y1 + current_view%y2) / 2.0_c_double
-           
-           ! Use the larger of (Actual Width, Min Size)
-
-           draw_w = max(current_w, min_size)
-           draw_h = max(current_h, min_size)
-           
-           ind_x1 = cx - (draw_w / 2.0_c_double)
-           ind_x2 = cx + (draw_w / 2.0_c_double)
-           ind_y1 = cy - (draw_h / 2.0_c_double)
-           ind_y2 = cy + (draw_h / 2.0_c_double)
-
-           ! Now draw the clamped indicator
-           call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-           call glColor3f(1.0_c_float, 1.0_c_float, 0.0_c_float) 
-           call glBegin(GL_QUADS)
-             call glVertex2f(real(ind_x1, c_float), real(ind_y1, c_float))
-             call glVertex2f(real(ind_x2, c_float), real(ind_y1, c_float))
-             call glVertex2f(real(ind_x2, c_float), real(ind_y2, c_float))
-             call glVertex2f(real(ind_x1, c_float), real(ind_y2, c_float))
-           call glEnd()
-           call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-       end block       
-
-       ! ==========================================
-       ! PASS 3: LAYER BUTTONS (Top Left Panel)
-       ! ==========================================
-       call glViewport(0, bot_h, ui_width, top_h)
-       call glMatrixMode(GL_PROJECTION)
-       call glLoadIdentity()
-       call glOrtho(0.0_c_double, real(ui_width, c_double), 0.0_c_double, real(top_h, c_double), -1.0_c_double, 1.0_c_double)
-       call glMatrixMode(GL_MODELVIEW)
-       call glLoadIdentity()
-
-       ! Calculate square button dimensions based on 8 columns and 8 rows
-       bw = real(ui_width, c_double) / 5.0_c_double
-       bh = real(top_h, c_double) / 12.0_c_double
-
-       idx = 1
-       do r = 0, N/5       ! 8 Rows (0 to 7)
-           do col = 0, 4 ! 8 Columns (0 to 7)
-               if (idx > 2*N) exit ! Stop drawing after 60 buttons
-
-               bx1 = real(col, c_double) * bw
-               bx2 = bx1 + bw
-               by2 = real(top_h, c_double) - (real(r, c_double) * bh)
-               by1 = by2 - bh
-               
-               ! 2-pixel aesthetic gap
-               bx1 = bx1 + 2.0_c_double
-               bx2 = bx2 - 2.0_c_double
-               by1 = by1 + 2.0_c_double
-               by2 = by2 - 2.0_c_double
-
-               ! Draw Solid Color
-               call glColor3f(layer_colors(1, idx), layer_colors(2, idx), layer_colors(3, idx))
-               call glBegin(GL_QUADS)
-                 call glVertex2f(real(bx1, c_float), real(by1, c_float))
-                 call glVertex2f(real(bx2, c_float), real(by1, c_float))
-                 call glVertex2f(real(bx2, c_float), real(by2, c_float))
-                 call glVertex2f(real(bx1, c_float), real(by2, c_float))
-               call glEnd()
-               
-               ! Draw Outline for Active Layer
-               if (idx == active_layer) then
-                   call glColor3f(1.0_c_float, 1.0_c_float, 1.0_c_float) ! White highlight
-                   call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-                   call glBegin(GL_QUADS)
-                     call glVertex2f(real(bx1, c_float), real(by1, c_float))
-                     call glVertex2f(real(bx2, c_float), real(by1, c_float))
-                     call glVertex2f(real(bx2, c_float), real(by2, c_float))
-                     call glVertex2f(real(bx1, c_float), real(by2, c_float))
-                   call glEnd()
-                   call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-               end if
-               ! Draw Double Boundary for a specific index
-               if (idx == N+1) then
-                  call glColor4f(1.0, 1.0, 1.0, 1.0) ! White
-                  call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-                  call glBegin(GL_QUADS)
-                  ! Shrink the boundary slightly (e.g., 5 pixels inset)
-                  call glVertex2f(real(bx1 + 5.0, c_float), real(by1 + 5.0, c_float))
-                  call glVertex2f(real(bx2 - 5.0, c_float), real(by1 + 5.0, c_float))
-                  call glVertex2f(real(bx2 - 5.0, c_float), real(by2 - 5.0, c_float))
-                  call glVertex2f(real(bx1 + 5.0, c_float), real(by2 - 5.0, c_float))
-                  call glEnd()
-                  call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-               end if
-               if (idx == N+2) then
-                  call glColor4f(1.0, 1.0, 1.0, 1.0) ! White
-                  call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-                  call glBegin(GL_QUADS)
-                  ! Shrink the boundary slightly (e.g., 5 pixels inset)
-                  call glVertex2f(real(bx1 + 5.0, c_float), real(by1 + 5.0, c_float))
-                  call glVertex2f(real(bx2 - 5.0, c_float), real(by1 + 5.0, c_float))
-                  call glVertex2f(real(bx2 - 5.0, c_float), real(by2 - 5.0, c_float))
-                  call glVertex2f(real(bx1 + 5.0, c_float), real(by2 - 5.0, c_float))
-                  call glEnd()
-                  call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-                  
-               end if
-               idx = idx + 1
-           end do
-       end do
-       ! ==========================================
-       ! END OF FRAME
-       ! ==========================================
        call glfwSwapBuffers(window)
-       call glfwPollEvents()              
+       if (any_input) then
+          call glfwPollEvents()
+       else
+          call glfwWaitEventsTimeout(0.016_c_double)
+       end if
     end do
 
-    deallocate(vertex_buffer)
-    !do
-    !   call glfwPollEvents()
-    !   call glfwSwapBuffers(window)
-    !   if (glfwWindowShouldClose(window)) exit
-    !end do
-
+    do idx = 1, N
+       if (allocated(input_layers(idx)%vbo_verts)) deallocate(input_layers(idx)%vbo_verts)
+    end do
+    if (allocated(layer_colors)) deallocate(layer_colors)
     call glfwDestroyWindow(window)
     call glfwTerminate()
   end subroutine SimpleWindow
+
 end module DrawUsingOpenGL
 
-#ifdef WORKING
-program main
+program magviewer
+  use, intrinsic :: iso_fortran_env, only: int64
+  use, intrinsic :: iso_c_binding, only: c_int
   use DrawUsingOpenGL
-  implicit none
-  integer :: narg, iostat
-  integer(kind=int64) :: total_nodes
-  type(DrawnLayer),allocatable     :: input_layers(:)
-  integer                :: N, i
-  character(len=256)     :: filename
-  character(len=256)     :: buf
-  integer                :: control_parameter
-  narg = command_argument_count()
-  if( narg < 2 ) error stop "./MAGVIEW N [KLBIN]+ CONTROL"
-  call get_command_argument(1, buf, status=iostat)   ! allocates automatically
-  read( buf, *, iostat=iostat ) N
-  if (iostat /= 0) then
-     write (*,*) "ERROR: 1st argument must be an integer."
-     stop 2
-  end if
-  allocate( input_layers(N) )
-  do i=1,N
-     call get_command_argument(1+i, filename, status=iostat)   ! allocates automatically
-     if (iostat /= 0) then
-        write (*,*) "ERROR: 1st argument must be a filename."
-        stop 2
-     end if
-     write (*,*) 'Reading filename: ', trim(filename)     
-     call RestoreSnapToLayer( input_layers(i)%input_layer, filename )
-  end do
-  call get_command_argument(N+2, buf, status=iostat)   ! allocates automatically
-  read( buf, *, iostat=iostat ) control_parameter
-  if (iostat /= 0) then
-     write (*,*) "ERROR: 2nd argument must be an integer."
-     stop 2
-  end if
-  call SimpleWindow(N, input_layers, 1200.0, 800.0)
-end program main
-#endif
-
-program main
-  use DrawUsingOpenGL
-  use LayoutDBLoaderModule, only: LoadLayoutDBFile
-  use DesignModule, only: Design, Layer, DESIGN_DIRECTION_INPUT, RestoreSnapToLayer
-  use CommonModule, only: temporary_layers
+  use LayoutDBLoaderModule, only: LoadLayoutDBFile, LoadLayoutDBFileHier
+  use DesignModule, only: Design, Layer, DESIGN_DIRECTION_INPUT, RestoreSnapToLayer, BuildTree
+  use GeometryModule, only: Box, mbr_of_array
+  use CommonModule, only: temporary_layers, K_COORDINATE_KIND
   use hash_mod, only: hash_nitems
   use MagicVLSILayoutParser, only: parseMagicLayoutFile
   implicit none
-  integer :: narg, iostat, extpos, j, ch
+
+  integer :: narg, iarg, ios, extpos, j, ch, max_layers, num_layers, i, test_vis
+  integer(kind=int64) :: total_boxes
+  character(len=512) :: arg, filename
+  character(len=16)  :: fext
+  logical :: is_layoutdb, is_single_layer, use_hier, headless_info
   type(Design), target :: load_design
-  type(DrawnLayer),allocatable     :: input_layers(:)
-  integer                :: N, i
-  character(len=256)     :: filename
-  character(len=256)     :: buf
-  character(len=16)      :: fext
-  integer                :: MAX_LAYERS
-  logical                :: is_layoutdb
+  type(Layer), target  :: single_layer
+  type(DrawnLayer), allocatable :: input_layers(:)
+  type(Box) :: global_mbr
+  integer(c_int), allocatable :: test_vbuf(:)
+
   narg = command_argument_count()
-  if( narg < 2 ) error stop "./MAGVIEWER <MAGIC|OASIS|GDS file> MAX-LAYERS"
-  call get_command_argument(1, filename, status=iostat)
-  if (iostat /= 0) then
-     write (*,*) "ERROR: 1st argument must be a layout filename."
+  if (narg < 1) then
+     write(*,'(A)') 'Usage: MAGVIEWER.exe <layout.mag|layout.gds|layout.oas|layer.bin|layer.snap> ' // &
+          '[max_layers] [--hier] [--info|--headless]'
+     stop 1
+  end if
+
+  filename      = ''
+  max_layers    = 256
+  use_hier      = .false.
+  headless_info = .false.
+
+  do iarg = 1, narg
+     call get_command_argument(iarg, arg, status=ios)
+     if (ios /= 0) cycle
+     select case (trim(arg))
+     case ('--hier', '-H')
+        use_hier = .true.
+     case ('--info', '--headless')
+        headless_info = .true.
+     case default
+        if (len_trim(filename) == 0) then
+           filename = trim(arg)
+        else
+           read(arg, *, iostat=ios) max_layers
+           if (ios /= 0 .or. max_layers <= 0) then
+              write(*,'(A,A)') 'ERROR: invalid max_layers argument: ', trim(arg)
+              stop 2
+           end if
+        end if
+     end select
+  end do
+
+  if (len_trim(filename) == 0) then
+     write(*,'(A)') 'ERROR: missing input layout filename.'
      stop 2
   end if
-  call get_command_argument(2, buf, status=iostat)
-  read( buf, *, iostat=iostat ) MAX_LAYERS
-  if (iostat /= 0) then
-     write (*,*) "ERROR: 2nd argument must be an integer."
-     stop 2
-  end if
+
+  ! Determine file format from lowercase extension
   fext = ''
   extpos = index(trim(filename), '.', back=.true.)
-  if (extpos > 0) fext = filename(extpos+1:)
-  do j=1,len_trim(fext)
+  if (extpos > 0) fext = filename(extpos + 1:)
+  do j = 1, len_trim(fext)
      ch = iachar(fext(j:j))
-     if (ch >= iachar('A') .and. ch <= iachar('Z')) fext(j:j) = achar(ch+32)
+     if (ch >= iachar('A') .and. ch <= iachar('Z')) fext(j:j) = achar(ch + 32)
   end do
-  is_layoutdb = (trim(fext)=='oas' .or. trim(fext)=='oasis' .or. trim(fext)=='gds' .or. trim(fext)=='gds2' .or. trim(fext)=='gdsii')
-  if( (.not. is_layoutdb) .and. MAX_LAYERS == 1 ) then
-     block
-       type(Layer), target :: tempLayer
-       !> short cut for single layer
-       allocate( input_layers(3) )
-       call RestoreSnapToLayer( tempLayer, filename )
-       input_layers(1)%input_layer => tempLayer
-       call SimpleWindow(1, input_layers, 1600.0, 900.0)
-     end block
-     stop
-  end if
-  load_design%fileName = trim( filename )
-  load_design%design_direction = DESIGN_DIRECTION_INPUT
-  temporary_layers = 2 !> so we can parse empty files as empty layers
-  if (is_layoutdb) then
-     write(*,*) 'INFO: MAGVIEWER loading OASIS/GDS via layoutdb (compressed/on-demand view): ', trim(filename)
-     call LoadLayoutDBFile(load_design, MAX_LAYERS)
-  else
-     call parseMagicLayoutFile( load_design, MAX_LAYERS )
-  end if
-  N = hash_nitems( load_design%ht )
-  write(*,*) 'Loaded: ', N, ' layers.'
-  allocate( input_layers(N+2) )
-  do i=1,N+2
-     nullify( input_layers(i)%input_layer )
-  end do
-  do i=1,N
-     input_layers(i)%input_layer => load_design%layers(i)
-  end do
-  call SimpleWindow(N, input_layers, 1600.0, 900.0)
-end program main
 
+  is_layoutdb = (trim(fext) == 'oas' .or. trim(fext) == 'oasis' .or. &
+                 trim(fext) == 'gds' .or. trim(fext) == 'gds2'  .or. trim(fext) == 'gdsii')
+  is_single_layer = (trim(fext) == 'bin' .or. trim(fext) == 'snap' .or. trim(fext) == 'snaz') &
+                    .or. ((.not. is_layoutdb) .and. max_layers == 1)
+
+  if (is_single_layer) then
+     call RestoreSnapToLayer(single_layer, trim(filename))
+     call BuildTree(single_layer)
+     num_layers = 1
+     allocate(input_layers(1))
+     input_layers(1)%input_layer => single_layer
+  else
+     if (allocated(load_design%fileName)) deallocate(load_design%fileName)
+     allocate(character(len=len_trim(filename)) :: load_design%fileName)
+     load_design%fileName = trim(filename)
+     load_design%design_direction = DESIGN_DIRECTION_INPUT
+     temporary_layers = 2
+     if (is_layoutdb) then
+        if (use_hier) then
+           write(*,'(A,A)') 'INFO: MAGVIEWER loading GDS/OASIS (hierarchical flatten): ', trim(filename)
+           call LoadLayoutDBFileHier(load_design, max_layers)
+        else
+           write(*,'(A,A)') 'INFO: MAGVIEWER loading GDS/OASIS (native layoutdb): ', trim(filename)
+           call LoadLayoutDBFile(load_design, max_layers)
+        end if
+        num_layers = hash_nitems(load_design%ht)
+        ! Build R-Trees for all loaded GDS/OASIS layers so viewport culling and LOD work
+        do i = 1, num_layers
+           if (load_design%layers(i)%n_used > 0_int64) then
+              call BuildTree(load_design%layers(i))
+           end if
+        end do
+     else
+        call parseMagicLayoutFile(load_design, max_layers)
+        num_layers = hash_nitems(load_design%ht)
+     end if
+     allocate(input_layers(max(1, num_layers)))
+     do i = 1, num_layers
+        input_layers(i)%input_layer => load_design%layers(i)
+     end do
+  end if
+
+  total_boxes = 0_int64
+  call global_mbr%reset_to_infinity()
+  do i = 1, num_layers
+     if (associated(input_layers(i)%input_layer)) then
+        total_boxes = total_boxes + input_layers(i)%input_layer%n_used
+        if (input_layers(i)%input_layer%n_used > 0_int64) then
+           global_mbr = global_mbr + mbr_of_array(input_layers(i)%input_layer%layer_boxes, &
+                input_layers(i)%input_layer%n_used)
+        end if
+     end if
+  end do
+  write(*,'(A,I0,A,I0,A,4I12)') 'INFO: MAGVIEWER ready: layers=', num_layers, &
+       ' total_boxes=', total_boxes, ' extent=', &
+       global_mbr%x1, global_mbr%y1, global_mbr%x2, global_mbr%y2
+
+  if (headless_info) then
+     ! Exercise the direct R-Tree vertex-buffer fill path in headless verification mode
+     test_vis = 0
+     do i = 1, num_layers
+        if (associated(input_layers(i)%input_layer)) then
+           if (input_layers(i)%input_layer%n_used > 0_int64) then
+              call FillLayerBoxesDirect(input_layers(i)%input_layer, global_mbr, &
+                   0_K_COORDINATE_KIND, test_vbuf, j)
+              test_vis = test_vis + j
+           end if
+        end if
+     end do
+     write(*,'(A,I0)') 'INFO: MAGVIEWER headless render-fill boxes=', test_vis
+     stop 0
+  end if
+
+  call SimpleWindow(num_layers, input_layers, 1600.0, 900.0)
+end program magviewer
