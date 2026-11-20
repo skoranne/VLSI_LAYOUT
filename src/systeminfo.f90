@@ -95,7 +95,9 @@ contains
 
     write(*,*) 'CPU Metrics:'
     ! Linux: lscpu; macOS: sysctl as fallback (lscpu usually absent)
-    call execute_command_line("lscpu 2>/dev/null | grep -E 'Model name|CPU\\(s\\):|Thread' || sysctl -n machdep.cpu.brand_string hw.ncpu 2>/dev/null")
+    call execute_command_line( &
+         "lscpu 2>/dev/null | grep -E 'Model name|CPU\\(s\\):|Thread' " // &
+         "|| sysctl -n machdep.cpu.brand_string hw.ncpu 2>/dev/null")
     print *, "---------------------------------------------------------"
     vm_size = -1
     vm_rss = -1

@@ -46,7 +46,7 @@ contains
 
       ! Map the array to the device (or use it if already there)
       ! 'use_device_ptr' extracts the raw device address to pass to C++
-      !$omp target data map(tofrom: Boxes(1:N)) use_device_ptr(Boxes)
+      !$omp target data map(tofrom: Boxes(1:N)) use_device_addr(Boxes)
 
       call thrust_sort_boxes_direct(c_loc(Boxes(1)), N)
 
@@ -66,7 +66,7 @@ contains
       ! Boxes are read-only (map 'to').
       ! SortedIndices is allocated/written on GPU and copied back (map 'from').
       !$omp target data map(to: Boxes(1:N)) map(from: SortedIndices(1:N)) &
-      !$omp use_device_ptr(Boxes, SortedIndices)
+      !$omp use_device_addr(Boxes, SortedIndices)
 
       call thrust_sort_boxes_indirect(c_loc(Boxes(1)), c_loc(SortedIndices(1)), N)
 

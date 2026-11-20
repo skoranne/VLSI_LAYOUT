@@ -62,8 +62,10 @@ contains
     integer(kind=int32) :: gpu_overflow
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
     logical :: use_gpu
+#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
     character(len=32) :: offload_env
     integer :: offload_len, offload_stat
+#endif
 
     if (profiling_enabled) t_start = get_cpu_time()
 

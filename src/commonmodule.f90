@@ -2,7 +2,7 @@
 ! Author : Sandeep Koranne (C) 2026. All rights reserved.
 ! Purpose: Collect all named constants, literals in one place
 module CommonModule
-  use, intrinsic :: iso_fortran_env, only: int8, int32, int64, real64
+  use, intrinsic :: iso_fortran_env, only: int8, int32, int64, real64, output_unit
   implicit none
   private
   integer(kind=int64), parameter :: K_LEAF_CAPACITY = 16 !> 32 is better than 64
@@ -71,7 +71,7 @@ contains
     ! The 'advance="no"' option prevents the automatic newline
     write(*, '(A)', advance='no') achar(7)
     ! Optional: Flush the output to ensure the system processes the char immediately
-    call flush(6) 
+    flush(output_unit)
   end subroutine beep
 end module CommonModule
 

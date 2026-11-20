@@ -70,7 +70,8 @@ contains
        chunk_perimeter = 0.0_real64
 
        !$omp target teams distribute parallel do &
-       !$omp private(i, j, k, childidx, currnode, stack, stackptr, qbox, nodembr, targetbox, tempBox, overlapx, overlapy, idx, w, h, j_start, j_end) &
+       !$omp private(i, j, k, childidx, currnode, stack, stackptr, qbox, &
+       !$omp   nodembr, targetbox, tempBox, overlapx, overlapy, idx, w, h, j_start, j_end) &
        !$omp reduction(+:chunk_area, chunk_perimeter)
        do i = chunk_start, chunk_end
           qbox = sorted_boxes(i)

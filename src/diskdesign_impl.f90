@@ -98,7 +98,7 @@ contains
     end if
     call BuildTree( input_layer ) !> does sorting
     snappy_stream%layer_properties = ior( snappy_stream%layer_properties, input_layer%layerState )
-    snappy_stream%layer_properties = iand( snappy_stream%layer_properties, .not. LAYER_STATE_RTREE ) !> no point in saving
+    snappy_stream%layer_properties = iand( snappy_stream%layer_properties, not(LAYER_STATE_RTREE) ) !> no point in saving
     if( .not. NeedsPNum( input_layer ) ) snappy_stream%arr => input_layer%pnumtable%arr
     if( method_to_use == COMPRESSION_METHOD_SNAPPY .or. method_to_use == COMPRESSION_METHOD_ZLIB &
          .or. method_to_use == COMPRESSION_METHOD_ZSTD ) then
@@ -149,8 +149,7 @@ contains
   module subroutine RestoreSnapToDLayer( input_layer, snap_filename )
     type(Layer), intent(inout) :: input_layer
     character(*), intent(in)   :: snap_filename
-    type(CompressedStream)     :: snappy_stream
-    integer                    :: pos, ios
+    integer                    :: ios
 
     open(newunit = input_layer%iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
     if (ios /= 0) then

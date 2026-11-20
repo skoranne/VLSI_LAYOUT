@@ -17,7 +17,8 @@ module GPUMergeModule
 
 contains
 
-  subroutine PerformMergeGPU(uf, sorted_boxes, num_boxes, capacity, tree_nodes, num_nodes, root_index, overlap_area, overlap_perimeter)
+  subroutine PerformMergeGPU(uf, sorted_boxes, num_boxes, capacity, tree_nodes, &
+       num_nodes, root_index, overlap_area, overlap_perimeter)
     type(UnionFind), intent(inout) :: uf
     integer(kind=int64),intent(in) :: num_boxes, num_nodes    
     type(Box), intent(in) :: sorted_boxes(num_boxes)

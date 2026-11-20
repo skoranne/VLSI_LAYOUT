@@ -79,7 +79,8 @@ contains
        end do
     else
        root_idx = input_layer_B%tree%root_index
-       !$omp parallel do private(i,k,tid,dfs_stack,sp,curr_idx,child_idx,c_end,overlap_any,touch_any,inside_any,outside_all,select_it,early_done,abox,ibox,has_edge_touch,currNode,childNode)
+       !$omp parallel do private(i,k,tid,dfs_stack,sp,curr_idx,child_idx,c_end,overlap_any, &
+       !$omp   touch_any,inside_any,outside_all,select_it,early_done,abox,ibox,has_edge_touch,currNode,childNode)
        do i=1,numA
           tid = omp_get_thread_num()+1
           abox = input_layer_A%layer_boxes(i)

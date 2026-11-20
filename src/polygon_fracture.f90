@@ -812,7 +812,7 @@ contains
 
     type(XYTracker), allocatable :: events(:)
     integer :: i
-    integer(kind=int64) :: n, output_tracker_count
+    integer(kind=int64) :: n
     integer(kind=K_COORDINATE_KIND) :: current_x, y_start, y_end, min_y, max_y, min_x, max_x
     integer(kind=int64) :: current_lap
     integer(kind=int8)                 :: winding_sign
@@ -1067,7 +1067,7 @@ contains
     type(XYTracker), allocatable :: work(:)   ! temporary workspace
     integer(kind=int64)                      :: n      ! original size
     integer(kind=int64)                      :: write_index  ! next free slot in work
-    integer(kind=int64)                      :: i, improved
+    integer(kind=int64)                      :: i
 
     !----------------------------------------------------------------
     !  Guard against empty or not‑allocated input

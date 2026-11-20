@@ -171,7 +171,8 @@ module DesignModule
        type(Layer), intent( inout ) :: input_layer
      end subroutine MergeHealLayer
      
-     module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, functype, control_opcode, control_parameter )
+     module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, &
+          functype, control_opcode, control_parameter )
        type(Layer), intent(inout) :: input_layer_A, input_layer_B
        type(Layer), intent(inout) :: output_layer
        type(CGFunction) :: functype
@@ -656,7 +657,7 @@ contains
        end if
 
        if( box_count > size( current_polygon_boxes ) ) then
-          !write(*,'(4(A,I0),A)') 'Processing polygon number: ', polygon_number, ' with ', box_count, ' rects, |cpb| = ', size( current_polygon_boxes ), ' |FC| = ', final_capacity, ' '
+          !write(*,'(4(A,I0),A)') 'Processing polygon: ', polygon_number, ' rects ', box_count
           deallocate( current_polygon_boxes )
           allocate( current_polygon_boxes( 2*box_count ) )
        end if
@@ -869,7 +870,7 @@ contains
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
     input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
-    input_layer%layerState = iand( input_layer%layerState, .not. LAYER_STATE_PNUM )
+    input_layer%layerState = iand( input_layer%layerState, not(LAYER_STATE_PNUM) )
     !call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
     !     input_layer%tree%root_index, overlap_area, overlap_perimeter)
     !input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )
@@ -1078,7 +1079,8 @@ contains
        input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
     end if
     if( NeedsPNum( input_layer ) ) then
-       call PerformMergeWithOverlapDetection( input_layer%pnumtable, input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes,&
+       call PerformMergeWithOverlapDetection( input_layer%pnumtable, input_layer%layer_boxes, &
+            K_LEAF_CAPACITY, input_layer%tree%tree_nodes, &
             input_layer%tree%root_index, overlap_area, overlap_perimeter, area_overlap_roots)
        if( overlap_area /= 0 ) then
           !> wipe HEALING state
@@ -1096,7 +1098,7 @@ contains
     implicit none
     type(Layer), intent(inout) :: input_layer
     integer            :: env_len, env_status
-    real(kind=real64)  :: t_start, t_end
+    real(kind=real64)  :: t_start
 
     if (profiling_enabled) t_start = get_cpu_time()
 

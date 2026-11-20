@@ -20,10 +20,14 @@ NSYS_DELAY ?= 0
 NSYS_DUR ?= 0
 NSYS_TRACE ?= cuda,nvtx,openmp,osrt
 NSYS_OUT ?= /tmp/magparser_nvf_profile
+STRICT ?= 0
 ifeq ($(DEBUG),1)
    FCFLAGS = -cuda -O0 -Mbounds -g -traceback -Mchkptr -Mpreprocess -mp=gpu -gpu=$(GPU_CC) -fopenmp -Minfo=accel,mp
 else
    FCFLAGS = -cuda -O3 -g -fno-strict-aliasing -Mpreprocess -mp=gpu -gpu=$(GPU_CC) -fopenmp -Minfo=accel,mp
+endif
+ifeq ($(STRICT),1)
+   FCFLAGS += -Mstandard -Mbounds -Mchkptr -Minform=inform -traceback
 endif
 #FCFLAGS = -g -O3 -Mpreprocess -Minfo=accel -fopenmp -mp=gpu
 # --- Linker Variables ---

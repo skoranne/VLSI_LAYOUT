@@ -108,7 +108,8 @@ contains
        call uf%merge(eb%pairs(1, k), eb%pairs(2, k))
     end do
   end subroutine process_edges
-  subroutine PerformMergeWithOverlapDetection(uf, sorted_boxes, capacity, tree_nodes, root_index, overlap_area, overlap_perimeter, area_overlap_roots)
+  subroutine PerformMergeWithOverlapDetection(uf, sorted_boxes, capacity, tree_nodes, &
+       root_index, overlap_area, overlap_perimeter, area_overlap_roots)
     type(UnionFind), intent(out) :: uf
     type(Box), intent(in)        :: sorted_boxes(:)
     integer(kind=int64), intent(in) :: capacity
@@ -156,7 +157,8 @@ contains
        return
     end if
 
-    !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
+    !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, &
+    !$omp   overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
     do i = 1, num_boxes
        tid = omp_get_thread_num() + 1
        boxI = sorted_boxes(i)
@@ -314,7 +316,8 @@ contains
        return
     end if
     if( root_index == 0 ) error stop "ERROR: No PNUM proceessing without RTRee"
-    !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
+    !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, &
+    !$omp   overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
     do i = 1, num_boxes
        tid = omp_get_thread_num() + 1
        boxI = sorted_boxes(i)
@@ -535,7 +538,8 @@ contains
                    ! Inline box_overlap check
                    overlapx = max(sorted_boxes(i)%x1, sorted_boxes(k)%x1) < min(sorted_boxes(i)%x2, sorted_boxes(k)%x2) !> OVERLAP
                    if (overlapx) then
-                      overlapy = max(sorted_boxes(i)%y1, sorted_boxes(k)%y1) < min(sorted_boxes(i)%y2, sorted_boxes(k)%y2) !> OVERLAP
+                      overlapy = max(sorted_boxes(i)%y1, sorted_boxes(k)%y1) < &
+                           min(sorted_boxes(i)%y2, sorted_boxes(k)%y2) !> OVERLAP
                       if (overlapy) then
                          interaction_count = interaction_count + 1
                       end if

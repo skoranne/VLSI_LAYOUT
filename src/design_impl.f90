@@ -52,7 +52,7 @@ contains
        return
     end if
     interaction_count_gpu = 0
-    call ComputeInteractionsCPU( input_layer%tree%tree_nodes, int(size(input_layer%tree%tree_nodes,kind=int64)),&
+    call ComputeInteractionsCPU( input_layer%tree%tree_nodes, size(input_layer%tree%tree_nodes,kind=int64),&
          input_layer%layer_boxes, input_layer%n_used, input_layer%tree%root_index, interaction_count_gpu)
     
     retval = interaction_count_gpu == 0
@@ -707,7 +707,9 @@ contains
       !write(*,*) '|B| = ', input_layer_B%n_used, ' ', input_layer_B%layerState
       if( debug_verbosity > 1 ) then
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
-         write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
+         write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A12,A,A12,A,A,A)') &
+              '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', &
+              '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
       end if
 
@@ -852,7 +854,9 @@ contains
          end do
       end do
       write(*,'(A85)') '+----------------------------------------------------------------------------------+'
-      write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
+      write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A12,A,A12,A,A,A)') &
+           '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', &
+           '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
       write(*,'(A85)') '+----------------------------------------------------------------------------------+'
       !> Initiate OpenMP Parallel region and spawn tasks from a single thread
 
@@ -920,7 +924,8 @@ contains
                !$omp end critical (gpu_lock)
                call cpu_time(end_time(rows,cols))
                call system_clock(count=end_tick(rows,cols))
-               elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / real(clock_rate, kind=real64)
+               elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / &
+                    real(clock_rate, kind=real64)
                !$omp critical (print_lock)
                write(*,'(A,I3,A,I3,A,I12,A,I12,A,I12,A,I12,A,I12,A,F10.3,A)') '|',rows,'|',cols,'|',AinGrid(rows,cols)%n_used,'|',&
                   BinGrid(rows,cols)%n_used,'|', size(trackersGrid(rows,cols)%trackers),'|',&
@@ -970,8 +975,10 @@ contains
       type(Box), allocatable :: empty_boxes(:), sized_boxes(:), result_boxes(:)
       integer(kind=int64) :: i, nA, nB
       logical :: gpu_size
+#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
       character(len=32) :: offload_env
       integer :: offload_len, offload_stat
+#endif
       allocate( empty_boxes(0) )
       nA = input_layer_A%n_used
       nB = input_layer_B%n_used
@@ -1074,7 +1081,8 @@ contains
       call CalculateOR( AnotB, BnotA, output_layer )
    end subroutine CalculateExplicitXOR
 
-   module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, functype, control_opcode, control_parameter )
+   module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, &
+        functype, control_opcode, control_parameter )
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout)   :: output_layer
       type(CGFunction) :: functype
@@ -1125,7 +1133,9 @@ contains
          write(*,*) '|A| = ', input_layer_A%n_used, ' ', input_layer_A%layerState
          write(*,*) '|B| = ', input_layer_B%n_used, ' ', input_layer_B%layerState
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
-         write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
+         write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A,A)') &
+              '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', &
+              '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
       end if
       !$omp parallel default(shared)
@@ -1350,7 +1360,8 @@ contains
                grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID) = outputGrid(rows,cols)%n_used
                call cpu_time(end_time(rows,cols))
                call system_clock(count=end_tick(rows,cols))
-               elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / real(clock_rate, kind=real64)
+               elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / &
+                    real(clock_rate, kind=real64)
                if( debug_verbosity > 1 ) then
                   !$omp critical(print_lock)
                   write(*,'(A,I3,A,I3,A,I12,A,I12,A,F10.3,A)') '|',rows,'|',cols,'|',&

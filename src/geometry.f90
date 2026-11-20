@@ -899,23 +899,23 @@ contains
     integer(kind=int64) :: i
 
     ! Initialize left MBR
-    l_xmin = arr(start_idx)%x1; l_xmax = arr(start_idx)%x2
-    l_ymin = arr(start_idx)%y1; l_ymax = arr(start_idx)%y2
+    l_xmin = int(arr(start_idx)%x1, kind=int64); l_xmax = int(arr(start_idx)%x2, kind=int64)
+    l_ymin = int(arr(start_idx)%y1, kind=int64); l_ymax = int(arr(start_idx)%y2, kind=int64)
     do i = start_idx + 1, split_idx
-       l_xmin = min(l_xmin, arr(i)%x1)
-       l_xmax = max(l_xmax, arr(i)%x2)
-       l_ymin = min(l_ymin, arr(i)%y1)
-       l_ymax = max(l_ymax, arr(i)%y2)
+       l_xmin = min(l_xmin, int(arr(i)%x1, kind=int64))
+       l_xmax = max(l_xmax, int(arr(i)%x2, kind=int64))
+       l_ymin = min(l_ymin, int(arr(i)%y1, kind=int64))
+       l_ymax = max(l_ymax, int(arr(i)%y2, kind=int64))
     end do
 
     ! Initialize right MBR
-    r_xmin = arr(split_idx + 1)%x1; r_xmax = arr(split_idx + 1)%x2
-    r_ymin = arr(split_idx + 1)%y1; r_ymax = arr(split_idx + 1)%y2
+    r_xmin = int(arr(split_idx + 1)%x1, kind=int64); r_xmax = int(arr(split_idx + 1)%x2, kind=int64)
+    r_ymin = int(arr(split_idx + 1)%y1, kind=int64); r_ymax = int(arr(split_idx + 1)%y2, kind=int64)
     do i = split_idx + 2, end_idx
-       r_xmin = min(r_xmin, arr(i)%x1)
-       r_xmax = max(r_xmax, arr(i)%x2)
-       r_ymin = min(r_ymin, arr(i)%y1)
-       r_ymax = max(r_ymax, arr(i)%y2)
+       r_xmin = min(r_xmin, int(arr(i)%x1, kind=int64))
+       r_xmax = max(r_xmax, int(arr(i)%x2, kind=int64))
+       r_ymin = min(r_ymin, int(arr(i)%y1, kind=int64))
+       r_ymax = max(r_ymax, int(arr(i)%y2, kind=int64))
     end do
 
     ! Compute total area of both bounding boxes
@@ -923,8 +923,8 @@ contains
          (r_xmax - r_xmin) * (r_ymax - r_ymin)
 
     ! Compute physical overlap area
-    over_x = max(0, min(l_xmax, r_xmax) - max(l_xmin, r_xmin))
-    over_y = max(0, min(l_ymax, r_ymax) - max(l_ymin, r_ymin))
+    over_x = max(0_int64, min(l_xmax, r_xmax) - max(l_xmin, r_xmin))
+    over_y = max(0_int64, min(l_ymax, r_ymax) - max(l_ymin, r_ymin))
     overlap = over_x * over_y
 
   end subroutine evaluate_split
@@ -934,7 +934,7 @@ contains
     type(Box), intent(in) :: boxes(:)
     integer(kind=real64) :: area
 
-    integer :: n, num_events, num_y, i, j
+    integer :: n, num_y, i, j
     type(Event), allocatable :: events(:)
     integer(kind=K_COORDINATE_KIND), allocatable :: y_vals(:), unique_y(:)
     integer, allocatable :: lap(:)

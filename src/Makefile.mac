@@ -10,6 +10,7 @@ CXX ?= g++
 AR ?= ar
 
 DEBUG ?= 0
+STRICT ?= 0
 USE_HDF5 ?= 0
 
 # --- Local dependency paths (override on command line if needed) ---
@@ -31,6 +32,9 @@ ifeq ($(DEBUG),1)
 else
   # Intel ifort performance tuning (OpenMP + host-tuned codegen)
   FCFLAGS = -fpp -g -O3 -qopenmp -xHost $(FCFLAGS_EXTRA)
+endif
+ifeq ($(STRICT),1)
+  FCFLAGS += -stand f18 -warn all -warn interfaces -warn unused -check bounds -check pointers -check uninit -traceback
 endif
 
 GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
