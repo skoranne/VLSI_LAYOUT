@@ -34,7 +34,7 @@ module DesignModule
        CalculateTopologicalSelect
 
   type :: LayerTree
-     integer(kind=int64) :: root_index
+     integer(kind=int64) :: root_index = 0
      type(RTreeNode), allocatable :: tree_nodes(:)
   end type LayerTree
   enum, bind(C)                     ! bind(C) makes the values C‑compatible
@@ -58,24 +58,26 @@ module DesignModule
   end enum
 
   type :: ConjugateLayer
-     integer :: conjugate_lid
+     integer :: conjugate_lid = 0
      integer(kind=c_int) :: purpose = CONJUGATE_LAYER_PURPOSE_NONE
   end type ConjugateLayer
   type :: Repetition
-     integer(kind=K_COORDINATE_KIND) :: num_rows, num_cols, dx, dy
+     integer(kind=K_COORDINATE_KIND) :: num_rows = 0, num_cols = 0, dx = 0, dy = 0
   end type Repetition
 
   type :: Layer
-     integer(kind=int64)    :: n_used   = 0   ! how many slots are filled
-     integer(kind=int64)    :: n_alloc  = 0   ! current allocation size
+     integer(kind=int64)    :: n_used   = 0          ! how many slots are filled
+     integer(kind=int64)    :: n_alloc  = 0          ! current allocation size
      type(Box), allocatable :: layer_boxes(:)
-     integer(kind=c_int)    :: layerState = 0 ! HEAL, SORT, PNUM, RTREE
+     integer(kind=c_int)    :: layerState = 0        ! HEAL, SORT, PNUM, RTREE
      type(LayerTree)        :: tree
      type(UnionFind)        :: pnumtable
-     real(kind=real64)      :: area, perimeter
+     real(kind=real64)      :: area = 0.0_real64
+     real(kind=real64)      :: perimeter = 0.0_real64
      character(len=:), allocatable :: fileName
      type(ConjugateLayer)   :: paired_layer
-     integer                :: iunit
+     integer                :: iunit = -1
+     logical                :: device_resident = .false.
   end type Layer
   type, extends(Layer) :: GridLayer
      integer(kind=int64)          :: rows = 0
@@ -1346,6 +1348,8 @@ contains
     if( allocated( input_layer_A%fileName ) ) deallocate( input_layer_A%fileName )
     input_layer_A%n_used = 0
     input_layer_A%n_alloc = 0
+    input_layer_A%tree%root_index = 0
+    input_layer_A%device_resident = .false.
     input_layer_A%layerState = LAYER_STATE_EVERYTHING
   end subroutine DeleteLayer
 
@@ -1356,6 +1360,8 @@ contains
     if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
     input_layer_A%n_used = 0
     input_layer_A%n_alloc = 0
+    input_layer_A%tree%root_index = 0
+    input_layer_A%device_resident = .false.
     input_layer_A%layerState = LAYER_STATE_EVERYTHING
   end subroutine ClearLayer
 
@@ -1363,24 +1369,30 @@ contains
     type(Layer), intent(inout) :: output_layer
     type(Layer), intent(in) :: input_layer_A
     character(len=*), parameter :: K_COPY_PREFIX = "MTL_COPY_"
+    integer(kind=int64) :: n
     if( input_layer_A%n_used == 0 ) then
        call ClearLayer( output_layer )
        return
     end if
-    output_layer%layer_boxes = input_layer_A%layer_boxes(1:input_layer_A%n_used)
-    output_layer%n_used = input_layer_A%n_used
-    output_layer%n_alloc = input_layer_A%n_used
+    n = input_layer_A%n_used
+    if( allocated( output_layer%layer_boxes ) ) deallocate( output_layer%layer_boxes )
+    allocate( output_layer%layer_boxes(n) )
+    output_layer%layer_boxes(1:n) = input_layer_A%layer_boxes(1:n)
+    output_layer%n_used = n
+    output_layer%n_alloc = n
+    output_layer%device_resident = .false.
+    if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )
     if( allocated( input_layer_A%pnumtable%arr ) ) then
+       allocate( output_layer%pnumtable%arr(size(input_layer_A%pnumtable%arr, kind=int64)) )
        output_layer%pnumtable%arr = input_layer_A%pnumtable%arr
-    else if( allocated( output_layer%pnumtable%arr ) ) then
-       deallocate( output_layer%pnumtable%arr )
     end if
     output_layer%layerState = input_layer_A%layerState
+    if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
     if( allocated( input_layer_A%tree%tree_nodes ) ) then
+       allocate( output_layer%tree%tree_nodes(size(input_layer_A%tree%tree_nodes, kind=int64)) )
        output_layer%tree%tree_nodes = input_layer_A%tree%tree_nodes
        output_layer%tree%root_index = input_layer_A%tree%root_index
-    else if( allocated( output_layer%tree%tree_nodes ) ) then
-       deallocate( output_layer%tree%tree_nodes )
+    else
        output_layer%tree%root_index = 0
     end if
     !if(allocated(input_layer_A%fileName)) output_layer%fileName = K_COPY_PREFIX//input_layer_A%fileName
@@ -1411,15 +1423,14 @@ contains
     integer(kind=c_int) :: temp_c_int
     real(kind=real64)   :: temp_real64
     integer             :: temp_int
+    logical             :: temp_logical
 
-    ! 2. Temporaries for Allocatables (Must explicitly be declared allocatable)
+    ! 2. Temporaries for Allocatables (O(1) pointer swap via move_alloc)
     type(Box), allocatable        :: temp_boxes(:)
+    type(RTreeNode), allocatable  :: temp_nodes(:)
+    integer(kind=int64), allocatable :: temp_pnum(:)
     character(len=:), allocatable :: temp_fileName
-
-    ! 3. Temporaries for Nested Derived Types
-    type(LayerTree)      :: temp_tree
-    type(UnionFind)      :: temp_pnumtable
-    type(ConjugateLayer) :: temp_paired_layer
+    type(ConjugateLayer)          :: temp_paired_layer
 
     ! --- Swap Scalars (Standard swap) ---
     temp_int64 = a%n_used;   a%n_used = b%n_used;   b%n_used = temp_int64
@@ -1431,10 +1442,9 @@ contains
     temp_real64 = a%perimeter;      a%perimeter = b%perimeter; b%perimeter = temp_real64
 
     temp_int = a%iunit; a%iunit = b%iunit; b%iunit = temp_int
-
+    temp_logical = a%device_resident; a%device_resident = b%device_resident; b%device_resident = temp_logical
 
     ! --- Swap Allocatables (O(1) Pointer Swap via move_alloc) ---
-    ! move_alloc transfers the allocation status and bounds from arg1 to arg2
     call move_alloc(a%layer_boxes, temp_boxes)
     call move_alloc(b%layer_boxes, a%layer_boxes)
     call move_alloc(temp_boxes,    b%layer_boxes)
@@ -1443,10 +1453,15 @@ contains
        call move_alloc(b%fileName, a%fileName)
        call move_alloc(temp_fileName, b%fileName)
     end if
-    ! --- Swap Nested Derived Types ---
-    temp_tree = a%tree; a%tree = b%tree; b%tree = temp_tree
+    ! --- Swap Tree & UnionFind in O(1) without deep array copy ---
+    temp_int64 = a%tree%root_index; a%tree%root_index = b%tree%root_index; b%tree%root_index = temp_int64
+    call move_alloc(a%tree%tree_nodes, temp_nodes)
+    call move_alloc(b%tree%tree_nodes, a%tree%tree_nodes)
+    call move_alloc(temp_nodes,        b%tree%tree_nodes)
 
-    temp_pnumtable = a%pnumtable; a%pnumtable = b%pnumtable; b%pnumtable = temp_pnumtable
+    call move_alloc(a%pnumtable%arr, temp_pnum)
+    call move_alloc(b%pnumtable%arr, a%pnumtable%arr)
+    call move_alloc(temp_pnum,       b%pnumtable%arr)
 
     temp_paired_layer = a%paired_layer; a%paired_layer = b%paired_layer; b%paired_layer = temp_paired_layer
 

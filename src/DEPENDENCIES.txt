@@ -6,7 +6,7 @@ LIB_OBJS = commonmodule.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o
 	   boost_polygon_apif.o boost_polygon_api.o boxbytestream.o box_compression.o\
 	   snappy_api.o snappy_apif.o layout_statistics.o box_codec.o serialization.o\
 	   diskdesign_impl.o gridlayer.o utilities.o event_sorter_apif.o event_sorter.o\
-	   gpu_morton.o layoutdb_f_api.o layoutdb_loader.o profiler.o profiler.o
+	   gpu_morton.o layoutdb_f_api.o layoutdb_loader.o profiler.o
 
 
 boxbytestream.o: commonmodule.o
@@ -14,7 +14,6 @@ box_compression.o: boxbytestream.o snappy_apif.o
 box_codec.o: commonmodule.o snappy_apif.o
 snappy_apif.o: snappy_api.o
 serialization.o: box_codec.o
-diskdesign_impl.o: serialization.o box_codec.o snappy_apif.o
 systeminfo.o: commonmodule.o version_mod.o
 hashtable.o: systeminfo.o
 geometry.o: hashtable.o
