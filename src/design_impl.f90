@@ -1081,11 +1081,9 @@ contains
          write(*,'(A,A3,A,A3,A,A12,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|','B in Grid','|',' Trackers ', '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
       end if
-      !$omp parallel default(shared)
-      !$omp single
+      ! Process grid cells sequentially to limit peak memory on large designs.
       do rows = 1, K_GRID
          do cols = 1, K_GRID
-            !$omp task default(shared) firstprivate(rows, cols) private(local_arg)
             call system_clock(count=start_tick(rows,cols))
             call cpu_time(start_time(rows,cols))
             grids(rows,cols) = gridA%layer_boxes( (rows-1)*K_GRID+cols ) !> this does Layer = Box
@@ -1112,20 +1110,16 @@ contains
             call system_clock(count=end_tick(rows,cols))
             elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / real(clock_rate, kind=real64)
             if( debug_verbosity > 1 ) then
-               !$omp critical(print_lock)
                write(*,'(A,I3,A,I3,A,I12,A,I12,A,I12,A,F10.3,A)') '|',rows,'|',cols,'|',&
                   grid_layer_counts(rows,cols,A_IN_GRID),'|',&
                   grid_layer_counts(rows,cols,B_IN_GRID),'|',&
                   grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID),&
                   '|',elapsed_time(rows,cols), '|'
-               !$omp end critical(print_lock)
             end if
             if( allocated( AinGrid(rows,cols)%layer_boxes )) call ClearLayer( AinGrid( rows, cols ) )
-            !$omp end task
+            if( allocated( BinGrid(rows,cols)%layer_boxes )) call ClearLayer( BinGrid( rows, cols ) )
          end do
       end do
-      !$omp end single
-      !$omp end parallel
       if( debug_verbosity > 1 ) then
          write(*,'(A85)') '+-----------------------------------------------------------------------------------+'
       end if
@@ -1155,6 +1149,7 @@ contains
                output_layer%layer_boxes( total_count + i ) =  outputGrid(rows,cols)%layer_boxes(i)
             end do
             total_count = total_count + outputGrid(rows,cols)%n_used
+            call ClearLayer( outputGrid(rows,cols) )
          end do
       end do
       deallocate( outputGrid )
