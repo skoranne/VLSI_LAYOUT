@@ -128,8 +128,14 @@ contains
     integer(c_size_t) :: esz
     integer :: i, n
     character(len=:), allocatable :: fname
-    fname = load_design%fileName
-    n = len_trim(fname)
+    if (.not. allocated(load_design%fileName)) then
+       write(*,*) 'ERROR: ldb_open failed: load_design%fileName not allocated'
+       fh_out = c_null_ptr
+       return
+    end if
+    n = len_trim(load_design%fileName)
+    allocate(character(len=n) :: fname)
+    fname = load_design%fileName(1:n)
     allocate(cpath(n+1))
     do i=1,n
        cpath(i) = fname(i:i)
@@ -144,7 +150,22 @@ contains
        fh_out = ldb_open_opts_c(cpath, opts, errbuf, esz)
     end block
     if(.not. c_associated(fh_out)) then
-       write(*,*) 'ERROR: ldb_open failed for ', trim(fname)
+       block
+          integer :: elen
+          character(len=512) :: emsg
+          emsg = ''
+          elen = 0
+          do i = 1, 512
+             if (errbuf(i) == c_null_char) exit
+             elen = i
+             emsg(i:i) = errbuf(i)
+          end do
+          if (elen > 0) then
+             write(*,*) 'ERROR: ldb_open failed for ', trim(fname), ': ', emsg(1:elen)
+          else
+             write(*,*) 'ERROR: ldb_open failed for ', trim(fname)
+          end if
+       end block
        return
     end if
     if(ldb_is_strict_c(fh_out) /= 0) write(*,*) 'INFO: OASIS STRICT mode detected/enforced'
