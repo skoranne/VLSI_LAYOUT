@@ -1343,6 +1343,7 @@ contains
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
     if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
     if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
+    input_layer_A%tree%root_index = 0
     input_layer_A%n_used = 0
     input_layer_A%n_alloc = 0
     input_layer_A%layerState = LAYER_STATE_EVERYTHING

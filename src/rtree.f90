@@ -64,7 +64,10 @@ contains
       type(Box) :: agg_mbr
 
       n_boxes = size(sorted_boxes, kind=int64)
-      if (n_boxes == 0) return
+      if (n_boxes == 0) then
+         root_index = 0
+         return
+      end if
       ! 1. Build Level 1 (Leaves pointing sequentially to sorted_boxes)
       ! Using integer math instead of ceiling(real(...) / real(...))
       current_level_nodes = (n_boxes + capacity - 1) / capacity

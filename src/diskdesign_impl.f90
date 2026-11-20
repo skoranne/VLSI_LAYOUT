@@ -31,9 +31,13 @@ contains
 
     if (profiling_enabled) t_start = get_cpu_time()
 
+    ! If state claims R-tree is valid but the tree is missing, rebuild it.
     if( .not. NeedsRTree( input_layer ) ) then
-       if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
-       return
+       if( allocated(input_layer%tree%tree_nodes) .and. input_layer%tree%root_index > 0 ) then
+          if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
+          return
+       end if
+       ! Inconsistent state: fall through and rebuild.
     end if
     if( NeedsSorting( input_layer ) ) then
        num_squares = count( is_square( input_layer%layer_boxes ) )
@@ -56,6 +60,7 @@ contains
       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
     end if
     if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )
+    input_layer%tree%root_index = 0
     total_nodes = CalculateTotalNodes( input_layer%n_used, K_LEAF_CAPACITY )
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
     call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
@@ -109,9 +114,10 @@ contains
        if( allocated(input_layer%layer_boxes) )   deallocate(input_layer%layer_boxes)
        if( allocated(input_layer%pnumtable%arr) )  deallocate(input_layer%pnumtable%arr)
        if( allocated(input_layer%tree%tree_nodes) ) deallocate(input_layer%tree%tree_nodes)
-       input_layer%layerState = LAYER_STATE_EVERYTHING
        call LoadKLBin( snap_filename, input_layer%layer_boxes)
        input_layer%n_used  = size(input_layer%layer_boxes)
+       input_layer%tree%root_index = 0
+       input_layer%layerState = LAYER_STATE_NONE
        call BuildTree( input_layer )
        return
     end if
