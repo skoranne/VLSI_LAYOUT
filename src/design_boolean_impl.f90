@@ -3,7 +3,7 @@
 ! Purpose: Submodule for core boolean operations (OR, AND, NOT)
 
 submodule (DesignModule) DesignBooleanImplModule
-  use iso_fortran_env, only: int64, real64
+  use iso_fortran_env, only: int32, int64, real64
   use CommonModule
   use GeometryModule
   use RTreeBuilder
@@ -59,8 +59,8 @@ contains
     type(Box) :: boxA, boxB, tempBox
     type(RTreeNode) :: currNode, childNode
     integer :: nthreads, tid, alloc_status
+    integer(kind=int32) :: gpu_overflow
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-    integer(kind=int64), allocatable :: andCounts(:), andOffsets(:)
     logical :: use_gpu
     character(len=32) :: offload_env
     integer :: offload_len, offload_stat
@@ -106,37 +106,24 @@ contains
 #endif
 
     if (use_gpu) then
-       allocate(andCounts(num_boxesA), andOffsets(num_boxesA), stat=alloc_status)
-       if (alloc_status == 0) then
-          call ComputeANDPairsCountGPU(input_layer_B%tree%tree_nodes, numNodesB, &
-               input_layer_B%layer_boxes, num_boxesB, input_layer_B%tree%root_index, &
-               input_layer_A%layer_boxes, num_boxesA, andCounts, num_boxesC)
-          andOffsets(1) = 0_int64
-          do i = 2, num_boxesA
-             andOffsets(i) = andOffsets(i-1) + andCounts(i-1)
-          end do
-          if (allocated(output_layer%layer_boxes)) deallocate(output_layer%layer_boxes)
-          allocate(output_layer%layer_boxes(max(num_boxesC, 1_int64)), stat=alloc_status)
-          if (alloc_status == 0 .and. num_boxesC > 0) then
-             call ComputeANDPairsFillGPU(input_layer_B%tree%tree_nodes, numNodesB, &
-                  input_layer_B%layer_boxes, num_boxesB, input_layer_B%tree%root_index, &
-                  input_layer_A%layer_boxes, num_boxesA, andOffsets, output_layer%layer_boxes, num_boxesC)
-          end if
+       gpu_overflow = 0_int32
+       call ComputeANDPairsGPU(input_layer_B%tree%tree_nodes, numNodesB, &
+            input_layer_B%layer_boxes(1:num_boxesB), num_boxesB, input_layer_B%tree%root_index, &
+            input_layer_A%layer_boxes(1:num_boxesA), num_boxesA, output_layer%layer_boxes, num_boxesC, gpu_overflow)
+       if (gpu_overflow == 0_int32) then
           output_layer%n_used = num_boxesC
-          output_layer%n_alloc = max(num_boxesC, 1_int64)
+          output_layer%n_alloc = size(output_layer%layer_boxes, kind=int64)
           output_layer%device_resident = .false.
           if (allocated(output_layer%tree%tree_nodes)) deallocate(output_layer%tree%tree_nodes)
           if (allocated(output_layer%pnumtable%arr)) deallocate(output_layer%pnumtable%arr)
           output_layer%tree%root_index = 0
           output_layer%layerState = LAYER_STATE_HEAL
-          if (allocated(andCounts)) deallocate(andCounts)
-          if (allocated(andOffsets)) deallocate(andOffsets)
           call PreprocessLayer(output_layer)
           if (profiling_enabled) call RecordTime("CalculateAND", get_cpu_time() - t_start)
           return
        end if
-       if (allocated(andCounts)) deallocate(andCounts)
-       if (allocated(andOffsets)) deallocate(andOffsets)
+       ! If GPU stack overflowed or allocation failed, cleanly fall through to CPU direct-DFS
+       if (allocated(output_layer%layer_boxes)) deallocate(output_layer%layer_boxes)
     end if
 
     !> CPU fallback (multithreaded direct RTree DFS; avoids 512 KB leafboxes stack array & 65536-leaf cap)
