@@ -977,15 +977,20 @@ contains
    end subroutine CalculateFrameNOTTask
 
    module subroutine CalculateBoostOperation( input_layer_A, input_layer_B, output_layer, control_parameter, control_value )
-      type(Layer), intent(inout) :: input_layer_A, input_layer_B
-      type(Layer), intent(inout)   :: output_layer
-      integer(kind=int64), intent(in) :: control_parameter, control_value
-      type(Box), allocatable :: empty_boxes(:), sized_boxes(:), result_boxes(:)
-      integer(kind=int64) :: i, nA, nB
-      allocate( empty_boxes(0) )
-      nA = input_layer_A%n_used
-      nB = input_layer_B%n_used
-      !> this function does the allocation; always slice to 1:n_used so uninitialized tail slots are never read
+     type(Layer), intent(inout) :: input_layer_A, input_layer_B
+     type(Layer), intent(inout)   :: output_layer
+     integer(kind=int64), intent(in) :: control_parameter, control_value
+     type(Box), allocatable :: empty_boxes(:), sized_boxes(:), result_boxes(:)
+     integer(kind=int64) :: i, nA, nB
+     !> Fast path: NOT uses direct parallel R-Tree subtraction (same geometric semantics as @).
+     if( control_parameter == K_BOOST_CONTROL_NOT ) then
+        call CalculateNOT( input_layer_A, input_layer_B, output_layer )
+        return
+     end if
+     allocate( empty_boxes(0) )
+     nA = input_layer_A%n_used
+     nB = input_layer_B%n_used
+     !> this function does the allocation; always slice to 1:n_used so uninitialized tail slots are never read
       if( control_parameter == K_BOOST_CONTROL_SIZE ) then
          if (nA == 0) then
             allocate(result_boxes(0))
@@ -1234,17 +1239,10 @@ contains
    end subroutine BoostMainCompute2
 
    module subroutine CalculateFrameNOT( input_layer_A, input_layer_B, output_layer )
-      type(Layer), intent(inout) :: input_layer_A, input_layer_B
-      type(Layer), intent(inout) :: output_layer
-      type(CGFunction)           :: local_functiontype
-      local_functiontype%preamble => null()
-      local_functiontype%main_compute => BoostMainCompute2
-      local_functiontype%postamble => null()
-
-      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, local_functiontype, K_BOOST_CONTROL_NOT, 0_int64 )
-      if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
-      output_layer%layerState = LAYER_STATE_HEAL
-      call PreprocessLayer( output_layer )
+     type(Layer), intent(inout) :: input_layer_A, input_layer_B
+     type(Layer), intent(inout) :: output_layer
+     !> Fast path: direct parallel R-Tree subtraction (same geometric semantics as @/!).
+     call CalculateNOT( input_layer_A, input_layer_B, output_layer )
    end subroutine CalculateFrameNOT
 
    module subroutine CalculateXOR( input_layer_A, input_layer_B, output_layer )
