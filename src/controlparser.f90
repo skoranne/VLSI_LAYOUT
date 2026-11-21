@@ -681,8 +681,62 @@ contains
                   read(rest, *, iostat=ios) buf1, buf2 !> now rest is at the COMMAND options
                   if( ios == 0 ) then
                      !> we got z = x OP y
-                     primary_operator = trim( adjustl( buf1 ) )
+                     primary_operator = to_upper_f(trim( adjustl( buf1 ) ))
                      rhs2_source_name = trim( adjustl( buf2 ) )
+                     !> Support multi-word topological operators, e.g. INSIDE EDGE, NOT INSIDE EDGE,
+                     !> COINCIDENT INSIDE EDGE, NOT COINCIDENT OUTSIDE EDGE. Normalize to underscore form.
+                     block
+                       character(len=:), allocatable :: rest_u, op_cand
+                       character(len=64) :: u1,u2,u3,u4,u5,o1,o2,o3,o4,o5
+                       integer :: ios3
+                       rest_u = to_upper_f( trim(adjustl(rest)) )
+                       u1='';u2='';u3='';u4='';u5='';o1='';o2='';o3='';o4='';o5=''
+                       read(rest_u, *, iostat=ios3) u1,u2,u3,u4,u5
+                       read(rest,   *, iostat=ios3) o1,o2,o3,o4,o5
+                       op_cand = ''
+                       if( trim(u1)=='NOT' .and. trim(u2)=='COINCIDENT' .and. trim(u3)=='INSIDE' .and. trim(u4)=='EDGE' ) then
+                          op_cand='NOT_COINCIDENT_INSIDE_EDGE'; rhs2_source_name=trim(adjustl(o5))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='COINCIDENT' .and. trim(u3)=='OUTSIDE' .and. trim(u4)=='EDGE' ) then
+                          op_cand='NOT_COINCIDENT_OUTSIDE_EDGE'; rhs2_source_name=trim(adjustl(o5))
+                       else if( trim(u1)=='COINCIDENT' .and. trim(u2)=='INSIDE' .and. trim(u3)=='EDGE' ) then
+                          op_cand='COINCIDENT_INSIDE_EDGE'; rhs2_source_name=trim(adjustl(o4))
+                       else if( trim(u1)=='COINCIDENT' .and. trim(u2)=='OUTSIDE' .and. trim(u3)=='EDGE' ) then
+                          op_cand='COINCIDENT_OUTSIDE_EDGE'; rhs2_source_name=trim(adjustl(o4))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='INSIDE' .and. trim(u3)=='EDGE' ) then
+                          op_cand='NOT_INSIDE_EDGE'; rhs2_source_name=trim(adjustl(o4))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='OUTSIDE' .and. trim(u3)=='EDGE' ) then
+                          op_cand='NOT_OUTSIDE_EDGE'; rhs2_source_name=trim(adjustl(o4))
+                       else if( trim(u1)=='INSIDE' .and. trim(u2)=='EDGE' ) then
+                          op_cand='INSIDE_EDGE'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='OUTSIDE' .and. trim(u2)=='EDGE' ) then
+                          op_cand='OUTSIDE_EDGE'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='INTERACT' ) then
+                          op_cand='NOT_INTERACT'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='CUT' ) then
+                          op_cand='NOT_CUT'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='TOUCH' ) then
+                          op_cand='NOT_TOUCH'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='INSIDE' ) then
+                          op_cand='NOT_INSIDE'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='OUTSIDE' ) then
+                          op_cand='NOT_OUTSIDE'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='EQUAL' ) then
+                          op_cand='NOT_EQUAL'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='DISJOINT' ) then
+                          op_cand='NOT_DISJOINT'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='MEET' ) then
+                          op_cand='NOT_MEET'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='OVERLAPS' ) then
+                          op_cand='NOT_OVERLAPS'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='COVERS' ) then
+                          op_cand='NOT_COVERS'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='COVEREDBY' ) then
+                          op_cand='NOT_COVEREDBY'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='CONTAINS' ) then
+                          op_cand='NOT_CONTAINS'; rhs2_source_name=trim(adjustl(o3))
+                       end if
+                       if( len_trim(op_cand) > 0 ) primary_operator = op_cand
+                     end block
                      if( .not. associated( rhs1_layer ) ) error stop "RHS1 layer not associated"
                      if( .not. associated( lhs_layer ) )  error stop "LHS  layer not associated"                     
                      if( rhs2_source_name /= 'nothing' ) then
@@ -769,6 +823,50 @@ contains
                         call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_OUTSIDE)
                      case ('NOT_OUTSIDE')
                         call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_OUTSIDE)
+                     case ('INSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_INSIDE_EDGE)
+                     case ('NOT_INSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_INSIDE_EDGE)
+                     case ('OUTSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_OUTSIDE_EDGE)
+                     case ('NOT_OUTSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_OUTSIDE_EDGE)
+                     case ('COINCIDENT_INSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_COINCIDENT_INSIDE_EDGE)
+                     case ('NOT_COINCIDENT_INSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_COINCIDENT_INSIDE_EDGE)
+                     case ('COINCIDENT_OUTSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_COINCIDENT_OUTSIDE_EDGE)
+                     case ('NOT_COINCIDENT_OUTSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_COINCIDENT_OUTSIDE_EDGE)
+                     case ('EQUAL')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_EQUAL)
+                     case ('NOT_EQUAL')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_EQUAL)
+                     case ('DISJOINT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_DISJOINT)
+                     case ('NOT_DISJOINT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_DISJOINT)
+                     case ('MEET')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_MEET)
+                     case ('NOT_MEET')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_MEET)
+                     case ('OVERLAPS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_OVERLAPS)
+                     case ('NOT_OVERLAPS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_OVERLAPS)
+                     case ('COVERS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_COVERS)
+                     case ('NOT_COVERS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_COVERS)
+                     case ('COVEREDBY')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_COVEREDBY)
+                     case ('NOT_COVEREDBY')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_COVEREDBY)
+                     case ('CONTAINS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_CONTAINS)
+                     case ('NOT_CONTAINS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_CONTAINS)
                      case ('COPY')
                         !> d1:poly COPY nothing
                         !if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"
@@ -784,6 +882,19 @@ contains
                         !write(*,*) 'RESTJUST before: ', rest
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
                         !write(*,'(A,I8,4(A,F8.2))') 'GROW prec ', used_precision, ' ', rvar(1:4)
+                        do i=1,4
+                           ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
+                        end do
+                        call CalculateGROWLayer( rhs1_layer, lhs_layer, ivar(1:4) )
+                     case ('SHRINK') !> SHRINK is morphological dilation (per spec): supports 4-directional args like GROW
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) &
+                             error stop "SHRINK must use nothing as second layer"
+                        rvar = 0.0_real64
+                        read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
+                        if( ios /= 0 ) then
+                           read(rest, *, iostat=ios) buf1, buf2, rvar(1)
+                           rvar(2)=rvar(1); rvar(3)=rvar(1); rvar(4)=rvar(1)
+                        end if
                         do i=1,4
                            ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
                         end do
@@ -1150,5 +1261,17 @@ contains
     allocate(character(len=n) :: str)   ! allocate the right‑sized block
     str = tmp
   end subroutine shrink_to_fit
+
+  pure function to_upper_f(s) result(r)
+    character(len=*), intent(in) :: s
+    character(len=:), allocatable :: r
+    integer :: i, c
+    allocate(character(len=len(s)) :: r)
+    r = s
+    do i=1,len(s)
+      c = iachar(s(i:i))
+      if(c>=iachar('a') .and. c<=iachar('z')) r(i:i)=achar(c-32)
+    end do
+  end function to_upper_f
 end module ControlModule
 

@@ -1,0 +1,63 @@
+program de9im_edge_semantic
+var temp_folder /tmp/de9im_edge_semantic/
+var temporary_layers 2
+var abort_on_assert_zero 2
+decl design d = ../examples/INV.mag
+decl memory m = nothing
+exec init m:nothing
+# DE-9IM edge semantics: INSIDE_EDGE = all A edges purely inside layer B
+exec run m:g5 = d:poly GROW nothing 5 5 5 5
+exec run m:ie = d:poly INSIDE_EDGE m:g5
+exec run m:oe = d:poly OUTSIDE_EDGE m:g5
+exec run m:cie = d:poly COINCIDENT_INSIDE_EDGE m:g5
+exec run m:coe = d:poly COINCIDENT_OUTSIDE_EDGE m:g5
+# all edges inside g5 => OUTSIDE_EDGE, COINCIDENT_* should be empty
+exec run m:oe_az = m:oe ASSERT_ZERO nothing
+exec run m:cie_az = m:cie ASSERT_ZERO nothing
+exec run m:coe_az = m:coe ASSERT_ZERO nothing
+# NOT_INSIDE_EDGE should be empty
+exec run m:nie = d:poly NOT_INSIDE_EDGE m:g5
+exec run m:nie_az = m:nie ASSERT_ZERO nothing
+
+# OUTSIDE_EDGE: disjoint -> all A edges outside B
+exec run m:g20 = d:poly GROW nothing 20 20 20 20
+exec run m:ring = m:g20 ~ m:g5
+exec run m:oe2 = d:poly OUTSIDE_EDGE m:ring
+exec run m:ie2 = d:poly INSIDE_EDGE m:ring
+exec run m:cie2 = d:poly COINCIDENT_INSIDE_EDGE m:ring
+exec run m:coe2 = d:poly COINCIDENT_OUTSIDE_EDGE m:ring
+exec run m:ie2_az = m:ie2 ASSERT_ZERO nothing
+exec run m:cie2_az = m:cie2 ASSERT_ZERO nothing
+exec run m:coe2_az = m:coe2 ASSERT_ZERO nothing
+exec run m:noe2 = d:poly NOT_OUTSIDE_EDGE m:ring
+exec run m:noe2_az = m:noe2 ASSERT_ZERO nothing
+
+# COINCIDENT_INSIDE_EDGE: same direction shared edge
+exec run m:g_up = d:poly GROW nothing 0 5 0 0
+exec run m:cie3 = d:poly COINCIDENT_INSIDE_EDGE m:g_up
+exec run m:coe3 = d:poly COINCIDENT_OUTSIDE_EDGE m:g_up
+# top edge of poly is inside g_up (g_up grew north), not coincident; bottom/left/right coincident same direction
+exec run m:coe3_az = m:coe3 ASSERT_ZERO nothing
+exec run m:ncie3 = d:poly NOT_COINCIDENT_INSIDE_EDGE m:g_up
+exec run m:cie3_ch = m:cie3 * m:ncie3
+# representation corner artifacts possible; check no gross error by union/exclusions
+exec run m:ie3 = d:poly INSIDE_EDGE m:g_up
+exec run m:oe3 = d:poly OUTSIDE_EDGE m:g_up
+exec run m:oe3_az = m:oe3 ASSERT_ZERO nothing
+
+# COINCIDENT_OUTSIDE_EDGE: opposite direction shared edge
+exec run m:cout = m:ring COINCIDENT_OUTSIDE_EDGE m:g5
+exec run m:cin = m:ring COINCIDENT_INSIDE_EDGE m:g5
+exec run m:inr = m:ring INSIDE_EDGE m:g5
+exec run m:cin_az = m:cin ASSERT_ZERO nothing
+exec run m:inr_az = m:inr ASSERT_ZERO nothing
+
+# complements
+exec run m:nie3 = d:poly NOT_INSIDE_EDGE m:g_up
+exec run m:ie3u = m:ie3 + m:nie3
+exec run m:ie3x = m:ie3u ^ m:ie3
+exec run m:ie3x2 = m:ie3x * m:ie3
+exec run m:ie3x2z = m:ie3x2 ASSERT_ZERO nothing
+
+flush
+end
