@@ -535,6 +535,8 @@ contains
     local_codec%current_h_index = 0
     local_codec%current_x = 0
     local_codec%current_y = 0
+    local_codec%w_hash_valid = .false.
+    local_codec%h_hash_valid = .false.
     pos = 1_int64
 
     do i = 1_int64, num_boxes

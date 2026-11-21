@@ -1204,12 +1204,12 @@ contains
   subroutine DeleteDesign( input_design )
     type(Design), intent(inout) :: input_design
     integer :: i
-    do i=1,hash_nitems( input_design%ht )
-       associate( resolved_layer => input_design%layers(i) )
-         call ClearLayer( resolved_layer )
-       end associate
-    end do
-    if( allocated( input_design%layers ) )     deallocate( input_design%layers )
+    if( allocated( input_design%layers ) ) then
+       do i = 1, size( input_design%layers )
+          call ClearLayer( input_design%layers(i) )
+       end do
+       deallocate( input_design%layers )
+    end if
     if( allocated( input_design%layerNames ) ) deallocate( input_design%layerNames )
 
   end subroutine DeleteDesign

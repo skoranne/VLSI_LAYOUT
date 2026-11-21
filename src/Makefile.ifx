@@ -10,6 +10,7 @@ PROFILE ?= 0
 USE_HDF5 ?= 0
 # Paths (override for local machine, e.g. Macbook)
 BOOST_DIR ?= /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost
+GLFW_LIBDIR ?= /scratch1/skoranne/OSS_EDA_TOOLS/glf90w/build
 CPPFLAGS_EXTRA ?=
 THRUST_INCLUDE ?= -I/scratch1/skoranne/OSS_EDA_TOOLS/cccl/thrust  -I/scratch1/skoranne/OSS_EDA_TOOLS/cccl/libcudacxx/include
 THRUST_OPTIONS ?= -std=c++17 -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP -DTHRUST_HOST_SYSTEM=THRUST_HOST_SYSTEM_CPP -D__CUB_INTERNAL_REDUCE__=0
@@ -32,7 +33,9 @@ else
    FCFLAGS = -g -traceback -fpp -O3 -parallel -qopenmp -qopt-report=3 -xHost $(FCFLAGS_EXTRA)
 endif
 ifeq ($(STRICT),1)
-   FCFLAGS += -stand f18 -warn all -warn interfaces -warn unused -check bounds -check pointers -check uninit -traceback
+   # Note: -check nouninit avoids false positives from uninstrumented libiomp5.so under -qopenmp;
+   # -check nostack keeps -O3 optimization enabled while retaining bounds/pointers/shape/assume/contiguous/format/arg_temp_created checks.
+   FCFLAGS += -stand f18 -warn all -warn interfaces -warn unused -check all,nouninit,nostack -fpe0 -init=snan,arrays -traceback
 endif
 ifeq ($(PROFILE),1)
    FCFLAGS += -pg
@@ -136,8 +139,9 @@ event_sorter.o:	       event_sorter.cu
 		       g++ -x c++ -O3 -c event_sorter.cu
 gpu_morton.o:	gpu_morton.cu
 	g++ -O3 -c -x c++ gpu_morton.cu
-MAGVIEWER.exe:	magviewer.f90 $(LIBRARY)
-		ifx -c -O3 -fpp glf90w.F90
-		ifx $(FCFLAGS) -fpp -fopenmp magviewer.f90 $(LIBRARY) glf90w.o -L ./lib/ifx -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
+glf90w.o: glf90w.F90
+	$(FC) -c -O3 -fpp -DGLF90W_USE_INTRINSIC_C_F_STRPOINTER glf90w.F90 -o $@
+MAGVIEWER.exe: magviewer.f90 $(LIBRARY) glf90w.o db/liblayoutdb.a
+	$(LINKER_FC) $(FCFLAGS) magviewer.f90 $(LIBRARY) glf90w.o -L$(GLFW_LIBDIR) -Wl,-rpath,$(GLFW_LIBDIR) -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
        
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe MAGVIEWER.exe
