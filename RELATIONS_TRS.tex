@@ -5,6 +5,7 @@
 \usepackage{booktabs}
 \usepackage{listings}
 \usepackage{xcolor}
+\usepackage{subcaption}
 \usepackage{hyperref}
 \usetikzlibrary{positioning,calc}
 \lstdefinelanguage{Lean}{morekeywords={theorem,def,abbrev,namespace,end,by,cases,rfl,decide,import,open,inductive,deriving},sensitive=true,morecomment=[l]{--},morestring=[b]"}
@@ -95,50 +96,106 @@ Table~\ref{tab:counts} reports derivation counts from exhaustive finite-model en
 \centering
 \begin{tabular}{lrrrr}
 \toprule
-Model & n & Semantic classes & Grammar E==R & Lean/machine proofs \\
+Model & n & Semantic classes & Grammar E==R / zero & Lean/machine proofs \\
 \midrule
-Boolean/Topo pure-set & 2 & 16 & 1330 & 1330 grammar + 16 classes \\
-Boolean/Topo pure-set & 3 & 256 & 7302 & 7302 grammar + 256 classes \\
-Boolean/Topo pure-set & 4 & 65536 & 24488 & 24488 grammar + 65536 classes \\
-9E-DIM/DE-9IM (3^n) & 2 & 9 pt-types & 3349 zero ids & verified \\
-9E-DIM/DE-9IM (3^n) & 3 & 27 pt-types & 14541 zero ids & verified \\
-9E-DIM/DE-9IM (3^n) & 4 & 81 pt-types & 38273 zero ids & verified \\
+Boolean/Topo pure-set & 2 & 16 & 857 zero / 1330 E==R & Lean+machine \\
+Boolean/Topo pure-set & 3 & 256 & 2790 zero / 7302 E==R & Lean+machine \\
+Boolean/Topo pure-set & 4 & 65536 & 6394 zero / 24488 E==R & Lean+machine \\
+9E-DIM/DE-9IM (3^n) & 2 & 9 pt-types & 3349 zero ids & machine verified \\
+9E-DIM/DE-9IM (3^n) & 3 & 27 pt-types & 14541 zero ids & machine verified \\
+9E-DIM/DE-9IM (3^n) & 4 & 81 pt-types & 38273 zero ids & machine verified \\
 \bottomrule
 \end{tabular}
-\caption{Derivation/proof counts for 2,3,4-layer Boolean and 9E-DIM models.}
+\caption{Derivation/proof counts for 2,3,4-layer Boolean and 9E-DIM models, including distributive and De Morgan generalizations.}
 \label{tab:counts}
 \end{table}
 
-\section{16 ALL\_ZERO Relations}
-Figure~\ref{fig:allzero} shows 16 prototypical relations that collapse to \texttt{ALL\_ZERO\_BY\_CONSTRUCTION}.
+\paragraph{Distributive and De Morgan laws.}
+The generator includes multi-layer generalizations such as
+$(A\land(B\lor C))\oplus((A\land B)\lor(A\land C))=0$,
+$(A\lor(B\land C))\oplus((A\lor B)\land(A\lor C))=0$,
+$\neg(A\land B)\oplus(\neg A\lor\neg B)=0$, and
+$\neg(A\lor B)\oplus(\neg A\land\neg B)=0$, proven by exhaustive finite-model evaluation and Lean case proofs.
+
+ \section{16 ALL\_ZERO Relations}
+Figure~\ref{fig:allzero} shows 16 prototypical relations collapsing to \texttt{ALL\_ZERO\_BY\_CONSTRUCTION}. Each subfigure draws the operation with rectangles and places the identity below.
 
 \begin{figure}[h]
 \centering
-\begin{tikzpicture}[x=3.2cm,y=1.7cm, every node/.style={font=\scriptsize}]
-\def\cell#1#2#3{%
-  \node[draw,rounded corners,minimum width=2.9cm,minimum height=1.25cm,align=center] at (#1,-#2) {#3};}
-\cell{0}{0}{$A\setminus A=0$}
-\cell{1}{0}{$A\land(B\setminus A)=0$}
-\cell{2}{0}{$(A\!\cap\!B)\setminus A=0$}
-\cell{3}{0}{$A\oplus A=0$}
-\cell{0}{1}{$(A\;\mathrm{IN}\;B)\land(A\;\mathrm{OUT}\;B)=0$}
-\cell{1}{1}{$(A\;\mathrm{IN}\;B)\oplus(A\land B)=0$}
-\cell{2}{1}{$(A\;\mathrm{OUT}\;B)\oplus(A\setminus B)=0$}
-\cell{3}{1}{$(A\land B)\land(A\setminus B)=0$}
-\cell{0}{2}{$(A\!\cup\!B)\setminus(A\!\cup\!B)=0$}
-\cell{1}{2}{$A\land(\neg A)=0$}
-\cell{2}{2}{$(A\!\cap\!B)\land\neg B=0$}
-\cell{3}{2}{$(A\setminus B)\land B=0$}
-\cell{0}{3}{$(A\;\mathrm{IN}\;A)\setminus A=0$}
-\cell{1}{3}{$(A\;\mathrm{OUT}\;A)\land A=0$}
-\cell{2}{3}{$(A\oplus B)\land(A\land B\land\neg(A\oplus B))=0$}
-\cell{3}{3}{$(A\;\mathrm{MEET}\;B)\land(A\;\mathrm{DISJ}\;B)=0$}
-\end{tikzpicture}
-\caption{Sixteen relations collapsing to \texttt{ALL\_ZERO\_BY\_CONSTRUCTION}.}
+\newcommand{\rectA}{\draw[thick] (0,0) rectangle (1.6,1); \node[font=\tiny] at (0.2,0.85) {A};}
+\newcommand{\rectB}{\draw[thick] (0.8,0.15) rectangle (2.4,0.85); \node[font=\tiny] at (2.2,0.85) {B};}
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA \node[font=\tiny] at (1.2,-0.25) {$A\setminus A=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$A\land(B\setminus A)=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\cap B)\setminus A=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA \node[font=\tiny] at (1.2,-0.25) {$A\oplus A=0$};\end{tikzpicture}
+\end{subfigure}
+
+\vspace{0.4em}
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\,\mathrm{IN}\,B)\land(A\,\mathrm{OUT}\,B)=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\,\mathrm{IN}\,B)\oplus(A\land B)=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\,\mathrm{OUT}\,B)\oplus(A\setminus B)=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\land B)\land(A\setminus B)=0$};\end{tikzpicture}
+\end{subfigure}
+
+\vspace{0.4em}
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\cup B)\setminus(A\cup B)=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA \node[font=\tiny] at (1.2,-0.25) {$A\land\neg A=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\cap B)\land\neg B=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\setminus B)\land B=0$};\end{tikzpicture}
+\end{subfigure}
+
+\vspace{0.4em}
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA \node[font=\tiny] at (1.2,-0.25) {$(A\,\mathrm{IN}\,A)\setminus A=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA \node[font=\tiny] at (1.2,-0.25) {$(A\,\mathrm{OUT}\,A)\land A=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\oplus B)\land A\land B=0$};\end{tikzpicture}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\textwidth}\centering
+\begin{tikzpicture}[scale=0.55]\rectA\rectB \node[font=\tiny] at (1.2,-0.25) {$(A\,\mathrm{MEET}\,B)\land(A\,\mathrm{DISJ}\,B)=0$};\end{tikzpicture}
+\end{subfigure}
+\caption{Sixteen relations collapsing to \texttt{ALL\_ZERO\_BY\_CONSTRUCTION}, shown as rectangle operation diagrams.}
 \label{fig:allzero}
 \end{figure}
 
+\section{Connectivity-Aware TRS Caveat}
+Layout operations can be non-commutative when operands carry electrical net information. For example, $A\land B$ and $B\land A$ have identical coordinate geometry, but $Z_1=A\land B$ may inherit net-id of $A$ while $Z_2=B\land A$ inherits net-id of $B$. Geometrically $Z_1\oplus Z_2=0$, but a connectivity-sensitive operation such as \texttt{EXTERNAL A Z1 < 0.5} may produce different results. Therefore, a DAG of operations must mark \emph{connectivity zones}: TRS inside a zone is conservative and only applies net-preserving rewrites.
+
+\section{Julia DAG TRS Implementation}
+We implement a Julia tool \texttt{trs\_dag.jl} that reads \texttt{RELATIONS.md}/JSON rules, parses CTR files, converts operations to a DAG, computes connectivity zones, and applies TRS. The CTR format supports \texttt{START CONNECT ZONE n} and \texttt{END CONNECT ZONE n} markers; every DAG node carries a \texttt{connect\_zone} marker. A TODO is to fully implement marker propagation through complex DAG transforms.
+
+\begin{lstlisting}[language=Python,caption={Julia TRS usage (conceptual)}]
+julia trs_dag.jl relations.json input.ctr output.ctr
+# Before TRS: 12 ops
+# After  TRS: 7 ops
+# Removed redundant: 5
+\end{lstlisting}
+
 \section{Conclusion}
-Term Rewrite Synthesis combines symbolic generation and automatic theorem proving to turn algebraic layout identities into verified rewrite rules. Exhaustive finite-model enumeration provides complete semantic coverage, while Lean proofs and machine-checkable certificates make each rule auditable. For Boolean and 9E-DIM layout relations, this enables aggressive but safe simplification in EDA pipelines.
+Term Rewrite Synthesis combines symbolic generation and automatic theorem proving to turn algebraic layout identities into verified rewrite rules. Exhaustive finite-model enumeration provides complete semantic coverage, while Lean proofs and machine-checkable certificates make each rule auditable. For Boolean and 9E-DIM layout relations, this enables aggressive but safe simplification in EDA pipelines, provided connectivity-aware zones are respected.
 
 \end{document}

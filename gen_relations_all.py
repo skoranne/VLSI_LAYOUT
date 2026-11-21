@@ -47,6 +47,22 @@ def gen(n,maxd=3):
                 add(m1&m2,f"({d1} COVERS {d2})",f"(scovers {l1} {l2})",nd)
                 add(m1&m2,f"({d1} EQUAL_PART {d2})",f"(sequal_part {l1} {l2})",nd)
                 add(m1&~m2,f"({d1} MEET_PART {d2})",f"(smeet_part {l1} {l2})",nd)
+    # add explicit distributive / De Morgan generalizations
+    def add0(disp,lean): 
+        if lean not in seen0: zeros.append((disp,lean))
+    seen0=set(l for d,l in zeros)
+    for i in range(n):
+        for j in range(n):
+            for k in range(n):
+                A,B,C=NAMES[i],NAMES[j],NAMES[k]
+                add0(f"(({A} AND ({B} OR {C})) XOR (({A} AND {B}) OR ({A} AND {C})))",
+                     f"(sxor (sand {A} (sor {B} {C})) (sor (sand {A} {B}) (sand {A} {C})))")
+                add0(f"(({A} OR ({B} AND {C})) XOR (({A} OR {B}) AND ({A} OR {C})))",
+                     f"(sxor (sor {A} (sand {B} {C})) (sand (sor {A} {B}) (sor {A} {C})))")
+                add0(f"((NOT ({A} AND {B})) XOR ((NOT {A}) OR (NOT {B})))",
+                     f"(sxor (! (sand {A} {B})) (sor (! {A}) (! {B})))")
+                add0(f"((NOT ({A} OR {B})) XOR ((NOT {A}) AND (NOT {B})))",
+                     f"(sxor (! (sor {A} {B})) (sand (! {A}) (! {B})))")
     # unique by lean form
     seen=set(); uz=[]
     for d,l in zeros:

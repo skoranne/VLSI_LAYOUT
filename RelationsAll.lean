@@ -724,130 +724,154 @@ theorem r2_705 (A B : S) : (snot (sand A (! A)) (sor (! A) (! B))) = false := by
 theorem r2_706 (A B : S) : (snot (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
 theorem r2_707 (A B : S) : (sand (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
 theorem r2_708 (A B : S) : (snot (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_709 (A B : S) : (sand (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_710 (A B : S) : (sand (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
-theorem r2_711 (A B : S) : (sand (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_712 (A B : S) : (sand (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_713 (A B : S) : (sand (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_714 (A B : S) : (sand (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_715 (A B : S) : (snot (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_716 (A B : S) : (snot (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_717 (A B : S) : (sand (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_718 (A B : S) : (sand (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_719 (A B : S) : (snot (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_720 (A B : S) : (scovers (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_721 (A B : S) : (scovers (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_722 (A B : S) : (sinside (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_723 (A B : S) : (sinside (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_724 (A B : S) : (soutside (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_725 (A B : S) : (scovers (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_726 (A B : S) : (sinside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_727 (A B : S) : (scovers (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_728 (A B : S) : (sinside (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_729 (A B : S) : (scovers (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_730 (A B : S) : (sinside (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_731 (A B : S) : (soutside (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_732 (A B : S) : (soverlap (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_733 (A B : S) : (soverlap (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_734 (A B : S) : (scovers (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
-theorem r2_735 (A B : S) : (scovers (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_736 (A B : S) : (scovers (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_737 (A B : S) : (scovers (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_738 (A B : S) : (sinside (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
-theorem r2_739 (A B : S) : (sinside (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_740 (A B : S) : (sinside (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_741 (A B : S) : (sinside (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_742 (A B : S) : (soutside (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_743 (A B : S) : (scovers (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_744 (A B : S) : (sinside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_745 (A B : S) : (soutside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_746 (A B : S) : (soverlap (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_747 (A B : S) : (soutside (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_748 (A B : S) : (scovers (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_749 (A B : S) : (sinside (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_750 (A B : S) : (soverlap (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_751 (A B : S) : (scovers (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_752 (A B : S) : (sinside (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_753 (A B : S) : (soutside (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_754 (A B : S) : (soverlap (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_755 (A B : S) : (scontains (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_756 (A B : S) : (scontains (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_757 (A B : S) : (smeet_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_758 (A B : S) : (soverlap (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
-theorem r2_759 (A B : S) : (soverlap (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_760 (A B : S) : (soverlap (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_761 (A B : S) : (soverlap (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_762 (A B : S) : (scontains (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_763 (A B : S) : (soutside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_764 (A B : S) : (soverlap (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_765 (A B : S) : (soutside (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_766 (A B : S) : (scontains (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_767 (A B : S) : (soverlap (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_768 (A B : S) : (soverlap (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_769 (A B : S) : (soutside (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_770 (A B : S) : (scontains (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_771 (A B : S) : (smeet_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_772 (A B : S) : (scoveredby (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_773 (A B : S) : (scoveredby (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_774 (A B : S) : (scontains (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
-theorem r2_775 (A B : S) : (scontains (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_776 (A B : S) : (scontains (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_777 (A B : S) : (scontains (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_778 (A B : S) : (smeet_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_779 (A B : S) : (scontains (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_780 (A B : S) : (scoveredby (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_781 (A B : S) : (smeet_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_782 (A B : S) : (smeet_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_783 (A B : S) : (scontains (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_784 (A B : S) : (scoveredby (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_785 (A B : S) : (scontains (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_786 (A B : S) : (smeet_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_787 (A B : S) : (scoveredby (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_788 (A B : S) : (sequal_part (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_789 (A B : S) : (sequal_part (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_790 (A B : S) : (scoveredby (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
-theorem r2_791 (A B : S) : (scoveredby (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_792 (A B : S) : (scoveredby (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_793 (A B : S) : (scoveredby (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_794 (A B : S) : (scoveredby (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_795 (A B : S) : (sequal_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_796 (A B : S) : (smeet_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_797 (A B : S) : (smeet_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_798 (A B : S) : (scoveredby (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_799 (A B : S) : (sequal_part (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_800 (A B : S) : (scoveredby (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_801 (A B : S) : (smeet_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_802 (A B : S) : (sequal_part (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_803 (A B : S) : (sequal_part (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
-theorem r2_804 (A B : S) : (sequal_part (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_805 (A B : S) : (sequal_part (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_806 (A B : S) : (sequal_part (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_807 (A B : S) : (sequal_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_808 (A B : S) : (sequal_part (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_809 (A B : S) : (sequal_part (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_810 (A B : S) : (sdisjoint_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_811 (A B : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_812 (A B : S) : (sdisjoint_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
-theorem r2_813 (A B : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_814 (A B : S) : (sdisjoint_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_815 (A B : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_816 (A B : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_817 (A B : S) : (sdisjoint_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_818 (A B : S) : (sdisjoint_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_819 (A B : S) : (snot (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_820 (A B : S) : (sxor (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_821 (A B : S) : (snot (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_822 (A B : S) : (snot (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_823 (A B : S) : (sxor (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_824 (A B : S) : (soutside (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_825 (A B : S) : (soutside (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_826 (A B : S) : (smeet_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_827 (A B : S) : (soutside (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_828 (A B : S) : (smeet_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_829 (A B : S) : (smeet_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_830 (A B : S) : (sdisjoint_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_831 (A B : S) : (sdisjoint_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
-theorem r2_832 (A B : S) : (sdisjoint_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_709 (A B : S) : (sxor (! (sand A A)) (sor (! A) (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_710 (A B : S) : (sxor (! (sand A B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_711 (A B : S) : (sxor (! (sor A A)) (sand (! A) (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_712 (A B : S) : (sxor (! (sor A B)) (sand (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_713 (A B : S) : (sxor (! (sand B A)) (sor (! B) (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_714 (A B : S) : (sxor (! (sand B B)) (sor (! B) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_715 (A B : S) : (sxor (! (sor B A)) (sand (! B) (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_716 (A B : S) : (sxor (! (sor B B)) (sand (! B) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_717 (A B : S) : (sand (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_718 (A B : S) : (sand (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
+theorem r2_719 (A B : S) : (sand (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_720 (A B : S) : (sand (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_721 (A B : S) : (sand (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_722 (A B : S) : (sand (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_723 (A B : S) : (snot (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_724 (A B : S) : (snot (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_725 (A B : S) : (sand (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_726 (A B : S) : (sand (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_727 (A B : S) : (snot (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_728 (A B : S) : (scovers (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_729 (A B : S) : (scovers (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_730 (A B : S) : (sinside (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_731 (A B : S) : (sinside (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_732 (A B : S) : (soutside (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_733 (A B : S) : (scovers (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_734 (A B : S) : (sinside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_735 (A B : S) : (scovers (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_736 (A B : S) : (sinside (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_737 (A B : S) : (scovers (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_738 (A B : S) : (sinside (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_739 (A B : S) : (soutside (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_740 (A B : S) : (soverlap (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_741 (A B : S) : (soverlap (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_742 (A B : S) : (scovers (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
+theorem r2_743 (A B : S) : (scovers (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_744 (A B : S) : (scovers (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_745 (A B : S) : (scovers (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_746 (A B : S) : (sinside (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
+theorem r2_747 (A B : S) : (sinside (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_748 (A B : S) : (sinside (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_749 (A B : S) : (sinside (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_750 (A B : S) : (soutside (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_751 (A B : S) : (scovers (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_752 (A B : S) : (sinside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_753 (A B : S) : (soutside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_754 (A B : S) : (soverlap (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_755 (A B : S) : (soutside (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_756 (A B : S) : (scovers (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_757 (A B : S) : (sinside (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_758 (A B : S) : (soverlap (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_759 (A B : S) : (sxor (sor A (sand A A)) (sand (sor A A) (sor A A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_760 (A B : S) : (sxor (sor A (sand A B)) (sand (sor A A) (sor A B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_761 (A B : S) : (sxor (sor A (sand B A)) (sand (sor A B) (sor A A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_762 (A B : S) : (sxor (sor A (sand B B)) (sand (sor A B) (sor A B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_763 (A B : S) : (scovers (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_764 (A B : S) : (sinside (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_765 (A B : S) : (soutside (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_766 (A B : S) : (sxor (sor B (sand A A)) (sand (sor B A) (sor B A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_767 (A B : S) : (sxor (sor B (sand A B)) (sand (sor B A) (sor B B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_768 (A B : S) : (sxor (sor B (sand B A)) (sand (sor B B) (sor B A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_769 (A B : S) : (sxor (sor B (sand B B)) (sand (sor B B) (sor B B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_770 (A B : S) : (soverlap (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_771 (A B : S) : (scontains (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_772 (A B : S) : (scontains (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_773 (A B : S) : (smeet_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_774 (A B : S) : (soverlap (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
+theorem r2_775 (A B : S) : (soverlap (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_776 (A B : S) : (soverlap (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_777 (A B : S) : (soverlap (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_778 (A B : S) : (sxor (sand A (sor A A)) (sor (sand A A) (sand A A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_779 (A B : S) : (sxor (sand A (sor A B)) (sor (sand A A) (sand A B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_780 (A B : S) : (sxor (sand A (sor B A)) (sor (sand A B) (sand A A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_781 (A B : S) : (sxor (sand A (sor B B)) (sor (sand A B) (sand A B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_782 (A B : S) : (scontains (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_783 (A B : S) : (soutside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_784 (A B : S) : (soverlap (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_785 (A B : S) : (soutside (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_786 (A B : S) : (scontains (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_787 (A B : S) : (soverlap (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_788 (A B : S) : (soverlap (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_789 (A B : S) : (sxor (sand B (sor A A)) (sor (sand B A) (sand B A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_790 (A B : S) : (sxor (sand B (sor A B)) (sor (sand B A) (sand B B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_791 (A B : S) : (sxor (sand B (sor B A)) (sor (sand B B) (sand B A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_792 (A B : S) : (sxor (sand B (sor B B)) (sor (sand B B) (sand B B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_793 (A B : S) : (soutside (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_794 (A B : S) : (scontains (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_795 (A B : S) : (smeet_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_796 (A B : S) : (scoveredby (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_797 (A B : S) : (scoveredby (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_798 (A B : S) : (scontains (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
+theorem r2_799 (A B : S) : (scontains (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_800 (A B : S) : (scontains (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_801 (A B : S) : (scontains (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_802 (A B : S) : (smeet_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_803 (A B : S) : (scontains (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_804 (A B : S) : (scoveredby (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_805 (A B : S) : (smeet_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_806 (A B : S) : (smeet_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_807 (A B : S) : (scontains (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_808 (A B : S) : (scoveredby (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_809 (A B : S) : (scontains (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_810 (A B : S) : (smeet_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_811 (A B : S) : (scoveredby (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_812 (A B : S) : (sequal_part (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_813 (A B : S) : (sequal_part (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_814 (A B : S) : (scoveredby (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
+theorem r2_815 (A B : S) : (scoveredby (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_816 (A B : S) : (scoveredby (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_817 (A B : S) : (scoveredby (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_818 (A B : S) : (scoveredby (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_819 (A B : S) : (sequal_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_820 (A B : S) : (smeet_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_821 (A B : S) : (smeet_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_822 (A B : S) : (scoveredby (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_823 (A B : S) : (sequal_part (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_824 (A B : S) : (scoveredby (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_825 (A B : S) : (smeet_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_826 (A B : S) : (sequal_part (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_827 (A B : S) : (sequal_part (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> rfl
+theorem r2_828 (A B : S) : (sequal_part (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_829 (A B : S) : (sequal_part (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_830 (A B : S) : (sequal_part (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_831 (A B : S) : (sequal_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_832 (A B : S) : (sequal_part (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_833 (A B : S) : (sequal_part (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_834 (A B : S) : (sdisjoint_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_835 (A B : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_836 (A B : S) : (sdisjoint_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> rfl
+theorem r2_837 (A B : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_838 (A B : S) : (sdisjoint_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_839 (A B : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_840 (A B : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_841 (A B : S) : (sdisjoint_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_842 (A B : S) : (sdisjoint_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_843 (A B : S) : (snot (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_844 (A B : S) : (sxor (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_845 (A B : S) : (snot (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_846 (A B : S) : (snot (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_847 (A B : S) : (sxor (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_848 (A B : S) : (soutside (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_849 (A B : S) : (soutside (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_850 (A B : S) : (smeet_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_851 (A B : S) : (soutside (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_852 (A B : S) : (smeet_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_853 (A B : S) : (smeet_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_854 (A B : S) : (sdisjoint_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_855 (A B : S) : (sdisjoint_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
+theorem r2_856 (A B : S) : (sdisjoint_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> rfl
 
 theorem r3_0 (A B C : S) : (sand (! A) A) = false := by cases A <;> cases B <;> cases C <;> rfl
 theorem r3_1 (A B C : S) : (sand (! B) B) = false := by cases A <;> cases B <;> cases C <;> rfl
@@ -3159,414 +3183,486 @@ theorem r3_2306 (A B C : S) : (snot (sand C (! A)) (sor (! A) (! B))) = false :=
 theorem r3_2307 (A B C : S) : (snot (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
 theorem r3_2308 (A B C : S) : (snot (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
 theorem r3_2309 (A B C : S) : (snot (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2310 (A B C : S) : (sand (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2311 (A B C : S) : (sand (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2312 (A B C : S) : (sand (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2313 (A B C : S) : (sand (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2314 (A B C : S) : (sand (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2315 (A B C : S) : (sand (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2316 (A B C : S) : (sand (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2317 (A B C : S) : (sand (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2318 (A B C : S) : (sand (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2319 (A B C : S) : (sand (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2320 (A B C : S) : (sand (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2321 (A B C : S) : (sand (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2322 (A B C : S) : (sand (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2323 (A B C : S) : (sand (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2324 (A B C : S) : (sand (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2325 (A B C : S) : (sand (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2326 (A B C : S) : (sand (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2327 (A B C : S) : (sand (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2328 (A B C : S) : (snot (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2329 (A B C : S) : (snot (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2330 (A B C : S) : (snot (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2331 (A B C : S) : (snot (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2332 (A B C : S) : (snot (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2333 (A B C : S) : (sand (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2334 (A B C : S) : (sand (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2335 (A B C : S) : (sand (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2336 (A B C : S) : (sand (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2337 (A B C : S) : (snot (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2338 (A B C : S) : (snot (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2339 (A B C : S) : (sand (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2340 (A B C : S) : (sand (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2341 (A B C : S) : (snot (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2342 (A B C : S) : (snot (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2343 (A B C : S) : (scovers (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2344 (A B C : S) : (scovers (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2345 (A B C : S) : (sinside (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2346 (A B C : S) : (sinside (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2347 (A B C : S) : (soutside (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2348 (A B C : S) : (scovers (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2349 (A B C : S) : (scovers (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2350 (A B C : S) : (sinside (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2351 (A B C : S) : (sinside (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2352 (A B C : S) : (soutside (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2353 (A B C : S) : (scovers (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2354 (A B C : S) : (scovers (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2355 (A B C : S) : (sinside (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2356 (A B C : S) : (sinside (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2357 (A B C : S) : (soutside (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2358 (A B C : S) : (scovers (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2359 (A B C : S) : (scovers (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2360 (A B C : S) : (scovers (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2361 (A B C : S) : (sinside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2362 (A B C : S) : (sinside (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2363 (A B C : S) : (sinside (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2364 (A B C : S) : (scovers (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2365 (A B C : S) : (sinside (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2366 (A B C : S) : (scovers (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2367 (A B C : S) : (sinside (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2368 (A B C : S) : (scovers (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2369 (A B C : S) : (sinside (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2370 (A B C : S) : (scovers (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2371 (A B C : S) : (sinside (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2372 (A B C : S) : (soutside (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2373 (A B C : S) : (soutside (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2374 (A B C : S) : (soutside (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2375 (A B C : S) : (scovers (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2376 (A B C : S) : (sinside (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2377 (A B C : S) : (soutside (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2378 (A B C : S) : (soutside (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2379 (A B C : S) : (soutside (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2380 (A B C : S) : (soverlap (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2381 (A B C : S) : (soverlap (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2382 (A B C : S) : (soverlap (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2383 (A B C : S) : (soverlap (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2384 (A B C : S) : (scovers (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2385 (A B C : S) : (scovers (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2386 (A B C : S) : (scovers (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2387 (A B C : S) : (scovers (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2388 (A B C : S) : (sinside (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2389 (A B C : S) : (sinside (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2390 (A B C : S) : (sinside (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2391 (A B C : S) : (sinside (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2392 (A B C : S) : (soutside (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2393 (A B C : S) : (scovers (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2394 (A B C : S) : (scovers (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2395 (A B C : S) : (scovers (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2396 (A B C : S) : (scovers (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2397 (A B C : S) : (sinside (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2398 (A B C : S) : (sinside (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2399 (A B C : S) : (sinside (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2400 (A B C : S) : (sinside (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2401 (A B C : S) : (soutside (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2402 (A B C : S) : (scovers (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2403 (A B C : S) : (sinside (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2404 (A B C : S) : (soutside (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2405 (A B C : S) : (soutside (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2406 (A B C : S) : (soutside (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2407 (A B C : S) : (soverlap (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2408 (A B C : S) : (soverlap (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2409 (A B C : S) : (scovers (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2410 (A B C : S) : (scovers (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2411 (A B C : S) : (scovers (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2412 (A B C : S) : (scovers (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2413 (A B C : S) : (sinside (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2414 (A B C : S) : (sinside (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2415 (A B C : S) : (sinside (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2416 (A B C : S) : (sinside (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2417 (A B C : S) : (soutside (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2418 (A B C : S) : (scovers (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2419 (A B C : S) : (scovers (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2420 (A B C : S) : (scovers (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2421 (A B C : S) : (sinside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2422 (A B C : S) : (sinside (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2423 (A B C : S) : (sinside (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2424 (A B C : S) : (soutside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2425 (A B C : S) : (soutside (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2426 (A B C : S) : (soutside (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2427 (A B C : S) : (soverlap (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2428 (A B C : S) : (soverlap (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2429 (A B C : S) : (soverlap (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2430 (A B C : S) : (soutside (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2431 (A B C : S) : (soutside (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2432 (A B C : S) : (soutside (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2433 (A B C : S) : (soutside (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2434 (A B C : S) : (scovers (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2435 (A B C : S) : (sinside (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2436 (A B C : S) : (soverlap (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2437 (A B C : S) : (scovers (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2438 (A B C : S) : (sinside (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2439 (A B C : S) : (soverlap (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2440 (A B C : S) : (scovers (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2441 (A B C : S) : (sinside (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2442 (A B C : S) : (scovers (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2443 (A B C : S) : (sinside (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2444 (A B C : S) : (soutside (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2445 (A B C : S) : (soutside (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2446 (A B C : S) : (soutside (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2447 (A B C : S) : (soutside (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2448 (A B C : S) : (scovers (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2449 (A B C : S) : (sinside (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2450 (A B C : S) : (soverlap (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2451 (A B C : S) : (scovers (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2452 (A B C : S) : (sinside (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2453 (A B C : S) : (soutside (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2454 (A B C : S) : (soutside (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2455 (A B C : S) : (soutside (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2456 (A B C : S) : (soutside (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2457 (A B C : S) : (soverlap (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2458 (A B C : S) : (soverlap (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2459 (A B C : S) : (scontains (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2460 (A B C : S) : (scontains (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2461 (A B C : S) : (smeet_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2462 (A B C : S) : (scontains (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2463 (A B C : S) : (scontains (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2464 (A B C : S) : (smeet_part (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2465 (A B C : S) : (soverlap (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2466 (A B C : S) : (soverlap (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2467 (A B C : S) : (soverlap (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2468 (A B C : S) : (soverlap (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2469 (A B C : S) : (soverlap (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2470 (A B C : S) : (soverlap (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2471 (A B C : S) : (soverlap (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2472 (A B C : S) : (soverlap (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2473 (A B C : S) : (soverlap (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2474 (A B C : S) : (scontains (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2475 (A B C : S) : (scontains (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2476 (A B C : S) : (smeet_part (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2477 (A B C : S) : (soverlap (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2478 (A B C : S) : (soverlap (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2479 (A B C : S) : (soverlap (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2480 (A B C : S) : (soverlap (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2481 (A B C : S) : (scontains (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2482 (A B C : S) : (scontains (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2483 (A B C : S) : (scontains (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2484 (A B C : S) : (soutside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2485 (A B C : S) : (soutside (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2486 (A B C : S) : (soutside (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2487 (A B C : S) : (soverlap (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2488 (A B C : S) : (soverlap (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2489 (A B C : S) : (soverlap (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2490 (A B C : S) : (soutside (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2491 (A B C : S) : (soutside (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2492 (A B C : S) : (scontains (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2493 (A B C : S) : (soverlap (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2494 (A B C : S) : (scontains (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2495 (A B C : S) : (soverlap (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2496 (A B C : S) : (soverlap (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2497 (A B C : S) : (soverlap (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2498 (A B C : S) : (soutside (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2499 (A B C : S) : (soutside (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2500 (A B C : S) : (scontains (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2501 (A B C : S) : (soverlap (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2502 (A B C : S) : (soverlap (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2503 (A B C : S) : (soutside (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2504 (A B C : S) : (soutside (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2505 (A B C : S) : (scontains (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2506 (A B C : S) : (smeet_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2507 (A B C : S) : (smeet_part (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2508 (A B C : S) : (smeet_part (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2509 (A B C : S) : (scontains (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2510 (A B C : S) : (smeet_part (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2511 (A B C : S) : (smeet_part (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2512 (A B C : S) : (smeet_part (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2513 (A B C : S) : (scoveredby (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2514 (A B C : S) : (scoveredby (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2515 (A B C : S) : (scoveredby (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2516 (A B C : S) : (scoveredby (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2517 (A B C : S) : (scontains (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2518 (A B C : S) : (scontains (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2519 (A B C : S) : (scontains (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2520 (A B C : S) : (scontains (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2521 (A B C : S) : (smeet_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2522 (A B C : S) : (scontains (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2523 (A B C : S) : (scontains (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2524 (A B C : S) : (scontains (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2525 (A B C : S) : (scontains (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2526 (A B C : S) : (smeet_part (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2527 (A B C : S) : (scontains (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2528 (A B C : S) : (smeet_part (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2529 (A B C : S) : (smeet_part (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2530 (A B C : S) : (smeet_part (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2531 (A B C : S) : (scoveredby (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2532 (A B C : S) : (scoveredby (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2533 (A B C : S) : (scontains (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2534 (A B C : S) : (scontains (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2535 (A B C : S) : (scontains (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2536 (A B C : S) : (scontains (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2537 (A B C : S) : (smeet_part (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2538 (A B C : S) : (scontains (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2539 (A B C : S) : (scontains (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2540 (A B C : S) : (scontains (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2541 (A B C : S) : (scoveredby (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2542 (A B C : S) : (scoveredby (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2543 (A B C : S) : (scoveredby (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2544 (A B C : S) : (smeet_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2545 (A B C : S) : (smeet_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2546 (A B C : S) : (smeet_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2547 (A B C : S) : (smeet_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2548 (A B C : S) : (smeet_part (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2549 (A B C : S) : (smeet_part (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2550 (A B C : S) : (smeet_part (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2551 (A B C : S) : (scontains (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2552 (A B C : S) : (scoveredby (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2553 (A B C : S) : (scontains (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2554 (A B C : S) : (scoveredby (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2555 (A B C : S) : (scontains (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2556 (A B C : S) : (scontains (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2557 (A B C : S) : (smeet_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2558 (A B C : S) : (smeet_part (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2559 (A B C : S) : (smeet_part (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2560 (A B C : S) : (smeet_part (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2561 (A B C : S) : (scontains (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2562 (A B C : S) : (scoveredby (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2563 (A B C : S) : (scontains (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2564 (A B C : S) : (smeet_part (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2565 (A B C : S) : (smeet_part (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2566 (A B C : S) : (smeet_part (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2567 (A B C : S) : (smeet_part (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2568 (A B C : S) : (scoveredby (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2569 (A B C : S) : (scoveredby (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2570 (A B C : S) : (sequal_part (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2571 (A B C : S) : (sequal_part (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2572 (A B C : S) : (sequal_part (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2573 (A B C : S) : (sequal_part (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2574 (A B C : S) : (scoveredby (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2575 (A B C : S) : (scoveredby (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2576 (A B C : S) : (scoveredby (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2577 (A B C : S) : (scoveredby (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2578 (A B C : S) : (scoveredby (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2579 (A B C : S) : (scoveredby (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2580 (A B C : S) : (scoveredby (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2581 (A B C : S) : (scoveredby (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2582 (A B C : S) : (scoveredby (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2583 (A B C : S) : (sequal_part (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2584 (A B C : S) : (sequal_part (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2585 (A B C : S) : (scoveredby (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2586 (A B C : S) : (scoveredby (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2587 (A B C : S) : (scoveredby (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2588 (A B C : S) : (scoveredby (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2589 (A B C : S) : (scoveredby (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2590 (A B C : S) : (scoveredby (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2591 (A B C : S) : (scoveredby (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2592 (A B C : S) : (sequal_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2593 (A B C : S) : (sequal_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2594 (A B C : S) : (sequal_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2595 (A B C : S) : (smeet_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2596 (A B C : S) : (smeet_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2597 (A B C : S) : (smeet_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2598 (A B C : S) : (smeet_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2599 (A B C : S) : (smeet_part (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2600 (A B C : S) : (scoveredby (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2601 (A B C : S) : (sequal_part (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2602 (A B C : S) : (scoveredby (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2603 (A B C : S) : (sequal_part (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2604 (A B C : S) : (scoveredby (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2605 (A B C : S) : (scoveredby (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2606 (A B C : S) : (smeet_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2607 (A B C : S) : (smeet_part (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2608 (A B C : S) : (scoveredby (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2609 (A B C : S) : (sequal_part (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2610 (A B C : S) : (scoveredby (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2611 (A B C : S) : (smeet_part (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2612 (A B C : S) : (smeet_part (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2613 (A B C : S) : (sequal_part (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2614 (A B C : S) : (sequal_part (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2615 (A B C : S) : (sequal_part (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2616 (A B C : S) : (sequal_part (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2617 (A B C : S) : (sequal_part (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2618 (A B C : S) : (sequal_part (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2619 (A B C : S) : (sequal_part (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2620 (A B C : S) : (sequal_part (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2621 (A B C : S) : (sequal_part (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2622 (A B C : S) : (sequal_part (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2623 (A B C : S) : (sequal_part (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2624 (A B C : S) : (sequal_part (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2625 (A B C : S) : (sequal_part (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2626 (A B C : S) : (sequal_part (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2627 (A B C : S) : (sequal_part (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2628 (A B C : S) : (sequal_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2629 (A B C : S) : (sequal_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2630 (A B C : S) : (sequal_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2631 (A B C : S) : (sequal_part (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2632 (A B C : S) : (sequal_part (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2633 (A B C : S) : (sequal_part (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2634 (A B C : S) : (sequal_part (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2635 (A B C : S) : (sequal_part (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2636 (A B C : S) : (sequal_part (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2637 (A B C : S) : (sdisjoint_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2638 (A B C : S) : (sdisjoint_part (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2639 (A B C : S) : (sdisjoint_part (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2640 (A B C : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2641 (A B C : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2642 (A B C : S) : (sdisjoint_part (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2643 (A B C : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2644 (A B C : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2645 (A B C : S) : (sdisjoint_part (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2646 (A B C : S) : (sdisjoint_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2647 (A B C : S) : (sdisjoint_part (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2648 (A B C : S) : (sdisjoint_part (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2649 (A B C : S) : (sdisjoint_part (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2650 (A B C : S) : (sdisjoint_part (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2651 (A B C : S) : (sdisjoint_part (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2652 (A B C : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2653 (A B C : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2654 (A B C : S) : (sdisjoint_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2655 (A B C : S) : (sdisjoint_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2656 (A B C : S) : (sdisjoint_part (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2657 (A B C : S) : (sdisjoint_part (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2658 (A B C : S) : (sdisjoint_part (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2659 (A B C : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2660 (A B C : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2661 (A B C : S) : (sdisjoint_part (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2662 (A B C : S) : (sdisjoint_part (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2663 (A B C : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2664 (A B C : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2665 (A B C : S) : (sdisjoint_part (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2666 (A B C : S) : (sdisjoint_part (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2667 (A B C : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2668 (A B C : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2669 (A B C : S) : (sdisjoint_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2670 (A B C : S) : (sdisjoint_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2671 (A B C : S) : (sdisjoint_part (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2672 (A B C : S) : (sdisjoint_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2673 (A B C : S) : (sdisjoint_part (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2674 (A B C : S) : (sdisjoint_part (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2675 (A B C : S) : (sdisjoint_part (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2676 (A B C : S) : (snot (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2677 (A B C : S) : (sxor (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2678 (A B C : S) : (snot (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2679 (A B C : S) : (sxor (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2680 (A B C : S) : (snot (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2681 (A B C : S) : (sxor (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2682 (A B C : S) : (snot (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2683 (A B C : S) : (snot (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2684 (A B C : S) : (snot (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2685 (A B C : S) : (snot (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2686 (A B C : S) : (sxor (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2687 (A B C : S) : (snot (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2688 (A B C : S) : (sxor (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2689 (A B C : S) : (snot (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2690 (A B C : S) : (sxor (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2691 (A B C : S) : (soutside (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2692 (A B C : S) : (soutside (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2693 (A B C : S) : (soutside (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2694 (A B C : S) : (soutside (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2695 (A B C : S) : (soutside (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2696 (A B C : S) : (soutside (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2697 (A B C : S) : (smeet_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2698 (A B C : S) : (smeet_part (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2699 (A B C : S) : (soutside (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2700 (A B C : S) : (soutside (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2701 (A B C : S) : (smeet_part (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2702 (A B C : S) : (soutside (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2703 (A B C : S) : (smeet_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2704 (A B C : S) : (smeet_part (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2705 (A B C : S) : (smeet_part (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2706 (A B C : S) : (smeet_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2707 (A B C : S) : (smeet_part (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2708 (A B C : S) : (smeet_part (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2709 (A B C : S) : (sdisjoint_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2710 (A B C : S) : (sdisjoint_part (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2711 (A B C : S) : (sdisjoint_part (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2712 (A B C : S) : (sdisjoint_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2713 (A B C : S) : (sdisjoint_part (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2714 (A B C : S) : (sdisjoint_part (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2715 (A B C : S) : (sdisjoint_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2716 (A B C : S) : (sdisjoint_part (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
-theorem r3_2717 (A B C : S) : (sdisjoint_part (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2310 (A B C : S) : (sxor (! (sand A A)) (sor (! A) (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2311 (A B C : S) : (sxor (! (sand A B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2312 (A B C : S) : (sxor (! (sand A C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2313 (A B C : S) : (sxor (! (sor A A)) (sand (! A) (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2314 (A B C : S) : (sxor (! (sor A B)) (sand (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2315 (A B C : S) : (sxor (! (sor A C)) (sand (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2316 (A B C : S) : (sxor (! (sand B A)) (sor (! B) (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2317 (A B C : S) : (sxor (! (sand B B)) (sor (! B) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2318 (A B C : S) : (sxor (! (sand B C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2319 (A B C : S) : (sxor (! (sor B A)) (sand (! B) (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2320 (A B C : S) : (sxor (! (sor B B)) (sand (! B) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2321 (A B C : S) : (sxor (! (sor B C)) (sand (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2322 (A B C : S) : (sxor (! (sand C A)) (sor (! C) (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2323 (A B C : S) : (sxor (! (sand C B)) (sor (! C) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2324 (A B C : S) : (sxor (! (sand C C)) (sor (! C) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2325 (A B C : S) : (sxor (! (sor C A)) (sand (! C) (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2326 (A B C : S) : (sxor (! (sor C B)) (sand (! C) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2327 (A B C : S) : (sxor (! (sor C C)) (sand (! C) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2328 (A B C : S) : (sand (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2329 (A B C : S) : (sand (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2330 (A B C : S) : (sand (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2331 (A B C : S) : (sand (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2332 (A B C : S) : (sand (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2333 (A B C : S) : (sand (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2334 (A B C : S) : (sand (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2335 (A B C : S) : (sand (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2336 (A B C : S) : (sand (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2337 (A B C : S) : (sand (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2338 (A B C : S) : (sand (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2339 (A B C : S) : (sand (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2340 (A B C : S) : (sand (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2341 (A B C : S) : (sand (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2342 (A B C : S) : (sand (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2343 (A B C : S) : (sand (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2344 (A B C : S) : (sand (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2345 (A B C : S) : (sand (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2346 (A B C : S) : (snot (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2347 (A B C : S) : (snot (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2348 (A B C : S) : (snot (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2349 (A B C : S) : (snot (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2350 (A B C : S) : (snot (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2351 (A B C : S) : (sand (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2352 (A B C : S) : (sand (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2353 (A B C : S) : (sand (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2354 (A B C : S) : (sand (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2355 (A B C : S) : (snot (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2356 (A B C : S) : (snot (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2357 (A B C : S) : (sand (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2358 (A B C : S) : (sand (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2359 (A B C : S) : (snot (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2360 (A B C : S) : (snot (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2361 (A B C : S) : (scovers (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2362 (A B C : S) : (scovers (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2363 (A B C : S) : (sinside (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2364 (A B C : S) : (sinside (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2365 (A B C : S) : (soutside (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2366 (A B C : S) : (scovers (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2367 (A B C : S) : (scovers (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2368 (A B C : S) : (sinside (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2369 (A B C : S) : (sinside (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2370 (A B C : S) : (soutside (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2371 (A B C : S) : (scovers (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2372 (A B C : S) : (scovers (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2373 (A B C : S) : (sinside (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2374 (A B C : S) : (sinside (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2375 (A B C : S) : (soutside (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2376 (A B C : S) : (scovers (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2377 (A B C : S) : (scovers (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2378 (A B C : S) : (scovers (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2379 (A B C : S) : (sinside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2380 (A B C : S) : (sinside (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2381 (A B C : S) : (sinside (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2382 (A B C : S) : (scovers (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2383 (A B C : S) : (sinside (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2384 (A B C : S) : (scovers (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2385 (A B C : S) : (sinside (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2386 (A B C : S) : (scovers (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2387 (A B C : S) : (sinside (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2388 (A B C : S) : (scovers (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2389 (A B C : S) : (sinside (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2390 (A B C : S) : (soutside (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2391 (A B C : S) : (soutside (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2392 (A B C : S) : (soutside (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2393 (A B C : S) : (scovers (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2394 (A B C : S) : (sinside (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2395 (A B C : S) : (soutside (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2396 (A B C : S) : (soutside (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2397 (A B C : S) : (soutside (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2398 (A B C : S) : (soverlap (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2399 (A B C : S) : (soverlap (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2400 (A B C : S) : (soverlap (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2401 (A B C : S) : (soverlap (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2402 (A B C : S) : (scovers (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2403 (A B C : S) : (scovers (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2404 (A B C : S) : (scovers (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2405 (A B C : S) : (scovers (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2406 (A B C : S) : (sinside (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2407 (A B C : S) : (sinside (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2408 (A B C : S) : (sinside (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2409 (A B C : S) : (sinside (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2410 (A B C : S) : (soutside (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2411 (A B C : S) : (scovers (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2412 (A B C : S) : (scovers (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2413 (A B C : S) : (scovers (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2414 (A B C : S) : (scovers (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2415 (A B C : S) : (sinside (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2416 (A B C : S) : (sinside (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2417 (A B C : S) : (sinside (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2418 (A B C : S) : (sinside (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2419 (A B C : S) : (soutside (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2420 (A B C : S) : (scovers (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2421 (A B C : S) : (sinside (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2422 (A B C : S) : (soutside (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2423 (A B C : S) : (soutside (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2424 (A B C : S) : (soutside (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2425 (A B C : S) : (soverlap (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2426 (A B C : S) : (soverlap (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2427 (A B C : S) : (scovers (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2428 (A B C : S) : (scovers (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2429 (A B C : S) : (scovers (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2430 (A B C : S) : (scovers (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2431 (A B C : S) : (sinside (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2432 (A B C : S) : (sinside (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2433 (A B C : S) : (sinside (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2434 (A B C : S) : (sinside (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2435 (A B C : S) : (soutside (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2436 (A B C : S) : (scovers (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2437 (A B C : S) : (scovers (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2438 (A B C : S) : (scovers (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2439 (A B C : S) : (sinside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2440 (A B C : S) : (sinside (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2441 (A B C : S) : (sinside (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2442 (A B C : S) : (soutside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2443 (A B C : S) : (soutside (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2444 (A B C : S) : (soutside (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2445 (A B C : S) : (soverlap (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2446 (A B C : S) : (soverlap (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2447 (A B C : S) : (soverlap (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2448 (A B C : S) : (soutside (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2449 (A B C : S) : (soutside (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2450 (A B C : S) : (soutside (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2451 (A B C : S) : (soutside (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2452 (A B C : S) : (scovers (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2453 (A B C : S) : (sinside (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2454 (A B C : S) : (soverlap (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2455 (A B C : S) : (scovers (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2456 (A B C : S) : (sinside (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2457 (A B C : S) : (soverlap (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2458 (A B C : S) : (sxor (sor A (sand A A)) (sand (sor A A) (sor A A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2459 (A B C : S) : (sxor (sor A (sand A B)) (sand (sor A A) (sor A B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2460 (A B C : S) : (sxor (sor A (sand A C)) (sand (sor A A) (sor A C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2461 (A B C : S) : (sxor (sor A (sand B A)) (sand (sor A B) (sor A A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2462 (A B C : S) : (sxor (sor A (sand B B)) (sand (sor A B) (sor A B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2463 (A B C : S) : (sxor (sor A (sand B C)) (sand (sor A B) (sor A C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2464 (A B C : S) : (sxor (sor A (sand C A)) (sand (sor A C) (sor A A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2465 (A B C : S) : (sxor (sor A (sand C B)) (sand (sor A C) (sor A B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2466 (A B C : S) : (sxor (sor A (sand C C)) (sand (sor A C) (sor A C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2467 (A B C : S) : (scovers (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2468 (A B C : S) : (sinside (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2469 (A B C : S) : (scovers (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2470 (A B C : S) : (sinside (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2471 (A B C : S) : (soutside (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2472 (A B C : S) : (soutside (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2473 (A B C : S) : (soutside (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2474 (A B C : S) : (soutside (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2475 (A B C : S) : (scovers (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2476 (A B C : S) : (sinside (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2477 (A B C : S) : (soverlap (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2478 (A B C : S) : (sxor (sor B (sand A A)) (sand (sor B A) (sor B A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2479 (A B C : S) : (sxor (sor B (sand A B)) (sand (sor B A) (sor B B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2480 (A B C : S) : (sxor (sor B (sand A C)) (sand (sor B A) (sor B C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2481 (A B C : S) : (sxor (sor B (sand B A)) (sand (sor B B) (sor B A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2482 (A B C : S) : (sxor (sor B (sand B B)) (sand (sor B B) (sor B B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2483 (A B C : S) : (sxor (sor B (sand B C)) (sand (sor B B) (sor B C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2484 (A B C : S) : (sxor (sor B (sand C A)) (sand (sor B C) (sor B A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2485 (A B C : S) : (sxor (sor B (sand C B)) (sand (sor B C) (sor B B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2486 (A B C : S) : (sxor (sor B (sand C C)) (sand (sor B C) (sor B C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2487 (A B C : S) : (scovers (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2488 (A B C : S) : (sinside (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2489 (A B C : S) : (soutside (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2490 (A B C : S) : (soutside (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2491 (A B C : S) : (soutside (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2492 (A B C : S) : (soutside (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2493 (A B C : S) : (sxor (sor C (sand A A)) (sand (sor C A) (sor C A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2494 (A B C : S) : (sxor (sor C (sand A B)) (sand (sor C A) (sor C B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2495 (A B C : S) : (sxor (sor C (sand A C)) (sand (sor C A) (sor C C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2496 (A B C : S) : (sxor (sor C (sand B A)) (sand (sor C B) (sor C A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2497 (A B C : S) : (sxor (sor C (sand B B)) (sand (sor C B) (sor C B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2498 (A B C : S) : (sxor (sor C (sand B C)) (sand (sor C B) (sor C C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2499 (A B C : S) : (sxor (sor C (sand C A)) (sand (sor C C) (sor C A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2500 (A B C : S) : (sxor (sor C (sand C B)) (sand (sor C C) (sor C B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2501 (A B C : S) : (sxor (sor C (sand C C)) (sand (sor C C) (sor C C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2502 (A B C : S) : (soverlap (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2503 (A B C : S) : (soverlap (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2504 (A B C : S) : (scontains (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2505 (A B C : S) : (scontains (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2506 (A B C : S) : (smeet_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2507 (A B C : S) : (scontains (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2508 (A B C : S) : (scontains (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2509 (A B C : S) : (smeet_part (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2510 (A B C : S) : (soverlap (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2511 (A B C : S) : (soverlap (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2512 (A B C : S) : (soverlap (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2513 (A B C : S) : (soverlap (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2514 (A B C : S) : (soverlap (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2515 (A B C : S) : (soverlap (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2516 (A B C : S) : (soverlap (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2517 (A B C : S) : (soverlap (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2518 (A B C : S) : (soverlap (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2519 (A B C : S) : (scontains (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2520 (A B C : S) : (scontains (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2521 (A B C : S) : (smeet_part (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2522 (A B C : S) : (soverlap (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2523 (A B C : S) : (soverlap (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2524 (A B C : S) : (soverlap (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2525 (A B C : S) : (soverlap (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2526 (A B C : S) : (sxor (sand A (sor A A)) (sor (sand A A) (sand A A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2527 (A B C : S) : (sxor (sand A (sor A B)) (sor (sand A A) (sand A B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2528 (A B C : S) : (sxor (sand A (sor A C)) (sor (sand A A) (sand A C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2529 (A B C : S) : (sxor (sand A (sor B A)) (sor (sand A B) (sand A A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2530 (A B C : S) : (sxor (sand A (sor B B)) (sor (sand A B) (sand A B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2531 (A B C : S) : (sxor (sand A (sor B C)) (sor (sand A B) (sand A C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2532 (A B C : S) : (sxor (sand A (sor C A)) (sor (sand A C) (sand A A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2533 (A B C : S) : (sxor (sand A (sor C B)) (sor (sand A C) (sand A B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2534 (A B C : S) : (sxor (sand A (sor C C)) (sor (sand A C) (sand A C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2535 (A B C : S) : (scontains (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2536 (A B C : S) : (scontains (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2537 (A B C : S) : (scontains (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2538 (A B C : S) : (soutside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2539 (A B C : S) : (soutside (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2540 (A B C : S) : (soutside (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2541 (A B C : S) : (soverlap (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2542 (A B C : S) : (soverlap (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2543 (A B C : S) : (soverlap (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2544 (A B C : S) : (soutside (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2545 (A B C : S) : (soutside (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2546 (A B C : S) : (scontains (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2547 (A B C : S) : (soverlap (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2548 (A B C : S) : (scontains (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2549 (A B C : S) : (soverlap (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2550 (A B C : S) : (soverlap (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2551 (A B C : S) : (soverlap (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2552 (A B C : S) : (sxor (sand B (sor A A)) (sor (sand B A) (sand B A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2553 (A B C : S) : (sxor (sand B (sor A B)) (sor (sand B A) (sand B B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2554 (A B C : S) : (sxor (sand B (sor A C)) (sor (sand B A) (sand B C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2555 (A B C : S) : (sxor (sand B (sor B A)) (sor (sand B B) (sand B A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2556 (A B C : S) : (sxor (sand B (sor B B)) (sor (sand B B) (sand B B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2557 (A B C : S) : (sxor (sand B (sor B C)) (sor (sand B B) (sand B C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2558 (A B C : S) : (sxor (sand B (sor C A)) (sor (sand B C) (sand B A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2559 (A B C : S) : (sxor (sand B (sor C B)) (sor (sand B C) (sand B B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2560 (A B C : S) : (sxor (sand B (sor C C)) (sor (sand B C) (sand B C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2561 (A B C : S) : (soutside (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2562 (A B C : S) : (soutside (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2563 (A B C : S) : (scontains (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2564 (A B C : S) : (soverlap (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2565 (A B C : S) : (soverlap (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2566 (A B C : S) : (sxor (sand C (sor A A)) (sor (sand C A) (sand C A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2567 (A B C : S) : (sxor (sand C (sor A B)) (sor (sand C A) (sand C B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2568 (A B C : S) : (sxor (sand C (sor A C)) (sor (sand C A) (sand C C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2569 (A B C : S) : (sxor (sand C (sor B A)) (sor (sand C B) (sand C A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2570 (A B C : S) : (sxor (sand C (sor B B)) (sor (sand C B) (sand C B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2571 (A B C : S) : (sxor (sand C (sor B C)) (sor (sand C B) (sand C C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2572 (A B C : S) : (sxor (sand C (sor C A)) (sor (sand C C) (sand C A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2573 (A B C : S) : (sxor (sand C (sor C B)) (sor (sand C C) (sand C B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2574 (A B C : S) : (sxor (sand C (sor C C)) (sor (sand C C) (sand C C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2575 (A B C : S) : (soutside (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2576 (A B C : S) : (soutside (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2577 (A B C : S) : (scontains (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2578 (A B C : S) : (smeet_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2579 (A B C : S) : (smeet_part (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2580 (A B C : S) : (smeet_part (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2581 (A B C : S) : (scontains (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2582 (A B C : S) : (smeet_part (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2583 (A B C : S) : (smeet_part (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2584 (A B C : S) : (smeet_part (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2585 (A B C : S) : (scoveredby (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2586 (A B C : S) : (scoveredby (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2587 (A B C : S) : (scoveredby (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2588 (A B C : S) : (scoveredby (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2589 (A B C : S) : (scontains (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2590 (A B C : S) : (scontains (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2591 (A B C : S) : (scontains (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2592 (A B C : S) : (scontains (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2593 (A B C : S) : (smeet_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2594 (A B C : S) : (scontains (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2595 (A B C : S) : (scontains (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2596 (A B C : S) : (scontains (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2597 (A B C : S) : (scontains (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2598 (A B C : S) : (smeet_part (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2599 (A B C : S) : (scontains (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2600 (A B C : S) : (smeet_part (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2601 (A B C : S) : (smeet_part (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2602 (A B C : S) : (smeet_part (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2603 (A B C : S) : (scoveredby (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2604 (A B C : S) : (scoveredby (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2605 (A B C : S) : (scontains (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2606 (A B C : S) : (scontains (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2607 (A B C : S) : (scontains (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2608 (A B C : S) : (scontains (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2609 (A B C : S) : (smeet_part (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2610 (A B C : S) : (scontains (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2611 (A B C : S) : (scontains (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2612 (A B C : S) : (scontains (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2613 (A B C : S) : (scoveredby (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2614 (A B C : S) : (scoveredby (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2615 (A B C : S) : (scoveredby (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2616 (A B C : S) : (smeet_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2617 (A B C : S) : (smeet_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2618 (A B C : S) : (smeet_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2619 (A B C : S) : (smeet_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2620 (A B C : S) : (smeet_part (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2621 (A B C : S) : (smeet_part (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2622 (A B C : S) : (smeet_part (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2623 (A B C : S) : (scontains (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2624 (A B C : S) : (scoveredby (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2625 (A B C : S) : (scontains (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2626 (A B C : S) : (scoveredby (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2627 (A B C : S) : (scontains (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2628 (A B C : S) : (scontains (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2629 (A B C : S) : (smeet_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2630 (A B C : S) : (smeet_part (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2631 (A B C : S) : (smeet_part (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2632 (A B C : S) : (smeet_part (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2633 (A B C : S) : (scontains (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2634 (A B C : S) : (scoveredby (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2635 (A B C : S) : (scontains (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2636 (A B C : S) : (smeet_part (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2637 (A B C : S) : (smeet_part (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2638 (A B C : S) : (smeet_part (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2639 (A B C : S) : (smeet_part (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2640 (A B C : S) : (scoveredby (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2641 (A B C : S) : (scoveredby (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2642 (A B C : S) : (sequal_part (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2643 (A B C : S) : (sequal_part (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2644 (A B C : S) : (sequal_part (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2645 (A B C : S) : (sequal_part (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2646 (A B C : S) : (scoveredby (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2647 (A B C : S) : (scoveredby (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2648 (A B C : S) : (scoveredby (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2649 (A B C : S) : (scoveredby (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2650 (A B C : S) : (scoveredby (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2651 (A B C : S) : (scoveredby (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2652 (A B C : S) : (scoveredby (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2653 (A B C : S) : (scoveredby (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2654 (A B C : S) : (scoveredby (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2655 (A B C : S) : (sequal_part (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2656 (A B C : S) : (sequal_part (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2657 (A B C : S) : (scoveredby (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2658 (A B C : S) : (scoveredby (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2659 (A B C : S) : (scoveredby (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2660 (A B C : S) : (scoveredby (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2661 (A B C : S) : (scoveredby (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2662 (A B C : S) : (scoveredby (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2663 (A B C : S) : (scoveredby (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2664 (A B C : S) : (sequal_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2665 (A B C : S) : (sequal_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2666 (A B C : S) : (sequal_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2667 (A B C : S) : (smeet_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2668 (A B C : S) : (smeet_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2669 (A B C : S) : (smeet_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2670 (A B C : S) : (smeet_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2671 (A B C : S) : (smeet_part (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2672 (A B C : S) : (scoveredby (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2673 (A B C : S) : (sequal_part (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2674 (A B C : S) : (scoveredby (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2675 (A B C : S) : (sequal_part (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2676 (A B C : S) : (scoveredby (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2677 (A B C : S) : (scoveredby (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2678 (A B C : S) : (smeet_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2679 (A B C : S) : (smeet_part (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2680 (A B C : S) : (scoveredby (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2681 (A B C : S) : (sequal_part (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2682 (A B C : S) : (scoveredby (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2683 (A B C : S) : (smeet_part (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2684 (A B C : S) : (smeet_part (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2685 (A B C : S) : (sequal_part (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2686 (A B C : S) : (sequal_part (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2687 (A B C : S) : (sequal_part (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2688 (A B C : S) : (sequal_part (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2689 (A B C : S) : (sequal_part (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2690 (A B C : S) : (sequal_part (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2691 (A B C : S) : (sequal_part (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2692 (A B C : S) : (sequal_part (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2693 (A B C : S) : (sequal_part (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2694 (A B C : S) : (sequal_part (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2695 (A B C : S) : (sequal_part (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2696 (A B C : S) : (sequal_part (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2697 (A B C : S) : (sequal_part (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2698 (A B C : S) : (sequal_part (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2699 (A B C : S) : (sequal_part (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2700 (A B C : S) : (sequal_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2701 (A B C : S) : (sequal_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2702 (A B C : S) : (sequal_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2703 (A B C : S) : (sequal_part (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2704 (A B C : S) : (sequal_part (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2705 (A B C : S) : (sequal_part (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2706 (A B C : S) : (sequal_part (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2707 (A B C : S) : (sequal_part (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2708 (A B C : S) : (sequal_part (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2709 (A B C : S) : (sdisjoint_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2710 (A B C : S) : (sdisjoint_part (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2711 (A B C : S) : (sdisjoint_part (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2712 (A B C : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2713 (A B C : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2714 (A B C : S) : (sdisjoint_part (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2715 (A B C : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2716 (A B C : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2717 (A B C : S) : (sdisjoint_part (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2718 (A B C : S) : (sdisjoint_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2719 (A B C : S) : (sdisjoint_part (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2720 (A B C : S) : (sdisjoint_part (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2721 (A B C : S) : (sdisjoint_part (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2722 (A B C : S) : (sdisjoint_part (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2723 (A B C : S) : (sdisjoint_part (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2724 (A B C : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2725 (A B C : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2726 (A B C : S) : (sdisjoint_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2727 (A B C : S) : (sdisjoint_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2728 (A B C : S) : (sdisjoint_part (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2729 (A B C : S) : (sdisjoint_part (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2730 (A B C : S) : (sdisjoint_part (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2731 (A B C : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2732 (A B C : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2733 (A B C : S) : (sdisjoint_part (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2734 (A B C : S) : (sdisjoint_part (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2735 (A B C : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2736 (A B C : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2737 (A B C : S) : (sdisjoint_part (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2738 (A B C : S) : (sdisjoint_part (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2739 (A B C : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2740 (A B C : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2741 (A B C : S) : (sdisjoint_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2742 (A B C : S) : (sdisjoint_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2743 (A B C : S) : (sdisjoint_part (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2744 (A B C : S) : (sdisjoint_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2745 (A B C : S) : (sdisjoint_part (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2746 (A B C : S) : (sdisjoint_part (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2747 (A B C : S) : (sdisjoint_part (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2748 (A B C : S) : (snot (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2749 (A B C : S) : (sxor (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2750 (A B C : S) : (snot (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2751 (A B C : S) : (sxor (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2752 (A B C : S) : (snot (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2753 (A B C : S) : (sxor (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2754 (A B C : S) : (snot (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2755 (A B C : S) : (snot (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2756 (A B C : S) : (snot (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2757 (A B C : S) : (snot (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2758 (A B C : S) : (sxor (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2759 (A B C : S) : (snot (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2760 (A B C : S) : (sxor (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2761 (A B C : S) : (snot (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2762 (A B C : S) : (sxor (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2763 (A B C : S) : (soutside (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2764 (A B C : S) : (soutside (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2765 (A B C : S) : (soutside (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2766 (A B C : S) : (soutside (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2767 (A B C : S) : (soutside (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2768 (A B C : S) : (soutside (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2769 (A B C : S) : (smeet_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2770 (A B C : S) : (smeet_part (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2771 (A B C : S) : (soutside (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2772 (A B C : S) : (soutside (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2773 (A B C : S) : (smeet_part (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2774 (A B C : S) : (soutside (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2775 (A B C : S) : (smeet_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2776 (A B C : S) : (smeet_part (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2777 (A B C : S) : (smeet_part (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2778 (A B C : S) : (smeet_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2779 (A B C : S) : (smeet_part (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2780 (A B C : S) : (smeet_part (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2781 (A B C : S) : (sdisjoint_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2782 (A B C : S) : (sdisjoint_part (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2783 (A B C : S) : (sdisjoint_part (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2784 (A B C : S) : (sdisjoint_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2785 (A B C : S) : (sdisjoint_part (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2786 (A B C : S) : (sdisjoint_part (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2787 (A B C : S) : (sdisjoint_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2788 (A B C : S) : (sdisjoint_part (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
+theorem r3_2789 (A B C : S) : (sdisjoint_part (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> rfl
 
 theorem r4_0 (A B C D : S) : (sand (! A) A) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
 theorem r4_1 (A B C D : S) : (sand (! B) B) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
@@ -8914,893 +9010,1053 @@ theorem r4_5342 (A B C D : S) : (snot (sand D (! B)) (sor (! B) (! D))) = false 
 theorem r4_5343 (A B C D : S) : (snot (sand D (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
 theorem r4_5344 (A B C D : S) : (snot (sand D (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
 theorem r4_5345 (A B C D : S) : (snot (sand D (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5346 (A B C D : S) : (sand (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5347 (A B C D : S) : (sand (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5348 (A B C D : S) : (sand (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5349 (A B C D : S) : (sand (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5350 (A B C D : S) : (sand (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5351 (A B C D : S) : (sand (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5352 (A B C D : S) : (sand (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5353 (A B C D : S) : (sand (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5354 (A B C D : S) : (sand (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5355 (A B C D : S) : (sand (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5356 (A B C D : S) : (sand (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5357 (A B C D : S) : (sand (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5358 (A B C D : S) : (sand (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5359 (A B C D : S) : (sand (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5360 (A B C D : S) : (sand (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5361 (A B C D : S) : (sand (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5362 (A B C D : S) : (sand (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5363 (A B C D : S) : (sand (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5364 (A B C D : S) : (sand (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5365 (A B C D : S) : (sand (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5366 (A B C D : S) : (sand (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5367 (A B C D : S) : (sand (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5368 (A B C D : S) : (sand (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5369 (A B C D : S) : (sand (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5370 (A B C D : S) : (sand (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5371 (A B C D : S) : (sand (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5372 (A B C D : S) : (sand (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5373 (A B C D : S) : (sand (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5374 (A B C D : S) : (sand (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5375 (A B C D : S) : (sand (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5376 (A B C D : S) : (sand (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5377 (A B C D : S) : (sand (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5378 (A B C D : S) : (sand (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5379 (A B C D : S) : (sand (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5380 (A B C D : S) : (sand (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5381 (A B C D : S) : (sand (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5382 (A B C D : S) : (snot (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5383 (A B C D : S) : (snot (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5384 (A B C D : S) : (snot (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5385 (A B C D : S) : (snot (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5386 (A B C D : S) : (snot (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5387 (A B C D : S) : (snot (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5388 (A B C D : S) : (snot (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5389 (A B C D : S) : (snot (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5390 (A B C D : S) : (snot (sand A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5391 (A B C D : S) : (sand (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5392 (A B C D : S) : (sand (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5393 (A B C D : S) : (sand (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5394 (A B C D : S) : (sand (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5395 (A B C D : S) : (sand (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5396 (A B C D : S) : (sand (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5397 (A B C D : S) : (snot (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5398 (A B C D : S) : (snot (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5399 (A B C D : S) : (snot (sand B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5400 (A B C D : S) : (sand (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5401 (A B C D : S) : (sand (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5402 (A B C D : S) : (sand (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5403 (A B C D : S) : (sand (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5404 (A B C D : S) : (snot (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5405 (A B C D : S) : (snot (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5406 (A B C D : S) : (snot (sand C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5407 (A B C D : S) : (sand (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5408 (A B C D : S) : (sand (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5409 (A B C D : S) : (snot (sand D (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5410 (A B C D : S) : (snot (sand D (! B)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5411 (A B C D : S) : (snot (sand D (! C)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5412 (A B C D : S) : (scovers (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5413 (A B C D : S) : (scovers (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5414 (A B C D : S) : (sinside (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5415 (A B C D : S) : (sinside (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5416 (A B C D : S) : (soutside (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5417 (A B C D : S) : (scovers (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5418 (A B C D : S) : (scovers (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5419 (A B C D : S) : (sinside (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5420 (A B C D : S) : (sinside (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5421 (A B C D : S) : (soutside (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5422 (A B C D : S) : (scovers (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5423 (A B C D : S) : (scovers (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5424 (A B C D : S) : (sinside (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5425 (A B C D : S) : (sinside (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5426 (A B C D : S) : (soutside (sor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5427 (A B C D : S) : (scovers (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5428 (A B C D : S) : (scovers (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5429 (A B C D : S) : (sinside (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5430 (A B C D : S) : (sinside (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5431 (A B C D : S) : (soutside (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5432 (A B C D : S) : (scovers (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5433 (A B C D : S) : (scovers (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5434 (A B C D : S) : (sinside (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5435 (A B C D : S) : (sinside (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5436 (A B C D : S) : (soutside (sor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5437 (A B C D : S) : (scovers (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5438 (A B C D : S) : (scovers (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5439 (A B C D : S) : (sinside (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5440 (A B C D : S) : (sinside (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5441 (A B C D : S) : (soutside (sor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5442 (A B C D : S) : (scovers (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5443 (A B C D : S) : (scovers (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5444 (A B C D : S) : (scovers (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5445 (A B C D : S) : (scovers (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5446 (A B C D : S) : (scovers (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5447 (A B C D : S) : (scovers (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5448 (A B C D : S) : (sinside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5449 (A B C D : S) : (sinside (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5450 (A B C D : S) : (sinside (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5451 (A B C D : S) : (sinside (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5452 (A B C D : S) : (sinside (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5453 (A B C D : S) : (sinside (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5454 (A B C D : S) : (scovers (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5455 (A B C D : S) : (sinside (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5456 (A B C D : S) : (scovers (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5457 (A B C D : S) : (sinside (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5458 (A B C D : S) : (scovers (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5459 (A B C D : S) : (sinside (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5460 (A B C D : S) : (scovers (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5461 (A B C D : S) : (sinside (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5462 (A B C D : S) : (scovers (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5463 (A B C D : S) : (sinside (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5464 (A B C D : S) : (scovers (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5465 (A B C D : S) : (sinside (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5466 (A B C D : S) : (scovers (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5467 (A B C D : S) : (sinside (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5468 (A B C D : S) : (soutside (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5469 (A B C D : S) : (soutside (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5470 (A B C D : S) : (soutside (snot (! A) B) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5471 (A B C D : S) : (soutside (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5472 (A B C D : S) : (soutside (snot (! A) B) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5473 (A B C D : S) : (scovers (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5474 (A B C D : S) : (sinside (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5475 (A B C D : S) : (soutside (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5476 (A B C D : S) : (soutside (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5477 (A B C D : S) : (soutside (snot (! A) C) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5478 (A B C D : S) : (soutside (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5479 (A B C D : S) : (soutside (snot (! A) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5480 (A B C D : S) : (scovers (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5481 (A B C D : S) : (sinside (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5482 (A B C D : S) : (soutside (snot (! A) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5483 (A B C D : S) : (soutside (snot (! A) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5484 (A B C D : S) : (soutside (snot (! A) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5485 (A B C D : S) : (soutside (snot (! A) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5486 (A B C D : S) : (soutside (snot (! A) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5487 (A B C D : S) : (soverlap (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5488 (A B C D : S) : (soverlap (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5489 (A B C D : S) : (soverlap (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5490 (A B C D : S) : (soverlap (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5491 (A B C D : S) : (soverlap (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5492 (A B C D : S) : (soverlap (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5493 (A B C D : S) : (scovers (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5494 (A B C D : S) : (scovers (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5495 (A B C D : S) : (scovers (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5496 (A B C D : S) : (scovers (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5497 (A B C D : S) : (sinside (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5498 (A B C D : S) : (sinside (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5499 (A B C D : S) : (sinside (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5500 (A B C D : S) : (sinside (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5501 (A B C D : S) : (soutside (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5502 (A B C D : S) : (scovers (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5503 (A B C D : S) : (scovers (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5504 (A B C D : S) : (scovers (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5505 (A B C D : S) : (scovers (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5506 (A B C D : S) : (sinside (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5507 (A B C D : S) : (sinside (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5508 (A B C D : S) : (sinside (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5509 (A B C D : S) : (sinside (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5510 (A B C D : S) : (soutside (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5511 (A B C D : S) : (scovers (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5512 (A B C D : S) : (scovers (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5513 (A B C D : S) : (scovers (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5514 (A B C D : S) : (scovers (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5515 (A B C D : S) : (sinside (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5516 (A B C D : S) : (sinside (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5517 (A B C D : S) : (sinside (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5518 (A B C D : S) : (sinside (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5519 (A B C D : S) : (soutside (sxor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5520 (A B C D : S) : (scovers (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5521 (A B C D : S) : (sinside (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5522 (A B C D : S) : (soutside (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5523 (A B C D : S) : (soutside (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5524 (A B C D : S) : (soutside (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5525 (A B C D : S) : (soutside (snot (! B) C) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5526 (A B C D : S) : (soutside (snot (! B) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5527 (A B C D : S) : (scovers (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5528 (A B C D : S) : (sinside (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5529 (A B C D : S) : (soutside (snot (! B) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5530 (A B C D : S) : (soutside (snot (! B) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5531 (A B C D : S) : (soutside (snot (! B) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5532 (A B C D : S) : (soutside (snot (! B) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5533 (A B C D : S) : (soutside (snot (! B) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5534 (A B C D : S) : (soverlap (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5535 (A B C D : S) : (soverlap (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5536 (A B C D : S) : (soverlap (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5537 (A B C D : S) : (soverlap (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5538 (A B C D : S) : (scovers (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5539 (A B C D : S) : (scovers (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5540 (A B C D : S) : (scovers (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5541 (A B C D : S) : (scovers (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5542 (A B C D : S) : (sinside (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5543 (A B C D : S) : (sinside (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5544 (A B C D : S) : (sinside (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5545 (A B C D : S) : (sinside (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5546 (A B C D : S) : (soutside (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5547 (A B C D : S) : (scovers (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5548 (A B C D : S) : (scovers (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5549 (A B C D : S) : (scovers (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5550 (A B C D : S) : (scovers (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5551 (A B C D : S) : (sinside (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5552 (A B C D : S) : (sinside (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5553 (A B C D : S) : (sinside (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5554 (A B C D : S) : (sinside (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5555 (A B C D : S) : (soutside (sxor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5556 (A B C D : S) : (scovers (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5557 (A B C D : S) : (sinside (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5558 (A B C D : S) : (soutside (snot (! C) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5559 (A B C D : S) : (soutside (snot (! C) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5560 (A B C D : S) : (soutside (snot (! C) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5561 (A B C D : S) : (soutside (snot (! C) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5562 (A B C D : S) : (soutside (snot (! C) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5563 (A B C D : S) : (soverlap (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5564 (A B C D : S) : (soverlap (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5565 (A B C D : S) : (scovers (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5566 (A B C D : S) : (scovers (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5567 (A B C D : S) : (scovers (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5568 (A B C D : S) : (scovers (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5569 (A B C D : S) : (sinside (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5570 (A B C D : S) : (sinside (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5571 (A B C D : S) : (sinside (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5572 (A B C D : S) : (sinside (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5573 (A B C D : S) : (soutside (sxor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5574 (A B C D : S) : (scovers (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5575 (A B C D : S) : (scovers (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5576 (A B C D : S) : (scovers (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5577 (A B C D : S) : (scovers (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5578 (A B C D : S) : (scovers (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5579 (A B C D : S) : (scovers (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5580 (A B C D : S) : (sinside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5581 (A B C D : S) : (sinside (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5582 (A B C D : S) : (sinside (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5583 (A B C D : S) : (sinside (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5584 (A B C D : S) : (sinside (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5585 (A B C D : S) : (sinside (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5586 (A B C D : S) : (soutside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5587 (A B C D : S) : (soutside (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5588 (A B C D : S) : (soutside (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5589 (A B C D : S) : (soutside (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5590 (A B C D : S) : (soutside (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5591 (A B C D : S) : (soutside (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5592 (A B C D : S) : (soverlap (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5593 (A B C D : S) : (soverlap (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5594 (A B C D : S) : (soverlap (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5595 (A B C D : S) : (soverlap (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5596 (A B C D : S) : (soverlap (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5597 (A B C D : S) : (soverlap (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5598 (A B C D : S) : (soutside (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5599 (A B C D : S) : (soutside (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5600 (A B C D : S) : (soutside (sand A (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5601 (A B C D : S) : (soutside (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5602 (A B C D : S) : (soutside (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5603 (A B C D : S) : (soutside (sand A (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5604 (A B C D : S) : (soutside (sand A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5605 (A B C D : S) : (soutside (sand A (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5606 (A B C D : S) : (soutside (sand A (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5607 (A B C D : S) : (scovers (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5608 (A B C D : S) : (sinside (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5609 (A B C D : S) : (soverlap (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5610 (A B C D : S) : (scovers (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5611 (A B C D : S) : (sinside (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5612 (A B C D : S) : (soverlap (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5613 (A B C D : S) : (scovers (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5614 (A B C D : S) : (sinside (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5615 (A B C D : S) : (soverlap (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5616 (A B C D : S) : (scovers (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5617 (A B C D : S) : (sinside (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5618 (A B C D : S) : (scovers (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5619 (A B C D : S) : (sinside (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5620 (A B C D : S) : (scovers (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5621 (A B C D : S) : (sinside (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5622 (A B C D : S) : (soutside (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5623 (A B C D : S) : (soutside (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5624 (A B C D : S) : (soutside (sand B (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5625 (A B C D : S) : (soutside (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5626 (A B C D : S) : (soutside (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5627 (A B C D : S) : (soutside (sand B (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5628 (A B C D : S) : (soutside (sand B (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5629 (A B C D : S) : (soutside (sand B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5630 (A B C D : S) : (soutside (sand B (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5631 (A B C D : S) : (scovers (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5632 (A B C D : S) : (sinside (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5633 (A B C D : S) : (soverlap (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5634 (A B C D : S) : (scovers (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5635 (A B C D : S) : (sinside (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5636 (A B C D : S) : (soverlap (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5637 (A B C D : S) : (scovers (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5638 (A B C D : S) : (sinside (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5639 (A B C D : S) : (scovers (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5640 (A B C D : S) : (sinside (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5641 (A B C D : S) : (soutside (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5642 (A B C D : S) : (soutside (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5643 (A B C D : S) : (soutside (sand C (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5644 (A B C D : S) : (soutside (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5645 (A B C D : S) : (soutside (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5646 (A B C D : S) : (soutside (sand C (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5647 (A B C D : S) : (soutside (sand C (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5648 (A B C D : S) : (soutside (sand C (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5649 (A B C D : S) : (soutside (sand C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5650 (A B C D : S) : (scovers (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5651 (A B C D : S) : (sinside (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5652 (A B C D : S) : (soverlap (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5653 (A B C D : S) : (scovers (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5654 (A B C D : S) : (sinside (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5655 (A B C D : S) : (soutside (sand D (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5656 (A B C D : S) : (soutside (sand D (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5657 (A B C D : S) : (soutside (sand D (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5658 (A B C D : S) : (soutside (sand D (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5659 (A B C D : S) : (soutside (sand D (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5660 (A B C D : S) : (soutside (sand D (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5661 (A B C D : S) : (soutside (sand D (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5662 (A B C D : S) : (soutside (sand D (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5663 (A B C D : S) : (soutside (sand D (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5664 (A B C D : S) : (soverlap (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5665 (A B C D : S) : (soverlap (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5666 (A B C D : S) : (soverlap (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5667 (A B C D : S) : (scontains (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5668 (A B C D : S) : (scontains (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5669 (A B C D : S) : (smeet_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5670 (A B C D : S) : (scontains (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5671 (A B C D : S) : (scontains (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5672 (A B C D : S) : (smeet_part (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5673 (A B C D : S) : (scontains (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5674 (A B C D : S) : (scontains (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5675 (A B C D : S) : (smeet_part (sor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5676 (A B C D : S) : (soverlap (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5677 (A B C D : S) : (soverlap (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5678 (A B C D : S) : (soverlap (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5679 (A B C D : S) : (soverlap (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5680 (A B C D : S) : (soverlap (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5681 (A B C D : S) : (soverlap (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5682 (A B C D : S) : (soverlap (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5683 (A B C D : S) : (soverlap (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5684 (A B C D : S) : (soverlap (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5685 (A B C D : S) : (soverlap (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5686 (A B C D : S) : (soverlap (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5687 (A B C D : S) : (soverlap (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5688 (A B C D : S) : (soverlap (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5689 (A B C D : S) : (soverlap (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5690 (A B C D : S) : (scontains (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5691 (A B C D : S) : (scontains (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5692 (A B C D : S) : (smeet_part (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5693 (A B C D : S) : (scontains (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5694 (A B C D : S) : (scontains (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5695 (A B C D : S) : (smeet_part (sor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5696 (A B C D : S) : (soverlap (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5697 (A B C D : S) : (soverlap (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5698 (A B C D : S) : (soverlap (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5699 (A B C D : S) : (soverlap (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5700 (A B C D : S) : (soverlap (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5701 (A B C D : S) : (soverlap (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5702 (A B C D : S) : (soverlap (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5703 (A B C D : S) : (soverlap (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5704 (A B C D : S) : (soverlap (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5705 (A B C D : S) : (scontains (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5706 (A B C D : S) : (scontains (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5707 (A B C D : S) : (smeet_part (sor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5708 (A B C D : S) : (soverlap (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5709 (A B C D : S) : (soverlap (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5710 (A B C D : S) : (soverlap (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5711 (A B C D : S) : (soverlap (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5712 (A B C D : S) : (scontains (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5713 (A B C D : S) : (scontains (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5714 (A B C D : S) : (scontains (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5715 (A B C D : S) : (scontains (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5716 (A B C D : S) : (scontains (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5717 (A B C D : S) : (scontains (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5718 (A B C D : S) : (soutside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5719 (A B C D : S) : (soutside (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5720 (A B C D : S) : (soutside (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5721 (A B C D : S) : (soutside (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5722 (A B C D : S) : (soutside (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5723 (A B C D : S) : (soutside (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5724 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5725 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5726 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5727 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5728 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5729 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5730 (A B C D : S) : (soutside (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5731 (A B C D : S) : (soutside (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5732 (A B C D : S) : (soutside (sand A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5733 (A B C D : S) : (scontains (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5734 (A B C D : S) : (soverlap (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5735 (A B C D : S) : (scontains (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5736 (A B C D : S) : (soverlap (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5737 (A B C D : S) : (scontains (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5738 (A B C D : S) : (soverlap (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5739 (A B C D : S) : (soverlap (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5740 (A B C D : S) : (soverlap (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5741 (A B C D : S) : (soverlap (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5742 (A B C D : S) : (soutside (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5743 (A B C D : S) : (soutside (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5744 (A B C D : S) : (soutside (sand B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5745 (A B C D : S) : (scontains (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5746 (A B C D : S) : (soverlap (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5747 (A B C D : S) : (scontains (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5748 (A B C D : S) : (soverlap (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5749 (A B C D : S) : (soverlap (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5750 (A B C D : S) : (soverlap (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5751 (A B C D : S) : (soutside (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5752 (A B C D : S) : (soutside (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5753 (A B C D : S) : (soutside (sand C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5754 (A B C D : S) : (scontains (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5755 (A B C D : S) : (soverlap (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5756 (A B C D : S) : (soverlap (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5757 (A B C D : S) : (soutside (sand D (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5758 (A B C D : S) : (soutside (sand D (! B)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5759 (A B C D : S) : (soutside (sand D (! C)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5760 (A B C D : S) : (scontains (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5761 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5762 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5763 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5764 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5765 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5766 (A B C D : S) : (scontains (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5767 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5768 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5769 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5770 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5771 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5772 (A B C D : S) : (scontains (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5773 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5774 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5775 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5776 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5777 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5778 (A B C D : S) : (scoveredby (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5779 (A B C D : S) : (scoveredby (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5780 (A B C D : S) : (scoveredby (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5781 (A B C D : S) : (scoveredby (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5782 (A B C D : S) : (scoveredby (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5783 (A B C D : S) : (scoveredby (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5784 (A B C D : S) : (scontains (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5785 (A B C D : S) : (scontains (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5786 (A B C D : S) : (scontains (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5787 (A B C D : S) : (scontains (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5788 (A B C D : S) : (smeet_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5789 (A B C D : S) : (scontains (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5790 (A B C D : S) : (scontains (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5791 (A B C D : S) : (scontains (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5792 (A B C D : S) : (scontains (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5793 (A B C D : S) : (smeet_part (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5794 (A B C D : S) : (scontains (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5795 (A B C D : S) : (scontains (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5796 (A B C D : S) : (scontains (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5797 (A B C D : S) : (scontains (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5798 (A B C D : S) : (smeet_part (sxor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5799 (A B C D : S) : (scontains (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5800 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5801 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5802 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5803 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5804 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5805 (A B C D : S) : (scontains (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5806 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5807 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5808 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5809 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5810 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5811 (A B C D : S) : (scoveredby (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5812 (A B C D : S) : (scoveredby (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5813 (A B C D : S) : (scoveredby (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5814 (A B C D : S) : (scoveredby (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5815 (A B C D : S) : (scontains (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5816 (A B C D : S) : (scontains (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5817 (A B C D : S) : (scontains (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5818 (A B C D : S) : (scontains (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5819 (A B C D : S) : (smeet_part (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5820 (A B C D : S) : (scontains (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5821 (A B C D : S) : (scontains (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5822 (A B C D : S) : (scontains (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5823 (A B C D : S) : (scontains (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5824 (A B C D : S) : (smeet_part (sxor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5825 (A B C D : S) : (scontains (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5826 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5827 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5828 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5829 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5830 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5831 (A B C D : S) : (scoveredby (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5832 (A B C D : S) : (scoveredby (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5833 (A B C D : S) : (scontains (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5834 (A B C D : S) : (scontains (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5835 (A B C D : S) : (scontains (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5836 (A B C D : S) : (scontains (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5837 (A B C D : S) : (smeet_part (sxor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5838 (A B C D : S) : (scontains (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5839 (A B C D : S) : (scontains (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5840 (A B C D : S) : (scontains (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5841 (A B C D : S) : (scontains (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5842 (A B C D : S) : (scontains (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5843 (A B C D : S) : (scontains (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5844 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5845 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5846 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5847 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5848 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5849 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5850 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5851 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5852 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5853 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5854 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5855 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5856 (A B C D : S) : (smeet_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5857 (A B C D : S) : (smeet_part (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5858 (A B C D : S) : (smeet_part (sand A (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5859 (A B C D : S) : (smeet_part (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5860 (A B C D : S) : (smeet_part (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5861 (A B C D : S) : (smeet_part (sand A (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5862 (A B C D : S) : (smeet_part (sand A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5863 (A B C D : S) : (smeet_part (sand A (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5864 (A B C D : S) : (smeet_part (sand A (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5865 (A B C D : S) : (scontains (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5866 (A B C D : S) : (scoveredby (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5867 (A B C D : S) : (scontains (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5868 (A B C D : S) : (scoveredby (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5869 (A B C D : S) : (scontains (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5870 (A B C D : S) : (scoveredby (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5871 (A B C D : S) : (scontains (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5872 (A B C D : S) : (scontains (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5873 (A B C D : S) : (scontains (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5874 (A B C D : S) : (smeet_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5875 (A B C D : S) : (smeet_part (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5876 (A B C D : S) : (smeet_part (sand B (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5877 (A B C D : S) : (smeet_part (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5878 (A B C D : S) : (smeet_part (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5879 (A B C D : S) : (smeet_part (sand B (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5880 (A B C D : S) : (smeet_part (sand B (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5881 (A B C D : S) : (smeet_part (sand B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5882 (A B C D : S) : (smeet_part (sand B (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5883 (A B C D : S) : (scontains (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5884 (A B C D : S) : (scoveredby (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5885 (A B C D : S) : (scontains (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5886 (A B C D : S) : (scoveredby (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5887 (A B C D : S) : (scontains (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5888 (A B C D : S) : (scontains (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5889 (A B C D : S) : (smeet_part (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5890 (A B C D : S) : (smeet_part (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5891 (A B C D : S) : (smeet_part (sand C (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5892 (A B C D : S) : (smeet_part (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5893 (A B C D : S) : (smeet_part (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5894 (A B C D : S) : (smeet_part (sand C (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5895 (A B C D : S) : (smeet_part (sand C (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5896 (A B C D : S) : (smeet_part (sand C (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5897 (A B C D : S) : (smeet_part (sand C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5898 (A B C D : S) : (scontains (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5899 (A B C D : S) : (scoveredby (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5900 (A B C D : S) : (scontains (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5901 (A B C D : S) : (smeet_part (sand D (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5902 (A B C D : S) : (smeet_part (sand D (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5903 (A B C D : S) : (smeet_part (sand D (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5904 (A B C D : S) : (smeet_part (sand D (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5905 (A B C D : S) : (smeet_part (sand D (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5906 (A B C D : S) : (smeet_part (sand D (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5907 (A B C D : S) : (smeet_part (sand D (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5908 (A B C D : S) : (smeet_part (sand D (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5909 (A B C D : S) : (smeet_part (sand D (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5910 (A B C D : S) : (scoveredby (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5911 (A B C D : S) : (scoveredby (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5912 (A B C D : S) : (scoveredby (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5913 (A B C D : S) : (sequal_part (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5914 (A B C D : S) : (sequal_part (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5915 (A B C D : S) : (sequal_part (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5916 (A B C D : S) : (sequal_part (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5917 (A B C D : S) : (sequal_part (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5918 (A B C D : S) : (sequal_part (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5919 (A B C D : S) : (scoveredby (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5920 (A B C D : S) : (scoveredby (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5921 (A B C D : S) : (scoveredby (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5922 (A B C D : S) : (scoveredby (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5923 (A B C D : S) : (scoveredby (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5924 (A B C D : S) : (scoveredby (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5925 (A B C D : S) : (scoveredby (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5926 (A B C D : S) : (scoveredby (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5927 (A B C D : S) : (scoveredby (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5928 (A B C D : S) : (scoveredby (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5929 (A B C D : S) : (scoveredby (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5930 (A B C D : S) : (scoveredby (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5931 (A B C D : S) : (scoveredby (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5932 (A B C D : S) : (scoveredby (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5933 (A B C D : S) : (sequal_part (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5934 (A B C D : S) : (sequal_part (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5935 (A B C D : S) : (sequal_part (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5936 (A B C D : S) : (sequal_part (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5937 (A B C D : S) : (scoveredby (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5938 (A B C D : S) : (scoveredby (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5939 (A B C D : S) : (scoveredby (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5940 (A B C D : S) : (scoveredby (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5941 (A B C D : S) : (scoveredby (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5942 (A B C D : S) : (scoveredby (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5943 (A B C D : S) : (scoveredby (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5944 (A B C D : S) : (scoveredby (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5945 (A B C D : S) : (scoveredby (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5946 (A B C D : S) : (sequal_part (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5947 (A B C D : S) : (sequal_part (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5948 (A B C D : S) : (scoveredby (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5949 (A B C D : S) : (scoveredby (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5950 (A B C D : S) : (scoveredby (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5951 (A B C D : S) : (scoveredby (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5952 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5953 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5954 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5955 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5956 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5957 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5958 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5959 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5960 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5961 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5962 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5963 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5964 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5965 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5966 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5967 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5968 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5969 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5970 (A B C D : S) : (smeet_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5971 (A B C D : S) : (smeet_part (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5972 (A B C D : S) : (smeet_part (sand A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5973 (A B C D : S) : (scoveredby (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5974 (A B C D : S) : (sequal_part (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5975 (A B C D : S) : (scoveredby (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5976 (A B C D : S) : (sequal_part (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5977 (A B C D : S) : (scoveredby (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5978 (A B C D : S) : (sequal_part (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5979 (A B C D : S) : (scoveredby (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5980 (A B C D : S) : (scoveredby (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5981 (A B C D : S) : (scoveredby (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5982 (A B C D : S) : (smeet_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5983 (A B C D : S) : (smeet_part (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5984 (A B C D : S) : (smeet_part (sand B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5985 (A B C D : S) : (scoveredby (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5986 (A B C D : S) : (sequal_part (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5987 (A B C D : S) : (scoveredby (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5988 (A B C D : S) : (sequal_part (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5989 (A B C D : S) : (scoveredby (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5990 (A B C D : S) : (scoveredby (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5991 (A B C D : S) : (smeet_part (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5992 (A B C D : S) : (smeet_part (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5993 (A B C D : S) : (smeet_part (sand C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5994 (A B C D : S) : (scoveredby (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5995 (A B C D : S) : (sequal_part (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5996 (A B C D : S) : (scoveredby (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5997 (A B C D : S) : (smeet_part (sand D (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5998 (A B C D : S) : (smeet_part (sand D (! B)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_5999 (A B C D : S) : (smeet_part (sand D (! C)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6000 (A B C D : S) : (sequal_part (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6001 (A B C D : S) : (sequal_part (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6002 (A B C D : S) : (sequal_part (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6003 (A B C D : S) : (sequal_part (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6004 (A B C D : S) : (sequal_part (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6005 (A B C D : S) : (sequal_part (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6006 (A B C D : S) : (sequal_part (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6007 (A B C D : S) : (sequal_part (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6008 (A B C D : S) : (sequal_part (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6009 (A B C D : S) : (sequal_part (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6010 (A B C D : S) : (sequal_part (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6011 (A B C D : S) : (sequal_part (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6012 (A B C D : S) : (sequal_part (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6013 (A B C D : S) : (sequal_part (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6014 (A B C D : S) : (sequal_part (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6015 (A B C D : S) : (sequal_part (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6016 (A B C D : S) : (sequal_part (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6017 (A B C D : S) : (sequal_part (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6018 (A B C D : S) : (sequal_part (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6019 (A B C D : S) : (sequal_part (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6020 (A B C D : S) : (sequal_part (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6021 (A B C D : S) : (sequal_part (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6022 (A B C D : S) : (sequal_part (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6023 (A B C D : S) : (sequal_part (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6024 (A B C D : S) : (sequal_part (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6025 (A B C D : S) : (sequal_part (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6026 (A B C D : S) : (sequal_part (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6027 (A B C D : S) : (sequal_part (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6028 (A B C D : S) : (sequal_part (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6029 (A B C D : S) : (sequal_part (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6030 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6031 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6032 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6033 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6034 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6035 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6036 (A B C D : S) : (sequal_part (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6037 (A B C D : S) : (sequal_part (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6038 (A B C D : S) : (sequal_part (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6039 (A B C D : S) : (sequal_part (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6040 (A B C D : S) : (sequal_part (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6041 (A B C D : S) : (sequal_part (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6042 (A B C D : S) : (sequal_part (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6043 (A B C D : S) : (sequal_part (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6044 (A B C D : S) : (sequal_part (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6045 (A B C D : S) : (sequal_part (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6046 (A B C D : S) : (sequal_part (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6047 (A B C D : S) : (sequal_part (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6048 (A B C D : S) : (sdisjoint_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6049 (A B C D : S) : (sdisjoint_part (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6050 (A B C D : S) : (sdisjoint_part (sor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6051 (A B C D : S) : (sdisjoint_part (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6052 (A B C D : S) : (sdisjoint_part (sor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6053 (A B C D : S) : (sdisjoint_part (sor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6054 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6055 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6056 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6057 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6058 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6059 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6060 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6061 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6062 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6063 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6064 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6065 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6066 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6067 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6068 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6069 (A B C D : S) : (sdisjoint_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6070 (A B C D : S) : (sdisjoint_part (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6071 (A B C D : S) : (sdisjoint_part (sxor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6072 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6073 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6074 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6075 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6076 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6077 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6078 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6079 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6080 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6081 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6082 (A B C D : S) : (sdisjoint_part (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6083 (A B C D : S) : (sdisjoint_part (sxor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6084 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6085 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6086 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6087 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6088 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6089 (A B C D : S) : (sdisjoint_part (sxor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6090 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6091 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6092 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6093 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6094 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6095 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6096 (A B C D : S) : (sdisjoint_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6097 (A B C D : S) : (sdisjoint_part (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6098 (A B C D : S) : (sdisjoint_part (sand A (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6099 (A B C D : S) : (sdisjoint_part (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6100 (A B C D : S) : (sdisjoint_part (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6101 (A B C D : S) : (sdisjoint_part (sand A (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6102 (A B C D : S) : (sdisjoint_part (sand A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6103 (A B C D : S) : (sdisjoint_part (sand A (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6104 (A B C D : S) : (sdisjoint_part (sand A (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6105 (A B C D : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6106 (A B C D : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6107 (A B C D : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6108 (A B C D : S) : (sdisjoint_part (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6109 (A B C D : S) : (sdisjoint_part (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6110 (A B C D : S) : (sdisjoint_part (sand B (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6111 (A B C D : S) : (sdisjoint_part (sand B (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6112 (A B C D : S) : (sdisjoint_part (sand B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6113 (A B C D : S) : (sdisjoint_part (sand B (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6114 (A B C D : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6115 (A B C D : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6116 (A B C D : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6117 (A B C D : S) : (sdisjoint_part (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6118 (A B C D : S) : (sdisjoint_part (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6119 (A B C D : S) : (sdisjoint_part (sand C (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6120 (A B C D : S) : (sdisjoint_part (sand C (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6121 (A B C D : S) : (sdisjoint_part (sand C (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6122 (A B C D : S) : (sdisjoint_part (sand C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6123 (A B C D : S) : (sdisjoint_part (sand D (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6124 (A B C D : S) : (sdisjoint_part (sand D (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6125 (A B C D : S) : (sdisjoint_part (sand D (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6126 (A B C D : S) : (sdisjoint_part (sand D (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6127 (A B C D : S) : (sdisjoint_part (sand D (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6128 (A B C D : S) : (sdisjoint_part (sand D (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6129 (A B C D : S) : (sdisjoint_part (sand D (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6130 (A B C D : S) : (sdisjoint_part (sand D (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6131 (A B C D : S) : (sdisjoint_part (sand D (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6132 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6133 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6134 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6135 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6136 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6137 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6138 (A B C D : S) : (sdisjoint_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6139 (A B C D : S) : (sdisjoint_part (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6140 (A B C D : S) : (sdisjoint_part (sand A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6141 (A B C D : S) : (sdisjoint_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6142 (A B C D : S) : (sdisjoint_part (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6143 (A B C D : S) : (sdisjoint_part (sand B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6144 (A B C D : S) : (sdisjoint_part (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6145 (A B C D : S) : (sdisjoint_part (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6146 (A B C D : S) : (sdisjoint_part (sand C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6147 (A B C D : S) : (sdisjoint_part (sand D (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6148 (A B C D : S) : (sdisjoint_part (sand D (! B)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6149 (A B C D : S) : (sdisjoint_part (sand D (! C)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6150 (A B C D : S) : (snot (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6151 (A B C D : S) : (sxor (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6152 (A B C D : S) : (snot (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6153 (A B C D : S) : (sxor (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6154 (A B C D : S) : (snot (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6155 (A B C D : S) : (sxor (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6156 (A B C D : S) : (snot (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6157 (A B C D : S) : (sxor (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6158 (A B C D : S) : (snot (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6159 (A B C D : S) : (sxor (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6160 (A B C D : S) : (snot (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6161 (A B C D : S) : (sxor (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6162 (A B C D : S) : (snot (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6163 (A B C D : S) : (snot (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6164 (A B C D : S) : (snot (sxor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6165 (A B C D : S) : (snot (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6166 (A B C D : S) : (snot (sxor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6167 (A B C D : S) : (snot (sxor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6168 (A B C D : S) : (snot (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6169 (A B C D : S) : (sxor (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6170 (A B C D : S) : (snot (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6171 (A B C D : S) : (sxor (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6172 (A B C D : S) : (snot (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6173 (A B C D : S) : (sxor (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6174 (A B C D : S) : (snot (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6175 (A B C D : S) : (sxor (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6176 (A B C D : S) : (snot (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6177 (A B C D : S) : (sxor (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6178 (A B C D : S) : (snot (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6179 (A B C D : S) : (sxor (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6180 (A B C D : S) : (soutside (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6181 (A B C D : S) : (soutside (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6182 (A B C D : S) : (soutside (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6183 (A B C D : S) : (soutside (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6184 (A B C D : S) : (soutside (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6185 (A B C D : S) : (soutside (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6186 (A B C D : S) : (soutside (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6187 (A B C D : S) : (soutside (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6188 (A B C D : S) : (soutside (sxor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6189 (A B C D : S) : (soutside (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6190 (A B C D : S) : (soutside (sxor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6191 (A B C D : S) : (soutside (sxor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6192 (A B C D : S) : (smeet_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6193 (A B C D : S) : (smeet_part (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6194 (A B C D : S) : (smeet_part (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6195 (A B C D : S) : (soutside (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6196 (A B C D : S) : (soutside (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6197 (A B C D : S) : (soutside (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6198 (A B C D : S) : (smeet_part (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6199 (A B C D : S) : (smeet_part (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6200 (A B C D : S) : (soutside (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6201 (A B C D : S) : (soutside (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6202 (A B C D : S) : (smeet_part (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6203 (A B C D : S) : (soutside (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6204 (A B C D : S) : (smeet_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6205 (A B C D : S) : (smeet_part (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6206 (A B C D : S) : (smeet_part (sxor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6207 (A B C D : S) : (smeet_part (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6208 (A B C D : S) : (smeet_part (sxor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6209 (A B C D : S) : (smeet_part (sxor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6210 (A B C D : S) : (smeet_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6211 (A B C D : S) : (smeet_part (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6212 (A B C D : S) : (smeet_part (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6213 (A B C D : S) : (smeet_part (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6214 (A B C D : S) : (smeet_part (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6215 (A B C D : S) : (smeet_part (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6216 (A B C D : S) : (sdisjoint_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6217 (A B C D : S) : (sdisjoint_part (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6218 (A B C D : S) : (sdisjoint_part (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6219 (A B C D : S) : (sdisjoint_part (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6220 (A B C D : S) : (sdisjoint_part (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6221 (A B C D : S) : (sdisjoint_part (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6222 (A B C D : S) : (sdisjoint_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6223 (A B C D : S) : (sdisjoint_part (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6224 (A B C D : S) : (sdisjoint_part (sxor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6225 (A B C D : S) : (sdisjoint_part (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6226 (A B C D : S) : (sdisjoint_part (sxor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6227 (A B C D : S) : (sdisjoint_part (sxor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6228 (A B C D : S) : (sdisjoint_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6229 (A B C D : S) : (sdisjoint_part (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6230 (A B C D : S) : (sdisjoint_part (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6231 (A B C D : S) : (sdisjoint_part (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6232 (A B C D : S) : (sdisjoint_part (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
-theorem r4_6233 (A B C D : S) : (sdisjoint_part (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5346 (A B C D : S) : (sxor (! (sand A A)) (sor (! A) (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5347 (A B C D : S) : (sxor (! (sand A B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5348 (A B C D : S) : (sxor (! (sand A C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5349 (A B C D : S) : (sxor (! (sand A D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5350 (A B C D : S) : (sxor (! (sor A A)) (sand (! A) (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5351 (A B C D : S) : (sxor (! (sor A B)) (sand (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5352 (A B C D : S) : (sxor (! (sor A C)) (sand (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5353 (A B C D : S) : (sxor (! (sor A D)) (sand (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5354 (A B C D : S) : (sxor (! (sand B A)) (sor (! B) (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5355 (A B C D : S) : (sxor (! (sand B B)) (sor (! B) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5356 (A B C D : S) : (sxor (! (sand B C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5357 (A B C D : S) : (sxor (! (sand B D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5358 (A B C D : S) : (sxor (! (sor B A)) (sand (! B) (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5359 (A B C D : S) : (sxor (! (sor B B)) (sand (! B) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5360 (A B C D : S) : (sxor (! (sor B C)) (sand (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5361 (A B C D : S) : (sxor (! (sor B D)) (sand (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5362 (A B C D : S) : (sxor (! (sand C A)) (sor (! C) (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5363 (A B C D : S) : (sxor (! (sand C B)) (sor (! C) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5364 (A B C D : S) : (sxor (! (sand C C)) (sor (! C) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5365 (A B C D : S) : (sxor (! (sand C D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5366 (A B C D : S) : (sxor (! (sor C A)) (sand (! C) (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5367 (A B C D : S) : (sxor (! (sor C B)) (sand (! C) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5368 (A B C D : S) : (sxor (! (sor C C)) (sand (! C) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5369 (A B C D : S) : (sxor (! (sor C D)) (sand (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5370 (A B C D : S) : (sxor (! (sand D A)) (sor (! D) (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5371 (A B C D : S) : (sxor (! (sand D B)) (sor (! D) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5372 (A B C D : S) : (sxor (! (sand D C)) (sor (! D) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5373 (A B C D : S) : (sxor (! (sand D D)) (sor (! D) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5374 (A B C D : S) : (sxor (! (sor D A)) (sand (! D) (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5375 (A B C D : S) : (sxor (! (sor D B)) (sand (! D) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5376 (A B C D : S) : (sxor (! (sor D C)) (sand (! D) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5377 (A B C D : S) : (sxor (! (sor D D)) (sand (! D) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5378 (A B C D : S) : (sand (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5379 (A B C D : S) : (sand (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5380 (A B C D : S) : (sand (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5381 (A B C D : S) : (sand (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5382 (A B C D : S) : (sand (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5383 (A B C D : S) : (sand (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5384 (A B C D : S) : (sand (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5385 (A B C D : S) : (sand (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5386 (A B C D : S) : (sand (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5387 (A B C D : S) : (sand (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5388 (A B C D : S) : (sand (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5389 (A B C D : S) : (sand (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5390 (A B C D : S) : (sand (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5391 (A B C D : S) : (sand (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5392 (A B C D : S) : (sand (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5393 (A B C D : S) : (sand (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5394 (A B C D : S) : (sand (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5395 (A B C D : S) : (sand (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5396 (A B C D : S) : (sand (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5397 (A B C D : S) : (sand (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5398 (A B C D : S) : (sand (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5399 (A B C D : S) : (sand (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5400 (A B C D : S) : (sand (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5401 (A B C D : S) : (sand (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5402 (A B C D : S) : (sand (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5403 (A B C D : S) : (sand (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5404 (A B C D : S) : (sand (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5405 (A B C D : S) : (sand (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5406 (A B C D : S) : (sand (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5407 (A B C D : S) : (sand (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5408 (A B C D : S) : (sand (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5409 (A B C D : S) : (sand (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5410 (A B C D : S) : (sand (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5411 (A B C D : S) : (sand (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5412 (A B C D : S) : (sand (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5413 (A B C D : S) : (sand (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5414 (A B C D : S) : (snot (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5415 (A B C D : S) : (snot (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5416 (A B C D : S) : (snot (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5417 (A B C D : S) : (snot (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5418 (A B C D : S) : (snot (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5419 (A B C D : S) : (snot (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5420 (A B C D : S) : (snot (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5421 (A B C D : S) : (snot (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5422 (A B C D : S) : (snot (sand A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5423 (A B C D : S) : (sand (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5424 (A B C D : S) : (sand (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5425 (A B C D : S) : (sand (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5426 (A B C D : S) : (sand (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5427 (A B C D : S) : (sand (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5428 (A B C D : S) : (sand (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5429 (A B C D : S) : (snot (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5430 (A B C D : S) : (snot (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5431 (A B C D : S) : (snot (sand B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5432 (A B C D : S) : (sand (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5433 (A B C D : S) : (sand (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5434 (A B C D : S) : (sand (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5435 (A B C D : S) : (sand (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5436 (A B C D : S) : (snot (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5437 (A B C D : S) : (snot (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5438 (A B C D : S) : (snot (sand C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5439 (A B C D : S) : (sand (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5440 (A B C D : S) : (sand (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5441 (A B C D : S) : (snot (sand D (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5442 (A B C D : S) : (snot (sand D (! B)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5443 (A B C D : S) : (snot (sand D (! C)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5444 (A B C D : S) : (scovers (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5445 (A B C D : S) : (scovers (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5446 (A B C D : S) : (sinside (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5447 (A B C D : S) : (sinside (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5448 (A B C D : S) : (soutside (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5449 (A B C D : S) : (scovers (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5450 (A B C D : S) : (scovers (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5451 (A B C D : S) : (sinside (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5452 (A B C D : S) : (sinside (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5453 (A B C D : S) : (soutside (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5454 (A B C D : S) : (scovers (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5455 (A B C D : S) : (scovers (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5456 (A B C D : S) : (sinside (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5457 (A B C D : S) : (sinside (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5458 (A B C D : S) : (soutside (sor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5459 (A B C D : S) : (scovers (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5460 (A B C D : S) : (scovers (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5461 (A B C D : S) : (sinside (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5462 (A B C D : S) : (sinside (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5463 (A B C D : S) : (soutside (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5464 (A B C D : S) : (scovers (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5465 (A B C D : S) : (scovers (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5466 (A B C D : S) : (sinside (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5467 (A B C D : S) : (sinside (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5468 (A B C D : S) : (soutside (sor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5469 (A B C D : S) : (scovers (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5470 (A B C D : S) : (scovers (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5471 (A B C D : S) : (sinside (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5472 (A B C D : S) : (sinside (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5473 (A B C D : S) : (soutside (sor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5474 (A B C D : S) : (scovers (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5475 (A B C D : S) : (scovers (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5476 (A B C D : S) : (scovers (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5477 (A B C D : S) : (scovers (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5478 (A B C D : S) : (scovers (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5479 (A B C D : S) : (scovers (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5480 (A B C D : S) : (sinside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5481 (A B C D : S) : (sinside (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5482 (A B C D : S) : (sinside (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5483 (A B C D : S) : (sinside (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5484 (A B C D : S) : (sinside (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5485 (A B C D : S) : (sinside (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5486 (A B C D : S) : (scovers (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5487 (A B C D : S) : (sinside (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5488 (A B C D : S) : (scovers (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5489 (A B C D : S) : (sinside (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5490 (A B C D : S) : (scovers (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5491 (A B C D : S) : (sinside (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5492 (A B C D : S) : (scovers (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5493 (A B C D : S) : (sinside (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5494 (A B C D : S) : (scovers (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5495 (A B C D : S) : (sinside (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5496 (A B C D : S) : (scovers (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5497 (A B C D : S) : (sinside (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5498 (A B C D : S) : (scovers (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5499 (A B C D : S) : (sinside (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5500 (A B C D : S) : (soutside (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5501 (A B C D : S) : (soutside (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5502 (A B C D : S) : (soutside (snot (! A) B) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5503 (A B C D : S) : (soutside (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5504 (A B C D : S) : (soutside (snot (! A) B) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5505 (A B C D : S) : (scovers (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5506 (A B C D : S) : (sinside (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5507 (A B C D : S) : (soutside (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5508 (A B C D : S) : (soutside (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5509 (A B C D : S) : (soutside (snot (! A) C) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5510 (A B C D : S) : (soutside (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5511 (A B C D : S) : (soutside (snot (! A) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5512 (A B C D : S) : (scovers (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5513 (A B C D : S) : (sinside (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5514 (A B C D : S) : (soutside (snot (! A) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5515 (A B C D : S) : (soutside (snot (! A) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5516 (A B C D : S) : (soutside (snot (! A) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5517 (A B C D : S) : (soutside (snot (! A) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5518 (A B C D : S) : (soutside (snot (! A) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5519 (A B C D : S) : (soverlap (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5520 (A B C D : S) : (soverlap (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5521 (A B C D : S) : (soverlap (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5522 (A B C D : S) : (soverlap (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5523 (A B C D : S) : (soverlap (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5524 (A B C D : S) : (soverlap (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5525 (A B C D : S) : (scovers (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5526 (A B C D : S) : (scovers (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5527 (A B C D : S) : (scovers (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5528 (A B C D : S) : (scovers (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5529 (A B C D : S) : (sinside (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5530 (A B C D : S) : (sinside (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5531 (A B C D : S) : (sinside (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5532 (A B C D : S) : (sinside (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5533 (A B C D : S) : (soutside (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5534 (A B C D : S) : (scovers (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5535 (A B C D : S) : (scovers (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5536 (A B C D : S) : (scovers (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5537 (A B C D : S) : (scovers (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5538 (A B C D : S) : (sinside (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5539 (A B C D : S) : (sinside (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5540 (A B C D : S) : (sinside (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5541 (A B C D : S) : (sinside (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5542 (A B C D : S) : (soutside (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5543 (A B C D : S) : (scovers (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5544 (A B C D : S) : (scovers (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5545 (A B C D : S) : (scovers (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5546 (A B C D : S) : (scovers (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5547 (A B C D : S) : (sinside (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5548 (A B C D : S) : (sinside (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5549 (A B C D : S) : (sinside (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5550 (A B C D : S) : (sinside (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5551 (A B C D : S) : (soutside (sxor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5552 (A B C D : S) : (scovers (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5553 (A B C D : S) : (sinside (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5554 (A B C D : S) : (soutside (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5555 (A B C D : S) : (soutside (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5556 (A B C D : S) : (soutside (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5557 (A B C D : S) : (soutside (snot (! B) C) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5558 (A B C D : S) : (soutside (snot (! B) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5559 (A B C D : S) : (scovers (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5560 (A B C D : S) : (sinside (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5561 (A B C D : S) : (soutside (snot (! B) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5562 (A B C D : S) : (soutside (snot (! B) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5563 (A B C D : S) : (soutside (snot (! B) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5564 (A B C D : S) : (soutside (snot (! B) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5565 (A B C D : S) : (soutside (snot (! B) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5566 (A B C D : S) : (soverlap (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5567 (A B C D : S) : (soverlap (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5568 (A B C D : S) : (soverlap (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5569 (A B C D : S) : (soverlap (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5570 (A B C D : S) : (scovers (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5571 (A B C D : S) : (scovers (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5572 (A B C D : S) : (scovers (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5573 (A B C D : S) : (scovers (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5574 (A B C D : S) : (sinside (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5575 (A B C D : S) : (sinside (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5576 (A B C D : S) : (sinside (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5577 (A B C D : S) : (sinside (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5578 (A B C D : S) : (soutside (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5579 (A B C D : S) : (scovers (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5580 (A B C D : S) : (scovers (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5581 (A B C D : S) : (scovers (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5582 (A B C D : S) : (scovers (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5583 (A B C D : S) : (sinside (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5584 (A B C D : S) : (sinside (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5585 (A B C D : S) : (sinside (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5586 (A B C D : S) : (sinside (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5587 (A B C D : S) : (soutside (sxor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5588 (A B C D : S) : (scovers (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5589 (A B C D : S) : (sinside (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5590 (A B C D : S) : (soutside (snot (! C) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5591 (A B C D : S) : (soutside (snot (! C) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5592 (A B C D : S) : (soutside (snot (! C) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5593 (A B C D : S) : (soutside (snot (! C) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5594 (A B C D : S) : (soutside (snot (! C) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5595 (A B C D : S) : (soverlap (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5596 (A B C D : S) : (soverlap (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5597 (A B C D : S) : (scovers (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5598 (A B C D : S) : (scovers (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5599 (A B C D : S) : (scovers (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5600 (A B C D : S) : (scovers (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5601 (A B C D : S) : (sinside (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5602 (A B C D : S) : (sinside (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5603 (A B C D : S) : (sinside (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5604 (A B C D : S) : (sinside (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5605 (A B C D : S) : (soutside (sxor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5606 (A B C D : S) : (scovers (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5607 (A B C D : S) : (scovers (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5608 (A B C D : S) : (scovers (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5609 (A B C D : S) : (scovers (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5610 (A B C D : S) : (scovers (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5611 (A B C D : S) : (scovers (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5612 (A B C D : S) : (sinside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5613 (A B C D : S) : (sinside (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5614 (A B C D : S) : (sinside (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5615 (A B C D : S) : (sinside (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5616 (A B C D : S) : (sinside (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5617 (A B C D : S) : (sinside (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5618 (A B C D : S) : (soutside (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5619 (A B C D : S) : (soutside (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5620 (A B C D : S) : (soutside (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5621 (A B C D : S) : (soutside (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5622 (A B C D : S) : (soutside (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5623 (A B C D : S) : (soutside (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5624 (A B C D : S) : (soverlap (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5625 (A B C D : S) : (soverlap (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5626 (A B C D : S) : (soverlap (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5627 (A B C D : S) : (soverlap (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5628 (A B C D : S) : (soverlap (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5629 (A B C D : S) : (soverlap (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5630 (A B C D : S) : (soutside (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5631 (A B C D : S) : (soutside (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5632 (A B C D : S) : (soutside (sand A (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5633 (A B C D : S) : (soutside (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5634 (A B C D : S) : (soutside (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5635 (A B C D : S) : (soutside (sand A (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5636 (A B C D : S) : (soutside (sand A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5637 (A B C D : S) : (soutside (sand A (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5638 (A B C D : S) : (soutside (sand A (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5639 (A B C D : S) : (scovers (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5640 (A B C D : S) : (sinside (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5641 (A B C D : S) : (soverlap (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5642 (A B C D : S) : (scovers (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5643 (A B C D : S) : (sinside (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5644 (A B C D : S) : (soverlap (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5645 (A B C D : S) : (scovers (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5646 (A B C D : S) : (sinside (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5647 (A B C D : S) : (soverlap (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5648 (A B C D : S) : (sxor (sor A (sand A A)) (sand (sor A A) (sor A A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5649 (A B C D : S) : (sxor (sor A (sand A B)) (sand (sor A A) (sor A B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5650 (A B C D : S) : (sxor (sor A (sand A C)) (sand (sor A A) (sor A C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5651 (A B C D : S) : (sxor (sor A (sand A D)) (sand (sor A A) (sor A D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5652 (A B C D : S) : (sxor (sor A (sand B A)) (sand (sor A B) (sor A A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5653 (A B C D : S) : (sxor (sor A (sand B B)) (sand (sor A B) (sor A B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5654 (A B C D : S) : (sxor (sor A (sand B C)) (sand (sor A B) (sor A C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5655 (A B C D : S) : (sxor (sor A (sand B D)) (sand (sor A B) (sor A D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5656 (A B C D : S) : (sxor (sor A (sand C A)) (sand (sor A C) (sor A A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5657 (A B C D : S) : (sxor (sor A (sand C B)) (sand (sor A C) (sor A B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5658 (A B C D : S) : (sxor (sor A (sand C C)) (sand (sor A C) (sor A C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5659 (A B C D : S) : (sxor (sor A (sand C D)) (sand (sor A C) (sor A D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5660 (A B C D : S) : (sxor (sor A (sand D A)) (sand (sor A D) (sor A A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5661 (A B C D : S) : (sxor (sor A (sand D B)) (sand (sor A D) (sor A B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5662 (A B C D : S) : (sxor (sor A (sand D C)) (sand (sor A D) (sor A C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5663 (A B C D : S) : (sxor (sor A (sand D D)) (sand (sor A D) (sor A D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5664 (A B C D : S) : (scovers (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5665 (A B C D : S) : (sinside (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5666 (A B C D : S) : (scovers (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5667 (A B C D : S) : (sinside (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5668 (A B C D : S) : (scovers (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5669 (A B C D : S) : (sinside (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5670 (A B C D : S) : (soutside (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5671 (A B C D : S) : (soutside (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5672 (A B C D : S) : (soutside (sand B (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5673 (A B C D : S) : (soutside (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5674 (A B C D : S) : (soutside (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5675 (A B C D : S) : (soutside (sand B (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5676 (A B C D : S) : (soutside (sand B (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5677 (A B C D : S) : (soutside (sand B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5678 (A B C D : S) : (soutside (sand B (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5679 (A B C D : S) : (scovers (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5680 (A B C D : S) : (sinside (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5681 (A B C D : S) : (soverlap (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5682 (A B C D : S) : (scovers (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5683 (A B C D : S) : (sinside (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5684 (A B C D : S) : (soverlap (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5685 (A B C D : S) : (sxor (sor B (sand A A)) (sand (sor B A) (sor B A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5686 (A B C D : S) : (sxor (sor B (sand A B)) (sand (sor B A) (sor B B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5687 (A B C D : S) : (sxor (sor B (sand A C)) (sand (sor B A) (sor B C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5688 (A B C D : S) : (sxor (sor B (sand A D)) (sand (sor B A) (sor B D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5689 (A B C D : S) : (sxor (sor B (sand B A)) (sand (sor B B) (sor B A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5690 (A B C D : S) : (sxor (sor B (sand B B)) (sand (sor B B) (sor B B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5691 (A B C D : S) : (sxor (sor B (sand B C)) (sand (sor B B) (sor B C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5692 (A B C D : S) : (sxor (sor B (sand B D)) (sand (sor B B) (sor B D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5693 (A B C D : S) : (sxor (sor B (sand C A)) (sand (sor B C) (sor B A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5694 (A B C D : S) : (sxor (sor B (sand C B)) (sand (sor B C) (sor B B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5695 (A B C D : S) : (sxor (sor B (sand C C)) (sand (sor B C) (sor B C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5696 (A B C D : S) : (sxor (sor B (sand C D)) (sand (sor B C) (sor B D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5697 (A B C D : S) : (sxor (sor B (sand D A)) (sand (sor B D) (sor B A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5698 (A B C D : S) : (sxor (sor B (sand D B)) (sand (sor B D) (sor B B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5699 (A B C D : S) : (sxor (sor B (sand D C)) (sand (sor B D) (sor B C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5700 (A B C D : S) : (sxor (sor B (sand D D)) (sand (sor B D) (sor B D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5701 (A B C D : S) : (scovers (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5702 (A B C D : S) : (sinside (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5703 (A B C D : S) : (scovers (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5704 (A B C D : S) : (sinside (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5705 (A B C D : S) : (soutside (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5706 (A B C D : S) : (soutside (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5707 (A B C D : S) : (soutside (sand C (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5708 (A B C D : S) : (soutside (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5709 (A B C D : S) : (soutside (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5710 (A B C D : S) : (soutside (sand C (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5711 (A B C D : S) : (soutside (sand C (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5712 (A B C D : S) : (soutside (sand C (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5713 (A B C D : S) : (soutside (sand C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5714 (A B C D : S) : (scovers (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5715 (A B C D : S) : (sinside (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5716 (A B C D : S) : (soverlap (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5717 (A B C D : S) : (sxor (sor C (sand A A)) (sand (sor C A) (sor C A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5718 (A B C D : S) : (sxor (sor C (sand A B)) (sand (sor C A) (sor C B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5719 (A B C D : S) : (sxor (sor C (sand A C)) (sand (sor C A) (sor C C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5720 (A B C D : S) : (sxor (sor C (sand A D)) (sand (sor C A) (sor C D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5721 (A B C D : S) : (sxor (sor C (sand B A)) (sand (sor C B) (sor C A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5722 (A B C D : S) : (sxor (sor C (sand B B)) (sand (sor C B) (sor C B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5723 (A B C D : S) : (sxor (sor C (sand B C)) (sand (sor C B) (sor C C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5724 (A B C D : S) : (sxor (sor C (sand B D)) (sand (sor C B) (sor C D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5725 (A B C D : S) : (sxor (sor C (sand C A)) (sand (sor C C) (sor C A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5726 (A B C D : S) : (sxor (sor C (sand C B)) (sand (sor C C) (sor C B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5727 (A B C D : S) : (sxor (sor C (sand C C)) (sand (sor C C) (sor C C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5728 (A B C D : S) : (sxor (sor C (sand C D)) (sand (sor C C) (sor C D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5729 (A B C D : S) : (sxor (sor C (sand D A)) (sand (sor C D) (sor C A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5730 (A B C D : S) : (sxor (sor C (sand D B)) (sand (sor C D) (sor C B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5731 (A B C D : S) : (sxor (sor C (sand D C)) (sand (sor C D) (sor C C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5732 (A B C D : S) : (sxor (sor C (sand D D)) (sand (sor C D) (sor C D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5733 (A B C D : S) : (scovers (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5734 (A B C D : S) : (sinside (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5735 (A B C D : S) : (soutside (sand D (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5736 (A B C D : S) : (soutside (sand D (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5737 (A B C D : S) : (soutside (sand D (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5738 (A B C D : S) : (soutside (sand D (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5739 (A B C D : S) : (soutside (sand D (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5740 (A B C D : S) : (soutside (sand D (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5741 (A B C D : S) : (soutside (sand D (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5742 (A B C D : S) : (soutside (sand D (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5743 (A B C D : S) : (soutside (sand D (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5744 (A B C D : S) : (sxor (sor D (sand A A)) (sand (sor D A) (sor D A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5745 (A B C D : S) : (sxor (sor D (sand A B)) (sand (sor D A) (sor D B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5746 (A B C D : S) : (sxor (sor D (sand A C)) (sand (sor D A) (sor D C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5747 (A B C D : S) : (sxor (sor D (sand A D)) (sand (sor D A) (sor D D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5748 (A B C D : S) : (sxor (sor D (sand B A)) (sand (sor D B) (sor D A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5749 (A B C D : S) : (sxor (sor D (sand B B)) (sand (sor D B) (sor D B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5750 (A B C D : S) : (sxor (sor D (sand B C)) (sand (sor D B) (sor D C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5751 (A B C D : S) : (sxor (sor D (sand B D)) (sand (sor D B) (sor D D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5752 (A B C D : S) : (sxor (sor D (sand C A)) (sand (sor D C) (sor D A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5753 (A B C D : S) : (sxor (sor D (sand C B)) (sand (sor D C) (sor D B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5754 (A B C D : S) : (sxor (sor D (sand C C)) (sand (sor D C) (sor D C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5755 (A B C D : S) : (sxor (sor D (sand C D)) (sand (sor D C) (sor D D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5756 (A B C D : S) : (sxor (sor D (sand D A)) (sand (sor D D) (sor D A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5757 (A B C D : S) : (sxor (sor D (sand D B)) (sand (sor D D) (sor D B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5758 (A B C D : S) : (sxor (sor D (sand D C)) (sand (sor D D) (sor D C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5759 (A B C D : S) : (sxor (sor D (sand D D)) (sand (sor D D) (sor D D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5760 (A B C D : S) : (soverlap (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5761 (A B C D : S) : (soverlap (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5762 (A B C D : S) : (soverlap (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5763 (A B C D : S) : (scontains (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5764 (A B C D : S) : (scontains (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5765 (A B C D : S) : (smeet_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5766 (A B C D : S) : (scontains (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5767 (A B C D : S) : (scontains (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5768 (A B C D : S) : (smeet_part (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5769 (A B C D : S) : (scontains (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5770 (A B C D : S) : (scontains (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5771 (A B C D : S) : (smeet_part (sor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5772 (A B C D : S) : (soverlap (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5773 (A B C D : S) : (soverlap (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5774 (A B C D : S) : (soverlap (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5775 (A B C D : S) : (soverlap (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5776 (A B C D : S) : (soverlap (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5777 (A B C D : S) : (soverlap (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5778 (A B C D : S) : (soverlap (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5779 (A B C D : S) : (soverlap (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5780 (A B C D : S) : (soverlap (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5781 (A B C D : S) : (soverlap (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5782 (A B C D : S) : (soverlap (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5783 (A B C D : S) : (soverlap (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5784 (A B C D : S) : (soverlap (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5785 (A B C D : S) : (soverlap (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5786 (A B C D : S) : (scontains (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5787 (A B C D : S) : (scontains (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5788 (A B C D : S) : (smeet_part (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5789 (A B C D : S) : (scontains (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5790 (A B C D : S) : (scontains (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5791 (A B C D : S) : (smeet_part (sor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5792 (A B C D : S) : (soverlap (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5793 (A B C D : S) : (soverlap (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5794 (A B C D : S) : (soverlap (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5795 (A B C D : S) : (soverlap (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5796 (A B C D : S) : (soverlap (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5797 (A B C D : S) : (soverlap (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5798 (A B C D : S) : (soverlap (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5799 (A B C D : S) : (soverlap (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5800 (A B C D : S) : (soverlap (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5801 (A B C D : S) : (scontains (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5802 (A B C D : S) : (scontains (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5803 (A B C D : S) : (smeet_part (sor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5804 (A B C D : S) : (soverlap (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5805 (A B C D : S) : (soverlap (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5806 (A B C D : S) : (soverlap (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5807 (A B C D : S) : (soverlap (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5808 (A B C D : S) : (sxor (sand A (sor A A)) (sor (sand A A) (sand A A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5809 (A B C D : S) : (sxor (sand A (sor A B)) (sor (sand A A) (sand A B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5810 (A B C D : S) : (sxor (sand A (sor A C)) (sor (sand A A) (sand A C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5811 (A B C D : S) : (sxor (sand A (sor A D)) (sor (sand A A) (sand A D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5812 (A B C D : S) : (sxor (sand A (sor B A)) (sor (sand A B) (sand A A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5813 (A B C D : S) : (sxor (sand A (sor B B)) (sor (sand A B) (sand A B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5814 (A B C D : S) : (sxor (sand A (sor B C)) (sor (sand A B) (sand A C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5815 (A B C D : S) : (sxor (sand A (sor B D)) (sor (sand A B) (sand A D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5816 (A B C D : S) : (sxor (sand A (sor C A)) (sor (sand A C) (sand A A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5817 (A B C D : S) : (sxor (sand A (sor C B)) (sor (sand A C) (sand A B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5818 (A B C D : S) : (sxor (sand A (sor C C)) (sor (sand A C) (sand A C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5819 (A B C D : S) : (sxor (sand A (sor C D)) (sor (sand A C) (sand A D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5820 (A B C D : S) : (sxor (sand A (sor D A)) (sor (sand A D) (sand A A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5821 (A B C D : S) : (sxor (sand A (sor D B)) (sor (sand A D) (sand A B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5822 (A B C D : S) : (sxor (sand A (sor D C)) (sor (sand A D) (sand A C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5823 (A B C D : S) : (sxor (sand A (sor D D)) (sor (sand A D) (sand A D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5824 (A B C D : S) : (scontains (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5825 (A B C D : S) : (scontains (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5826 (A B C D : S) : (scontains (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5827 (A B C D : S) : (scontains (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5828 (A B C D : S) : (scontains (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5829 (A B C D : S) : (scontains (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5830 (A B C D : S) : (soutside (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5831 (A B C D : S) : (soutside (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5832 (A B C D : S) : (soutside (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5833 (A B C D : S) : (soutside (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5834 (A B C D : S) : (soutside (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5835 (A B C D : S) : (soutside (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5836 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5837 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5838 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5839 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5840 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5841 (A B C D : S) : (soverlap (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5842 (A B C D : S) : (soutside (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5843 (A B C D : S) : (soutside (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5844 (A B C D : S) : (soutside (sand A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5845 (A B C D : S) : (scontains (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5846 (A B C D : S) : (soverlap (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5847 (A B C D : S) : (scontains (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5848 (A B C D : S) : (soverlap (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5849 (A B C D : S) : (scontains (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5850 (A B C D : S) : (soverlap (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5851 (A B C D : S) : (soverlap (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5852 (A B C D : S) : (soverlap (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5853 (A B C D : S) : (soverlap (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5854 (A B C D : S) : (sxor (sand B (sor A A)) (sor (sand B A) (sand B A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5855 (A B C D : S) : (sxor (sand B (sor A B)) (sor (sand B A) (sand B B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5856 (A B C D : S) : (sxor (sand B (sor A C)) (sor (sand B A) (sand B C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5857 (A B C D : S) : (sxor (sand B (sor A D)) (sor (sand B A) (sand B D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5858 (A B C D : S) : (sxor (sand B (sor B A)) (sor (sand B B) (sand B A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5859 (A B C D : S) : (sxor (sand B (sor B B)) (sor (sand B B) (sand B B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5860 (A B C D : S) : (sxor (sand B (sor B C)) (sor (sand B B) (sand B C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5861 (A B C D : S) : (sxor (sand B (sor B D)) (sor (sand B B) (sand B D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5862 (A B C D : S) : (sxor (sand B (sor C A)) (sor (sand B C) (sand B A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5863 (A B C D : S) : (sxor (sand B (sor C B)) (sor (sand B C) (sand B B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5864 (A B C D : S) : (sxor (sand B (sor C C)) (sor (sand B C) (sand B C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5865 (A B C D : S) : (sxor (sand B (sor C D)) (sor (sand B C) (sand B D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5866 (A B C D : S) : (sxor (sand B (sor D A)) (sor (sand B D) (sand B A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5867 (A B C D : S) : (sxor (sand B (sor D B)) (sor (sand B D) (sand B B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5868 (A B C D : S) : (sxor (sand B (sor D C)) (sor (sand B D) (sand B C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5869 (A B C D : S) : (sxor (sand B (sor D D)) (sor (sand B D) (sand B D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5870 (A B C D : S) : (soutside (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5871 (A B C D : S) : (soutside (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5872 (A B C D : S) : (soutside (sand B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5873 (A B C D : S) : (scontains (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5874 (A B C D : S) : (soverlap (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5875 (A B C D : S) : (scontains (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5876 (A B C D : S) : (soverlap (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5877 (A B C D : S) : (soverlap (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5878 (A B C D : S) : (soverlap (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5879 (A B C D : S) : (sxor (sand C (sor A A)) (sor (sand C A) (sand C A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5880 (A B C D : S) : (sxor (sand C (sor A B)) (sor (sand C A) (sand C B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5881 (A B C D : S) : (sxor (sand C (sor A C)) (sor (sand C A) (sand C C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5882 (A B C D : S) : (sxor (sand C (sor A D)) (sor (sand C A) (sand C D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5883 (A B C D : S) : (sxor (sand C (sor B A)) (sor (sand C B) (sand C A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5884 (A B C D : S) : (sxor (sand C (sor B B)) (sor (sand C B) (sand C B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5885 (A B C D : S) : (sxor (sand C (sor B C)) (sor (sand C B) (sand C C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5886 (A B C D : S) : (sxor (sand C (sor B D)) (sor (sand C B) (sand C D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5887 (A B C D : S) : (sxor (sand C (sor C A)) (sor (sand C C) (sand C A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5888 (A B C D : S) : (sxor (sand C (sor C B)) (sor (sand C C) (sand C B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5889 (A B C D : S) : (sxor (sand C (sor C C)) (sor (sand C C) (sand C C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5890 (A B C D : S) : (sxor (sand C (sor C D)) (sor (sand C C) (sand C D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5891 (A B C D : S) : (sxor (sand C (sor D A)) (sor (sand C D) (sand C A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5892 (A B C D : S) : (sxor (sand C (sor D B)) (sor (sand C D) (sand C B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5893 (A B C D : S) : (sxor (sand C (sor D C)) (sor (sand C D) (sand C C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5894 (A B C D : S) : (sxor (sand C (sor D D)) (sor (sand C D) (sand C D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5895 (A B C D : S) : (soutside (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5896 (A B C D : S) : (soutside (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5897 (A B C D : S) : (soutside (sand C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5898 (A B C D : S) : (scontains (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5899 (A B C D : S) : (soverlap (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5900 (A B C D : S) : (soverlap (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5901 (A B C D : S) : (sxor (sand D (sor A A)) (sor (sand D A) (sand D A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5902 (A B C D : S) : (sxor (sand D (sor A B)) (sor (sand D A) (sand D B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5903 (A B C D : S) : (sxor (sand D (sor A C)) (sor (sand D A) (sand D C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5904 (A B C D : S) : (sxor (sand D (sor A D)) (sor (sand D A) (sand D D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5905 (A B C D : S) : (sxor (sand D (sor B A)) (sor (sand D B) (sand D A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5906 (A B C D : S) : (sxor (sand D (sor B B)) (sor (sand D B) (sand D B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5907 (A B C D : S) : (sxor (sand D (sor B C)) (sor (sand D B) (sand D C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5908 (A B C D : S) : (sxor (sand D (sor B D)) (sor (sand D B) (sand D D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5909 (A B C D : S) : (sxor (sand D (sor C A)) (sor (sand D C) (sand D A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5910 (A B C D : S) : (sxor (sand D (sor C B)) (sor (sand D C) (sand D B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5911 (A B C D : S) : (sxor (sand D (sor C C)) (sor (sand D C) (sand D C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5912 (A B C D : S) : (sxor (sand D (sor C D)) (sor (sand D C) (sand D D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5913 (A B C D : S) : (sxor (sand D (sor D A)) (sor (sand D D) (sand D A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5914 (A B C D : S) : (sxor (sand D (sor D B)) (sor (sand D D) (sand D B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5915 (A B C D : S) : (sxor (sand D (sor D C)) (sor (sand D D) (sand D C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5916 (A B C D : S) : (sxor (sand D (sor D D)) (sor (sand D D) (sand D D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5917 (A B C D : S) : (soutside (sand D (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5918 (A B C D : S) : (soutside (sand D (! B)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5919 (A B C D : S) : (soutside (sand D (! C)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5920 (A B C D : S) : (scontains (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5921 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5922 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5923 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5924 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5925 (A B C D : S) : (smeet_part (snot (! A) B) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5926 (A B C D : S) : (scontains (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5927 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5928 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5929 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5930 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5931 (A B C D : S) : (smeet_part (snot (! A) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5932 (A B C D : S) : (scontains (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5933 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5934 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5935 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5936 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5937 (A B C D : S) : (smeet_part (snot (! A) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5938 (A B C D : S) : (scoveredby (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5939 (A B C D : S) : (scoveredby (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5940 (A B C D : S) : (scoveredby (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5941 (A B C D : S) : (scoveredby (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5942 (A B C D : S) : (scoveredby (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5943 (A B C D : S) : (scoveredby (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5944 (A B C D : S) : (scontains (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5945 (A B C D : S) : (scontains (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5946 (A B C D : S) : (scontains (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5947 (A B C D : S) : (scontains (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5948 (A B C D : S) : (smeet_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5949 (A B C D : S) : (scontains (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5950 (A B C D : S) : (scontains (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5951 (A B C D : S) : (scontains (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5952 (A B C D : S) : (scontains (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5953 (A B C D : S) : (smeet_part (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5954 (A B C D : S) : (scontains (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5955 (A B C D : S) : (scontains (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5956 (A B C D : S) : (scontains (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5957 (A B C D : S) : (scontains (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5958 (A B C D : S) : (smeet_part (sxor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5959 (A B C D : S) : (scontains (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5960 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5961 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5962 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5963 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5964 (A B C D : S) : (smeet_part (snot (! B) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5965 (A B C D : S) : (scontains (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5966 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5967 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5968 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5969 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5970 (A B C D : S) : (smeet_part (snot (! B) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5971 (A B C D : S) : (scoveredby (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5972 (A B C D : S) : (scoveredby (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5973 (A B C D : S) : (scoveredby (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5974 (A B C D : S) : (scoveredby (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5975 (A B C D : S) : (scontains (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5976 (A B C D : S) : (scontains (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5977 (A B C D : S) : (scontains (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5978 (A B C D : S) : (scontains (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5979 (A B C D : S) : (smeet_part (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5980 (A B C D : S) : (scontains (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5981 (A B C D : S) : (scontains (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5982 (A B C D : S) : (scontains (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5983 (A B C D : S) : (scontains (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5984 (A B C D : S) : (smeet_part (sxor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5985 (A B C D : S) : (scontains (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5986 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5987 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5988 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5989 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5990 (A B C D : S) : (smeet_part (snot (! C) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5991 (A B C D : S) : (scoveredby (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5992 (A B C D : S) : (scoveredby (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5993 (A B C D : S) : (scontains (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5994 (A B C D : S) : (scontains (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5995 (A B C D : S) : (scontains (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5996 (A B C D : S) : (scontains (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5997 (A B C D : S) : (smeet_part (sxor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5998 (A B C D : S) : (scontains (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_5999 (A B C D : S) : (scontains (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6000 (A B C D : S) : (scontains (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6001 (A B C D : S) : (scontains (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6002 (A B C D : S) : (scontains (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6003 (A B C D : S) : (scontains (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6004 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6005 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6006 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6007 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6008 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6009 (A B C D : S) : (scoveredby (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6010 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6011 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6012 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6013 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6014 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6015 (A B C D : S) : (smeet_part (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6016 (A B C D : S) : (smeet_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6017 (A B C D : S) : (smeet_part (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6018 (A B C D : S) : (smeet_part (sand A (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6019 (A B C D : S) : (smeet_part (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6020 (A B C D : S) : (smeet_part (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6021 (A B C D : S) : (smeet_part (sand A (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6022 (A B C D : S) : (smeet_part (sand A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6023 (A B C D : S) : (smeet_part (sand A (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6024 (A B C D : S) : (smeet_part (sand A (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6025 (A B C D : S) : (scontains (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6026 (A B C D : S) : (scoveredby (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6027 (A B C D : S) : (scontains (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6028 (A B C D : S) : (scoveredby (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6029 (A B C D : S) : (scontains (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6030 (A B C D : S) : (scoveredby (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6031 (A B C D : S) : (scontains (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6032 (A B C D : S) : (scontains (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6033 (A B C D : S) : (scontains (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6034 (A B C D : S) : (smeet_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6035 (A B C D : S) : (smeet_part (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6036 (A B C D : S) : (smeet_part (sand B (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6037 (A B C D : S) : (smeet_part (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6038 (A B C D : S) : (smeet_part (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6039 (A B C D : S) : (smeet_part (sand B (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6040 (A B C D : S) : (smeet_part (sand B (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6041 (A B C D : S) : (smeet_part (sand B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6042 (A B C D : S) : (smeet_part (sand B (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6043 (A B C D : S) : (scontains (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6044 (A B C D : S) : (scoveredby (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6045 (A B C D : S) : (scontains (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6046 (A B C D : S) : (scoveredby (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6047 (A B C D : S) : (scontains (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6048 (A B C D : S) : (scontains (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6049 (A B C D : S) : (smeet_part (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6050 (A B C D : S) : (smeet_part (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6051 (A B C D : S) : (smeet_part (sand C (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6052 (A B C D : S) : (smeet_part (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6053 (A B C D : S) : (smeet_part (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6054 (A B C D : S) : (smeet_part (sand C (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6055 (A B C D : S) : (smeet_part (sand C (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6056 (A B C D : S) : (smeet_part (sand C (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6057 (A B C D : S) : (smeet_part (sand C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6058 (A B C D : S) : (scontains (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6059 (A B C D : S) : (scoveredby (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6060 (A B C D : S) : (scontains (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6061 (A B C D : S) : (smeet_part (sand D (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6062 (A B C D : S) : (smeet_part (sand D (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6063 (A B C D : S) : (smeet_part (sand D (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6064 (A B C D : S) : (smeet_part (sand D (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6065 (A B C D : S) : (smeet_part (sand D (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6066 (A B C D : S) : (smeet_part (sand D (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6067 (A B C D : S) : (smeet_part (sand D (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6068 (A B C D : S) : (smeet_part (sand D (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6069 (A B C D : S) : (smeet_part (sand D (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6070 (A B C D : S) : (scoveredby (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6071 (A B C D : S) : (scoveredby (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6072 (A B C D : S) : (scoveredby (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6073 (A B C D : S) : (sequal_part (sor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6074 (A B C D : S) : (sequal_part (sor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6075 (A B C D : S) : (sequal_part (sor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6076 (A B C D : S) : (sequal_part (sor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6077 (A B C D : S) : (sequal_part (sor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6078 (A B C D : S) : (sequal_part (sor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6079 (A B C D : S) : (scoveredby (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6080 (A B C D : S) : (scoveredby (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6081 (A B C D : S) : (scoveredby (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6082 (A B C D : S) : (scoveredby (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6083 (A B C D : S) : (scoveredby (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6084 (A B C D : S) : (scoveredby (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6085 (A B C D : S) : (scoveredby (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6086 (A B C D : S) : (scoveredby (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6087 (A B C D : S) : (scoveredby (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6088 (A B C D : S) : (scoveredby (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6089 (A B C D : S) : (scoveredby (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6090 (A B C D : S) : (scoveredby (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6091 (A B C D : S) : (scoveredby (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6092 (A B C D : S) : (scoveredby (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6093 (A B C D : S) : (sequal_part (sor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6094 (A B C D : S) : (sequal_part (sor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6095 (A B C D : S) : (sequal_part (sor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6096 (A B C D : S) : (sequal_part (sor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6097 (A B C D : S) : (scoveredby (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6098 (A B C D : S) : (scoveredby (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6099 (A B C D : S) : (scoveredby (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6100 (A B C D : S) : (scoveredby (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6101 (A B C D : S) : (scoveredby (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6102 (A B C D : S) : (scoveredby (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6103 (A B C D : S) : (scoveredby (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6104 (A B C D : S) : (scoveredby (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6105 (A B C D : S) : (scoveredby (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6106 (A B C D : S) : (sequal_part (sor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6107 (A B C D : S) : (sequal_part (sor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6108 (A B C D : S) : (scoveredby (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6109 (A B C D : S) : (scoveredby (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6110 (A B C D : S) : (scoveredby (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6111 (A B C D : S) : (scoveredby (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6112 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6113 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6114 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6115 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6116 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6117 (A B C D : S) : (scoveredby (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6118 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6119 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6120 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6121 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6122 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6123 (A B C D : S) : (sequal_part (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6124 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6125 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6126 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6127 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6128 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6129 (A B C D : S) : (smeet_part (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6130 (A B C D : S) : (smeet_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6131 (A B C D : S) : (smeet_part (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6132 (A B C D : S) : (smeet_part (sand A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6133 (A B C D : S) : (scoveredby (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6134 (A B C D : S) : (sequal_part (snot A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6135 (A B C D : S) : (scoveredby (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6136 (A B C D : S) : (sequal_part (snot A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6137 (A B C D : S) : (scoveredby (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6138 (A B C D : S) : (sequal_part (snot A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6139 (A B C D : S) : (scoveredby (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6140 (A B C D : S) : (scoveredby (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6141 (A B C D : S) : (scoveredby (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6142 (A B C D : S) : (smeet_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6143 (A B C D : S) : (smeet_part (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6144 (A B C D : S) : (smeet_part (sand B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6145 (A B C D : S) : (scoveredby (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6146 (A B C D : S) : (sequal_part (snot B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6147 (A B C D : S) : (scoveredby (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6148 (A B C D : S) : (sequal_part (snot B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6149 (A B C D : S) : (scoveredby (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6150 (A B C D : S) : (scoveredby (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6151 (A B C D : S) : (smeet_part (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6152 (A B C D : S) : (smeet_part (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6153 (A B C D : S) : (smeet_part (sand C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6154 (A B C D : S) : (scoveredby (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6155 (A B C D : S) : (sequal_part (snot C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6156 (A B C D : S) : (scoveredby (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6157 (A B C D : S) : (smeet_part (sand D (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6158 (A B C D : S) : (smeet_part (sand D (! B)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6159 (A B C D : S) : (smeet_part (sand D (! C)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6160 (A B C D : S) : (sequal_part (snot (! A) B) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6161 (A B C D : S) : (sequal_part (snot (! A) C) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6162 (A B C D : S) : (sequal_part (snot (! A) D) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6163 (A B C D : S) : (sequal_part (sxor (! A) (! B)) (snot (! A) B)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6164 (A B C D : S) : (sequal_part (sxor (! A) (! B)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6165 (A B C D : S) : (sequal_part (sxor (! A) (! B)) (snot A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6166 (A B C D : S) : (sequal_part (sxor (! A) (! B)) (sxor A (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6167 (A B C D : S) : (sequal_part (sxor (! A) (! C)) (snot (! A) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6168 (A B C D : S) : (sequal_part (sxor (! A) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6169 (A B C D : S) : (sequal_part (sxor (! A) (! C)) (snot A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6170 (A B C D : S) : (sequal_part (sxor (! A) (! C)) (sxor A (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6171 (A B C D : S) : (sequal_part (sxor (! A) (! D)) (snot (! A) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6172 (A B C D : S) : (sequal_part (sxor (! A) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6173 (A B C D : S) : (sequal_part (sxor (! A) (! D)) (snot A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6174 (A B C D : S) : (sequal_part (sxor (! A) (! D)) (sxor A (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6175 (A B C D : S) : (sequal_part (snot (! B) C) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6176 (A B C D : S) : (sequal_part (snot (! B) D) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6177 (A B C D : S) : (sequal_part (sxor (! B) (! C)) (snot (! B) C)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6178 (A B C D : S) : (sequal_part (sxor (! B) (! C)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6179 (A B C D : S) : (sequal_part (sxor (! B) (! C)) (snot B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6180 (A B C D : S) : (sequal_part (sxor (! B) (! C)) (sxor B (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6181 (A B C D : S) : (sequal_part (sxor (! B) (! D)) (snot (! B) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6182 (A B C D : S) : (sequal_part (sxor (! B) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6183 (A B C D : S) : (sequal_part (sxor (! B) (! D)) (snot B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6184 (A B C D : S) : (sequal_part (sxor (! B) (! D)) (sxor B (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6185 (A B C D : S) : (sequal_part (snot (! C) D) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6186 (A B C D : S) : (sequal_part (sxor (! C) (! D)) (snot (! C) D)) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6187 (A B C D : S) : (sequal_part (sxor (! C) (! D)) (sand A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6188 (A B C D : S) : (sequal_part (sxor (! C) (! D)) (snot C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6189 (A B C D : S) : (sequal_part (sxor (! C) (! D)) (sxor C (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6190 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6191 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6192 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6193 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6194 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6195 (A B C D : S) : (sequal_part (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6196 (A B C D : S) : (sequal_part (snot A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6197 (A B C D : S) : (sequal_part (snot A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6198 (A B C D : S) : (sequal_part (snot A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6199 (A B C D : S) : (sequal_part (sxor A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6200 (A B C D : S) : (sequal_part (sxor A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6201 (A B C D : S) : (sequal_part (sxor A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6202 (A B C D : S) : (sequal_part (snot B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6203 (A B C D : S) : (sequal_part (snot B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6204 (A B C D : S) : (sequal_part (sxor B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6205 (A B C D : S) : (sequal_part (sxor B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6206 (A B C D : S) : (sequal_part (snot C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6207 (A B C D : S) : (sequal_part (sxor C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6208 (A B C D : S) : (sdisjoint_part (sor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6209 (A B C D : S) : (sdisjoint_part (sor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6210 (A B C D : S) : (sdisjoint_part (sor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6211 (A B C D : S) : (sdisjoint_part (sor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6212 (A B C D : S) : (sdisjoint_part (sor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6213 (A B C D : S) : (sdisjoint_part (sor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6214 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6215 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6216 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6217 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6218 (A B C D : S) : (sdisjoint_part (snot (! A) B) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6219 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6220 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6221 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6222 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6223 (A B C D : S) : (sdisjoint_part (snot (! A) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6224 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6225 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6226 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6227 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6228 (A B C D : S) : (sdisjoint_part (snot (! A) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6229 (A B C D : S) : (sdisjoint_part (sxor (! A) (! B)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6230 (A B C D : S) : (sdisjoint_part (sxor (! A) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6231 (A B C D : S) : (sdisjoint_part (sxor (! A) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6232 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6233 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6234 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6235 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6236 (A B C D : S) : (sdisjoint_part (snot (! B) C) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6237 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6238 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6239 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6240 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6241 (A B C D : S) : (sdisjoint_part (snot (! B) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6242 (A B C D : S) : (sdisjoint_part (sxor (! B) (! C)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6243 (A B C D : S) : (sdisjoint_part (sxor (! B) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6244 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6245 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6246 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6247 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6248 (A B C D : S) : (sdisjoint_part (snot (! C) D) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6249 (A B C D : S) : (sdisjoint_part (sxor (! C) (! D)) (sor A (! A))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6250 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6251 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6252 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6253 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6254 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6255 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6256 (A B C D : S) : (sdisjoint_part (sand A (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6257 (A B C D : S) : (sdisjoint_part (sand A (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6258 (A B C D : S) : (sdisjoint_part (sand A (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6259 (A B C D : S) : (sdisjoint_part (sand A (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6260 (A B C D : S) : (sdisjoint_part (sand A (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6261 (A B C D : S) : (sdisjoint_part (sand A (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6262 (A B C D : S) : (sdisjoint_part (sand A (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6263 (A B C D : S) : (sdisjoint_part (sand A (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6264 (A B C D : S) : (sdisjoint_part (sand A (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6265 (A B C D : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6266 (A B C D : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6267 (A B C D : S) : (sdisjoint_part (sand B (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6268 (A B C D : S) : (sdisjoint_part (sand B (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6269 (A B C D : S) : (sdisjoint_part (sand B (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6270 (A B C D : S) : (sdisjoint_part (sand B (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6271 (A B C D : S) : (sdisjoint_part (sand B (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6272 (A B C D : S) : (sdisjoint_part (sand B (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6273 (A B C D : S) : (sdisjoint_part (sand B (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6274 (A B C D : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6275 (A B C D : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6276 (A B C D : S) : (sdisjoint_part (sand C (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6277 (A B C D : S) : (sdisjoint_part (sand C (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6278 (A B C D : S) : (sdisjoint_part (sand C (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6279 (A B C D : S) : (sdisjoint_part (sand C (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6280 (A B C D : S) : (sdisjoint_part (sand C (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6281 (A B C D : S) : (sdisjoint_part (sand C (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6282 (A B C D : S) : (sdisjoint_part (sand C (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6283 (A B C D : S) : (sdisjoint_part (sand D (! A)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6284 (A B C D : S) : (sdisjoint_part (sand D (! A)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6285 (A B C D : S) : (sdisjoint_part (sand D (! A)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6286 (A B C D : S) : (sdisjoint_part (sand D (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6287 (A B C D : S) : (sdisjoint_part (sand D (! B)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6288 (A B C D : S) : (sdisjoint_part (sand D (! B)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6289 (A B C D : S) : (sdisjoint_part (sand D (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6290 (A B C D : S) : (sdisjoint_part (sand D (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6291 (A B C D : S) : (sdisjoint_part (sand D (! C)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6292 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6293 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6294 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6295 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6296 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6297 (A B C D : S) : (sdisjoint_part (sand A (! A)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6298 (A B C D : S) : (sdisjoint_part (sand A (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6299 (A B C D : S) : (sdisjoint_part (sand A (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6300 (A B C D : S) : (sdisjoint_part (sand A (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6301 (A B C D : S) : (sdisjoint_part (sand B (! A)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6302 (A B C D : S) : (sdisjoint_part (sand B (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6303 (A B C D : S) : (sdisjoint_part (sand B (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6304 (A B C D : S) : (sdisjoint_part (sand C (! A)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6305 (A B C D : S) : (sdisjoint_part (sand C (! B)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6306 (A B C D : S) : (sdisjoint_part (sand C (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6307 (A B C D : S) : (sdisjoint_part (sand D (! A)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6308 (A B C D : S) : (sdisjoint_part (sand D (! B)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6309 (A B C D : S) : (sdisjoint_part (sand D (! C)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6310 (A B C D : S) : (snot (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6311 (A B C D : S) : (sxor (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6312 (A B C D : S) : (snot (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6313 (A B C D : S) : (sxor (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6314 (A B C D : S) : (snot (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6315 (A B C D : S) : (sxor (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6316 (A B C D : S) : (snot (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6317 (A B C D : S) : (sxor (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6318 (A B C D : S) : (snot (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6319 (A B C D : S) : (sxor (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6320 (A B C D : S) : (snot (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6321 (A B C D : S) : (sxor (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6322 (A B C D : S) : (snot (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6323 (A B C D : S) : (snot (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6324 (A B C D : S) : (snot (sxor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6325 (A B C D : S) : (snot (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6326 (A B C D : S) : (snot (sxor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6327 (A B C D : S) : (snot (sxor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6328 (A B C D : S) : (snot (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6329 (A B C D : S) : (sxor (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6330 (A B C D : S) : (snot (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6331 (A B C D : S) : (sxor (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6332 (A B C D : S) : (snot (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6333 (A B C D : S) : (sxor (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6334 (A B C D : S) : (snot (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6335 (A B C D : S) : (sxor (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6336 (A B C D : S) : (snot (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6337 (A B C D : S) : (sxor (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6338 (A B C D : S) : (snot (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6339 (A B C D : S) : (sxor (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6340 (A B C D : S) : (soutside (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6341 (A B C D : S) : (soutside (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6342 (A B C D : S) : (soutside (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6343 (A B C D : S) : (soutside (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6344 (A B C D : S) : (soutside (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6345 (A B C D : S) : (soutside (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6346 (A B C D : S) : (soutside (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6347 (A B C D : S) : (soutside (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6348 (A B C D : S) : (soutside (sxor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6349 (A B C D : S) : (soutside (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6350 (A B C D : S) : (soutside (sxor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6351 (A B C D : S) : (soutside (sxor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6352 (A B C D : S) : (smeet_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6353 (A B C D : S) : (smeet_part (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6354 (A B C D : S) : (smeet_part (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6355 (A B C D : S) : (soutside (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6356 (A B C D : S) : (soutside (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6357 (A B C D : S) : (soutside (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6358 (A B C D : S) : (smeet_part (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6359 (A B C D : S) : (smeet_part (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6360 (A B C D : S) : (soutside (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6361 (A B C D : S) : (soutside (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6362 (A B C D : S) : (smeet_part (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6363 (A B C D : S) : (soutside (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6364 (A B C D : S) : (smeet_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6365 (A B C D : S) : (smeet_part (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6366 (A B C D : S) : (smeet_part (sxor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6367 (A B C D : S) : (smeet_part (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6368 (A B C D : S) : (smeet_part (sxor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6369 (A B C D : S) : (smeet_part (sxor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6370 (A B C D : S) : (smeet_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6371 (A B C D : S) : (smeet_part (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6372 (A B C D : S) : (smeet_part (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6373 (A B C D : S) : (smeet_part (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6374 (A B C D : S) : (smeet_part (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6375 (A B C D : S) : (smeet_part (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6376 (A B C D : S) : (sdisjoint_part (sor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6377 (A B C D : S) : (sdisjoint_part (sor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6378 (A B C D : S) : (sdisjoint_part (sor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6379 (A B C D : S) : (sdisjoint_part (sor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6380 (A B C D : S) : (sdisjoint_part (sor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6381 (A B C D : S) : (sdisjoint_part (sor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6382 (A B C D : S) : (sdisjoint_part (sxor (! A) (! B)) (sor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6383 (A B C D : S) : (sdisjoint_part (sxor (! A) (! C)) (sor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6384 (A B C D : S) : (sdisjoint_part (sxor (! A) (! D)) (sor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6385 (A B C D : S) : (sdisjoint_part (sxor (! B) (! C)) (sor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6386 (A B C D : S) : (sdisjoint_part (sxor (! B) (! D)) (sor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6387 (A B C D : S) : (sdisjoint_part (sxor (! C) (! D)) (sor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6388 (A B C D : S) : (sdisjoint_part (sxor (! A) (! B)) (sxor (! A) (! B))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6389 (A B C D : S) : (sdisjoint_part (sxor (! A) (! C)) (sxor (! A) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6390 (A B C D : S) : (sdisjoint_part (sxor (! A) (! D)) (sxor (! A) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6391 (A B C D : S) : (sdisjoint_part (sxor (! B) (! C)) (sxor (! B) (! C))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6392 (A B C D : S) : (sdisjoint_part (sxor (! B) (! D)) (sxor (! B) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
+theorem r4_6393 (A B C D : S) : (sdisjoint_part (sxor (! C) (! D)) (sxor (! C) (! D))) = false := by cases A <;> cases B <;> cases C <;> cases D <;> rfl
 
 end VLSI.RelationsAll

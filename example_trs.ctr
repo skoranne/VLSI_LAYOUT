@@ -1,0 +1,20 @@
+# Example CTR with redundant operations for TRS
+program trs_example
+decl design d = MW4x4_FLAT.mag
+decl memory m = nothing
+# redundant: A NOT A
+exec run m:r1 = d:diff NOT d:diff
+# A AND (B NOT A) pattern
+exec run m:bna = d:poly NOT d:diff
+exec run m:r2 = d:diff AND m:bna
+# INSIDE/OUTSIDE same args
+exec run m:in1 = d:diff INSIDE d:poly
+exec run m:out1 = d:diff OUTSIDE d:poly
+exec run m:r3 = m:in1 AND m:out1
+# INSIDE XOR AND same args
+exec run m:in2 = d:diff INSIDE d:poly
+exec run m:and2 = d:diff AND d:poly
+exec run m:r4 = m:in2 XOR m:and2
+# useful op
+exec run m:keep = d:diff AND d:poly
+end
