@@ -60502,3 +60502,291 @@ Extends ALL_ZERO_BY_CONSTRUCTION to equivalences with atoms/0. Includes generali
 - `((A OR (NOT D)) XOR ((NOT A) OR (NOT D))) == D`
 - `((B OR (NOT D)) XOR ((NOT B) OR (NOT D))) == D`
 - `((C OR (NOT D)) XOR ((NOT C) OR (NOT D))) == D`
+
+## Complete semantic equivalence classes (DNF-canonical, all 2^(2^n) functions)
+For each semantic class R (any Boolean function on n layers), canonical DNF representative is given. Any E with same mask satisfies E==R. This covers ALL finite equivalences in the complete Boolean+Topological (pointwise) space.
+
+### n=2: 16 semantic classes
+- class 0: `0`
+- class 1: `((NOT A) AND (NOT B))`
+- class 2: `(A AND (NOT B))`
+- class 3: `(((NOT A) AND (NOT B)) OR (A AND (NOT B)))`
+- class 4: `((NOT A) AND B)`
+- class 5: `(((NOT A) AND (NOT B)) OR ((NOT A) AND B))`
+- class 6: `((A AND (NOT B)) OR ((NOT A) AND B))`
+- class 7: `(((NOT A) AND (NOT B)) OR (A AND (NOT B)) OR ((NOT A) AND B))`
+- class 8: `(A AND B)`
+- class 9: `(((NOT A) AND (NOT B)) OR (A AND B))`
+- class 10: `((A AND (NOT B)) OR (A AND B))`
+- class 11: `(((NOT A) AND (NOT B)) OR (A AND (NOT B)) OR (A AND B))`
+- class 12: `(((NOT A) AND B) OR (A AND B))`
+- class 13: `(((NOT A) AND (NOT B)) OR ((NOT A) AND B) OR (A AND B))`
+- class 14: `((A AND (NOT B)) OR ((NOT A) AND B) OR (A AND B))`
+- class 15: `(((NOT A) AND (NOT B)) OR (A AND (NOT B)) OR ((NOT A) AND B) OR (A AND B))`
+
+### n=3: 256 semantic classes
+- class 0: `0`
+- class 1: `((NOT A) AND (NOT B) AND (NOT C))`
+- class 2: `(A AND (NOT B) AND (NOT C))`
+- class 3: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)))`
+- class 4: `((NOT A) AND B AND (NOT C))`
+- class 5: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)))`
+- class 6: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)))`
+- class 7: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)))`
+- class 8: `(A AND B AND (NOT C))`
+- class 9: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)))`
+- class 10: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)))`
+- class 11: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)))`
+- class 12: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)))`
+- class 13: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)))`
+- class 14: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)))`
+- class 15: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)))`
+- class 16: `((NOT A) AND (NOT B) AND C)`
+- class 17: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 18: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 19: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 20: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 21: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 22: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 23: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 24: `((A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 25: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 26: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 27: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 28: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 29: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 30: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 31: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C))`
+- class 32: `(A AND (NOT B) AND C)`
+- class 33: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 34: `((A AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 35: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 36: `(((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 37: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 38: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 39: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 40: `((A AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 41: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 42: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 43: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 44: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 45: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 46: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 47: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C))`
+- class 48: `(((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 49: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 50: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 51: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 52: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 53: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 54: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 55: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 56: `((A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 57: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 58: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 59: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 60: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 61: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 62: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 63: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C))`
+- class 64: `((NOT A) AND B AND C)`
+- class 65: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 66: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 67: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 68: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 69: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 70: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 71: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 72: `((A AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 73: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 74: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 75: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 76: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 77: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 78: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 79: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C))`
+- class 80: `(((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 81: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 82: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 83: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 84: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 85: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 86: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 87: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 88: `((A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 89: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 90: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 91: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 92: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 93: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 94: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 95: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 96: `((A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 97: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 98: `((A AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 99: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 100: `(((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 101: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 102: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 103: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 104: `((A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 105: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 106: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 107: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 108: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 109: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 110: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 111: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 112: `(((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 113: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 114: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 115: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 116: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 117: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 118: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 119: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 120: `((A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 121: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 122: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 123: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 124: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 125: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 126: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 127: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C))`
+- class 128: `(A AND B AND C)`
+- class 129: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND C))`
+- class 130: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND C))`
+- class 131: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND C))`
+- class 132: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND C))`
+- class 133: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND C))`
+- class 134: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND C))`
+- class 135: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND C))`
+- class 136: `((A AND B AND (NOT C)) OR (A AND B AND C))`
+- class 137: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND B AND C))`
+- class 138: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND B AND C))`
+- class 139: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND B AND C))`
+- class 140: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND B AND C))`
+- class 141: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND B AND C))`
+- class 142: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND B AND C))`
+- class 143: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND B AND C))`
+- class 144: `(((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 145: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 146: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 147: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 148: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 149: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 150: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 151: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 152: `((A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 153: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 154: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 155: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 156: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 157: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 158: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 159: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND B AND C))`
+- class 160: `((A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 161: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 162: `((A AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 163: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 164: `(((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 165: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 166: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 167: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 168: `((A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 169: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 170: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 171: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 172: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 173: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 174: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 175: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 176: `(((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 177: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 178: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 179: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 180: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 181: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 182: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 183: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 184: `((A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 185: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 186: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 187: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 188: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 189: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 190: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 191: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR (A AND B AND C))`
+- class 192: `(((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 193: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 194: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 195: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 196: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 197: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 198: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 199: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 200: `((A AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 201: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 202: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 203: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 204: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 205: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 206: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 207: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 208: `(((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 209: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 210: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 211: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 212: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 213: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 214: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 215: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 216: `((A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 217: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 218: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 219: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 220: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 221: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 222: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 223: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 224: `((A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 225: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 226: `((A AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 227: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 228: `(((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 229: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 230: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 231: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 232: `((A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 233: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 234: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 235: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 236: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 237: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 238: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 239: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 240: `(((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 241: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 242: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 243: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 244: `(((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 245: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 246: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 247: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 248: `((A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 249: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 250: `((A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 251: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 252: `(((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 253: `(((NOT A) AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 254: `((A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+- class 255: `(((NOT A) AND (NOT B) AND (NOT C)) OR (A AND (NOT B) AND (NOT C)) OR ((NOT A) AND B AND (NOT C)) OR (A AND B AND (NOT C)) OR ((NOT A) AND (NOT B) AND C) OR (A AND (NOT B) AND C) OR ((NOT A) AND B AND C) OR (A AND B AND C))`
+
+### n=4: 65536 semantic classes
+- All 65536 classes enumerated in `RELATIONS_N4_DNF.md` (DNF canonical). Sample:
+  - class 0: `0`
+  - class 1: `((NOT A) AND (NOT B) AND (NOT C) AND (NOT D))`
+  - class 2: `(A AND (NOT B) AND (NOT C) AND (NOT D))`
+  - class 3: `(((NOT A) AND (NOT B) AND (NOT C) AND (NOT D)) OR (A AND (NOT B) AND (NOT C) AND (NOT D)))`
+  - class 65535: `(((NOT A) AND (NOT B) AND (NOT C) AND (NOT D)) OR (A AND (NOT B) AND (NOT C) AND (NOT D)) OR ((NOT A) AND B AND (NOT C) AND (NOT D)) OR (A AND B AND (NOT C) AND (NOT D)) OR ((NOT A) AND (NOT B) AND C AND (NOT D)) OR (A AND (NOT B) AND C AND (NOT D)) OR ((NOT A) AND B AND C AND (NOT D)) OR (A AND B AND C AND (NOT D)) OR ((NOT A) AND (NOT B) AND (NOT C) AND D) OR (A AND (NOT B) AND (NOT C) AND D) OR ((NOT A) AND B AND (NOT C) AND D) OR (A AND B AND (NOT C) AND D) OR ((NOT A) AND (NOT B) AND C AND D) OR (A AND (NOT B) AND C AND D) OR ((NOT A) AND B AND C AND D) OR (A AND B AND C AND D))`
+  - class 65535: `(((NOT A) AND (NOT B) AND (NOT C) AND (NOT D)) OR (A AND (NOT B) AND (NOT C) AND (NOT D)) OR ((NOT A) AND B AND (NOT C) AND (NOT D)) OR (A AND B AND (NOT C) AND (NOT D)) OR ((NOT A) AND (NOT B) AND C AND (NOT D)) OR (A AND (NOT B) AND C AND (NOT D)) OR ((NOT A) AND B AND C AND (NOT D)) OR (A AND B AND C AND (NOT D)) OR ((NOT A) AND (NOT B) AND (NOT C) AND D) OR (A AND (NOT B) AND (NOT C) AND D) OR ((NOT A) AND B AND (NOT C) AND D) OR (A AND B AND (NOT C) AND D) OR ((NOT A) AND (NOT B) AND C AND D) OR (A AND (NOT B) AND C AND D) OR ((NOT A) AND B AND C AND D) OR (A AND B AND C AND D))`
