@@ -171,7 +171,7 @@ Figure~\ref{fig:allzero} shows 16 prototypical relations collapsing to \texttt{A
 
 \vspace{0.5em}
 \begin{subfigure}[t]{0.24\textwidth}\centering
-\begin{tikzpicture}[scale=0.55]\baseA \node[font=\tiny,align=center] at (1.1,-0.35) {$(A\,\mathrm{IN}\,A)\setminus A$\\$=0$*};\end{tikzpicture}
+\begin{tikzpicture}[scale=0.55]\baseA \node[font=\tiny,align=center] at (1.1,-0.35) {$(A\,\mathrm{IN}\,A)\setminus A$\\$=0$};\end{tikzpicture}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}\centering
 \begin{tikzpicture}[scale=0.55]\baseA \node[font=\tiny,align=center] at (1.1,-0.35) {$(A\,\mathrm{OUT}\,A)\land A$\\$=0$};\end{tikzpicture}
@@ -194,7 +194,7 @@ We implement a Julia tool \texttt{trs\_dag.jl} that reads \texttt{RELATIONS.md}/
 
 \begin{lstlisting}[language=Python,caption={Julia TRS usage (conceptual)}]
 julia trs_dag.jl relations_trs.json example_trs.ctr /tmp/example_trs_out.ctr
-# Rules loaded: 16
+# Rules loaded: 14
 # Before TRS ops: 10
 # After  TRS ops: 7
 # Rewritten/removed: 3

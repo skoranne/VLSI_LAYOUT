@@ -60,7 +60,7 @@
       "lhs": "A AND (A INSIDE B)",
       "rhs": "A INSIDE B",
       "kind": "equiv",
-      "note": "pointwise model only; shape-level: A AND (A INSIDE B) == (A INSIDE B)"
+      "note": "shape-subset valid: A AND (A INSIDE B) == (A INSIDE B); net-id may change outside zones"
     },
     {
       "name": "distrib_and_or",
