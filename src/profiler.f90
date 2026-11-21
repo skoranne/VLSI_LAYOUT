@@ -41,6 +41,7 @@ module ProfilerModule
        real(kind=real64), intent(in) :: duration
        integer :: i
        logical :: found
+       type(ProfileEntry), allocatable :: tmp(:)
 
        !$omp critical(profiler_lock)
        if (.not. profiler_initialized) then
@@ -64,12 +65,9 @@ module ProfilerModule
           num_profiles = num_profiles + 1
           if (num_profiles > size(profiles)) then
              ! Expand array
-             block
-                type(ProfileEntry), allocatable :: tmp(:)
-                allocate(tmp(size(profiles) * 2))
-                tmp(1:num_profiles-1) = profiles(1:num_profiles-1)
-                call move_alloc(tmp, profiles)
-             end block
+             allocate(tmp(size(profiles) * 2))
+             tmp(1:num_profiles-1) = profiles(1:num_profiles-1)
+             call move_alloc(tmp, profiles)
           end if
           profiles(num_profiles)%name = name
           profiles(num_profiles)%total_time = duration
