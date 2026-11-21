@@ -92,12 +92,39 @@ extern "C"
             indices[i] = temp[i].index;
         }
     }
+
+    int32_t thrust_sort_boxes_direct_host(Box *h_boxes, int64_t n)
+    {
+        thrust_sort_boxes_direct(h_boxes, n);
+        return 0;
+    }
+
+    int32_t thrust_sort_boxes_indirect_host(Box *h_boxes, int64_t *h_indices, int64_t n)
+    {
+        thrust_sort_boxes_indirect(h_boxes, h_indices, n);
+        return 0;
+    }
+
+    int32_t thrust_exclusive_scan_i64(const int64_t *in_arr, int64_t *out_arr, int64_t n, int64_t *total_out)
+    {
+        int64_t acc = 0;
+        for (int64_t i = 0; i < n; ++i)
+        {
+            out_arr[i] = acc;
+            acc += in_arr[i];
+        }
+        if (total_out)
+            *total_out = acc;
+        return 0;
+    }
 }
 #else
 #include <thrust/sort.h>
+#include <thrust/scan.h>
 #include <thrust/execution_policy.h>
 #include <thrust/transform.h>
 #include <thrust/sequence.h>
+#include <cuda_runtime.h>
 #include <stdint.h>
 
 extern "C"
@@ -184,6 +211,118 @@ extern "C"
         thrust::sort_by_key(thrust::device, d_keys, d_keys + n, d_indices);
 
         cudaFree(d_keys);
+    }
+
+    // ------------------------------------------------------------------------
+    // HOST-POINTER DIRECT SORT: 1D cudaMemcpy avoids nvfortran cuMemcpy2DAsync
+    // derived-type pitch/width errors on large layers.
+    // Returns 0 on success, nonzero on CUDA error.
+    // ------------------------------------------------------------------------
+    int32_t thrust_sort_boxes_direct_host(Box *h_boxes, int64_t n)
+    {
+        if (n <= 1)
+            return 0;
+
+        Box *d_boxes = nullptr;
+        uint64_t *d_keys = nullptr;
+        size_t box_bytes = (size_t)n * sizeof(Box);
+        size_t key_bytes = (size_t)n * sizeof(uint64_t);
+
+        if (cudaMalloc((void **)&d_boxes, box_bytes) != cudaSuccess)
+            return 1;
+        if (cudaMalloc((void **)&d_keys, key_bytes) != cudaSuccess)
+        {
+            cudaFree(d_boxes);
+            return 2;
+        }
+        if (cudaMemcpy(d_boxes, h_boxes, box_bytes, cudaMemcpyHostToDevice) != cudaSuccess)
+        {
+            cudaFree(d_keys);
+            cudaFree(d_boxes);
+            return 3;
+        }
+
+        thrust::transform(thrust::device, d_boxes, d_boxes + n, d_keys, ComputeMorton());
+        thrust::sort_by_key(thrust::device, d_keys, d_keys + n, d_boxes);
+
+        cudaError_t err = cudaMemcpy(h_boxes, d_boxes, box_bytes, cudaMemcpyDeviceToHost);
+        cudaFree(d_keys);
+        cudaFree(d_boxes);
+        if (err != cudaSuccess)
+            return 4;
+        return (cudaDeviceSynchronize() == cudaSuccess) ? 0 : 5;
+    }
+
+    int32_t thrust_sort_boxes_indirect_host(Box *h_boxes, int64_t *h_indices, int64_t n)
+    {
+        if (n <= 1)
+        {
+            if (n == 1)
+                h_indices[0] = 1;
+            return 0;
+        }
+
+        Box *d_boxes = nullptr;
+        uint64_t *d_keys = nullptr;
+        int64_t *d_indices = nullptr;
+        size_t box_bytes = (size_t)n * sizeof(Box);
+        size_t key_bytes = (size_t)n * sizeof(uint64_t);
+        size_t idx_bytes = (size_t)n * sizeof(int64_t);
+
+        if (cudaMalloc((void **)&d_boxes, box_bytes) != cudaSuccess)
+            return 1;
+        if (cudaMalloc((void **)&d_keys, key_bytes) != cudaSuccess)
+        {
+            cudaFree(d_boxes);
+            return 2;
+        }
+        if (cudaMalloc((void **)&d_indices, idx_bytes) != cudaSuccess)
+        {
+            cudaFree(d_keys);
+            cudaFree(d_boxes);
+            return 3;
+        }
+        if (cudaMemcpy(d_boxes, h_boxes, box_bytes, cudaMemcpyHostToDevice) != cudaSuccess)
+        {
+            cudaFree(d_indices);
+            cudaFree(d_keys);
+            cudaFree(d_boxes);
+            return 4;
+        }
+
+        thrust::transform(thrust::device, d_boxes, d_boxes + n, d_keys, ComputeMorton());
+        thrust::sequence(thrust::device, d_indices, d_indices + n, 1LL);
+        thrust::sort_by_key(thrust::device, d_keys, d_keys + n, d_indices);
+
+        cudaError_t err = cudaMemcpy(h_indices, d_indices, idx_bytes, cudaMemcpyDeviceToHost);
+        cudaFree(d_indices);
+        cudaFree(d_keys);
+        cudaFree(d_boxes);
+        if (err != cudaSuccess)
+            return 5;
+        return (cudaDeviceSynchronize() == cudaSuccess) ? 0 : 6;
+    }
+
+    // ------------------------------------------------------------------------
+    // DEVICE EXCLUSIVE SCAN (int64): eliminates D2H Counts + host scan + H2D Offsets
+    // ------------------------------------------------------------------------
+    int32_t thrust_exclusive_scan_i64(const int64_t *d_in, int64_t *d_out, int64_t n, int64_t *h_total)
+    {
+        if (n <= 0)
+        {
+            if (h_total)
+                *h_total = 0;
+            return 0;
+        }
+        int64_t last_in = 0, last_out = 0;
+        if (cudaMemcpy(&last_in, d_in + (n - 1), sizeof(int64_t), cudaMemcpyDeviceToHost) != cudaSuccess)
+            return 1;
+        thrust::exclusive_scan(thrust::device, d_in, d_in + n, d_out, 0LL);
+        if (cudaMemcpy(&last_out, d_out + (n - 1), sizeof(int64_t), cudaMemcpyDeviceToHost) != cudaSuccess)
+            return 2;
+        if (h_total)
+            *h_total = last_out + last_in;
+        return (cudaDeviceSynchronize() == cudaSuccess) ? 0 : 3;
     }
 }
 #endif

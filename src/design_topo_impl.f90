@@ -3,10 +3,11 @@
 ! Purpose: Submodule for box-level topological selection operations
 
 submodule (DesignModule) DesignTopoImplModule
-  use iso_fortran_env, only: int64
+  use iso_fortran_env, only: int8, int32, int64
   use CommonModule
   use GeometryModule
   use RTreeBuilder
+  use RTreeBuilderGPU, only: gpu_offload_enabled, ComputeTopoSelectGPU
   use omp_lib
   implicit none
 
@@ -41,6 +42,9 @@ contains
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
     type(Box) :: abox, ibox
     type(RTreeNode) :: currNode, childNode
+    integer(kind=int8), allocatable :: keep_mask(:)
+    integer(kind=int32) :: gpu_overflow
+    integer(kind=int64) :: numNodesB, kept_count, widx
 
     call PreprocessLayer( input_layer_A )
     call PreprocessLayer( input_layer_B )
@@ -54,6 +58,47 @@ contains
        call ClearLayer( output_layer )
        output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
        return
+    end if
+
+    if( numB > 0 .and. allocated(input_layer_B%tree%tree_nodes) ) then
+       numNodesB = size(input_layer_B%tree%tree_nodes, kind=int64)
+       if( numNodesB > 0 .and. input_layer_B%tree%root_index > 0 .and. gpu_offload_enabled(numA) ) then
+          allocate(keep_mask(numA), stat=alloc_status)
+          if( alloc_status == 0 ) then
+             gpu_overflow = 0_int32
+             call ComputeTopoSelectGPU(input_layer_B%tree%tree_nodes, numNodesB, &
+                  input_layer_B%layer_boxes(1:numB), numB, input_layer_B%tree%root_index, &
+                  input_layer_A%layer_boxes(1:numA), numA, topo_op, keep_mask, gpu_overflow)
+             if( gpu_overflow == 0_int32 ) then
+                kept_count = 0_int64
+                do i = 1, numA
+                   if( keep_mask(i) /= 0_int8 ) kept_count = kept_count + 1_int64
+                end do
+                if( kept_count == 0_int64 ) then
+                   call ClearLayer( output_layer )
+                   output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
+                else
+                   allocate( output_layer%layer_boxes( kept_count ), stat=alloc_status )
+                   if( alloc_status /= 0 ) error stop "ALLOCATION FAILED in CalculateTopologicalSelect (GPU)"
+                   widx = 0_int64
+                   do i = 1, numA
+                      if( keep_mask(i) /= 0_int8 ) then
+                         widx = widx + 1_int64
+                         output_layer%layer_boxes(widx) = input_layer_A%layer_boxes(i)
+                      end if
+                   end do
+                   output_layer%n_used = kept_count
+                   output_layer%n_alloc = kept_count
+                   output_layer%device_resident = .false.
+                   output_layer%layerState = LAYER_STATE_HEAL
+                   call PreprocessLayer( output_layer )
+                end if
+                deallocate(keep_mask)
+                return
+             end if
+             deallocate(keep_mask)
+          end if
+       end if
     end if
 
     nthreads = max(1, omp_get_max_threads())

@@ -52,6 +52,11 @@ contains
        return
     end if
     interaction_count_gpu = 0
+    if( gpu_offload_enabled(input_layer%n_used) ) then
+       retval = CertifyHealingGPU( input_layer%tree%tree_nodes, size(input_layer%tree%tree_nodes,kind=int64), &
+            input_layer%layer_boxes(1:input_layer%n_used), input_layer%n_used, input_layer%tree%root_index )
+       return
+    end if
     call ComputeInteractionsCPU( input_layer%tree%tree_nodes, size(input_layer%tree%tree_nodes,kind=int64),&
          input_layer%layer_boxes, input_layer%n_used, input_layer%tree%root_index, interaction_count_gpu)
     
@@ -977,37 +982,21 @@ contains
       integer(kind=int64), intent(in) :: control_parameter, control_value
       type(Box), allocatable :: empty_boxes(:), sized_boxes(:), result_boxes(:)
       integer(kind=int64) :: i, nA, nB
-      logical :: gpu_size
-#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
-      character(len=32) :: offload_env
-      integer :: offload_len, offload_stat
-#endif
       allocate( empty_boxes(0) )
       nA = input_layer_A%n_used
       nB = input_layer_B%n_used
       !> this function does the allocation; always slice to 1:n_used so uninitialized tail slots are never read
       if( control_parameter == K_BOOST_CONTROL_SIZE ) then
-         gpu_size = .false.
-#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
-         if (nA > 0 .and. control_value > 0 .and. omp_get_num_devices() > 0) then
-            gpu_size = .true.
-            call get_environment_variable('OMP_TARGET_OFFLOAD', offload_env, length=offload_len, status=offload_stat)
-            if (offload_stat == 0 .and. offload_len > 0) then
-               if (trim(offload_env) == 'DISABLED' .or. trim(offload_env) == 'disabled') gpu_size = .false.
-            end if
-         end if
-#endif
          if (nA == 0) then
             allocate(result_boxes(0))
-         else if (gpu_size) then
+         else if (control_value > 0) then
             allocate(sized_boxes(nA))
-            sized_boxes(1:nA) = input_layer_A%layer_boxes(1:nA)
-            !$omp target teams distribute parallel do map(tofrom: sized_boxes(1:nA))
+            !$omp parallel do if(nA >= 4096) private(i)
             do i = 1, nA
-               sized_boxes(i)%x1 = sized_boxes(i)%x1 - int(control_value, kind=K_COORDINATE_KIND)
-               sized_boxes(i)%y1 = sized_boxes(i)%y1 - int(control_value, kind=K_COORDINATE_KIND)
-               sized_boxes(i)%x2 = sized_boxes(i)%x2 + int(control_value, kind=K_COORDINATE_KIND)
-               sized_boxes(i)%y2 = sized_boxes(i)%y2 + int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%x1 = input_layer_A%layer_boxes(i)%x1 - int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%y1 = input_layer_A%layer_boxes(i)%y1 - int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%x2 = input_layer_A%layer_boxes(i)%x2 + int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%y2 = input_layer_A%layer_boxes(i)%y2 + int(control_value, kind=K_COORDINATE_KIND)
             end do
             call MergeBoxesUsingBoostPolygon(sized_boxes, result_boxes)
             if (allocated(sized_boxes)) deallocate(sized_boxes)

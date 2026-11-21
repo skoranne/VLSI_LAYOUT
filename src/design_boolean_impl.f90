@@ -61,11 +61,8 @@ contains
     integer :: nthreads, tid, alloc_status
     integer(kind=int32) :: gpu_overflow
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-    logical :: use_gpu
-#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
-    character(len=32) :: offload_env
-    integer :: offload_len, offload_stat
-#endif
+    logical :: use_gpu, swap_ab
+    integer(kind=int64) :: numNodesA
 
     if (profiling_enabled) t_start = get_cpu_time()
 
@@ -92,26 +89,35 @@ contains
     end if
 
     use_gpu = .false.
-#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
-    if (num_boxesA > 0 .and. num_boxesB > 0 .and. allocated(input_layer_B%tree%tree_nodes)) then
-       numNodesB = size(input_layer_B%tree%tree_nodes, kind=int64)
-       if (numNodesB > 0 .and. input_layer_B%tree%root_index > 0) then
-          use_gpu = (omp_get_num_devices() > 0)
-          call get_environment_variable('OMP_TARGET_OFFLOAD', offload_env, length=offload_len, status=offload_stat)
-          if (offload_stat == 0 .and. offload_len > 0) then
-             if (trim(offload_env) == 'DISABLED' .or. trim(offload_env) == 'disabled') use_gpu = .false.
+    swap_ab = .false.
+    if (gpu_offload_enabled(min(num_boxesA, num_boxesB))) then
+       if (num_boxesA > num_boxesB .and. allocated(input_layer_A%tree%tree_nodes)) then
+          numNodesA = size(input_layer_A%tree%tree_nodes, kind=int64)
+          if (numNodesA > 0 .and. input_layer_A%tree%root_index > 0) then
+             use_gpu = .true.
+             swap_ab = .true.
+          end if
+       end if
+       if (.not. use_gpu .and. allocated(input_layer_B%tree%tree_nodes)) then
+          numNodesB = size(input_layer_B%tree%tree_nodes, kind=int64)
+          if (numNodesB > 0 .and. input_layer_B%tree%root_index > 0) then
+             use_gpu = .true.
+             swap_ab = .false.
           end if
        end if
     end if
-#else
-    use_gpu = .false.
-#endif
 
     if (use_gpu) then
        gpu_overflow = 0_int32
-       call ComputeANDPairsGPU(input_layer_B%tree%tree_nodes, numNodesB, &
-            input_layer_B%layer_boxes(1:num_boxesB), num_boxesB, input_layer_B%tree%root_index, &
-            input_layer_A%layer_boxes(1:num_boxesA), num_boxesA, output_layer%layer_boxes, num_boxesC, gpu_overflow)
+       if (swap_ab) then
+          call ComputeANDPairsGPU(input_layer_A%tree%tree_nodes, numNodesA, &
+               input_layer_A%layer_boxes(1:num_boxesA), num_boxesA, input_layer_A%tree%root_index, &
+               input_layer_B%layer_boxes(1:num_boxesB), num_boxesB, output_layer%layer_boxes, num_boxesC, gpu_overflow)
+       else
+          call ComputeANDPairsGPU(input_layer_B%tree%tree_nodes, numNodesB, &
+               input_layer_B%layer_boxes(1:num_boxesB), num_boxesB, input_layer_B%tree%root_index, &
+               input_layer_A%layer_boxes(1:num_boxesA), num_boxesA, output_layer%layer_boxes, num_boxesC, gpu_overflow)
+       end if
        if (gpu_overflow == 0_int32) then
           output_layer%n_used = num_boxesC
           output_layer%n_alloc = size(output_layer%layer_boxes, kind=int64)

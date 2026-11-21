@@ -53,7 +53,7 @@ contains
       end do
    end function CalculateTotalNodesOld
 
-   pure subroutine BuildRTree(sorted_boxes, capacity, tree_nodes, root_index)
+   subroutine BuildRTree(sorted_boxes, capacity, tree_nodes, root_index)
       type(Box), intent(in) :: sorted_boxes(:)
       integer(kind=int64), intent(in) :: capacity
       type(RTreeNode), intent(inout) :: tree_nodes(:)
@@ -70,31 +70,29 @@ contains
          return
       end if
       ! 1. Build Level 1 (Leaves pointing sequentially to sorted_boxes)
-      ! Using integer math instead of ceiling(real(...) / real(...))
       current_level_nodes = (n_boxes + capacity - 1) / capacity
-      node_idx = 1
 
+      !$omp parallel do if(current_level_nodes >= 256) private(i, j, ChildStart, child_end, agg_mbr)
       do i = 1, current_level_nodes
          ChildStart = (i - 1) * capacity + 1
-         child_end   = min(i * capacity, n_boxes)
+         child_end  = min(i * capacity, n_boxes)
 
-         ! Initialize the aggregate MBR with the first child
          agg_mbr = sorted_boxes(ChildStart)
-         tree_nodes(node_idx)%ChildStart = ChildStart
-         tree_nodes(node_idx)%NumChildren = int(child_end - ChildStart + 1, kind=int32)
-         tree_nodes(node_idx)%IsLeaf = .true.
+         tree_nodes(i)%ChildStart = ChildStart
+         tree_nodes(i)%NumChildren = int(child_end - ChildStart + 1, kind=int32)
+         tree_nodes(i)%IsLeaf = .true.
 
-         ! Compute MBR for this contiguous chunk of boxes
-         do j = ChildStart, child_end
+         do j = ChildStart + 1, child_end
             agg_mbr%x1 = min(agg_mbr%x1, sorted_boxes(j)%x1)
             agg_mbr%y1 = min(agg_mbr%y1, sorted_boxes(j)%y1)
             agg_mbr%x2 = max(agg_mbr%x2, sorted_boxes(j)%x2)
             agg_mbr%y2 = max(agg_mbr%y2, sorted_boxes(j)%y2)
          end do
 
-         tree_nodes(node_idx)%mbr = agg_mbr
-         node_idx = node_idx + 1
+         tree_nodes(i)%mbr = agg_mbr
       end do
+
+      node_idx = current_level_nodes + 1
 
       ! 2. Build Higher Levels (Internal Nodes pointing sequentially to tree_nodes)
       prev_level_start = 1
@@ -104,29 +102,27 @@ contains
          current_level_start = node_idx
          current_level_nodes = (prev_level_nodes + capacity - 1) / capacity
 
+         !$omp parallel do if(current_level_nodes >= 256) private(i, j, ChildStart, child_end, agg_mbr)
          do i = 1, current_level_nodes
             ChildStart = prev_level_start + (i - 1) * capacity
-            child_end   = min(prev_level_start + i * capacity - 1, prev_level_start + prev_level_nodes - 1)
+            child_end  = min(prev_level_start + i * capacity - 1, prev_level_start + prev_level_nodes - 1)
 
-            ! Initialize aggregate MBR with the first child node
             agg_mbr = tree_nodes(ChildStart)%mbr
+            tree_nodes(current_level_start + i - 1)%ChildStart = ChildStart
+            tree_nodes(current_level_start + i - 1)%NumChildren = int(child_end - ChildStart + 1, kind=int32)
+            tree_nodes(current_level_start + i - 1)%IsLeaf = .false.
 
-            tree_nodes(node_idx)%ChildStart = ChildStart
-            tree_nodes(node_idx)%NumChildren = int(child_end - ChildStart + 1, kind=int32)
-            tree_nodes(node_idx)%IsLeaf = .false.
-
-            ! Compute MBR for this contiguous chunk of child nodes
-            do j = ChildStart, child_end
+            do j = ChildStart + 1, child_end
                agg_mbr%x1 = min(agg_mbr%x1, tree_nodes(j)%mbr%x1)
                agg_mbr%y1 = min(agg_mbr%y1, tree_nodes(j)%mbr%y1)
                agg_mbr%x2 = max(agg_mbr%x2, tree_nodes(j)%mbr%x2)
                agg_mbr%y2 = max(agg_mbr%y2, tree_nodes(j)%mbr%y2)
             end do
 
-            tree_nodes(node_idx)%mbr = agg_mbr
-            node_idx = node_idx + 1
+            tree_nodes(current_level_start + i - 1)%mbr = agg_mbr
          end do
 
+         node_idx = current_level_start + current_level_nodes
          prev_level_start = current_level_start
          prev_level_nodes = current_level_nodes
       end do

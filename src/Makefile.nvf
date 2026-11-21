@@ -115,8 +115,6 @@ systeminfo_macos.o: systeminfo_macos.c
 		       $(CC) -O3 -Wall -c systeminfo_macos.c -o $@
 snappy_api.o:	       snappy_api.cpp
 		       g++ -O3 -Wall -c snappy_api.cpp -o snappy_api.o
-systeminfo_macos.o: systeminfo_macos.c
-		       $(CC) -O3 -Wall -c systeminfo_macos.c -o $@
 boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost boost_polygon_api.cpp -c
 event_sorter.o:	       event_sorter.cu
