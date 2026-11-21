@@ -46,10 +46,11 @@ println("Layers: ", layers)
 
 # Default: all layers with 0.1um thickness, stacked with 0.1um gap
 stack = LayerDef[]
-z = 0.0
-for (i, (layer, dtype)) in enumerate(layers)
-    push!(stack, LayerDef(layer, "L$(layer)_$(dtype)"; datatype=dtype, zmin=z, zmax=z + 0.1e-6))
-    z += 0.2e-6
+let z = 0.0
+    for (i, (layer, dtype)) in enumerate(layers)
+        push!(stack, LayerDef(layer, "L$(layer)_$(dtype)"; datatype=dtype, zmin=z, zmax=z + 0.1e-6))
+        z += 0.2e-6
+    end
 end
 
 opts = MeshOptions(dbu=dbu, mesh_size_min=mesh_min, mesh_size_max=mesh_max)
