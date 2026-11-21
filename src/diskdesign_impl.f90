@@ -122,11 +122,9 @@ contains
     type(CompressedStream)     :: snappy_stream
     integer                    :: pos, iunit, ios
     !> for memory based layers we need an optimization that NO-FILE => EMPTY LAYER
-    !        write(*,*) 'DEBUG RestoreSnapToLayer: input_layer%layer_boxes allocated = ', allocated(input_layer%layer_boxes), ' n_used = ', input_layer%n_used
     if( temporary_layers > 1 ) then
        open(newunit=iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
        if (ios /= 0) then
-          close(iunit)
           call ClearLayer( input_layer )
           return
        end if
