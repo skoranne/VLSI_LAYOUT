@@ -1,20 +1,90 @@
 {
   "rules": [
-    {"name":"not_self","lhs":"A NOT A","rhs":"0","kind":"zero"},
-    {"name":"and_not_self","lhs":"A AND (B NOT A)","rhs":"0","kind":"zero","pattern":"A AND (B NOT A)"},
-    {"name":"xor_self","lhs":"A XOR A","rhs":"0","kind":"zero"},
-    {"name":"inside_xor_and","lhs":"(A INSIDE B) XOR (A AND B)","rhs":"0","kind":"zero"},
-    {"name":"inside_and_outside","lhs":"(A INSIDE B) AND (A OUTSIDE B)","rhs":"0","kind":"zero"},
-    {"name":"outside_xor_not","lhs":"(A OUTSIDE B) XOR (A NOT B)","rhs":"0","kind":"zero"},
-    {"name":"and_idem","lhs":"A AND A","rhs":"A","kind":"equiv"},
-    {"name":"or_idem","lhs":"A OR A","rhs":"A","kind":"equiv"},
-    {"name":"and_absorb","lhs":"A AND (A OR B)","rhs":"A","kind":"equiv"},
-    {"name":"or_absorb","lhs":"A OR (A AND B)","rhs":"A","kind":"equiv"},
-    {"name":"and_and","lhs":"A AND (A AND B)","rhs":"A AND B","kind":"equiv"},
-    {"name":"and_inside","lhs":"A AND (A INSIDE B)","rhs":"A AND B","kind":"equiv"},
-    {"name":"distrib_and_or","lhs":"A AND (B OR C)","rhs":"(A AND B) OR (A AND C)","kind":"equiv"},
-    {"name":"distrib_or_and","lhs":"A OR (B AND C)","rhs":"(A OR B) AND (A OR C)","kind":"equiv"},
-    {"name":"demorgan_and","lhs":"NOT (A AND B)","rhs":"(NOT A) OR (NOT B)","kind":"equiv"},
-    {"name":"demorgan_or","lhs":"NOT (A OR B)","rhs":"(NOT A) AND (NOT B)","kind":"equiv"}
+    {
+      "name": "not_self",
+      "lhs": "A NOT A",
+      "rhs": "0",
+      "kind": "zero"
+    },
+    {
+      "name": "and_not_self",
+      "lhs": "A AND (B NOT A)",
+      "rhs": "0",
+      "kind": "zero",
+      "pattern": "A AND (B NOT A)"
+    },
+    {
+      "name": "xor_self",
+      "lhs": "A XOR A",
+      "rhs": "0",
+      "kind": "zero"
+    },
+    {
+      "name": "inside_and_outside",
+      "lhs": "(A INSIDE B) AND (A OUTSIDE B)",
+      "rhs": "0",
+      "kind": "zero"
+    },
+    {
+      "name": "and_idem",
+      "lhs": "A AND A",
+      "rhs": "A",
+      "kind": "equiv"
+    },
+    {
+      "name": "or_idem",
+      "lhs": "A OR A",
+      "rhs": "A",
+      "kind": "equiv"
+    },
+    {
+      "name": "and_absorb",
+      "lhs": "A AND (A OR B)",
+      "rhs": "A",
+      "kind": "equiv"
+    },
+    {
+      "name": "or_absorb",
+      "lhs": "A OR (A AND B)",
+      "rhs": "A",
+      "kind": "equiv"
+    },
+    {
+      "name": "and_and",
+      "lhs": "A AND (A AND B)",
+      "rhs": "A AND B",
+      "kind": "equiv"
+    },
+    {
+      "name": "and_inside",
+      "lhs": "A AND (A INSIDE B)",
+      "rhs": "A INSIDE B",
+      "kind": "equiv",
+      "note": "pointwise model only; shape-level: A AND (A INSIDE B) == (A INSIDE B)"
+    },
+    {
+      "name": "distrib_and_or",
+      "lhs": "A AND (B OR C)",
+      "rhs": "(A AND B) OR (A AND C)",
+      "kind": "equiv"
+    },
+    {
+      "name": "distrib_or_and",
+      "lhs": "A OR (B AND C)",
+      "rhs": "(A OR B) AND (A OR C)",
+      "kind": "equiv"
+    },
+    {
+      "name": "demorgan_and",
+      "lhs": "NOT (A AND B)",
+      "rhs": "(NOT A) OR (NOT B)",
+      "kind": "equiv"
+    },
+    {
+      "name": "demorgan_or",
+      "lhs": "NOT (A OR B)",
+      "rhs": "(NOT A) AND (NOT B)",
+      "kind": "equiv"
+    }
   ]
 }

@@ -25,9 +25,11 @@ def gen(n,maxd=3):
             best[m]=(disp,lean,d)
     for i in range(n):
         add(atom(n,i),NAMES[i],NAMES[i],0)
+    # unary
     for m,(disp,lean,d) in list(best.items()):
-        add(F&~m,f"(NOT {disp})",f"(! {lean})",d+1)
-    for depth in range(2,maxd+1):
+        if d<=maxd-1: add(F&~m,f"(NOT {disp})",f"(! {lean})",d+1)
+    # binary
+    for depth in range(1,maxd+1):
         items=list(best.items())
         for m1,(d1,l1,p1) in items:
             for m2,(d2,l2,p2) in items:
@@ -55,14 +57,18 @@ def gen(n,maxd=3):
         for j in range(n):
             for k in range(n):
                 A,B,C=NAMES[i],NAMES[j],NAMES[k]
-                add0(f"(({A} AND ({B} OR {C})) XOR (({A} AND {B}) OR ({A} AND {C})))",
-                     f"(sxor (sand {A} (sor {B} {C})) (sor (sand {A} {B}) (sand {A} {C})))")
-                add0(f"(({A} OR ({B} AND {C})) XOR (({A} OR {B}) AND ({A} OR {C})))",
-                     f"(sxor (sor {A} (sand {B} {C})) (sand (sor {A} {B}) (sor {A} {C})))")
-                add0(f"((NOT ({A} AND {B})) XOR ((NOT {A}) OR (NOT {B})))",
-                     f"(sxor (! (sand {A} {B})) (sor (! {A}) (! {B})))")
-                add0(f"((NOT ({A} OR {B})) XOR ((NOT {A}) AND (NOT {B})))",
-                     f"(sxor (! (sor {A} {B})) (sand (! {A}) (! {B})))")
+                for disp,lean in [
+                    (f"(({A} AND ({B} OR {C})) XOR (({A} AND {B}) OR ({A} AND {C})))",
+                     f"(sxor (sand {A} (sor {B} {C})) (sor (sand {A} {B}) (sand {A} {C})))"),
+                    (f"(({A} OR ({B} AND {C})) XOR (({A} OR {B}) AND ({A} OR {C})))",
+                     f"(sxor (sor {A} (sand {B} {C})) (sand (sor {A} {B}) (sor {A} {C})))"),
+                    (f"((NOT ({A} AND {B})) XOR ((NOT {A}) OR (NOT {B})))",
+                     f"(sxor (! (sand {A} {B})) (sor (! {A}) (! {B})))"),
+                    (f"((NOT ({A} OR {B})) XOR ((NOT {A}) AND (NOT {B})))",
+                     f"(sxor (! (sor {A} {B})) (sand (! {A}) (! {B})))"),
+                ]:
+                    if lean not in seen0:
+                        zeros.append((disp,lean)); seen0.add(lean)
     # unique by lean form
     seen=set(); uz=[]
     for d,l in zeros:

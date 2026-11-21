@@ -67,24 +67,23 @@ function apply_rules!(nodes, rules)
     changed = 0
     for n in nodes
         n.dead && continue
+        n.zone > 0 && continue  # conservative: no rewrites inside connectivity zones
         e = expr(n)
-        # A NOT A / A XOR A / A AND A
+        # A NOT A / A XOR A -> 0 (net-safe: result empty)
         if n.a == n.b && n.op in ["NOT","@","XOR","^"]
             n.op="CONST0"; n.a="0"; n.b="0"; changed+=1; continue
         end
-        if n.a == n.b && n.op in ["AND","*"]
-            n.op="COPY"; n.b=""; changed+=1; continue
+        # A AND A / A OR A -> A (geometry idempotent; net-id may change - skip in zones handled above)
+        if n.a == n.b && n.op in ["AND","*","OR","+"]
+            n.op="COPY"; n.b="nothing"; changed+=1; continue
         end
-        if n.a == n.b && n.op in ["OR","+"]
-            n.op="COPY"; n.b=""; changed+=1; continue
-        end
-        # (A INSIDE B) AND (A OUTSIDE B) and XOR/AND combos as textual patterns in CTR are hard;
-        # handle common: X AND (Y NOT X) -> 0 when we can see def
     end
-    # second pass: find A AND (B NOT A) by definition lookup
-    defop = Dict(n.lhs => n for n in nodes)
+    # second pass: definition lookup (last definition wins)
+    defop = Dict{String,Node}()
+    for n in nodes; defop[n.lhs]=n; end
     for n in nodes
         n.dead && continue
+        n.zone > 0 && continue
         if n.op in ["AND","*"]
             # n.a = X, n.b = Y where Y is (Z NOT X)
             if haskey(defop, n.b)
@@ -107,13 +106,7 @@ function apply_rules!(nodes, rules)
                 n.op="CONST0"; n.a="0"; n.b="0"; changed+=1
             end
         end
-        # INSIDE XOR AND same args -> 0
-        if n.op in ["XOR","^"] && haskey(defop,n.a) && haskey(defop,n.b)
-            da,db = defop[n.a],defop[n.b]
-            if da.a==db.a && da.b==db.b && ((da.op=="INSIDE" && db.op in ["AND","*"]) || (db.op=="INSIDE" && da.op in ["AND","*"]))
-                n.op="CONST0"; n.a="0"; n.b="0"; changed+=1
-            end
-        end
+        # INSIDE XOR AND is NOT a valid shape-level zero identity; omitted.
         # distributive: (A AND B) OR (A AND C) where seen
     end
     return changed
