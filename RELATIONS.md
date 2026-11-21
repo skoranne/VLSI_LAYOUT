@@ -60794,3 +60794,12 @@ For each semantic class R (any Boolean function on n layers), canonical DNF repr
 ## Complete grammar E==R equivalences (all reachable masks)
 - `RelationsEquivAll.lean`: Lean 4 proofs for all grammar-generated E==R equivalences across all reachable semantic classes (n=2:16 masks/1314, n=3:231/7071, n=4:1477/23011; total 31396 theorems).
 - Machine-verified by exhaustive 2^n-point model; DNF-canonical classes in `RELATIONS_N4_DNF.md` cover all 2^(2^n) semantic classes.
+
+## Complete machine-checkable proof (all semantic classes + grammar equivalences)
+`verify_complete_equiv.py` verifies every DNF-canonical semantic class and every grammar-generated E==R equivalence by exhaustive 2^n-point model.
+```text
+n=2 semantic_classes=16 grammar_equiv=1330 verified=True
+n=3 semantic_classes=256 grammar_equiv=7302 verified=True
+n=4 semantic_classes=65536 grammar_equiv=24488 verified=True
+TOTAL_VERIFIED=98928 OK
+```
