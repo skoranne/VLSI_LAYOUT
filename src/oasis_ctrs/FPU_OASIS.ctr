@@ -1,0 +1,9 @@
+# Repurposed from FPU.ctr: KLBIN/MAG design references replaced with OASIS files from /scratch1/skoranne/DESIGNS/
+# Control file for MAGPARSER
+program square
+decl design d1 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
+decl output o1 = oFPU.mag
+info
+
+end 
+end 

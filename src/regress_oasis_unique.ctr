@@ -1,0 +1,112 @@
+# Comprehensive regression for unique OASIS files in /scratch1/skoranne/DESIGNS/
+# Unique by md5: FMD_QNC_TTIHP25b.oas, MW_FLAT.oas, caravel_00088bca.oas, MW4x4.oas
+# Focus: SHRINK and EDGE TOPOLOGICAL ops, plus boolean/topological self-tests.
+program regress_oasis_unique
+var temp_folder /tmp/regress_oasis_unique/
+var temporary_layers 2
+var abort_on_assert_zero 2
+var debug 1
+systeminfo
+
+# --- FMD_QNC_TTIHP25b.oas ---
+decl design fmd = /scratch1/skoranne/DESIGNS/TO_Sep2025/TTIHP25b/design_data/oas/FMD_QNC_TTIHP25b.oas
+decl memory m = nothing
+info
+
+# SHRINK: 1-arg and 4-arg
+exec run m:f_g = fmd:L1_D1440 GROW nothing 0.1 0.1 0.1 0.1
+exec run m:f_s4 = fmd:L1_D1440 SHRINK nothing 0.1 0.1 0.1 0.1
+exec run m:f_s1 = fmd:L1_D1440 SHRINK nothing 0.1
+exec run m:f_ring = m:f_g ~ fmd:L1_D1440
+exec run m:f_inner = fmd:L1_D1440 ~ m:f_s4
+# SHRINK should produce smaller/equal result: shrunk NOT original == 0
+exec run m:f_schk = m:f_s4 @ fmd:L1_D1440
+exec run m:f_schkaz = m:f_schk ASSERT_ZERO nothing
+
+# EDGE TOPOLOGICAL: A edges relative to GROW(A) should be inside-edge
+exec run m:f_ie = fmd:L1_D1440 INSIDE_EDGE m:f_g
+exec run m:f_nie = fmd:L1_D1440 NOT_INSIDE_EDGE m:f_g
+exec run m:f_oe = fmd:L1_D1440 OUTSIDE_EDGE m:f_g
+exec run m:f_noe = fmd:L1_D1440 NOT_OUTSIDE_EDGE m:f_g
+exec run m:f_cie = fmd:L1_D1440 COINCIDENT_INSIDE_EDGE m:f_g
+exec run m:f_ncie = fmd:L1_D1440 NOT_COINCIDENT_INSIDE_EDGE m:f_g
+exec run m:f_coe = fmd:L1_D1440 COINCIDENT_OUTSIDE_EDGE m:f_g
+exec run m:f_ncoe = fmd:L1_D1440 NOT_COINCIDENT_OUTSIDE_EDGE m:f_g
+exec run m:f_oeaz = m:f_oe ASSERT_ZERO nothing
+exec run m:f_cieaz = m:f_cie ASSERT_ZERO nothing
+exec run m:f_coeaz = m:f_coe ASSERT_ZERO nothing
+exec run m:f_nieaz = m:f_nie ASSERT_ZERO nothing
+
+# Self-test A AND (B NOT A) == 0
+exec run m:f_bna = fmd:L1200_D1440 @ fmd:L1_D1440
+exec run m:f_self = fmd:L1_D1440 * m:f_bna
+exec run m:f_selfaz = m:f_self ASSERT_ZERO nothing
+
+# Boolean identities
+exec run m:f_xs = fmd:L1_D1440 ^ fmd:L1_D1440
+exec run m:f_xsaz = m:f_xs ASSERT_ZERO nothing
+exec run m:f_ns = fmd:L1_D1440 @ fmd:L1_D1440
+exec run m:f_nsaz = m:f_ns ASSERT_ZERO nothing
+
+# --- MW_FLAT.oas ---
+decl design mw = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW_FLAT.oas
+info
+exec run m:mw_g = mw:L8740_D2720 GROW nothing 0.01 0.01 0.01 0.01
+exec run m:mw_s = mw:L8740_D2720 SHRINK nothing 0.01 0.01 0.01 0.01
+exec run m:mw_schk = m:mw_s @ mw:L8740_D2720
+exec run m:mw_schkaz = m:mw_schk ASSERT_ZERO nothing
+exec run m:mw_ie = mw:L8740_D2720 INSIDE_EDGE m:mw_g
+exec run m:mw_nie = mw:L8740_D2720 NOT_INSIDE_EDGE m:mw_g
+exec run m:mw_oe = mw:L8740_D2720 OUTSIDE_EDGE m:mw_g
+exec run m:mw_cie = mw:L8740_D2720 COINCIDENT_INSIDE_EDGE m:mw_g
+exec run m:mw_coe = mw:L8740_D2720 COINCIDENT_OUTSIDE_EDGE m:mw_g
+exec run m:mw_oeaz = m:mw_oe ASSERT_ZERO nothing
+exec run m:mw_cieaz = m:mw_cie ASSERT_ZERO nothing
+exec run m:mw_coeaz = m:mw_coe ASSERT_ZERO nothing
+exec run m:mw_nieaz = m:mw_nie ASSERT_ZERO nothing
+exec run m:mw_bna = mw:L4140_D2720 @ mw:L3680_D2720
+exec run m:mw_self = mw:L3680_D2720 * m:mw_bna
+exec run m:mw_selfaz = m:mw_self ASSERT_ZERO nothing
+
+# --- caravel_00088bca.oas ---
+decl design car = /scratch1/skoranne/DESIGNS/riscduino/caravel_00088bca.oas
+info
+exec run m:car_g = car:L95_D117 GROW nothing 0.01 0.01 0.01 0.01
+exec run m:car_s = car:L95_D117 SHRINK nothing 0.01 0.01 0.01 0.01
+exec run m:car_schk = m:car_s @ car:L95_D117
+exec run m:car_schkaz = m:car_schk ASSERT_ZERO nothing
+exec run m:car_ie = car:L95_D117 INSIDE_EDGE m:car_g
+exec run m:car_nie = car:L95_D117 NOT_INSIDE_EDGE m:car_g
+exec run m:car_oe = car:L95_D117 OUTSIDE_EDGE m:car_g
+exec run m:car_cie = car:L95_D117 COINCIDENT_INSIDE_EDGE m:car_g
+exec run m:car_coe = car:L95_D117 COINCIDENT_OUTSIDE_EDGE m:car_g
+exec run m:car_oeaz = m:car_oe ASSERT_ZERO nothing
+exec run m:car_cieaz = m:car_cie ASSERT_ZERO nothing
+exec run m:car_coeaz = m:car_coe ASSERT_ZERO nothing
+exec run m:car_nieaz = m:car_nie ASSERT_ZERO nothing
+exec run m:car_bna = car:L95_D115 @ car:L95_D117
+exec run m:car_self = car:L95_D117 * m:car_bna
+exec run m:car_selfaz = m:car_self ASSERT_ZERO nothing
+
+# --- MW4x4.oas (unique; parser desync warnings possible, but load must succeed) ---
+decl design mw4 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW4x4.oas
+info
+exec run m:mw4_g = mw4:L1380_D2720 GROW nothing 0.01 0.01 0.01 0.01
+exec run m:mw4_s = mw4:L1380_D2720 SHRINK nothing 0.01 0.01 0.01 0.01
+exec run m:mw4_schk = m:mw4_s @ mw4:L1380_D2720
+exec run m:mw4_schkaz = m:mw4_schk ASSERT_ZERO nothing
+exec run m:mw4_ie = mw4:L1380_D2720 INSIDE_EDGE m:mw4_g
+exec run m:mw4_nie = mw4:L1380_D2720 NOT_INSIDE_EDGE m:mw4_g
+exec run m:mw4_oe = mw4:L1380_D2720 OUTSIDE_EDGE m:mw4_g
+exec run m:mw4_cie = mw4:L1380_D2720 COINCIDENT_INSIDE_EDGE m:mw4_g
+exec run m:mw4_coe = mw4:L1380_D2720 COINCIDENT_OUTSIDE_EDGE m:mw4_g
+exec run m:mw4_oeaz = m:mw4_oe ASSERT_ZERO nothing
+exec run m:mw4_cieaz = m:mw4_cie ASSERT_ZERO nothing
+exec run m:mw4_coeaz = m:mw4_coe ASSERT_ZERO nothing
+exec run m:mw4_nieaz = m:mw4_nie ASSERT_ZERO nothing
+exec run m:mw4_bna = mw4:L1840_D2720 @ mw4:L1380_D2720
+exec run m:mw4_self = mw4:L1380_D2720 * m:mw4_bna
+exec run m:mw4_selfaz = m:mw4_self ASSERT_ZERO nothing
+
+flush
+end

@@ -637,6 +637,14 @@ contains
       type(Layer) :: temp_layer
       integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
       call PreprocessLayer( input_layer_A )
+      if( input_layer_A%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
+      end if
+      if( shrink_value <= 0 ) then
+         call CopyLayer( output_layer, input_layer_A )
+         return
+      end if
       !> Step 1
       bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
       call box_grow( bboxA, shrink_value, shrink_value )
@@ -648,6 +656,41 @@ contains
       call PreprocessLayer( temp_layer )
       call CalculateNOT( input_layer_A, temp_layer, output_layer )
    end subroutine CalculateSHRINKLayer
+
+   module subroutine CalculateSHRINKDirectional( input_layer, output_layer, ivar )
+      type(Layer), intent(in) :: input_layer
+      type(Layer), intent(inout) :: output_layer
+      integer(kind=K_COORDINATE_KIND), intent(in) :: ivar(4) ! E,N,W,S
+      integer(kind=int64) :: i, n, j
+      type(Box) :: b
+      call ClearLayer( output_layer )
+      n = input_layer%n_used
+      if( n <= 0 ) return
+      allocate( output_layer%layer_boxes(n) )
+      j = 0
+      do i = 1, n
+         b = input_layer%layer_boxes(i)
+         b%x1 = b%x1 + ivar(3)
+         b%x2 = b%x2 - ivar(1)
+         b%y1 = b%y1 + ivar(4)
+         b%y2 = b%y2 - ivar(2)
+         if( b%x2 > b%x1 .and. b%y2 > b%y1 ) then
+            j = j + 1
+            output_layer%layer_boxes(j) = b
+         end if
+      end do
+      output_layer%n_used = j
+      if( j == 0 ) then
+         if( allocated(output_layer%layer_boxes) ) deallocate(output_layer%layer_boxes)
+         allocate(output_layer%layer_boxes(0))
+         output_layer%n_used = 0
+         return
+      end if
+      output_layer%layerState = ior(output_layer%layerState, LAYER_STATE_SORT)
+      call BuildTree( output_layer )
+      call MergeHealLayer( output_layer )
+      call PreprocessLayer( output_layer )
+   end subroutine CalculateSHRINKDirectional
 
    !> ConvertLayerToBox
    !>

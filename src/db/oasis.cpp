@@ -68,7 +68,13 @@ struct Ctx {
     size_t cblock_fail = 0;
 };
 
-static void ensure_table(std::vector<std::string>& t, uint64_t idx, const std::string& v=""){ if(t.size()<=idx) t.resize(idx+1); if(!v.empty()) t[idx]=v; }
+static void ensure_table(std::vector<std::string>& t, uint64_t idx, const std::string& v=""){
+    if(idx > 10000000ULL){
+        fprintf(stderr, "OASIS parse warning: absurd table index %llu, ignoring\n", (unsigned long long)idx);
+        return;
+    }
+    if(t.size()<=idx) t.resize(idx+1); if(!v.empty()) t[idx]=v;
+}
 static std::string tget(const std::vector<std::string>& t, uint64_t idx){ return (idx<t.size())?t[idx]:std::string(); }
 
 static void rec_raw(Stream& s, size_t start, Ctx& ctx){

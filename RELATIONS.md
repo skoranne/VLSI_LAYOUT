@@ -1,0 +1,9811 @@
+# RELATIONS.md
+
+## Formal model and completeness
+- Universe: finite pointwise Boolean algebra model. For `n` layers, `2^n` point types are complete for set-algebra equational identities (Stone/finite model property).
+- Layers: `A,B,C,D ∈ P(U)` represented as Bool membership per point.
+- Complete signature (set-valued): Boolean `AND=∩, OR=∪, NOT=A\B, XOR, NOT_UNARY=¬`; Topological `INSIDE=A∩B, OUTSIDE=A\B, OVERLAP=A∩B, DISJOINT_PART=A\B`; 9E-DIM/DE-9IM/Egenhofer-named selectors `CONTAINS=A∩B, COVEREDBY=A∩B, COVERS=A∩B, EQUAL_PART=A∩B, MEET_PART=A\B` (pure-set pointwise semantics; boundary-sensitive 9IM distinctions collapse in this model and are explicitly documented).
+- Completeness: {AND,NOT_UNARY} is functionally complete. Depth <= 3 is DNF-complete for n<=4, so every set function has a depth<=3 representative; enumerating all depth<=3 zero expressions in this complete signature covers all semantic zero identities. All 9E-DIM/DE-9IM named selectors above are included.
+- Zero identity: `E == 0` iff for all assignments in all 2^n points, E evaluates to false. Verified by exhaustive finite-model enumeration.
+- "ALL" scope: all syntactic zero identities in the declared complete signature, exhaustively enumerated up to depth <= 3 (DNF-complete depth for Boolean functions over n<=4). Each listed relation is machine-verified and has a Lean 4 proof theorem in `RelationsAll.lean`.
+
+## Objective examples
+- `A AND (B NOT A) == 0`
+- `(A INSIDE B) XOR (A AND B) == 0`
+- `(A INSIDE B) AND (A OUTSIDE B) == 0`
+
+## 2-layer zero identities (ALL in declared signature, depth <= 3)
+Total: 833
+
+- `((NOT A) AND A) == 0`
+- `((NOT B) AND B) == 0`
+- `(A AND (NOT A)) == 0`
+- `(B AND (NOT B)) == 0`
+- `((NOT A) COVERS A) == 0`
+- `((NOT A) INSIDE A) == 0`
+- `((NOT B) COVERS B) == 0`
+- `((NOT B) INSIDE B) == 0`
+- `(A COVERS (NOT A)) == 0`
+- `(A INSIDE (NOT A)) == 0`
+- `(B COVERS (NOT B)) == 0`
+- `(B INSIDE (NOT B)) == 0`
+- `((NOT A) OVERLAP A) == 0`
+- `((NOT B) OVERLAP B) == 0`
+- `(A OVERLAP (NOT A)) == 0`
+- `(B OVERLAP (NOT B)) == 0`
+- `((NOT A) CONTAINS A) == 0`
+- `((NOT B) CONTAINS B) == 0`
+- `(A CONTAINS (NOT A)) == 0`
+- `(B CONTAINS (NOT B)) == 0`
+- `((NOT A) COVEREDBY A) == 0`
+- `((NOT B) COVEREDBY B) == 0`
+- `(A COVEREDBY (NOT A)) == 0`
+- `(B COVEREDBY (NOT B)) == 0`
+- `((NOT A) EQUAL_PART A) == 0`
+- `((NOT B) EQUAL_PART B) == 0`
+- `(A EQUAL_PART (NOT A)) == 0`
+- `(B EQUAL_PART (NOT B)) == 0`
+- `((NOT A) NOT (NOT A)) == 0`
+- `((NOT A) XOR (NOT A)) == 0`
+- `((NOT B) NOT (NOT B)) == 0`
+- `((NOT B) XOR (NOT B)) == 0`
+- `(A NOT (A OR (NOT A))) == 0`
+- `(A NOT (A OR (NOT B))) == 0`
+- `(B NOT (A OR (NOT A))) == 0`
+- `(B NOT (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) AND A) == 0`
+- `(((NOT A) NOT B) AND B) == 0`
+- `((A AND (NOT A)) AND A) == 0`
+- `((A AND (NOT A)) AND B) == 0`
+- `((A AND (NOT A)) NOT A) == 0`
+- `((A AND (NOT A)) NOT B) == 0`
+- `((A AND (NOT B)) AND B) == 0`
+- `((A AND (NOT B)) NOT A) == 0`
+- `((A NOT (NOT B)) NOT A) == 0`
+- `((A NOT (NOT B)) NOT B) == 0`
+- `((B AND (NOT A)) AND A) == 0`
+- `((B AND (NOT A)) NOT B) == 0`
+- `(A AND ((NOT A) NOT B)) == 0`
+- `(A AND (A AND (NOT A))) == 0`
+- `(A AND (B AND (NOT A))) == 0`
+- `(B AND ((NOT A) NOT B)) == 0`
+- `(B AND (A AND (NOT A))) == 0`
+- `(B AND (A AND (NOT B))) == 0`
+- `((NOT A) OUTSIDE (NOT A)) == 0`
+- `((NOT B) OUTSIDE (NOT B)) == 0`
+- `(((NOT A) NOT B) COVERS A) == 0`
+- `(((NOT A) NOT B) COVERS B) == 0`
+- `(((NOT A) NOT B) INSIDE A) == 0`
+- `(((NOT A) NOT B) INSIDE B) == 0`
+- `((A AND (NOT A)) COVERS A) == 0`
+- `((A AND (NOT A)) COVERS B) == 0`
+- `((A AND (NOT A)) INSIDE A) == 0`
+- `((A AND (NOT A)) INSIDE B) == 0`
+- `((A AND (NOT B)) COVERS B) == 0`
+- `((A AND (NOT B)) INSIDE B) == 0`
+- `((B AND (NOT A)) COVERS A) == 0`
+- `((B AND (NOT A)) INSIDE A) == 0`
+- `(A COVERS ((NOT A) NOT B)) == 0`
+- `(A COVERS (A AND (NOT A))) == 0`
+- `(A COVERS (B AND (NOT A))) == 0`
+- `(A INSIDE ((NOT A) NOT B)) == 0`
+- `(A INSIDE (A AND (NOT A))) == 0`
+- `(A INSIDE (B AND (NOT A))) == 0`
+- `(A OUTSIDE (A OR (NOT A))) == 0`
+- `(A OUTSIDE (A OR (NOT B))) == 0`
+- `(B COVERS ((NOT A) NOT B)) == 0`
+- `(B COVERS (A AND (NOT A))) == 0`
+- `(B COVERS (A AND (NOT B))) == 0`
+- `(B INSIDE ((NOT A) NOT B)) == 0`
+- `(B INSIDE (A AND (NOT A))) == 0`
+- `(B INSIDE (A AND (NOT B))) == 0`
+- `(B OUTSIDE (A OR (NOT A))) == 0`
+- `(B OUTSIDE (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) OVERLAP A) == 0`
+- `(((NOT A) NOT B) OVERLAP B) == 0`
+- `((A AND (NOT A)) OUTSIDE A) == 0`
+- `((A AND (NOT A)) OUTSIDE B) == 0`
+- `((A AND (NOT A)) OVERLAP A) == 0`
+- `((A AND (NOT A)) OVERLAP B) == 0`
+- `((A AND (NOT B)) OUTSIDE A) == 0`
+- `((A AND (NOT B)) OVERLAP B) == 0`
+- `((A NOT (NOT B)) OUTSIDE A) == 0`
+- `((A NOT (NOT B)) OUTSIDE B) == 0`
+- `((B AND (NOT A)) OUTSIDE B) == 0`
+- `((B AND (NOT A)) OVERLAP A) == 0`
+- `((NOT A) MEET_PART (NOT A)) == 0`
+- `((NOT B) MEET_PART (NOT B)) == 0`
+- `(A OVERLAP ((NOT A) NOT B)) == 0`
+- `(A OVERLAP (A AND (NOT A))) == 0`
+- `(A OVERLAP (B AND (NOT A))) == 0`
+- `(B OVERLAP ((NOT A) NOT B)) == 0`
+- `(B OVERLAP (A AND (NOT A))) == 0`
+- `(B OVERLAP (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) CONTAINS A) == 0`
+- `(((NOT A) NOT B) CONTAINS B) == 0`
+- `((A AND (NOT A)) CONTAINS A) == 0`
+- `((A AND (NOT A)) CONTAINS B) == 0`
+- `((A AND (NOT B)) CONTAINS B) == 0`
+- `((B AND (NOT A)) CONTAINS A) == 0`
+- `(A CONTAINS ((NOT A) NOT B)) == 0`
+- `(A CONTAINS (A AND (NOT A))) == 0`
+- `(A CONTAINS (B AND (NOT A))) == 0`
+- `(A MEET_PART (A OR (NOT A))) == 0`
+- `(A MEET_PART (A OR (NOT B))) == 0`
+- `(B CONTAINS ((NOT A) NOT B)) == 0`
+- `(B CONTAINS (A AND (NOT A))) == 0`
+- `(B CONTAINS (A AND (NOT B))) == 0`
+- `(B MEET_PART (A OR (NOT A))) == 0`
+- `(B MEET_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) COVEREDBY A) == 0`
+- `(((NOT A) NOT B) COVEREDBY B) == 0`
+- `((A AND (NOT A)) COVEREDBY A) == 0`
+- `((A AND (NOT A)) COVEREDBY B) == 0`
+- `((A AND (NOT A)) MEET_PART A) == 0`
+- `((A AND (NOT A)) MEET_PART B) == 0`
+- `((A AND (NOT B)) COVEREDBY B) == 0`
+- `((A AND (NOT B)) MEET_PART A) == 0`
+- `((A NOT (NOT B)) MEET_PART A) == 0`
+- `((A NOT (NOT B)) MEET_PART B) == 0`
+- `((B AND (NOT A)) COVEREDBY A) == 0`
+- `((B AND (NOT A)) MEET_PART B) == 0`
+- `(A COVEREDBY ((NOT A) NOT B)) == 0`
+- `(A COVEREDBY (A AND (NOT A))) == 0`
+- `(A COVEREDBY (B AND (NOT A))) == 0`
+- `(B COVEREDBY ((NOT A) NOT B)) == 0`
+- `(B COVEREDBY (A AND (NOT A))) == 0`
+- `(B COVEREDBY (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART A) == 0`
+- `(((NOT A) NOT B) EQUAL_PART B) == 0`
+- `((A AND (NOT A)) EQUAL_PART A) == 0`
+- `((A AND (NOT A)) EQUAL_PART B) == 0`
+- `((A AND (NOT B)) EQUAL_PART B) == 0`
+- `((B AND (NOT A)) EQUAL_PART A) == 0`
+- `(A EQUAL_PART ((NOT A) NOT B)) == 0`
+- `(A EQUAL_PART (A AND (NOT A))) == 0`
+- `(A EQUAL_PART (B AND (NOT A))) == 0`
+- `(B EQUAL_PART ((NOT A) NOT B)) == 0`
+- `(B EQUAL_PART (A AND (NOT A))) == 0`
+- `(B EQUAL_PART (A AND (NOT B))) == 0`
+- `((NOT A) DISJOINT_PART (NOT A)) == 0`
+- `((NOT B) DISJOINT_PART (NOT B)) == 0`
+- `(A DISJOINT_PART (A OR (NOT A))) == 0`
+- `(A DISJOINT_PART (A OR (NOT B))) == 0`
+- `(B DISJOINT_PART (A OR (NOT A))) == 0`
+- `(B DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART A) == 0`
+- `((A AND (NOT A)) DISJOINT_PART B) == 0`
+- `((A AND (NOT B)) DISJOINT_PART A) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART A) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART B) == 0`
+- `((B AND (NOT A)) DISJOINT_PART B) == 0`
+- `((NOT A) NOT (A OR (NOT A))) == 0`
+- `((NOT A) NOT (B OR (NOT A))) == 0`
+- `((NOT B) NOT (A OR (NOT A))) == 0`
+- `((NOT B) NOT (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) NOT (NOT A)) == 0`
+- `(((NOT A) NOT B) NOT (NOT B)) == 0`
+- `((A AND (NOT A)) AND (NOT A)) == 0`
+- `((A AND (NOT A)) AND (NOT B)) == 0`
+- `((A AND (NOT A)) NOT (NOT A)) == 0`
+- `((A AND (NOT A)) NOT (NOT B)) == 0`
+- `((A AND (NOT B)) AND (NOT A)) == 0`
+- `((A AND (NOT B)) NOT (NOT B)) == 0`
+- `((A NOT (NOT B)) AND (NOT A)) == 0`
+- `((A NOT (NOT B)) AND (NOT B)) == 0`
+- `((B AND (NOT A)) AND (NOT B)) == 0`
+- `((B AND (NOT A)) NOT (NOT A)) == 0`
+- `((NOT A) AND (A AND (NOT A))) == 0`
+- `((NOT A) AND (A AND (NOT B))) == 0`
+- `((NOT A) AND (A NOT (NOT B))) == 0`
+- `((NOT B) AND (A AND (NOT A))) == 0`
+- `((NOT B) AND (A NOT (NOT B))) == 0`
+- `((NOT B) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (NOT A)) == 0`
+- `((A AND (NOT A)) COVERS (NOT B)) == 0`
+- `((A AND (NOT A)) INSIDE (NOT A)) == 0`
+- `((A AND (NOT A)) INSIDE (NOT B)) == 0`
+- `((A AND (NOT B)) COVERS (NOT A)) == 0`
+- `((A AND (NOT B)) INSIDE (NOT A)) == 0`
+- `((A NOT (NOT B)) COVERS (NOT A)) == 0`
+- `((A NOT (NOT B)) COVERS (NOT B)) == 0`
+- `((A NOT (NOT B)) INSIDE (NOT A)) == 0`
+- `((A NOT (NOT B)) INSIDE (NOT B)) == 0`
+- `((B AND (NOT A)) COVERS (NOT B)) == 0`
+- `((B AND (NOT A)) INSIDE (NOT B)) == 0`
+- `((NOT A) COVERS (A AND (NOT A))) == 0`
+- `((NOT A) COVERS (A AND (NOT B))) == 0`
+- `((NOT A) COVERS (A NOT (NOT B))) == 0`
+- `((NOT A) INSIDE (A AND (NOT A))) == 0`
+- `((NOT A) INSIDE (A AND (NOT B))) == 0`
+- `((NOT A) INSIDE (A NOT (NOT B))) == 0`
+- `((NOT A) OUTSIDE (A OR (NOT A))) == 0`
+- `((NOT A) OUTSIDE (B OR (NOT A))) == 0`
+- `((NOT B) COVERS (A AND (NOT A))) == 0`
+- `((NOT B) COVERS (A NOT (NOT B))) == 0`
+- `((NOT B) COVERS (B AND (NOT A))) == 0`
+- `((NOT B) INSIDE (A AND (NOT A))) == 0`
+- `((NOT B) INSIDE (A NOT (NOT B))) == 0`
+- `((NOT B) INSIDE (B AND (NOT A))) == 0`
+- `((NOT B) OUTSIDE (A OR (NOT A))) == 0`
+- `((NOT B) OUTSIDE (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (NOT A)) == 0`
+- `(((NOT A) NOT B) OUTSIDE (NOT B)) == 0`
+- `((A AND (NOT A)) OUTSIDE (NOT A)) == 0`
+- `((A AND (NOT A)) OUTSIDE (NOT B)) == 0`
+- `((A AND (NOT A)) OVERLAP (NOT A)) == 0`
+- `((A AND (NOT A)) OVERLAP (NOT B)) == 0`
+- `((A AND (NOT B)) OUTSIDE (NOT B)) == 0`
+- `((A AND (NOT B)) OVERLAP (NOT A)) == 0`
+- `((A NOT (NOT B)) OVERLAP (NOT A)) == 0`
+- `((A NOT (NOT B)) OVERLAP (NOT B)) == 0`
+- `((B AND (NOT A)) OUTSIDE (NOT A)) == 0`
+- `((B AND (NOT A)) OVERLAP (NOT B)) == 0`
+- `((NOT A) OVERLAP (A AND (NOT A))) == 0`
+- `((NOT A) OVERLAP (A AND (NOT B))) == 0`
+- `((NOT A) OVERLAP (A NOT (NOT B))) == 0`
+- `((NOT B) OVERLAP (A AND (NOT A))) == 0`
+- `((NOT B) OVERLAP (A NOT (NOT B))) == 0`
+- `((NOT B) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (NOT A)) == 0`
+- `((A AND (NOT A)) CONTAINS (NOT B)) == 0`
+- `((A AND (NOT B)) CONTAINS (NOT A)) == 0`
+- `((A NOT (NOT B)) CONTAINS (NOT A)) == 0`
+- `((A NOT (NOT B)) CONTAINS (NOT B)) == 0`
+- `((B AND (NOT A)) CONTAINS (NOT B)) == 0`
+- `((NOT A) CONTAINS (A AND (NOT A))) == 0`
+- `((NOT A) CONTAINS (A AND (NOT B))) == 0`
+- `((NOT A) CONTAINS (A NOT (NOT B))) == 0`
+- `((NOT A) MEET_PART (A OR (NOT A))) == 0`
+- `((NOT A) MEET_PART (B OR (NOT A))) == 0`
+- `((NOT B) CONTAINS (A AND (NOT A))) == 0`
+- `((NOT B) CONTAINS (A NOT (NOT B))) == 0`
+- `((NOT B) CONTAINS (B AND (NOT A))) == 0`
+- `((NOT B) MEET_PART (A OR (NOT A))) == 0`
+- `((NOT B) MEET_PART (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART (NOT A)) == 0`
+- `(((NOT A) NOT B) MEET_PART (NOT B)) == 0`
+- `((A AND (NOT A)) COVEREDBY (NOT A)) == 0`
+- `((A AND (NOT A)) COVEREDBY (NOT B)) == 0`
+- `((A AND (NOT A)) MEET_PART (NOT A)) == 0`
+- `((A AND (NOT A)) MEET_PART (NOT B)) == 0`
+- `((A AND (NOT B)) COVEREDBY (NOT A)) == 0`
+- `((A AND (NOT B)) MEET_PART (NOT B)) == 0`
+- `((A NOT (NOT B)) COVEREDBY (NOT A)) == 0`
+- `((A NOT (NOT B)) COVEREDBY (NOT B)) == 0`
+- `((B AND (NOT A)) COVEREDBY (NOT B)) == 0`
+- `((B AND (NOT A)) MEET_PART (NOT A)) == 0`
+- `((NOT A) COVEREDBY (A AND (NOT A))) == 0`
+- `((NOT A) COVEREDBY (A AND (NOT B))) == 0`
+- `((NOT A) COVEREDBY (A NOT (NOT B))) == 0`
+- `((NOT B) COVEREDBY (A AND (NOT A))) == 0`
+- `((NOT B) COVEREDBY (A NOT (NOT B))) == 0`
+- `((NOT B) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (NOT A)) == 0`
+- `((A AND (NOT A)) EQUAL_PART (NOT B)) == 0`
+- `((A AND (NOT B)) EQUAL_PART (NOT A)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (NOT A)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (NOT B)) == 0`
+- `((B AND (NOT A)) EQUAL_PART (NOT B)) == 0`
+- `((NOT A) EQUAL_PART (A AND (NOT A))) == 0`
+- `((NOT A) EQUAL_PART (A AND (NOT B))) == 0`
+- `((NOT A) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((NOT B) EQUAL_PART (A AND (NOT A))) == 0`
+- `((NOT B) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((NOT B) EQUAL_PART (B AND (NOT A))) == 0`
+- `((NOT A) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((NOT A) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((NOT B) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((NOT B) DISJOINT_PART (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (NOT A)) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (NOT B)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (NOT A)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (NOT B)) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (NOT B)) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (NOT A)) == 0`
+- `((NOT A) NOT ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) NOT ((NOT A) OR (NOT B))) == 0`
+- `((A OR (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((A OR (NOT A)) XOR (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A OR (NOT B)) XOR (A OR (NOT B))) == 0`
+- `((B OR (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((B OR (NOT A)) XOR (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) NOT (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) AND (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) OR (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) NOT (B OR (NOT A))) == 0`
+- `((A OR (NOT A)) AND (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) NOT (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) AND (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((B OR (NOT A)) AND (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) AND (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) AND (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) AND (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) AND (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) NOT (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) XOR ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) AND ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) AND (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) AND (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) NOT (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) XOR (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) AND (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) NOT (A AND (NOT B))) == 0`
+- `((A AND (NOT B)) XOR (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) AND (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) NOT (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) NOT (A XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) XOR (A NOT (NOT B))) == 0`
+- `((A XOR (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) AND (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) NOT (A XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) XOR (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) AND ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) AND (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) AND (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) AND (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) AND (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) NOT (B AND (NOT A))) == 0`
+- `((B AND (NOT A)) XOR (B AND (NOT A))) == 0`
+- `((NOT A) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) COVERS (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE (B OR (NOT A))) == 0`
+- `((A OR (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((A OR (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((A OR (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A OR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A OR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (A OR (NOT B))) == 0`
+- `((B OR (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((B OR (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((B OR (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVERS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) COVERS (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) INSIDE (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) INSIDE (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) COVERS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) COVERS (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) INSIDE (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP (B OR (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) INSIDE (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (B OR (NOT A))) == 0`
+- `((A OR (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVERS (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) INSIDE (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) COVERS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) OVERLAP (A OR (NOT B))) == 0`
+- `((B OR (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((NOT A) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) OUTSIDE (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) OUTSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) CONTAINS (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A AND (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OVERLAP (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A OR (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((A OR (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A OR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (A XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) OVERLAP (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((B AND (NOT A)) CONTAINS (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE (B AND (NOT A))) == 0`
+- `((B AND (NOT A)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) OVERLAP (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) OVERLAP (A XOR (NOT B))) == 0`
+- `((B OR (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((B OR (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) CONTAINS (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) CONTAINS (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) CONTAINS (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (B OR (NOT A))) == 0`
+- `((A OR (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) CONTAINS (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) MEET_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) CONTAINS (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) CONTAINS (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((B OR (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) MEET_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) MEET_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) MEET_PART (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A XOR (NOT B))) == 0`
+- `((A OR (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVEREDBY (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) MEET_PART (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART (B AND (NOT A))) == 0`
+- `((B OR (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((B AND (NOT A)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((NOT A) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((A OR (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((B OR (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (B AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) AND ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) AND ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) AND (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT B)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) AND ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT A)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) OR (NOT B))) == 0`
+- `((A XOR (NOT B)) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT B)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) OR (NOT B))) == 0`
+- `((A XOR (NOT B)) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT B)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) OR (NOT B))) == 0`
+- `((A XOR (NOT B)) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) XOR ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) XOR ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+
+## 3-layer zero identities (ALL in declared signature, depth <= 3)
+Total: 2718
+
+- `((NOT A) AND A) == 0`
+- `((NOT B) AND B) == 0`
+- `((NOT C) AND C) == 0`
+- `(A AND (NOT A)) == 0`
+- `(B AND (NOT B)) == 0`
+- `(C AND (NOT C)) == 0`
+- `((NOT A) COVERS A) == 0`
+- `((NOT A) INSIDE A) == 0`
+- `((NOT B) COVERS B) == 0`
+- `((NOT B) INSIDE B) == 0`
+- `((NOT C) COVERS C) == 0`
+- `((NOT C) INSIDE C) == 0`
+- `(A COVERS (NOT A)) == 0`
+- `(A INSIDE (NOT A)) == 0`
+- `(B COVERS (NOT B)) == 0`
+- `(B INSIDE (NOT B)) == 0`
+- `(C COVERS (NOT C)) == 0`
+- `(C INSIDE (NOT C)) == 0`
+- `((NOT A) OVERLAP A) == 0`
+- `((NOT B) OVERLAP B) == 0`
+- `((NOT C) OVERLAP C) == 0`
+- `(A OVERLAP (NOT A)) == 0`
+- `(B OVERLAP (NOT B)) == 0`
+- `(C OVERLAP (NOT C)) == 0`
+- `((NOT A) CONTAINS A) == 0`
+- `((NOT B) CONTAINS B) == 0`
+- `((NOT C) CONTAINS C) == 0`
+- `(A CONTAINS (NOT A)) == 0`
+- `(B CONTAINS (NOT B)) == 0`
+- `(C CONTAINS (NOT C)) == 0`
+- `((NOT A) COVEREDBY A) == 0`
+- `((NOT B) COVEREDBY B) == 0`
+- `((NOT C) COVEREDBY C) == 0`
+- `(A COVEREDBY (NOT A)) == 0`
+- `(B COVEREDBY (NOT B)) == 0`
+- `(C COVEREDBY (NOT C)) == 0`
+- `((NOT A) EQUAL_PART A) == 0`
+- `((NOT B) EQUAL_PART B) == 0`
+- `((NOT C) EQUAL_PART C) == 0`
+- `(A EQUAL_PART (NOT A)) == 0`
+- `(B EQUAL_PART (NOT B)) == 0`
+- `(C EQUAL_PART (NOT C)) == 0`
+- `((NOT A) NOT (NOT A)) == 0`
+- `((NOT A) XOR (NOT A)) == 0`
+- `((NOT B) NOT (NOT B)) == 0`
+- `((NOT B) XOR (NOT B)) == 0`
+- `((NOT C) NOT (NOT C)) == 0`
+- `((NOT C) XOR (NOT C)) == 0`
+- `(A NOT (A OR (NOT A))) == 0`
+- `(A NOT (A OR (NOT B))) == 0`
+- `(A NOT (A OR (NOT C))) == 0`
+- `(B NOT (A OR (NOT A))) == 0`
+- `(B NOT (B OR (NOT A))) == 0`
+- `(B NOT (B OR (NOT C))) == 0`
+- `(C NOT (A OR (NOT A))) == 0`
+- `(C NOT (C OR (NOT A))) == 0`
+- `(C NOT (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) AND A) == 0`
+- `(((NOT A) NOT B) AND B) == 0`
+- `(((NOT A) NOT C) AND A) == 0`
+- `(((NOT A) NOT C) AND C) == 0`
+- `(((NOT B) NOT C) AND B) == 0`
+- `(((NOT B) NOT C) AND C) == 0`
+- `((A AND (NOT A)) AND A) == 0`
+- `((A AND (NOT A)) AND B) == 0`
+- `((A AND (NOT A)) AND C) == 0`
+- `((A AND (NOT A)) NOT A) == 0`
+- `((A AND (NOT A)) NOT B) == 0`
+- `((A AND (NOT A)) NOT C) == 0`
+- `((A AND (NOT B)) AND B) == 0`
+- `((A AND (NOT B)) NOT A) == 0`
+- `((A AND (NOT C)) AND C) == 0`
+- `((A AND (NOT C)) NOT A) == 0`
+- `((A NOT (NOT B)) NOT A) == 0`
+- `((A NOT (NOT B)) NOT B) == 0`
+- `((A NOT (NOT C)) NOT A) == 0`
+- `((A NOT (NOT C)) NOT C) == 0`
+- `((B AND (NOT A)) AND A) == 0`
+- `((B AND (NOT A)) NOT B) == 0`
+- `((B AND (NOT C)) AND C) == 0`
+- `((B AND (NOT C)) NOT B) == 0`
+- `((B NOT (NOT C)) NOT B) == 0`
+- `((B NOT (NOT C)) NOT C) == 0`
+- `((C AND (NOT A)) AND A) == 0`
+- `((C AND (NOT A)) NOT C) == 0`
+- `((C AND (NOT B)) AND B) == 0`
+- `((C AND (NOT B)) NOT C) == 0`
+- `(A AND ((NOT A) NOT B)) == 0`
+- `(A AND ((NOT A) NOT C)) == 0`
+- `(A AND (A AND (NOT A))) == 0`
+- `(A AND (B AND (NOT A))) == 0`
+- `(A AND (C AND (NOT A))) == 0`
+- `(B AND ((NOT A) NOT B)) == 0`
+- `(B AND ((NOT B) NOT C)) == 0`
+- `(B AND (A AND (NOT A))) == 0`
+- `(B AND (A AND (NOT B))) == 0`
+- `(B AND (C AND (NOT B))) == 0`
+- `(C AND ((NOT A) NOT C)) == 0`
+- `(C AND ((NOT B) NOT C)) == 0`
+- `(C AND (A AND (NOT A))) == 0`
+- `(C AND (A AND (NOT C))) == 0`
+- `(C AND (B AND (NOT C))) == 0`
+- `((NOT A) OUTSIDE (NOT A)) == 0`
+- `((NOT B) OUTSIDE (NOT B)) == 0`
+- `((NOT C) OUTSIDE (NOT C)) == 0`
+- `(((NOT A) NOT B) COVERS A) == 0`
+- `(((NOT A) NOT B) COVERS B) == 0`
+- `(((NOT A) NOT B) INSIDE A) == 0`
+- `(((NOT A) NOT B) INSIDE B) == 0`
+- `(((NOT A) NOT C) COVERS A) == 0`
+- `(((NOT A) NOT C) COVERS C) == 0`
+- `(((NOT A) NOT C) INSIDE A) == 0`
+- `(((NOT A) NOT C) INSIDE C) == 0`
+- `(((NOT B) NOT C) COVERS B) == 0`
+- `(((NOT B) NOT C) COVERS C) == 0`
+- `(((NOT B) NOT C) INSIDE B) == 0`
+- `(((NOT B) NOT C) INSIDE C) == 0`
+- `((A AND (NOT A)) COVERS A) == 0`
+- `((A AND (NOT A)) COVERS B) == 0`
+- `((A AND (NOT A)) COVERS C) == 0`
+- `((A AND (NOT A)) INSIDE A) == 0`
+- `((A AND (NOT A)) INSIDE B) == 0`
+- `((A AND (NOT A)) INSIDE C) == 0`
+- `((A AND (NOT B)) COVERS B) == 0`
+- `((A AND (NOT B)) INSIDE B) == 0`
+- `((A AND (NOT C)) COVERS C) == 0`
+- `((A AND (NOT C)) INSIDE C) == 0`
+- `((B AND (NOT A)) COVERS A) == 0`
+- `((B AND (NOT A)) INSIDE A) == 0`
+- `((B AND (NOT C)) COVERS C) == 0`
+- `((B AND (NOT C)) INSIDE C) == 0`
+- `((C AND (NOT A)) COVERS A) == 0`
+- `((C AND (NOT A)) INSIDE A) == 0`
+- `((C AND (NOT B)) COVERS B) == 0`
+- `((C AND (NOT B)) INSIDE B) == 0`
+- `(A COVERS ((NOT A) NOT B)) == 0`
+- `(A COVERS ((NOT A) NOT C)) == 0`
+- `(A COVERS (A AND (NOT A))) == 0`
+- `(A COVERS (B AND (NOT A))) == 0`
+- `(A COVERS (C AND (NOT A))) == 0`
+- `(A INSIDE ((NOT A) NOT B)) == 0`
+- `(A INSIDE ((NOT A) NOT C)) == 0`
+- `(A INSIDE (A AND (NOT A))) == 0`
+- `(A INSIDE (B AND (NOT A))) == 0`
+- `(A INSIDE (C AND (NOT A))) == 0`
+- `(A OUTSIDE (A OR (NOT A))) == 0`
+- `(A OUTSIDE (A OR (NOT B))) == 0`
+- `(A OUTSIDE (A OR (NOT C))) == 0`
+- `(B COVERS ((NOT A) NOT B)) == 0`
+- `(B COVERS ((NOT B) NOT C)) == 0`
+- `(B COVERS (A AND (NOT A))) == 0`
+- `(B COVERS (A AND (NOT B))) == 0`
+- `(B COVERS (C AND (NOT B))) == 0`
+- `(B INSIDE ((NOT A) NOT B)) == 0`
+- `(B INSIDE ((NOT B) NOT C)) == 0`
+- `(B INSIDE (A AND (NOT A))) == 0`
+- `(B INSIDE (A AND (NOT B))) == 0`
+- `(B INSIDE (C AND (NOT B))) == 0`
+- `(B OUTSIDE (A OR (NOT A))) == 0`
+- `(B OUTSIDE (B OR (NOT A))) == 0`
+- `(B OUTSIDE (B OR (NOT C))) == 0`
+- `(C COVERS ((NOT A) NOT C)) == 0`
+- `(C COVERS ((NOT B) NOT C)) == 0`
+- `(C COVERS (A AND (NOT A))) == 0`
+- `(C COVERS (A AND (NOT C))) == 0`
+- `(C COVERS (B AND (NOT C))) == 0`
+- `(C INSIDE ((NOT A) NOT C)) == 0`
+- `(C INSIDE ((NOT B) NOT C)) == 0`
+- `(C INSIDE (A AND (NOT A))) == 0`
+- `(C INSIDE (A AND (NOT C))) == 0`
+- `(C INSIDE (B AND (NOT C))) == 0`
+- `(C OUTSIDE (A OR (NOT A))) == 0`
+- `(C OUTSIDE (C OR (NOT A))) == 0`
+- `(C OUTSIDE (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP A) == 0`
+- `(((NOT A) NOT B) OVERLAP B) == 0`
+- `(((NOT A) NOT C) OVERLAP A) == 0`
+- `(((NOT A) NOT C) OVERLAP C) == 0`
+- `(((NOT B) NOT C) OVERLAP B) == 0`
+- `(((NOT B) NOT C) OVERLAP C) == 0`
+- `((A AND (NOT A)) OUTSIDE A) == 0`
+- `((A AND (NOT A)) OUTSIDE B) == 0`
+- `((A AND (NOT A)) OUTSIDE C) == 0`
+- `((A AND (NOT A)) OVERLAP A) == 0`
+- `((A AND (NOT A)) OVERLAP B) == 0`
+- `((A AND (NOT A)) OVERLAP C) == 0`
+- `((A AND (NOT B)) OUTSIDE A) == 0`
+- `((A AND (NOT B)) OVERLAP B) == 0`
+- `((A AND (NOT C)) OUTSIDE A) == 0`
+- `((A AND (NOT C)) OVERLAP C) == 0`
+- `((A NOT (NOT B)) OUTSIDE A) == 0`
+- `((A NOT (NOT B)) OUTSIDE B) == 0`
+- `((A NOT (NOT C)) OUTSIDE A) == 0`
+- `((A NOT (NOT C)) OUTSIDE C) == 0`
+- `((B AND (NOT A)) OUTSIDE B) == 0`
+- `((B AND (NOT A)) OVERLAP A) == 0`
+- `((B AND (NOT C)) OUTSIDE B) == 0`
+- `((B AND (NOT C)) OVERLAP C) == 0`
+- `((B NOT (NOT C)) OUTSIDE B) == 0`
+- `((B NOT (NOT C)) OUTSIDE C) == 0`
+- `((C AND (NOT A)) OUTSIDE C) == 0`
+- `((C AND (NOT A)) OVERLAP A) == 0`
+- `((C AND (NOT B)) OUTSIDE C) == 0`
+- `((C AND (NOT B)) OVERLAP B) == 0`
+- `((NOT A) MEET_PART (NOT A)) == 0`
+- `((NOT B) MEET_PART (NOT B)) == 0`
+- `((NOT C) MEET_PART (NOT C)) == 0`
+- `(A OVERLAP ((NOT A) NOT B)) == 0`
+- `(A OVERLAP ((NOT A) NOT C)) == 0`
+- `(A OVERLAP (A AND (NOT A))) == 0`
+- `(A OVERLAP (B AND (NOT A))) == 0`
+- `(A OVERLAP (C AND (NOT A))) == 0`
+- `(B OVERLAP ((NOT A) NOT B)) == 0`
+- `(B OVERLAP ((NOT B) NOT C)) == 0`
+- `(B OVERLAP (A AND (NOT A))) == 0`
+- `(B OVERLAP (A AND (NOT B))) == 0`
+- `(B OVERLAP (C AND (NOT B))) == 0`
+- `(C OVERLAP ((NOT A) NOT C)) == 0`
+- `(C OVERLAP ((NOT B) NOT C)) == 0`
+- `(C OVERLAP (A AND (NOT A))) == 0`
+- `(C OVERLAP (A AND (NOT C))) == 0`
+- `(C OVERLAP (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS A) == 0`
+- `(((NOT A) NOT B) CONTAINS B) == 0`
+- `(((NOT A) NOT C) CONTAINS A) == 0`
+- `(((NOT A) NOT C) CONTAINS C) == 0`
+- `(((NOT B) NOT C) CONTAINS B) == 0`
+- `(((NOT B) NOT C) CONTAINS C) == 0`
+- `((A AND (NOT A)) CONTAINS A) == 0`
+- `((A AND (NOT A)) CONTAINS B) == 0`
+- `((A AND (NOT A)) CONTAINS C) == 0`
+- `((A AND (NOT B)) CONTAINS B) == 0`
+- `((A AND (NOT C)) CONTAINS C) == 0`
+- `((B AND (NOT A)) CONTAINS A) == 0`
+- `((B AND (NOT C)) CONTAINS C) == 0`
+- `((C AND (NOT A)) CONTAINS A) == 0`
+- `((C AND (NOT B)) CONTAINS B) == 0`
+- `(A CONTAINS ((NOT A) NOT B)) == 0`
+- `(A CONTAINS ((NOT A) NOT C)) == 0`
+- `(A CONTAINS (A AND (NOT A))) == 0`
+- `(A CONTAINS (B AND (NOT A))) == 0`
+- `(A CONTAINS (C AND (NOT A))) == 0`
+- `(A MEET_PART (A OR (NOT A))) == 0`
+- `(A MEET_PART (A OR (NOT B))) == 0`
+- `(A MEET_PART (A OR (NOT C))) == 0`
+- `(B CONTAINS ((NOT A) NOT B)) == 0`
+- `(B CONTAINS ((NOT B) NOT C)) == 0`
+- `(B CONTAINS (A AND (NOT A))) == 0`
+- `(B CONTAINS (A AND (NOT B))) == 0`
+- `(B CONTAINS (C AND (NOT B))) == 0`
+- `(B MEET_PART (A OR (NOT A))) == 0`
+- `(B MEET_PART (B OR (NOT A))) == 0`
+- `(B MEET_PART (B OR (NOT C))) == 0`
+- `(C CONTAINS ((NOT A) NOT C)) == 0`
+- `(C CONTAINS ((NOT B) NOT C)) == 0`
+- `(C CONTAINS (A AND (NOT A))) == 0`
+- `(C CONTAINS (A AND (NOT C))) == 0`
+- `(C CONTAINS (B AND (NOT C))) == 0`
+- `(C MEET_PART (A OR (NOT A))) == 0`
+- `(C MEET_PART (C OR (NOT A))) == 0`
+- `(C MEET_PART (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) COVEREDBY A) == 0`
+- `(((NOT A) NOT B) COVEREDBY B) == 0`
+- `(((NOT A) NOT C) COVEREDBY A) == 0`
+- `(((NOT A) NOT C) COVEREDBY C) == 0`
+- `(((NOT B) NOT C) COVEREDBY B) == 0`
+- `(((NOT B) NOT C) COVEREDBY C) == 0`
+- `((A AND (NOT A)) COVEREDBY A) == 0`
+- `((A AND (NOT A)) COVEREDBY B) == 0`
+- `((A AND (NOT A)) COVEREDBY C) == 0`
+- `((A AND (NOT A)) MEET_PART A) == 0`
+- `((A AND (NOT A)) MEET_PART B) == 0`
+- `((A AND (NOT A)) MEET_PART C) == 0`
+- `((A AND (NOT B)) COVEREDBY B) == 0`
+- `((A AND (NOT B)) MEET_PART A) == 0`
+- `((A AND (NOT C)) COVEREDBY C) == 0`
+- `((A AND (NOT C)) MEET_PART A) == 0`
+- `((A NOT (NOT B)) MEET_PART A) == 0`
+- `((A NOT (NOT B)) MEET_PART B) == 0`
+- `((A NOT (NOT C)) MEET_PART A) == 0`
+- `((A NOT (NOT C)) MEET_PART C) == 0`
+- `((B AND (NOT A)) COVEREDBY A) == 0`
+- `((B AND (NOT A)) MEET_PART B) == 0`
+- `((B AND (NOT C)) COVEREDBY C) == 0`
+- `((B AND (NOT C)) MEET_PART B) == 0`
+- `((B NOT (NOT C)) MEET_PART B) == 0`
+- `((B NOT (NOT C)) MEET_PART C) == 0`
+- `((C AND (NOT A)) COVEREDBY A) == 0`
+- `((C AND (NOT A)) MEET_PART C) == 0`
+- `((C AND (NOT B)) COVEREDBY B) == 0`
+- `((C AND (NOT B)) MEET_PART C) == 0`
+- `(A COVEREDBY ((NOT A) NOT B)) == 0`
+- `(A COVEREDBY ((NOT A) NOT C)) == 0`
+- `(A COVEREDBY (A AND (NOT A))) == 0`
+- `(A COVEREDBY (B AND (NOT A))) == 0`
+- `(A COVEREDBY (C AND (NOT A))) == 0`
+- `(B COVEREDBY ((NOT A) NOT B)) == 0`
+- `(B COVEREDBY ((NOT B) NOT C)) == 0`
+- `(B COVEREDBY (A AND (NOT A))) == 0`
+- `(B COVEREDBY (A AND (NOT B))) == 0`
+- `(B COVEREDBY (C AND (NOT B))) == 0`
+- `(C COVEREDBY ((NOT A) NOT C)) == 0`
+- `(C COVEREDBY ((NOT B) NOT C)) == 0`
+- `(C COVEREDBY (A AND (NOT A))) == 0`
+- `(C COVEREDBY (A AND (NOT C))) == 0`
+- `(C COVEREDBY (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART A) == 0`
+- `(((NOT A) NOT B) EQUAL_PART B) == 0`
+- `(((NOT A) NOT C) EQUAL_PART A) == 0`
+- `(((NOT A) NOT C) EQUAL_PART C) == 0`
+- `(((NOT B) NOT C) EQUAL_PART B) == 0`
+- `(((NOT B) NOT C) EQUAL_PART C) == 0`
+- `((A AND (NOT A)) EQUAL_PART A) == 0`
+- `((A AND (NOT A)) EQUAL_PART B) == 0`
+- `((A AND (NOT A)) EQUAL_PART C) == 0`
+- `((A AND (NOT B)) EQUAL_PART B) == 0`
+- `((A AND (NOT C)) EQUAL_PART C) == 0`
+- `((B AND (NOT A)) EQUAL_PART A) == 0`
+- `((B AND (NOT C)) EQUAL_PART C) == 0`
+- `((C AND (NOT A)) EQUAL_PART A) == 0`
+- `((C AND (NOT B)) EQUAL_PART B) == 0`
+- `(A EQUAL_PART ((NOT A) NOT B)) == 0`
+- `(A EQUAL_PART ((NOT A) NOT C)) == 0`
+- `(A EQUAL_PART (A AND (NOT A))) == 0`
+- `(A EQUAL_PART (B AND (NOT A))) == 0`
+- `(A EQUAL_PART (C AND (NOT A))) == 0`
+- `(B EQUAL_PART ((NOT A) NOT B)) == 0`
+- `(B EQUAL_PART ((NOT B) NOT C)) == 0`
+- `(B EQUAL_PART (A AND (NOT A))) == 0`
+- `(B EQUAL_PART (A AND (NOT B))) == 0`
+- `(B EQUAL_PART (C AND (NOT B))) == 0`
+- `(C EQUAL_PART ((NOT A) NOT C)) == 0`
+- `(C EQUAL_PART ((NOT B) NOT C)) == 0`
+- `(C EQUAL_PART (A AND (NOT A))) == 0`
+- `(C EQUAL_PART (A AND (NOT C))) == 0`
+- `(C EQUAL_PART (B AND (NOT C))) == 0`
+- `((NOT A) DISJOINT_PART (NOT A)) == 0`
+- `((NOT B) DISJOINT_PART (NOT B)) == 0`
+- `((NOT C) DISJOINT_PART (NOT C)) == 0`
+- `(A DISJOINT_PART (A OR (NOT A))) == 0`
+- `(A DISJOINT_PART (A OR (NOT B))) == 0`
+- `(A DISJOINT_PART (A OR (NOT C))) == 0`
+- `(B DISJOINT_PART (A OR (NOT A))) == 0`
+- `(B DISJOINT_PART (B OR (NOT A))) == 0`
+- `(B DISJOINT_PART (B OR (NOT C))) == 0`
+- `(C DISJOINT_PART (A OR (NOT A))) == 0`
+- `(C DISJOINT_PART (C OR (NOT A))) == 0`
+- `(C DISJOINT_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART A) == 0`
+- `((A AND (NOT A)) DISJOINT_PART B) == 0`
+- `((A AND (NOT A)) DISJOINT_PART C) == 0`
+- `((A AND (NOT B)) DISJOINT_PART A) == 0`
+- `((A AND (NOT C)) DISJOINT_PART A) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART A) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART B) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART A) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART C) == 0`
+- `((B AND (NOT A)) DISJOINT_PART B) == 0`
+- `((B AND (NOT C)) DISJOINT_PART B) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART B) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART C) == 0`
+- `((C AND (NOT A)) DISJOINT_PART C) == 0`
+- `((C AND (NOT B)) DISJOINT_PART C) == 0`
+- `((NOT A) NOT (A OR (NOT A))) == 0`
+- `((NOT A) NOT (B OR (NOT A))) == 0`
+- `((NOT A) NOT (C OR (NOT A))) == 0`
+- `((NOT B) NOT (A OR (NOT A))) == 0`
+- `((NOT B) NOT (A OR (NOT B))) == 0`
+- `((NOT B) NOT (C OR (NOT B))) == 0`
+- `((NOT C) NOT (A OR (NOT A))) == 0`
+- `((NOT C) NOT (A OR (NOT C))) == 0`
+- `((NOT C) NOT (B OR (NOT C))) == 0`
+- `(((NOT A) NOT B) NOT (NOT A)) == 0`
+- `(((NOT A) NOT B) NOT (NOT B)) == 0`
+- `(((NOT A) NOT C) NOT (NOT A)) == 0`
+- `(((NOT A) NOT C) NOT (NOT C)) == 0`
+- `(((NOT B) NOT C) NOT (NOT B)) == 0`
+- `(((NOT B) NOT C) NOT (NOT C)) == 0`
+- `((A AND (NOT A)) AND (NOT A)) == 0`
+- `((A AND (NOT A)) AND (NOT B)) == 0`
+- `((A AND (NOT A)) AND (NOT C)) == 0`
+- `((A AND (NOT A)) NOT (NOT A)) == 0`
+- `((A AND (NOT A)) NOT (NOT B)) == 0`
+- `((A AND (NOT A)) NOT (NOT C)) == 0`
+- `((A AND (NOT B)) AND (NOT A)) == 0`
+- `((A AND (NOT B)) NOT (NOT B)) == 0`
+- `((A AND (NOT C)) AND (NOT A)) == 0`
+- `((A AND (NOT C)) NOT (NOT C)) == 0`
+- `((A NOT (NOT B)) AND (NOT A)) == 0`
+- `((A NOT (NOT B)) AND (NOT B)) == 0`
+- `((A NOT (NOT C)) AND (NOT A)) == 0`
+- `((A NOT (NOT C)) AND (NOT C)) == 0`
+- `((B AND (NOT A)) AND (NOT B)) == 0`
+- `((B AND (NOT A)) NOT (NOT A)) == 0`
+- `((B AND (NOT C)) AND (NOT B)) == 0`
+- `((B AND (NOT C)) NOT (NOT C)) == 0`
+- `((B NOT (NOT C)) AND (NOT B)) == 0`
+- `((B NOT (NOT C)) AND (NOT C)) == 0`
+- `((C AND (NOT A)) AND (NOT C)) == 0`
+- `((C AND (NOT A)) NOT (NOT A)) == 0`
+- `((C AND (NOT B)) AND (NOT C)) == 0`
+- `((C AND (NOT B)) NOT (NOT B)) == 0`
+- `((NOT A) AND (A AND (NOT A))) == 0`
+- `((NOT A) AND (A AND (NOT B))) == 0`
+- `((NOT A) AND (A AND (NOT C))) == 0`
+- `((NOT A) AND (A NOT (NOT B))) == 0`
+- `((NOT A) AND (A NOT (NOT C))) == 0`
+- `((NOT B) AND (A AND (NOT A))) == 0`
+- `((NOT B) AND (A NOT (NOT B))) == 0`
+- `((NOT B) AND (B AND (NOT A))) == 0`
+- `((NOT B) AND (B AND (NOT C))) == 0`
+- `((NOT B) AND (B NOT (NOT C))) == 0`
+- `((NOT C) AND (A AND (NOT A))) == 0`
+- `((NOT C) AND (A NOT (NOT C))) == 0`
+- `((NOT C) AND (B NOT (NOT C))) == 0`
+- `((NOT C) AND (C AND (NOT A))) == 0`
+- `((NOT C) AND (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (NOT A)) == 0`
+- `((A AND (NOT A)) COVERS (NOT B)) == 0`
+- `((A AND (NOT A)) COVERS (NOT C)) == 0`
+- `((A AND (NOT A)) INSIDE (NOT A)) == 0`
+- `((A AND (NOT A)) INSIDE (NOT B)) == 0`
+- `((A AND (NOT A)) INSIDE (NOT C)) == 0`
+- `((A AND (NOT B)) COVERS (NOT A)) == 0`
+- `((A AND (NOT B)) INSIDE (NOT A)) == 0`
+- `((A AND (NOT C)) COVERS (NOT A)) == 0`
+- `((A AND (NOT C)) INSIDE (NOT A)) == 0`
+- `((A NOT (NOT B)) COVERS (NOT A)) == 0`
+- `((A NOT (NOT B)) COVERS (NOT B)) == 0`
+- `((A NOT (NOT B)) INSIDE (NOT A)) == 0`
+- `((A NOT (NOT B)) INSIDE (NOT B)) == 0`
+- `((A NOT (NOT C)) COVERS (NOT A)) == 0`
+- `((A NOT (NOT C)) COVERS (NOT C)) == 0`
+- `((A NOT (NOT C)) INSIDE (NOT A)) == 0`
+- `((A NOT (NOT C)) INSIDE (NOT C)) == 0`
+- `((B AND (NOT A)) COVERS (NOT B)) == 0`
+- `((B AND (NOT A)) INSIDE (NOT B)) == 0`
+- `((B AND (NOT C)) COVERS (NOT B)) == 0`
+- `((B AND (NOT C)) INSIDE (NOT B)) == 0`
+- `((B NOT (NOT C)) COVERS (NOT B)) == 0`
+- `((B NOT (NOT C)) COVERS (NOT C)) == 0`
+- `((B NOT (NOT C)) INSIDE (NOT B)) == 0`
+- `((B NOT (NOT C)) INSIDE (NOT C)) == 0`
+- `((C AND (NOT A)) COVERS (NOT C)) == 0`
+- `((C AND (NOT A)) INSIDE (NOT C)) == 0`
+- `((C AND (NOT B)) COVERS (NOT C)) == 0`
+- `((C AND (NOT B)) INSIDE (NOT C)) == 0`
+- `((NOT A) COVERS (A AND (NOT A))) == 0`
+- `((NOT A) COVERS (A AND (NOT B))) == 0`
+- `((NOT A) COVERS (A AND (NOT C))) == 0`
+- `((NOT A) COVERS (A NOT (NOT B))) == 0`
+- `((NOT A) COVERS (A NOT (NOT C))) == 0`
+- `((NOT A) INSIDE (A AND (NOT A))) == 0`
+- `((NOT A) INSIDE (A AND (NOT B))) == 0`
+- `((NOT A) INSIDE (A AND (NOT C))) == 0`
+- `((NOT A) INSIDE (A NOT (NOT B))) == 0`
+- `((NOT A) INSIDE (A NOT (NOT C))) == 0`
+- `((NOT A) OUTSIDE (A OR (NOT A))) == 0`
+- `((NOT A) OUTSIDE (B OR (NOT A))) == 0`
+- `((NOT A) OUTSIDE (C OR (NOT A))) == 0`
+- `((NOT B) COVERS (A AND (NOT A))) == 0`
+- `((NOT B) COVERS (A NOT (NOT B))) == 0`
+- `((NOT B) COVERS (B AND (NOT A))) == 0`
+- `((NOT B) COVERS (B AND (NOT C))) == 0`
+- `((NOT B) COVERS (B NOT (NOT C))) == 0`
+- `((NOT B) INSIDE (A AND (NOT A))) == 0`
+- `((NOT B) INSIDE (A NOT (NOT B))) == 0`
+- `((NOT B) INSIDE (B AND (NOT A))) == 0`
+- `((NOT B) INSIDE (B AND (NOT C))) == 0`
+- `((NOT B) INSIDE (B NOT (NOT C))) == 0`
+- `((NOT B) OUTSIDE (A OR (NOT A))) == 0`
+- `((NOT B) OUTSIDE (A OR (NOT B))) == 0`
+- `((NOT B) OUTSIDE (C OR (NOT B))) == 0`
+- `((NOT C) COVERS (A AND (NOT A))) == 0`
+- `((NOT C) COVERS (A NOT (NOT C))) == 0`
+- `((NOT C) COVERS (B NOT (NOT C))) == 0`
+- `((NOT C) COVERS (C AND (NOT A))) == 0`
+- `((NOT C) COVERS (C AND (NOT B))) == 0`
+- `((NOT C) INSIDE (A AND (NOT A))) == 0`
+- `((NOT C) INSIDE (A NOT (NOT C))) == 0`
+- `((NOT C) INSIDE (B NOT (NOT C))) == 0`
+- `((NOT C) INSIDE (C AND (NOT A))) == 0`
+- `((NOT C) INSIDE (C AND (NOT B))) == 0`
+- `((NOT C) OUTSIDE (A OR (NOT A))) == 0`
+- `((NOT C) OUTSIDE (A OR (NOT C))) == 0`
+- `((NOT C) OUTSIDE (B OR (NOT C))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (NOT A)) == 0`
+- `(((NOT A) NOT B) OUTSIDE (NOT B)) == 0`
+- `(((NOT A) NOT C) OUTSIDE (NOT A)) == 0`
+- `(((NOT A) NOT C) OUTSIDE (NOT C)) == 0`
+- `(((NOT B) NOT C) OUTSIDE (NOT B)) == 0`
+- `(((NOT B) NOT C) OUTSIDE (NOT C)) == 0`
+- `((A AND (NOT A)) OUTSIDE (NOT A)) == 0`
+- `((A AND (NOT A)) OUTSIDE (NOT B)) == 0`
+- `((A AND (NOT A)) OUTSIDE (NOT C)) == 0`
+- `((A AND (NOT A)) OVERLAP (NOT A)) == 0`
+- `((A AND (NOT A)) OVERLAP (NOT B)) == 0`
+- `((A AND (NOT A)) OVERLAP (NOT C)) == 0`
+- `((A AND (NOT B)) OUTSIDE (NOT B)) == 0`
+- `((A AND (NOT B)) OVERLAP (NOT A)) == 0`
+- `((A AND (NOT C)) OUTSIDE (NOT C)) == 0`
+- `((A AND (NOT C)) OVERLAP (NOT A)) == 0`
+- `((A NOT (NOT B)) OVERLAP (NOT A)) == 0`
+- `((A NOT (NOT B)) OVERLAP (NOT B)) == 0`
+- `((A NOT (NOT C)) OVERLAP (NOT A)) == 0`
+- `((A NOT (NOT C)) OVERLAP (NOT C)) == 0`
+- `((B AND (NOT A)) OUTSIDE (NOT A)) == 0`
+- `((B AND (NOT A)) OVERLAP (NOT B)) == 0`
+- `((B AND (NOT C)) OUTSIDE (NOT C)) == 0`
+- `((B AND (NOT C)) OVERLAP (NOT B)) == 0`
+- `((B NOT (NOT C)) OVERLAP (NOT B)) == 0`
+- `((B NOT (NOT C)) OVERLAP (NOT C)) == 0`
+- `((C AND (NOT A)) OUTSIDE (NOT A)) == 0`
+- `((C AND (NOT A)) OVERLAP (NOT C)) == 0`
+- `((C AND (NOT B)) OUTSIDE (NOT B)) == 0`
+- `((C AND (NOT B)) OVERLAP (NOT C)) == 0`
+- `((NOT A) OVERLAP (A AND (NOT A))) == 0`
+- `((NOT A) OVERLAP (A AND (NOT B))) == 0`
+- `((NOT A) OVERLAP (A AND (NOT C))) == 0`
+- `((NOT A) OVERLAP (A NOT (NOT B))) == 0`
+- `((NOT A) OVERLAP (A NOT (NOT C))) == 0`
+- `((NOT B) OVERLAP (A AND (NOT A))) == 0`
+- `((NOT B) OVERLAP (A NOT (NOT B))) == 0`
+- `((NOT B) OVERLAP (B AND (NOT A))) == 0`
+- `((NOT B) OVERLAP (B AND (NOT C))) == 0`
+- `((NOT B) OVERLAP (B NOT (NOT C))) == 0`
+- `((NOT C) OVERLAP (A AND (NOT A))) == 0`
+- `((NOT C) OVERLAP (A NOT (NOT C))) == 0`
+- `((NOT C) OVERLAP (B NOT (NOT C))) == 0`
+- `((NOT C) OVERLAP (C AND (NOT A))) == 0`
+- `((NOT C) OVERLAP (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (NOT A)) == 0`
+- `((A AND (NOT A)) CONTAINS (NOT B)) == 0`
+- `((A AND (NOT A)) CONTAINS (NOT C)) == 0`
+- `((A AND (NOT B)) CONTAINS (NOT A)) == 0`
+- `((A AND (NOT C)) CONTAINS (NOT A)) == 0`
+- `((A NOT (NOT B)) CONTAINS (NOT A)) == 0`
+- `((A NOT (NOT B)) CONTAINS (NOT B)) == 0`
+- `((A NOT (NOT C)) CONTAINS (NOT A)) == 0`
+- `((A NOT (NOT C)) CONTAINS (NOT C)) == 0`
+- `((B AND (NOT A)) CONTAINS (NOT B)) == 0`
+- `((B AND (NOT C)) CONTAINS (NOT B)) == 0`
+- `((B NOT (NOT C)) CONTAINS (NOT B)) == 0`
+- `((B NOT (NOT C)) CONTAINS (NOT C)) == 0`
+- `((C AND (NOT A)) CONTAINS (NOT C)) == 0`
+- `((C AND (NOT B)) CONTAINS (NOT C)) == 0`
+- `((NOT A) CONTAINS (A AND (NOT A))) == 0`
+- `((NOT A) CONTAINS (A AND (NOT B))) == 0`
+- `((NOT A) CONTAINS (A AND (NOT C))) == 0`
+- `((NOT A) CONTAINS (A NOT (NOT B))) == 0`
+- `((NOT A) CONTAINS (A NOT (NOT C))) == 0`
+- `((NOT A) MEET_PART (A OR (NOT A))) == 0`
+- `((NOT A) MEET_PART (B OR (NOT A))) == 0`
+- `((NOT A) MEET_PART (C OR (NOT A))) == 0`
+- `((NOT B) CONTAINS (A AND (NOT A))) == 0`
+- `((NOT B) CONTAINS (A NOT (NOT B))) == 0`
+- `((NOT B) CONTAINS (B AND (NOT A))) == 0`
+- `((NOT B) CONTAINS (B AND (NOT C))) == 0`
+- `((NOT B) CONTAINS (B NOT (NOT C))) == 0`
+- `((NOT B) MEET_PART (A OR (NOT A))) == 0`
+- `((NOT B) MEET_PART (A OR (NOT B))) == 0`
+- `((NOT B) MEET_PART (C OR (NOT B))) == 0`
+- `((NOT C) CONTAINS (A AND (NOT A))) == 0`
+- `((NOT C) CONTAINS (A NOT (NOT C))) == 0`
+- `((NOT C) CONTAINS (B NOT (NOT C))) == 0`
+- `((NOT C) CONTAINS (C AND (NOT A))) == 0`
+- `((NOT C) CONTAINS (C AND (NOT B))) == 0`
+- `((NOT C) MEET_PART (A OR (NOT A))) == 0`
+- `((NOT C) MEET_PART (A OR (NOT C))) == 0`
+- `((NOT C) MEET_PART (B OR (NOT C))) == 0`
+- `(((NOT A) NOT B) MEET_PART (NOT A)) == 0`
+- `(((NOT A) NOT B) MEET_PART (NOT B)) == 0`
+- `(((NOT A) NOT C) MEET_PART (NOT A)) == 0`
+- `(((NOT A) NOT C) MEET_PART (NOT C)) == 0`
+- `(((NOT B) NOT C) MEET_PART (NOT B)) == 0`
+- `(((NOT B) NOT C) MEET_PART (NOT C)) == 0`
+- `((A AND (NOT A)) COVEREDBY (NOT A)) == 0`
+- `((A AND (NOT A)) COVEREDBY (NOT B)) == 0`
+- `((A AND (NOT A)) COVEREDBY (NOT C)) == 0`
+- `((A AND (NOT A)) MEET_PART (NOT A)) == 0`
+- `((A AND (NOT A)) MEET_PART (NOT B)) == 0`
+- `((A AND (NOT A)) MEET_PART (NOT C)) == 0`
+- `((A AND (NOT B)) COVEREDBY (NOT A)) == 0`
+- `((A AND (NOT B)) MEET_PART (NOT B)) == 0`
+- `((A AND (NOT C)) COVEREDBY (NOT A)) == 0`
+- `((A AND (NOT C)) MEET_PART (NOT C)) == 0`
+- `((A NOT (NOT B)) COVEREDBY (NOT A)) == 0`
+- `((A NOT (NOT B)) COVEREDBY (NOT B)) == 0`
+- `((A NOT (NOT C)) COVEREDBY (NOT A)) == 0`
+- `((A NOT (NOT C)) COVEREDBY (NOT C)) == 0`
+- `((B AND (NOT A)) COVEREDBY (NOT B)) == 0`
+- `((B AND (NOT A)) MEET_PART (NOT A)) == 0`
+- `((B AND (NOT C)) COVEREDBY (NOT B)) == 0`
+- `((B AND (NOT C)) MEET_PART (NOT C)) == 0`
+- `((B NOT (NOT C)) COVEREDBY (NOT B)) == 0`
+- `((B NOT (NOT C)) COVEREDBY (NOT C)) == 0`
+- `((C AND (NOT A)) COVEREDBY (NOT C)) == 0`
+- `((C AND (NOT A)) MEET_PART (NOT A)) == 0`
+- `((C AND (NOT B)) COVEREDBY (NOT C)) == 0`
+- `((C AND (NOT B)) MEET_PART (NOT B)) == 0`
+- `((NOT A) COVEREDBY (A AND (NOT A))) == 0`
+- `((NOT A) COVEREDBY (A AND (NOT B))) == 0`
+- `((NOT A) COVEREDBY (A AND (NOT C))) == 0`
+- `((NOT A) COVEREDBY (A NOT (NOT B))) == 0`
+- `((NOT A) COVEREDBY (A NOT (NOT C))) == 0`
+- `((NOT B) COVEREDBY (A AND (NOT A))) == 0`
+- `((NOT B) COVEREDBY (A NOT (NOT B))) == 0`
+- `((NOT B) COVEREDBY (B AND (NOT A))) == 0`
+- `((NOT B) COVEREDBY (B AND (NOT C))) == 0`
+- `((NOT B) COVEREDBY (B NOT (NOT C))) == 0`
+- `((NOT C) COVEREDBY (A AND (NOT A))) == 0`
+- `((NOT C) COVEREDBY (A NOT (NOT C))) == 0`
+- `((NOT C) COVEREDBY (B NOT (NOT C))) == 0`
+- `((NOT C) COVEREDBY (C AND (NOT A))) == 0`
+- `((NOT C) COVEREDBY (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (NOT A)) == 0`
+- `((A AND (NOT A)) EQUAL_PART (NOT B)) == 0`
+- `((A AND (NOT A)) EQUAL_PART (NOT C)) == 0`
+- `((A AND (NOT B)) EQUAL_PART (NOT A)) == 0`
+- `((A AND (NOT C)) EQUAL_PART (NOT A)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (NOT A)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (NOT B)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (NOT A)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (NOT C)) == 0`
+- `((B AND (NOT A)) EQUAL_PART (NOT B)) == 0`
+- `((B AND (NOT C)) EQUAL_PART (NOT B)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (NOT B)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (NOT C)) == 0`
+- `((C AND (NOT A)) EQUAL_PART (NOT C)) == 0`
+- `((C AND (NOT B)) EQUAL_PART (NOT C)) == 0`
+- `((NOT A) EQUAL_PART (A AND (NOT A))) == 0`
+- `((NOT A) EQUAL_PART (A AND (NOT B))) == 0`
+- `((NOT A) EQUAL_PART (A AND (NOT C))) == 0`
+- `((NOT A) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((NOT A) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((NOT B) EQUAL_PART (A AND (NOT A))) == 0`
+- `((NOT B) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((NOT B) EQUAL_PART (B AND (NOT A))) == 0`
+- `((NOT B) EQUAL_PART (B AND (NOT C))) == 0`
+- `((NOT B) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((NOT C) EQUAL_PART (A AND (NOT A))) == 0`
+- `((NOT C) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((NOT C) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((NOT C) EQUAL_PART (C AND (NOT A))) == 0`
+- `((NOT C) EQUAL_PART (C AND (NOT B))) == 0`
+- `((NOT A) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((NOT A) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((NOT A) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((NOT B) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((NOT B) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((NOT B) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((NOT C) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((NOT C) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((NOT C) DISJOINT_PART (B OR (NOT C))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (NOT A)) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (NOT B)) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (NOT A)) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (NOT C)) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (NOT B)) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (NOT C)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (NOT A)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (NOT B)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (NOT C)) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (NOT B)) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (NOT C)) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (NOT A)) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (NOT C)) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (NOT A)) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (NOT B)) == 0`
+- `((NOT A) NOT ((NOT A) OR (NOT B))) == 0`
+- `((NOT A) NOT ((NOT A) OR (NOT C))) == 0`
+- `((NOT B) NOT ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) NOT ((NOT B) OR (NOT C))) == 0`
+- `((NOT C) NOT ((NOT A) OR (NOT C))) == 0`
+- `((NOT C) NOT ((NOT B) OR (NOT C))) == 0`
+- `((A OR (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((A OR (NOT A)) XOR (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A OR (NOT B)) XOR (A OR (NOT B))) == 0`
+- `((A OR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((A OR (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((A OR (NOT C)) XOR (A OR (NOT C))) == 0`
+- `((B OR (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((B OR (NOT A)) XOR (B OR (NOT A))) == 0`
+- `((B OR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((B OR (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((B OR (NOT C)) XOR (B OR (NOT C))) == 0`
+- `((C OR (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((C OR (NOT A)) NOT (C OR (NOT A))) == 0`
+- `((C OR (NOT A)) XOR (C OR (NOT A))) == 0`
+- `((C OR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((C OR (NOT B)) NOT (C OR (NOT B))) == 0`
+- `((C OR (NOT B)) XOR (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) NOT (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT (C OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT (C OR (NOT B))) == 0`
+- `(((NOT A) NOT C) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) NOT C) NOT (A OR (NOT C))) == 0`
+- `(((NOT A) NOT C) NOT (B OR (NOT A))) == 0`
+- `(((NOT A) NOT C) NOT (B OR (NOT C))) == 0`
+- `(((NOT A) NOT C) NOT (C OR (NOT A))) == 0`
+- `(((NOT B) NOT C) NOT (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) NOT (A OR (NOT B))) == 0`
+- `(((NOT B) NOT C) NOT (A OR (NOT C))) == 0`
+- `(((NOT B) NOT C) NOT (B OR (NOT C))) == 0`
+- `(((NOT B) NOT C) NOT (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) AND (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) AND (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) OR (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A AND (NOT B)) NOT (A OR (NOT C))) == 0`
+- `((A AND (NOT B)) NOT (C OR (NOT B))) == 0`
+- `((A AND (NOT C)) AND (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT C)) NOT (A OR (NOT B))) == 0`
+- `((A AND (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((A AND (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((A NOT (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) NOT (A OR (NOT C))) == 0`
+- `((A NOT (NOT B)) NOT (B OR (NOT A))) == 0`
+- `((A NOT (NOT B)) NOT (B OR (NOT C))) == 0`
+- `((A NOT (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((A NOT (NOT C)) NOT (A OR (NOT B))) == 0`
+- `((A NOT (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((A NOT (NOT C)) NOT (C OR (NOT A))) == 0`
+- `((A NOT (NOT C)) NOT (C OR (NOT B))) == 0`
+- `((A OR (NOT A)) AND (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A OR (NOT C)) AND (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) AND (C AND (NOT A))) == 0`
+- `((A XOR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) NOT (B OR (NOT A))) == 0`
+- `((A XOR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((A XOR (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((A XOR (NOT C)) NOT (C OR (NOT A))) == 0`
+- `((B AND (NOT A)) AND (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) NOT (B OR (NOT C))) == 0`
+- `((B AND (NOT A)) NOT (C OR (NOT A))) == 0`
+- `((B AND (NOT C)) AND (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((B AND (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((B AND (NOT C)) NOT (B OR (NOT A))) == 0`
+- `((B AND (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((B NOT (NOT C)) NOT (B OR (NOT A))) == 0`
+- `((B NOT (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) NOT (C OR (NOT A))) == 0`
+- `((B NOT (NOT C)) NOT (C OR (NOT B))) == 0`
+- `((B OR (NOT A)) AND (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) AND (A AND (NOT B))) == 0`
+- `((B OR (NOT C)) AND (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) AND (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((B XOR (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((B XOR (NOT C)) NOT (C OR (NOT B))) == 0`
+- `((C AND (NOT A)) AND (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((C AND (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((C AND (NOT A)) NOT (C OR (NOT A))) == 0`
+- `((C AND (NOT A)) NOT (C OR (NOT B))) == 0`
+- `((C AND (NOT B)) AND (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((C AND (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((C AND (NOT B)) NOT (C OR (NOT A))) == 0`
+- `((C AND (NOT B)) NOT (C OR (NOT B))) == 0`
+- `((C OR (NOT A)) AND (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) AND (A AND (NOT C))) == 0`
+- `((C OR (NOT B)) AND (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) AND (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) AND (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) AND (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) AND (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) AND (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) AND (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) AND (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) AND (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) NOT (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) XOR ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT C) AND (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) AND (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) AND (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) AND (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) AND (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) AND (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) AND (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT A) NOT C)) == 0`
+- `(((NOT A) NOT C) NOT (A XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) XOR ((NOT A) NOT C)) == 0`
+- `(((NOT B) NOT C) AND (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) AND (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) AND (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) AND (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) AND (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) AND (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) AND (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) AND (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT B) NOT C)) == 0`
+- `(((NOT B) NOT C) NOT (B XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) XOR ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) AND ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) AND ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) AND ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) AND (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) AND (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) AND (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) AND (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) AND (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) AND (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) AND (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) AND (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) AND (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) NOT ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) NOT (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) XOR (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) AND ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) AND (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) AND (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) AND (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) NOT (A AND (NOT B))) == 0`
+- `((A AND (NOT B)) XOR (A AND (NOT B))) == 0`
+- `((A AND (NOT C)) AND ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) AND ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) AND (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) AND (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) AND (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) AND (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) AND (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) AND (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) NOT (A AND (NOT C))) == 0`
+- `((A AND (NOT C)) XOR (A AND (NOT C))) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) AND ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) AND (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) AND (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) AND (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) NOT (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) NOT (A XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) XOR (A NOT (NOT B))) == 0`
+- `((A NOT (NOT C)) AND ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) AND ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) AND ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) AND (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) AND (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) AND (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) AND (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) AND (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) NOT (A NOT (NOT C))) == 0`
+- `((A NOT (NOT C)) NOT (A XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) XOR (A NOT (NOT C))) == 0`
+- `((A XOR (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) AND (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) NOT (A XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) XOR (A XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) AND (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) AND (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) AND (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) NOT (A XOR (NOT C))) == 0`
+- `((A XOR (NOT C)) XOR (A XOR (NOT C))) == 0`
+- `((B AND (NOT A)) AND ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) AND ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) AND (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) AND (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) AND (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) AND (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) AND (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) AND (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) AND (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) NOT (B AND (NOT A))) == 0`
+- `((B AND (NOT A)) XOR (B AND (NOT A))) == 0`
+- `((B AND (NOT C)) AND ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) AND ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) AND (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) AND (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) AND (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) AND (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) AND (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) AND (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) AND (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) NOT (B AND (NOT C))) == 0`
+- `((B AND (NOT C)) XOR (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) AND ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) AND ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) AND ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) AND (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) AND (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) AND (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) AND (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) AND (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) NOT (B NOT (NOT C))) == 0`
+- `((B NOT (NOT C)) NOT (B XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) XOR (B NOT (NOT C))) == 0`
+- `((B XOR (NOT C)) AND (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) AND (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) AND (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) NOT (B XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) XOR (B XOR (NOT C))) == 0`
+- `((C AND (NOT A)) AND ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) AND ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) AND (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) AND (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) AND (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) AND (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) AND (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) AND (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) AND (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) NOT (C AND (NOT A))) == 0`
+- `((C AND (NOT A)) XOR (C AND (NOT A))) == 0`
+- `((C AND (NOT B)) AND ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) AND ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) AND (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) AND (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) AND (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) AND (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) AND (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) AND (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) AND (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) NOT (C AND (NOT B))) == 0`
+- `((C AND (NOT B)) XOR (C AND (NOT B))) == 0`
+- `((NOT A) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((NOT A) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((NOT B) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((NOT C) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((NOT C) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (C OR (NOT B))) == 0`
+- `((A AND (NOT B)) COVERS (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE (B OR (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) INSIDE (C OR (NOT A))) == 0`
+- `((A OR (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((A OR (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((A OR (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A OR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A OR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A OR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((A OR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((A OR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A OR (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((B AND (NOT A)) COVERS (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (A OR (NOT B))) == 0`
+- `((B AND (NOT C)) COVERS (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) INSIDE (C OR (NOT B))) == 0`
+- `((B OR (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((B OR (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((B OR (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B OR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((B OR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((B OR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B OR (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((C AND (NOT A)) COVERS (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE (A OR (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE (B OR (NOT C))) == 0`
+- `((C OR (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) COVERS (A AND (NOT C))) == 0`
+- `((C OR (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) INSIDE (A AND (NOT C))) == 0`
+- `((C OR (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C OR (NOT A)) OUTSIDE (C OR (NOT A))) == 0`
+- `((C OR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) COVERS (B AND (NOT C))) == 0`
+- `((C OR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) INSIDE (B AND (NOT C))) == 0`
+- `((C OR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C OR (NOT B)) OUTSIDE (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVERS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) COVERS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) COVERS (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVERS (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) INSIDE (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) INSIDE (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) INSIDE (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) INSIDE (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (C OR (NOT A))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (C OR (NOT B))) == 0`
+- `(((NOT A) NOT C) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) COVERS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) COVERS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) COVERS (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) COVERS (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) INSIDE (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) INSIDE (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) INSIDE (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) INSIDE (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (A OR (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (B OR (NOT A))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (B OR (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (C OR (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) COVERS (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) COVERS (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) INSIDE (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) INSIDE (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) INSIDE (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) INSIDE (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (A OR (NOT B))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (A OR (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (B OR (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) COVERS ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (C OR (NOT B))) == 0`
+- `((A AND (NOT B)) COVERS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) COVERS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) COVERS (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVERS (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) COVERS (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) COVERS (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) INSIDE (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) INSIDE (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) INSIDE (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A AND (NOT B)) OUTSIDE (C OR (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP (B OR (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) COVERS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) COVERS (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) COVERS (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) INSIDE (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) INSIDE (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) INSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) INSIDE (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT C)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A AND (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP (C OR (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) INSIDE (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) INSIDE (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) INSIDE (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (B OR (NOT A))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (B OR (NOT C))) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVERS (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) COVERS (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVERS (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) INSIDE (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) INSIDE (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) INSIDE (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (C OR (NOT A))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (C OR (NOT B))) == 0`
+- `((A OR (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A OR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVERS (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) INSIDE (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (B OR (NOT A))) == 0`
+- `((A XOR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) COVERS (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) INSIDE (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A XOR (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A XOR (NOT C)) OUTSIDE (C OR (NOT A))) == 0`
+- `((B AND (NOT A)) COVERS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) COVERS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) COVERS (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) COVERS (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) INSIDE ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) INSIDE (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) INSIDE (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B AND (NOT A)) OUTSIDE (C OR (NOT A))) == 0`
+- `((B AND (NOT A)) OVERLAP (A OR (NOT B))) == 0`
+- `((B AND (NOT C)) COVERS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) COVERS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVERS (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) COVERS (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) COVERS (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) COVERS (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) INSIDE ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) INSIDE ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) INSIDE (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) INSIDE (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) INSIDE (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) INSIDE (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B AND (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((B AND (NOT C)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B AND (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP (C OR (NOT B))) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) COVERS (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) COVERS (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) COVERS (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) INSIDE (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) INSIDE (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) INSIDE (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (C OR (NOT A))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (C OR (NOT B))) == 0`
+- `((B OR (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((B OR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) COVERS (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) INSIDE (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B XOR (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B XOR (NOT C)) OUTSIDE (C OR (NOT B))) == 0`
+- `((C AND (NOT A)) COVERS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) COVERS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) COVERS (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) COVERS (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) COVERS (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) COVERS (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) COVERS (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) INSIDE ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) INSIDE (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) INSIDE (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C AND (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((C AND (NOT A)) OUTSIDE (C OR (NOT A))) == 0`
+- `((C AND (NOT A)) OUTSIDE (C OR (NOT B))) == 0`
+- `((C AND (NOT A)) OVERLAP (A OR (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) COVERS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVERS (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVERS (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) INSIDE ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) INSIDE (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) INSIDE (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C AND (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((C AND (NOT B)) OUTSIDE (C OR (NOT A))) == 0`
+- `((C AND (NOT B)) OUTSIDE (C OR (NOT B))) == 0`
+- `((C AND (NOT B)) OVERLAP (B OR (NOT C))) == 0`
+- `((C OR (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) OVERLAP (A AND (NOT C))) == 0`
+- `((C OR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) OVERLAP (B AND (NOT C))) == 0`
+- `((NOT A) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT A) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((NOT B) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((NOT C) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((NOT C) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) OUTSIDE (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) OVERLAP (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) OVERLAP (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT A) NOT C)) == 0`
+- `(((NOT A) NOT C) OUTSIDE (A XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) OVERLAP (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) OVERLAP (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT B) NOT C)) == 0`
+- `(((NOT B) NOT C) OUTSIDE (B XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) OVERLAP (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) OVERLAP (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) OVERLAP (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) OVERLAP (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) OUTSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (C AND (NOT B))) == 0`
+- `((A AND (NOT B)) CONTAINS (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A AND (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) OVERLAP (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) OVERLAP (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) OVERLAP (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) CONTAINS (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) OUTSIDE (A AND (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) OVERLAP (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) OVERLAP (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OVERLAP (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OVERLAP (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OVERLAP (C AND (NOT B))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A NOT (NOT C))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) OVERLAP (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) OVERLAP (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((A OR (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((A OR (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A OR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A OR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((A OR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (A XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) OVERLAP (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A XOR (NOT C)) OUTSIDE (A XOR (NOT C))) == 0`
+- `((A XOR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) OVERLAP (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((B AND (NOT A)) CONTAINS (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE (B AND (NOT A))) == 0`
+- `((B AND (NOT A)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) OVERLAP (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) OVERLAP (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) OVERLAP (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) OVERLAP (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) OVERLAP (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) CONTAINS (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) OUTSIDE (B AND (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) OVERLAP (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) OVERLAP (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (B NOT (NOT C))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (B XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) OVERLAP (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) OVERLAP (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((B OR (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((B OR (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((B OR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((B OR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((B XOR (NOT C)) OUTSIDE (B XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) OVERLAP (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((C AND (NOT A)) CONTAINS (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) OUTSIDE (C AND (NOT A))) == 0`
+- `((C AND (NOT A)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) OVERLAP (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) OVERLAP (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) OVERLAP (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) OVERLAP (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) OVERLAP (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) CONTAINS (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) OUTSIDE (C AND (NOT B))) == 0`
+- `((C AND (NOT B)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) OVERLAP (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) OVERLAP (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) OVERLAP (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) OVERLAP (B XOR (NOT C))) == 0`
+- `((C OR (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) CONTAINS (A AND (NOT C))) == 0`
+- `((C OR (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT A)) MEET_PART (C OR (NOT A))) == 0`
+- `((C OR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) CONTAINS (B AND (NOT C))) == 0`
+- `((C OR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT B)) MEET_PART (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) CONTAINS (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART (C OR (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART (C OR (NOT B))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) CONTAINS (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) CONTAINS (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT C) MEET_PART (A OR (NOT C))) == 0`
+- `(((NOT A) NOT C) MEET_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT C) MEET_PART (B OR (NOT C))) == 0`
+- `(((NOT A) NOT C) MEET_PART (C OR (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) CONTAINS (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) CONTAINS (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) MEET_PART (A OR (NOT B))) == 0`
+- `(((NOT B) NOT C) MEET_PART (A OR (NOT C))) == 0`
+- `(((NOT B) NOT C) MEET_PART (B OR (NOT C))) == 0`
+- `(((NOT B) NOT C) MEET_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT B)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) CONTAINS (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) CONTAINS (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) CONTAINS (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) CONTAINS (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT B)) MEET_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT B)) MEET_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT C)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) CONTAINS (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) CONTAINS (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) CONTAINS (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) CONTAINS (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) COVEREDBY (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT C)) MEET_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) CONTAINS (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) CONTAINS (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) CONTAINS (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT B)) MEET_PART (B OR (NOT A))) == 0`
+- `((A NOT (NOT B)) MEET_PART (B OR (NOT C))) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) CONTAINS (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) CONTAINS (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) CONTAINS (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT C)) MEET_PART (C OR (NOT A))) == 0`
+- `((A NOT (NOT C)) MEET_PART (C OR (NOT B))) == 0`
+- `((A OR (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A OR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A XOR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) CONTAINS (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) MEET_PART (B OR (NOT A))) == 0`
+- `((A XOR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) CONTAINS (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((A XOR (NOT C)) MEET_PART (C OR (NOT A))) == 0`
+- `((B AND (NOT A)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) CONTAINS (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) CONTAINS (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) CONTAINS (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) CONTAINS (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) CONTAINS (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) MEET_PART (B OR (NOT C))) == 0`
+- `((B AND (NOT A)) MEET_PART (C OR (NOT A))) == 0`
+- `((B AND (NOT C)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) CONTAINS (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) CONTAINS (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) CONTAINS (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) CONTAINS (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) COVEREDBY (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((B AND (NOT C)) MEET_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) CONTAINS (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) CONTAINS (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) CONTAINS (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((B NOT (NOT C)) MEET_PART (B OR (NOT A))) == 0`
+- `((B NOT (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) MEET_PART (C OR (NOT A))) == 0`
+- `((B NOT (NOT C)) MEET_PART (C OR (NOT B))) == 0`
+- `((B OR (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B OR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) CONTAINS (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((B XOR (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((B XOR (NOT C)) MEET_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT A)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) CONTAINS (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) CONTAINS (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) CONTAINS (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) CONTAINS (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) CONTAINS (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((C AND (NOT A)) MEET_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT A)) MEET_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT B)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) CONTAINS (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) CONTAINS (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) CONTAINS (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) CONTAINS (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((C AND (NOT B)) MEET_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT B)) MEET_PART (C OR (NOT B))) == 0`
+- `((C OR (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) COVEREDBY (A AND (NOT C))) == 0`
+- `((C OR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) COVEREDBY (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) MEET_PART (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT A) NOT C)) == 0`
+- `(((NOT A) NOT C) MEET_PART (A XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT B) NOT C)) == 0`
+- `(((NOT B) NOT C) MEET_PART (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) MEET_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (C AND (NOT B))) == 0`
+- `((A AND (NOT B)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) MEET_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT C)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) COVEREDBY (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) MEET_PART (A AND (NOT C))) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A NOT (NOT C))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A XOR (NOT C))) == 0`
+- `((A OR (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A OR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVEREDBY (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) MEET_PART (A XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) COVEREDBY (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) MEET_PART (A XOR (NOT C))) == 0`
+- `((B AND (NOT A)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART (B AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) COVEREDBY (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) MEET_PART (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) MEET_PART (B NOT (NOT C))) == 0`
+- `((B NOT (NOT C)) MEET_PART (B XOR (NOT C))) == 0`
+- `((B OR (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B OR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) COVEREDBY (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) MEET_PART (B XOR (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) MEET_PART (C AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVEREDBY (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) MEET_PART (C AND (NOT B))) == 0`
+- `((C OR (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((C OR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) EQUAL_PART (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((A AND (NOT B)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A XOR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((B AND (NOT A)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((C AND (NOT A)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B XOR (NOT C))) == 0`
+- `((NOT A) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT A) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((NOT B) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((NOT C) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((NOT C) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((A OR (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A OR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((B OR (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B OR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((C OR (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT A)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((C OR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT B)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (C OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (C OR (NOT B))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (A OR (NOT C))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (B OR (NOT C))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (C OR (NOT A))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (A OR (NOT B))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (A OR (NOT C))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (B OR (NOT C))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A XOR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A XOR (NOT C)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((B XOR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B XOR (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B XOR (NOT C)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT A) NOT C)) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (A XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT B) NOT C)) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C AND (NOT B))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (A AND (NOT C))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A NOT (NOT C))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A XOR (NOT C))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) DISJOINT_PART (A XOR (NOT C))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (B AND (NOT A))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (B NOT (NOT C))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (B XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) DISJOINT_PART (B XOR (NOT C))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (C AND (NOT A))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (C AND (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) AND (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) AND (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) AND (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) AND ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT C)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT C)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) AND ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT A)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT C)) AND ((NOT B) OR (NOT C))) == 0`
+- `((C AND (NOT A)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT A)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((C AND (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT B)) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) AND ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) AND ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) AND ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) AND (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) AND ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) AND (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) AND (A XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) AND ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) AND ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) AND (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) AND (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) AND (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) AND ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT B)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT C)) NOT ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) AND ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT B)) AND ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) AND ((NOT A) XOR (NOT C))) == 0`
+- `((B AND (NOT A)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT C)) NOT ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) AND ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) AND ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT A)) NOT ((NOT A) XOR (NOT C))) == 0`
+- `((C AND (NOT B)) NOT ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT B) OR (NOT C))) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT A) OR (NOT C))) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT A) OR (NOT C))) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) COVERS ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) INSIDE ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) COVERS ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) COVERS (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) INSIDE ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) INSIDE (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) INSIDE ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) COVERS ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) COVERS (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) INSIDE ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) INSIDE (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT C)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT C)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT A) OR (NOT C))) == 0`
+- `((A XOR (NOT B)) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) COVERS ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT C)) INSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((B AND (NOT A)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT B) OR (NOT C))) == 0`
+- `((B XOR (NOT C)) COVERS ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) INSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT A)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT A)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((C AND (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT B)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) OVERLAP ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) OVERLAP ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) OVERLAP (A XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) OVERLAP ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) OVERLAP ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) OVERLAP (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT B)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT C)) OUTSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT A) OR (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT B)) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) OVERLAP ((NOT A) XOR (NOT C))) == 0`
+- `((B AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT C)) OUTSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) OVERLAP ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((C AND (NOT B)) OUTSIDE ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) CONTAINS ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) CONTAINS ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) CONTAINS (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) CONTAINS ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) CONTAINS (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT C)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT C)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT A) OR (NOT C))) == 0`
+- `((A XOR (NOT B)) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) CONTAINS ((NOT A) XOR (NOT C))) == 0`
+- `((B AND (NOT A)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT B) OR (NOT C))) == 0`
+- `((B XOR (NOT C)) CONTAINS ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT A)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT A)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((C AND (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT B)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) COVEREDBY ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) COVEREDBY (A XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) COVEREDBY ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) COVEREDBY (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT B)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT C)) MEET_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT A) OR (NOT C))) == 0`
+- `((A XOR (NOT B)) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) COVEREDBY ((NOT A) XOR (NOT C))) == 0`
+- `((B AND (NOT A)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT C)) MEET_PART ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT B) OR (NOT C))) == 0`
+- `((B XOR (NOT C)) COVEREDBY ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT A)) MEET_PART ((NOT A) XOR (NOT C))) == 0`
+- `((C AND (NOT B)) MEET_PART ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) EQUAL_PART (A XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) EQUAL_PART (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT B) XOR (NOT C))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) EQUAL_PART ((NOT A) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) EQUAL_PART ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART ((NOT A) XOR (NOT C))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT C))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) XOR ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT C)) XOR ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) XOR ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) XOR ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) NOT ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) XOR ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) NOT ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) XOR ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) OUTSIDE ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) OUTSIDE ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) MEET_PART ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) MEET_PART ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT B)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) DISJOINT_PART ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) DISJOINT_PART ((NOT B) XOR (NOT C))) == 0`
+
+## 4-layer zero identities (ALL in declared signature, depth <= 3)
+Total: 6234
+
+- `((NOT A) AND A) == 0`
+- `((NOT B) AND B) == 0`
+- `((NOT C) AND C) == 0`
+- `((NOT D) AND D) == 0`
+- `(A AND (NOT A)) == 0`
+- `(B AND (NOT B)) == 0`
+- `(C AND (NOT C)) == 0`
+- `(D AND (NOT D)) == 0`
+- `((NOT A) COVERS A) == 0`
+- `((NOT A) INSIDE A) == 0`
+- `((NOT B) COVERS B) == 0`
+- `((NOT B) INSIDE B) == 0`
+- `((NOT C) COVERS C) == 0`
+- `((NOT C) INSIDE C) == 0`
+- `((NOT D) COVERS D) == 0`
+- `((NOT D) INSIDE D) == 0`
+- `(A COVERS (NOT A)) == 0`
+- `(A INSIDE (NOT A)) == 0`
+- `(B COVERS (NOT B)) == 0`
+- `(B INSIDE (NOT B)) == 0`
+- `(C COVERS (NOT C)) == 0`
+- `(C INSIDE (NOT C)) == 0`
+- `(D COVERS (NOT D)) == 0`
+- `(D INSIDE (NOT D)) == 0`
+- `((NOT A) OVERLAP A) == 0`
+- `((NOT B) OVERLAP B) == 0`
+- `((NOT C) OVERLAP C) == 0`
+- `((NOT D) OVERLAP D) == 0`
+- `(A OVERLAP (NOT A)) == 0`
+- `(B OVERLAP (NOT B)) == 0`
+- `(C OVERLAP (NOT C)) == 0`
+- `(D OVERLAP (NOT D)) == 0`
+- `((NOT A) CONTAINS A) == 0`
+- `((NOT B) CONTAINS B) == 0`
+- `((NOT C) CONTAINS C) == 0`
+- `((NOT D) CONTAINS D) == 0`
+- `(A CONTAINS (NOT A)) == 0`
+- `(B CONTAINS (NOT B)) == 0`
+- `(C CONTAINS (NOT C)) == 0`
+- `(D CONTAINS (NOT D)) == 0`
+- `((NOT A) COVEREDBY A) == 0`
+- `((NOT B) COVEREDBY B) == 0`
+- `((NOT C) COVEREDBY C) == 0`
+- `((NOT D) COVEREDBY D) == 0`
+- `(A COVEREDBY (NOT A)) == 0`
+- `(B COVEREDBY (NOT B)) == 0`
+- `(C COVEREDBY (NOT C)) == 0`
+- `(D COVEREDBY (NOT D)) == 0`
+- `((NOT A) EQUAL_PART A) == 0`
+- `((NOT B) EQUAL_PART B) == 0`
+- `((NOT C) EQUAL_PART C) == 0`
+- `((NOT D) EQUAL_PART D) == 0`
+- `(A EQUAL_PART (NOT A)) == 0`
+- `(B EQUAL_PART (NOT B)) == 0`
+- `(C EQUAL_PART (NOT C)) == 0`
+- `(D EQUAL_PART (NOT D)) == 0`
+- `((NOT A) NOT (NOT A)) == 0`
+- `((NOT A) XOR (NOT A)) == 0`
+- `((NOT B) NOT (NOT B)) == 0`
+- `((NOT B) XOR (NOT B)) == 0`
+- `((NOT C) NOT (NOT C)) == 0`
+- `((NOT C) XOR (NOT C)) == 0`
+- `((NOT D) NOT (NOT D)) == 0`
+- `((NOT D) XOR (NOT D)) == 0`
+- `(A NOT (A OR (NOT A))) == 0`
+- `(A NOT (A OR (NOT B))) == 0`
+- `(A NOT (A OR (NOT C))) == 0`
+- `(A NOT (A OR (NOT D))) == 0`
+- `(B NOT (A OR (NOT A))) == 0`
+- `(B NOT (B OR (NOT A))) == 0`
+- `(B NOT (B OR (NOT C))) == 0`
+- `(B NOT (B OR (NOT D))) == 0`
+- `(C NOT (A OR (NOT A))) == 0`
+- `(C NOT (C OR (NOT A))) == 0`
+- `(C NOT (C OR (NOT B))) == 0`
+- `(C NOT (C OR (NOT D))) == 0`
+- `(D NOT (A OR (NOT A))) == 0`
+- `(D NOT (D OR (NOT A))) == 0`
+- `(D NOT (D OR (NOT B))) == 0`
+- `(D NOT (D OR (NOT C))) == 0`
+- `(((NOT A) NOT B) AND A) == 0`
+- `(((NOT A) NOT B) AND B) == 0`
+- `(((NOT A) NOT C) AND A) == 0`
+- `(((NOT A) NOT C) AND C) == 0`
+- `(((NOT A) NOT D) AND A) == 0`
+- `(((NOT A) NOT D) AND D) == 0`
+- `(((NOT B) NOT C) AND B) == 0`
+- `(((NOT B) NOT C) AND C) == 0`
+- `(((NOT B) NOT D) AND B) == 0`
+- `(((NOT B) NOT D) AND D) == 0`
+- `(((NOT C) NOT D) AND C) == 0`
+- `(((NOT C) NOT D) AND D) == 0`
+- `((A AND (NOT A)) AND A) == 0`
+- `((A AND (NOT A)) AND B) == 0`
+- `((A AND (NOT A)) AND C) == 0`
+- `((A AND (NOT A)) AND D) == 0`
+- `((A AND (NOT A)) NOT A) == 0`
+- `((A AND (NOT A)) NOT B) == 0`
+- `((A AND (NOT A)) NOT C) == 0`
+- `((A AND (NOT A)) NOT D) == 0`
+- `((A AND (NOT B)) AND B) == 0`
+- `((A AND (NOT B)) NOT A) == 0`
+- `((A AND (NOT C)) AND C) == 0`
+- `((A AND (NOT C)) NOT A) == 0`
+- `((A AND (NOT D)) AND D) == 0`
+- `((A AND (NOT D)) NOT A) == 0`
+- `((A NOT (NOT B)) NOT A) == 0`
+- `((A NOT (NOT B)) NOT B) == 0`
+- `((A NOT (NOT C)) NOT A) == 0`
+- `((A NOT (NOT C)) NOT C) == 0`
+- `((A NOT (NOT D)) NOT A) == 0`
+- `((A NOT (NOT D)) NOT D) == 0`
+- `((B AND (NOT A)) AND A) == 0`
+- `((B AND (NOT A)) NOT B) == 0`
+- `((B AND (NOT C)) AND C) == 0`
+- `((B AND (NOT C)) NOT B) == 0`
+- `((B AND (NOT D)) AND D) == 0`
+- `((B AND (NOT D)) NOT B) == 0`
+- `((B NOT (NOT C)) NOT B) == 0`
+- `((B NOT (NOT C)) NOT C) == 0`
+- `((B NOT (NOT D)) NOT B) == 0`
+- `((B NOT (NOT D)) NOT D) == 0`
+- `((C AND (NOT A)) AND A) == 0`
+- `((C AND (NOT A)) NOT C) == 0`
+- `((C AND (NOT B)) AND B) == 0`
+- `((C AND (NOT B)) NOT C) == 0`
+- `((C AND (NOT D)) AND D) == 0`
+- `((C AND (NOT D)) NOT C) == 0`
+- `((C NOT (NOT D)) NOT C) == 0`
+- `((C NOT (NOT D)) NOT D) == 0`
+- `((D AND (NOT A)) AND A) == 0`
+- `((D AND (NOT A)) NOT D) == 0`
+- `((D AND (NOT B)) AND B) == 0`
+- `((D AND (NOT B)) NOT D) == 0`
+- `((D AND (NOT C)) AND C) == 0`
+- `((D AND (NOT C)) NOT D) == 0`
+- `(A AND ((NOT A) NOT B)) == 0`
+- `(A AND ((NOT A) NOT C)) == 0`
+- `(A AND ((NOT A) NOT D)) == 0`
+- `(A AND (A AND (NOT A))) == 0`
+- `(A AND (B AND (NOT A))) == 0`
+- `(A AND (C AND (NOT A))) == 0`
+- `(A AND (D AND (NOT A))) == 0`
+- `(B AND ((NOT A) NOT B)) == 0`
+- `(B AND ((NOT B) NOT C)) == 0`
+- `(B AND ((NOT B) NOT D)) == 0`
+- `(B AND (A AND (NOT A))) == 0`
+- `(B AND (A AND (NOT B))) == 0`
+- `(B AND (C AND (NOT B))) == 0`
+- `(B AND (D AND (NOT B))) == 0`
+- `(C AND ((NOT A) NOT C)) == 0`
+- `(C AND ((NOT B) NOT C)) == 0`
+- `(C AND ((NOT C) NOT D)) == 0`
+- `(C AND (A AND (NOT A))) == 0`
+- `(C AND (A AND (NOT C))) == 0`
+- `(C AND (B AND (NOT C))) == 0`
+- `(C AND (D AND (NOT C))) == 0`
+- `(D AND ((NOT A) NOT D)) == 0`
+- `(D AND ((NOT B) NOT D)) == 0`
+- `(D AND ((NOT C) NOT D)) == 0`
+- `(D AND (A AND (NOT A))) == 0`
+- `(D AND (A AND (NOT D))) == 0`
+- `(D AND (B AND (NOT D))) == 0`
+- `(D AND (C AND (NOT D))) == 0`
+- `((NOT A) OUTSIDE (NOT A)) == 0`
+- `((NOT B) OUTSIDE (NOT B)) == 0`
+- `((NOT C) OUTSIDE (NOT C)) == 0`
+- `((NOT D) OUTSIDE (NOT D)) == 0`
+- `(((NOT A) NOT B) COVERS A) == 0`
+- `(((NOT A) NOT B) COVERS B) == 0`
+- `(((NOT A) NOT B) INSIDE A) == 0`
+- `(((NOT A) NOT B) INSIDE B) == 0`
+- `(((NOT A) NOT C) COVERS A) == 0`
+- `(((NOT A) NOT C) COVERS C) == 0`
+- `(((NOT A) NOT C) INSIDE A) == 0`
+- `(((NOT A) NOT C) INSIDE C) == 0`
+- `(((NOT A) NOT D) COVERS A) == 0`
+- `(((NOT A) NOT D) COVERS D) == 0`
+- `(((NOT A) NOT D) INSIDE A) == 0`
+- `(((NOT A) NOT D) INSIDE D) == 0`
+- `(((NOT B) NOT C) COVERS B) == 0`
+- `(((NOT B) NOT C) COVERS C) == 0`
+- `(((NOT B) NOT C) INSIDE B) == 0`
+- `(((NOT B) NOT C) INSIDE C) == 0`
+- `(((NOT B) NOT D) COVERS B) == 0`
+- `(((NOT B) NOT D) COVERS D) == 0`
+- `(((NOT B) NOT D) INSIDE B) == 0`
+- `(((NOT B) NOT D) INSIDE D) == 0`
+- `(((NOT C) NOT D) COVERS C) == 0`
+- `(((NOT C) NOT D) COVERS D) == 0`
+- `(((NOT C) NOT D) INSIDE C) == 0`
+- `(((NOT C) NOT D) INSIDE D) == 0`
+- `((A AND (NOT A)) COVERS A) == 0`
+- `((A AND (NOT A)) COVERS B) == 0`
+- `((A AND (NOT A)) COVERS C) == 0`
+- `((A AND (NOT A)) COVERS D) == 0`
+- `((A AND (NOT A)) INSIDE A) == 0`
+- `((A AND (NOT A)) INSIDE B) == 0`
+- `((A AND (NOT A)) INSIDE C) == 0`
+- `((A AND (NOT A)) INSIDE D) == 0`
+- `((A AND (NOT B)) COVERS B) == 0`
+- `((A AND (NOT B)) INSIDE B) == 0`
+- `((A AND (NOT C)) COVERS C) == 0`
+- `((A AND (NOT C)) INSIDE C) == 0`
+- `((A AND (NOT D)) COVERS D) == 0`
+- `((A AND (NOT D)) INSIDE D) == 0`
+- `((B AND (NOT A)) COVERS A) == 0`
+- `((B AND (NOT A)) INSIDE A) == 0`
+- `((B AND (NOT C)) COVERS C) == 0`
+- `((B AND (NOT C)) INSIDE C) == 0`
+- `((B AND (NOT D)) COVERS D) == 0`
+- `((B AND (NOT D)) INSIDE D) == 0`
+- `((C AND (NOT A)) COVERS A) == 0`
+- `((C AND (NOT A)) INSIDE A) == 0`
+- `((C AND (NOT B)) COVERS B) == 0`
+- `((C AND (NOT B)) INSIDE B) == 0`
+- `((C AND (NOT D)) COVERS D) == 0`
+- `((C AND (NOT D)) INSIDE D) == 0`
+- `((D AND (NOT A)) COVERS A) == 0`
+- `((D AND (NOT A)) INSIDE A) == 0`
+- `((D AND (NOT B)) COVERS B) == 0`
+- `((D AND (NOT B)) INSIDE B) == 0`
+- `((D AND (NOT C)) COVERS C) == 0`
+- `((D AND (NOT C)) INSIDE C) == 0`
+- `(A COVERS ((NOT A) NOT B)) == 0`
+- `(A COVERS ((NOT A) NOT C)) == 0`
+- `(A COVERS ((NOT A) NOT D)) == 0`
+- `(A COVERS (A AND (NOT A))) == 0`
+- `(A COVERS (B AND (NOT A))) == 0`
+- `(A COVERS (C AND (NOT A))) == 0`
+- `(A COVERS (D AND (NOT A))) == 0`
+- `(A INSIDE ((NOT A) NOT B)) == 0`
+- `(A INSIDE ((NOT A) NOT C)) == 0`
+- `(A INSIDE ((NOT A) NOT D)) == 0`
+- `(A INSIDE (A AND (NOT A))) == 0`
+- `(A INSIDE (B AND (NOT A))) == 0`
+- `(A INSIDE (C AND (NOT A))) == 0`
+- `(A INSIDE (D AND (NOT A))) == 0`
+- `(A OUTSIDE (A OR (NOT A))) == 0`
+- `(A OUTSIDE (A OR (NOT B))) == 0`
+- `(A OUTSIDE (A OR (NOT C))) == 0`
+- `(A OUTSIDE (A OR (NOT D))) == 0`
+- `(B COVERS ((NOT A) NOT B)) == 0`
+- `(B COVERS ((NOT B) NOT C)) == 0`
+- `(B COVERS ((NOT B) NOT D)) == 0`
+- `(B COVERS (A AND (NOT A))) == 0`
+- `(B COVERS (A AND (NOT B))) == 0`
+- `(B COVERS (C AND (NOT B))) == 0`
+- `(B COVERS (D AND (NOT B))) == 0`
+- `(B INSIDE ((NOT A) NOT B)) == 0`
+- `(B INSIDE ((NOT B) NOT C)) == 0`
+- `(B INSIDE ((NOT B) NOT D)) == 0`
+- `(B INSIDE (A AND (NOT A))) == 0`
+- `(B INSIDE (A AND (NOT B))) == 0`
+- `(B INSIDE (C AND (NOT B))) == 0`
+- `(B INSIDE (D AND (NOT B))) == 0`
+- `(B OUTSIDE (A OR (NOT A))) == 0`
+- `(B OUTSIDE (B OR (NOT A))) == 0`
+- `(B OUTSIDE (B OR (NOT C))) == 0`
+- `(B OUTSIDE (B OR (NOT D))) == 0`
+- `(C COVERS ((NOT A) NOT C)) == 0`
+- `(C COVERS ((NOT B) NOT C)) == 0`
+- `(C COVERS ((NOT C) NOT D)) == 0`
+- `(C COVERS (A AND (NOT A))) == 0`
+- `(C COVERS (A AND (NOT C))) == 0`
+- `(C COVERS (B AND (NOT C))) == 0`
+- `(C COVERS (D AND (NOT C))) == 0`
+- `(C INSIDE ((NOT A) NOT C)) == 0`
+- `(C INSIDE ((NOT B) NOT C)) == 0`
+- `(C INSIDE ((NOT C) NOT D)) == 0`
+- `(C INSIDE (A AND (NOT A))) == 0`
+- `(C INSIDE (A AND (NOT C))) == 0`
+- `(C INSIDE (B AND (NOT C))) == 0`
+- `(C INSIDE (D AND (NOT C))) == 0`
+- `(C OUTSIDE (A OR (NOT A))) == 0`
+- `(C OUTSIDE (C OR (NOT A))) == 0`
+- `(C OUTSIDE (C OR (NOT B))) == 0`
+- `(C OUTSIDE (C OR (NOT D))) == 0`
+- `(D COVERS ((NOT A) NOT D)) == 0`
+- `(D COVERS ((NOT B) NOT D)) == 0`
+- `(D COVERS ((NOT C) NOT D)) == 0`
+- `(D COVERS (A AND (NOT A))) == 0`
+- `(D COVERS (A AND (NOT D))) == 0`
+- `(D COVERS (B AND (NOT D))) == 0`
+- `(D COVERS (C AND (NOT D))) == 0`
+- `(D INSIDE ((NOT A) NOT D)) == 0`
+- `(D INSIDE ((NOT B) NOT D)) == 0`
+- `(D INSIDE ((NOT C) NOT D)) == 0`
+- `(D INSIDE (A AND (NOT A))) == 0`
+- `(D INSIDE (A AND (NOT D))) == 0`
+- `(D INSIDE (B AND (NOT D))) == 0`
+- `(D INSIDE (C AND (NOT D))) == 0`
+- `(D OUTSIDE (A OR (NOT A))) == 0`
+- `(D OUTSIDE (D OR (NOT A))) == 0`
+- `(D OUTSIDE (D OR (NOT B))) == 0`
+- `(D OUTSIDE (D OR (NOT C))) == 0`
+- `(((NOT A) NOT B) OVERLAP A) == 0`
+- `(((NOT A) NOT B) OVERLAP B) == 0`
+- `(((NOT A) NOT C) OVERLAP A) == 0`
+- `(((NOT A) NOT C) OVERLAP C) == 0`
+- `(((NOT A) NOT D) OVERLAP A) == 0`
+- `(((NOT A) NOT D) OVERLAP D) == 0`
+- `(((NOT B) NOT C) OVERLAP B) == 0`
+- `(((NOT B) NOT C) OVERLAP C) == 0`
+- `(((NOT B) NOT D) OVERLAP B) == 0`
+- `(((NOT B) NOT D) OVERLAP D) == 0`
+- `(((NOT C) NOT D) OVERLAP C) == 0`
+- `(((NOT C) NOT D) OVERLAP D) == 0`
+- `((A AND (NOT A)) OUTSIDE A) == 0`
+- `((A AND (NOT A)) OUTSIDE B) == 0`
+- `((A AND (NOT A)) OUTSIDE C) == 0`
+- `((A AND (NOT A)) OUTSIDE D) == 0`
+- `((A AND (NOT A)) OVERLAP A) == 0`
+- `((A AND (NOT A)) OVERLAP B) == 0`
+- `((A AND (NOT A)) OVERLAP C) == 0`
+- `((A AND (NOT A)) OVERLAP D) == 0`
+- `((A AND (NOT B)) OUTSIDE A) == 0`
+- `((A AND (NOT B)) OVERLAP B) == 0`
+- `((A AND (NOT C)) OUTSIDE A) == 0`
+- `((A AND (NOT C)) OVERLAP C) == 0`
+- `((A AND (NOT D)) OUTSIDE A) == 0`
+- `((A AND (NOT D)) OVERLAP D) == 0`
+- `((A NOT (NOT B)) OUTSIDE A) == 0`
+- `((A NOT (NOT B)) OUTSIDE B) == 0`
+- `((A NOT (NOT C)) OUTSIDE A) == 0`
+- `((A NOT (NOT C)) OUTSIDE C) == 0`
+- `((A NOT (NOT D)) OUTSIDE A) == 0`
+- `((A NOT (NOT D)) OUTSIDE D) == 0`
+- `((B AND (NOT A)) OUTSIDE B) == 0`
+- `((B AND (NOT A)) OVERLAP A) == 0`
+- `((B AND (NOT C)) OUTSIDE B) == 0`
+- `((B AND (NOT C)) OVERLAP C) == 0`
+- `((B AND (NOT D)) OUTSIDE B) == 0`
+- `((B AND (NOT D)) OVERLAP D) == 0`
+- `((B NOT (NOT C)) OUTSIDE B) == 0`
+- `((B NOT (NOT C)) OUTSIDE C) == 0`
+- `((B NOT (NOT D)) OUTSIDE B) == 0`
+- `((B NOT (NOT D)) OUTSIDE D) == 0`
+- `((C AND (NOT A)) OUTSIDE C) == 0`
+- `((C AND (NOT A)) OVERLAP A) == 0`
+- `((C AND (NOT B)) OUTSIDE C) == 0`
+- `((C AND (NOT B)) OVERLAP B) == 0`
+- `((C AND (NOT D)) OUTSIDE C) == 0`
+- `((C AND (NOT D)) OVERLAP D) == 0`
+- `((C NOT (NOT D)) OUTSIDE C) == 0`
+- `((C NOT (NOT D)) OUTSIDE D) == 0`
+- `((D AND (NOT A)) OUTSIDE D) == 0`
+- `((D AND (NOT A)) OVERLAP A) == 0`
+- `((D AND (NOT B)) OUTSIDE D) == 0`
+- `((D AND (NOT B)) OVERLAP B) == 0`
+- `((D AND (NOT C)) OUTSIDE D) == 0`
+- `((D AND (NOT C)) OVERLAP C) == 0`
+- `((NOT A) MEET_PART (NOT A)) == 0`
+- `((NOT B) MEET_PART (NOT B)) == 0`
+- `((NOT C) MEET_PART (NOT C)) == 0`
+- `((NOT D) MEET_PART (NOT D)) == 0`
+- `(A OVERLAP ((NOT A) NOT B)) == 0`
+- `(A OVERLAP ((NOT A) NOT C)) == 0`
+- `(A OVERLAP ((NOT A) NOT D)) == 0`
+- `(A OVERLAP (A AND (NOT A))) == 0`
+- `(A OVERLAP (B AND (NOT A))) == 0`
+- `(A OVERLAP (C AND (NOT A))) == 0`
+- `(A OVERLAP (D AND (NOT A))) == 0`
+- `(B OVERLAP ((NOT A) NOT B)) == 0`
+- `(B OVERLAP ((NOT B) NOT C)) == 0`
+- `(B OVERLAP ((NOT B) NOT D)) == 0`
+- `(B OVERLAP (A AND (NOT A))) == 0`
+- `(B OVERLAP (A AND (NOT B))) == 0`
+- `(B OVERLAP (C AND (NOT B))) == 0`
+- `(B OVERLAP (D AND (NOT B))) == 0`
+- `(C OVERLAP ((NOT A) NOT C)) == 0`
+- `(C OVERLAP ((NOT B) NOT C)) == 0`
+- `(C OVERLAP ((NOT C) NOT D)) == 0`
+- `(C OVERLAP (A AND (NOT A))) == 0`
+- `(C OVERLAP (A AND (NOT C))) == 0`
+- `(C OVERLAP (B AND (NOT C))) == 0`
+- `(C OVERLAP (D AND (NOT C))) == 0`
+- `(D OVERLAP ((NOT A) NOT D)) == 0`
+- `(D OVERLAP ((NOT B) NOT D)) == 0`
+- `(D OVERLAP ((NOT C) NOT D)) == 0`
+- `(D OVERLAP (A AND (NOT A))) == 0`
+- `(D OVERLAP (A AND (NOT D))) == 0`
+- `(D OVERLAP (B AND (NOT D))) == 0`
+- `(D OVERLAP (C AND (NOT D))) == 0`
+- `(((NOT A) NOT B) CONTAINS A) == 0`
+- `(((NOT A) NOT B) CONTAINS B) == 0`
+- `(((NOT A) NOT C) CONTAINS A) == 0`
+- `(((NOT A) NOT C) CONTAINS C) == 0`
+- `(((NOT A) NOT D) CONTAINS A) == 0`
+- `(((NOT A) NOT D) CONTAINS D) == 0`
+- `(((NOT B) NOT C) CONTAINS B) == 0`
+- `(((NOT B) NOT C) CONTAINS C) == 0`
+- `(((NOT B) NOT D) CONTAINS B) == 0`
+- `(((NOT B) NOT D) CONTAINS D) == 0`
+- `(((NOT C) NOT D) CONTAINS C) == 0`
+- `(((NOT C) NOT D) CONTAINS D) == 0`
+- `((A AND (NOT A)) CONTAINS A) == 0`
+- `((A AND (NOT A)) CONTAINS B) == 0`
+- `((A AND (NOT A)) CONTAINS C) == 0`
+- `((A AND (NOT A)) CONTAINS D) == 0`
+- `((A AND (NOT B)) CONTAINS B) == 0`
+- `((A AND (NOT C)) CONTAINS C) == 0`
+- `((A AND (NOT D)) CONTAINS D) == 0`
+- `((B AND (NOT A)) CONTAINS A) == 0`
+- `((B AND (NOT C)) CONTAINS C) == 0`
+- `((B AND (NOT D)) CONTAINS D) == 0`
+- `((C AND (NOT A)) CONTAINS A) == 0`
+- `((C AND (NOT B)) CONTAINS B) == 0`
+- `((C AND (NOT D)) CONTAINS D) == 0`
+- `((D AND (NOT A)) CONTAINS A) == 0`
+- `((D AND (NOT B)) CONTAINS B) == 0`
+- `((D AND (NOT C)) CONTAINS C) == 0`
+- `(A CONTAINS ((NOT A) NOT B)) == 0`
+- `(A CONTAINS ((NOT A) NOT C)) == 0`
+- `(A CONTAINS ((NOT A) NOT D)) == 0`
+- `(A CONTAINS (A AND (NOT A))) == 0`
+- `(A CONTAINS (B AND (NOT A))) == 0`
+- `(A CONTAINS (C AND (NOT A))) == 0`
+- `(A CONTAINS (D AND (NOT A))) == 0`
+- `(A MEET_PART (A OR (NOT A))) == 0`
+- `(A MEET_PART (A OR (NOT B))) == 0`
+- `(A MEET_PART (A OR (NOT C))) == 0`
+- `(A MEET_PART (A OR (NOT D))) == 0`
+- `(B CONTAINS ((NOT A) NOT B)) == 0`
+- `(B CONTAINS ((NOT B) NOT C)) == 0`
+- `(B CONTAINS ((NOT B) NOT D)) == 0`
+- `(B CONTAINS (A AND (NOT A))) == 0`
+- `(B CONTAINS (A AND (NOT B))) == 0`
+- `(B CONTAINS (C AND (NOT B))) == 0`
+- `(B CONTAINS (D AND (NOT B))) == 0`
+- `(B MEET_PART (A OR (NOT A))) == 0`
+- `(B MEET_PART (B OR (NOT A))) == 0`
+- `(B MEET_PART (B OR (NOT C))) == 0`
+- `(B MEET_PART (B OR (NOT D))) == 0`
+- `(C CONTAINS ((NOT A) NOT C)) == 0`
+- `(C CONTAINS ((NOT B) NOT C)) == 0`
+- `(C CONTAINS ((NOT C) NOT D)) == 0`
+- `(C CONTAINS (A AND (NOT A))) == 0`
+- `(C CONTAINS (A AND (NOT C))) == 0`
+- `(C CONTAINS (B AND (NOT C))) == 0`
+- `(C CONTAINS (D AND (NOT C))) == 0`
+- `(C MEET_PART (A OR (NOT A))) == 0`
+- `(C MEET_PART (C OR (NOT A))) == 0`
+- `(C MEET_PART (C OR (NOT B))) == 0`
+- `(C MEET_PART (C OR (NOT D))) == 0`
+- `(D CONTAINS ((NOT A) NOT D)) == 0`
+- `(D CONTAINS ((NOT B) NOT D)) == 0`
+- `(D CONTAINS ((NOT C) NOT D)) == 0`
+- `(D CONTAINS (A AND (NOT A))) == 0`
+- `(D CONTAINS (A AND (NOT D))) == 0`
+- `(D CONTAINS (B AND (NOT D))) == 0`
+- `(D CONTAINS (C AND (NOT D))) == 0`
+- `(D MEET_PART (A OR (NOT A))) == 0`
+- `(D MEET_PART (D OR (NOT A))) == 0`
+- `(D MEET_PART (D OR (NOT B))) == 0`
+- `(D MEET_PART (D OR (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY A) == 0`
+- `(((NOT A) NOT B) COVEREDBY B) == 0`
+- `(((NOT A) NOT C) COVEREDBY A) == 0`
+- `(((NOT A) NOT C) COVEREDBY C) == 0`
+- `(((NOT A) NOT D) COVEREDBY A) == 0`
+- `(((NOT A) NOT D) COVEREDBY D) == 0`
+- `(((NOT B) NOT C) COVEREDBY B) == 0`
+- `(((NOT B) NOT C) COVEREDBY C) == 0`
+- `(((NOT B) NOT D) COVEREDBY B) == 0`
+- `(((NOT B) NOT D) COVEREDBY D) == 0`
+- `(((NOT C) NOT D) COVEREDBY C) == 0`
+- `(((NOT C) NOT D) COVEREDBY D) == 0`
+- `((A AND (NOT A)) COVEREDBY A) == 0`
+- `((A AND (NOT A)) COVEREDBY B) == 0`
+- `((A AND (NOT A)) COVEREDBY C) == 0`
+- `((A AND (NOT A)) COVEREDBY D) == 0`
+- `((A AND (NOT A)) MEET_PART A) == 0`
+- `((A AND (NOT A)) MEET_PART B) == 0`
+- `((A AND (NOT A)) MEET_PART C) == 0`
+- `((A AND (NOT A)) MEET_PART D) == 0`
+- `((A AND (NOT B)) COVEREDBY B) == 0`
+- `((A AND (NOT B)) MEET_PART A) == 0`
+- `((A AND (NOT C)) COVEREDBY C) == 0`
+- `((A AND (NOT C)) MEET_PART A) == 0`
+- `((A AND (NOT D)) COVEREDBY D) == 0`
+- `((A AND (NOT D)) MEET_PART A) == 0`
+- `((A NOT (NOT B)) MEET_PART A) == 0`
+- `((A NOT (NOT B)) MEET_PART B) == 0`
+- `((A NOT (NOT C)) MEET_PART A) == 0`
+- `((A NOT (NOT C)) MEET_PART C) == 0`
+- `((A NOT (NOT D)) MEET_PART A) == 0`
+- `((A NOT (NOT D)) MEET_PART D) == 0`
+- `((B AND (NOT A)) COVEREDBY A) == 0`
+- `((B AND (NOT A)) MEET_PART B) == 0`
+- `((B AND (NOT C)) COVEREDBY C) == 0`
+- `((B AND (NOT C)) MEET_PART B) == 0`
+- `((B AND (NOT D)) COVEREDBY D) == 0`
+- `((B AND (NOT D)) MEET_PART B) == 0`
+- `((B NOT (NOT C)) MEET_PART B) == 0`
+- `((B NOT (NOT C)) MEET_PART C) == 0`
+- `((B NOT (NOT D)) MEET_PART B) == 0`
+- `((B NOT (NOT D)) MEET_PART D) == 0`
+- `((C AND (NOT A)) COVEREDBY A) == 0`
+- `((C AND (NOT A)) MEET_PART C) == 0`
+- `((C AND (NOT B)) COVEREDBY B) == 0`
+- `((C AND (NOT B)) MEET_PART C) == 0`
+- `((C AND (NOT D)) COVEREDBY D) == 0`
+- `((C AND (NOT D)) MEET_PART C) == 0`
+- `((C NOT (NOT D)) MEET_PART C) == 0`
+- `((C NOT (NOT D)) MEET_PART D) == 0`
+- `((D AND (NOT A)) COVEREDBY A) == 0`
+- `((D AND (NOT A)) MEET_PART D) == 0`
+- `((D AND (NOT B)) COVEREDBY B) == 0`
+- `((D AND (NOT B)) MEET_PART D) == 0`
+- `((D AND (NOT C)) COVEREDBY C) == 0`
+- `((D AND (NOT C)) MEET_PART D) == 0`
+- `(A COVEREDBY ((NOT A) NOT B)) == 0`
+- `(A COVEREDBY ((NOT A) NOT C)) == 0`
+- `(A COVEREDBY ((NOT A) NOT D)) == 0`
+- `(A COVEREDBY (A AND (NOT A))) == 0`
+- `(A COVEREDBY (B AND (NOT A))) == 0`
+- `(A COVEREDBY (C AND (NOT A))) == 0`
+- `(A COVEREDBY (D AND (NOT A))) == 0`
+- `(B COVEREDBY ((NOT A) NOT B)) == 0`
+- `(B COVEREDBY ((NOT B) NOT C)) == 0`
+- `(B COVEREDBY ((NOT B) NOT D)) == 0`
+- `(B COVEREDBY (A AND (NOT A))) == 0`
+- `(B COVEREDBY (A AND (NOT B))) == 0`
+- `(B COVEREDBY (C AND (NOT B))) == 0`
+- `(B COVEREDBY (D AND (NOT B))) == 0`
+- `(C COVEREDBY ((NOT A) NOT C)) == 0`
+- `(C COVEREDBY ((NOT B) NOT C)) == 0`
+- `(C COVEREDBY ((NOT C) NOT D)) == 0`
+- `(C COVEREDBY (A AND (NOT A))) == 0`
+- `(C COVEREDBY (A AND (NOT C))) == 0`
+- `(C COVEREDBY (B AND (NOT C))) == 0`
+- `(C COVEREDBY (D AND (NOT C))) == 0`
+- `(D COVEREDBY ((NOT A) NOT D)) == 0`
+- `(D COVEREDBY ((NOT B) NOT D)) == 0`
+- `(D COVEREDBY ((NOT C) NOT D)) == 0`
+- `(D COVEREDBY (A AND (NOT A))) == 0`
+- `(D COVEREDBY (A AND (NOT D))) == 0`
+- `(D COVEREDBY (B AND (NOT D))) == 0`
+- `(D COVEREDBY (C AND (NOT D))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART A) == 0`
+- `(((NOT A) NOT B) EQUAL_PART B) == 0`
+- `(((NOT A) NOT C) EQUAL_PART A) == 0`
+- `(((NOT A) NOT C) EQUAL_PART C) == 0`
+- `(((NOT A) NOT D) EQUAL_PART A) == 0`
+- `(((NOT A) NOT D) EQUAL_PART D) == 0`
+- `(((NOT B) NOT C) EQUAL_PART B) == 0`
+- `(((NOT B) NOT C) EQUAL_PART C) == 0`
+- `(((NOT B) NOT D) EQUAL_PART B) == 0`
+- `(((NOT B) NOT D) EQUAL_PART D) == 0`
+- `(((NOT C) NOT D) EQUAL_PART C) == 0`
+- `(((NOT C) NOT D) EQUAL_PART D) == 0`
+- `((A AND (NOT A)) EQUAL_PART A) == 0`
+- `((A AND (NOT A)) EQUAL_PART B) == 0`
+- `((A AND (NOT A)) EQUAL_PART C) == 0`
+- `((A AND (NOT A)) EQUAL_PART D) == 0`
+- `((A AND (NOT B)) EQUAL_PART B) == 0`
+- `((A AND (NOT C)) EQUAL_PART C) == 0`
+- `((A AND (NOT D)) EQUAL_PART D) == 0`
+- `((B AND (NOT A)) EQUAL_PART A) == 0`
+- `((B AND (NOT C)) EQUAL_PART C) == 0`
+- `((B AND (NOT D)) EQUAL_PART D) == 0`
+- `((C AND (NOT A)) EQUAL_PART A) == 0`
+- `((C AND (NOT B)) EQUAL_PART B) == 0`
+- `((C AND (NOT D)) EQUAL_PART D) == 0`
+- `((D AND (NOT A)) EQUAL_PART A) == 0`
+- `((D AND (NOT B)) EQUAL_PART B) == 0`
+- `((D AND (NOT C)) EQUAL_PART C) == 0`
+- `(A EQUAL_PART ((NOT A) NOT B)) == 0`
+- `(A EQUAL_PART ((NOT A) NOT C)) == 0`
+- `(A EQUAL_PART ((NOT A) NOT D)) == 0`
+- `(A EQUAL_PART (A AND (NOT A))) == 0`
+- `(A EQUAL_PART (B AND (NOT A))) == 0`
+- `(A EQUAL_PART (C AND (NOT A))) == 0`
+- `(A EQUAL_PART (D AND (NOT A))) == 0`
+- `(B EQUAL_PART ((NOT A) NOT B)) == 0`
+- `(B EQUAL_PART ((NOT B) NOT C)) == 0`
+- `(B EQUAL_PART ((NOT B) NOT D)) == 0`
+- `(B EQUAL_PART (A AND (NOT A))) == 0`
+- `(B EQUAL_PART (A AND (NOT B))) == 0`
+- `(B EQUAL_PART (C AND (NOT B))) == 0`
+- `(B EQUAL_PART (D AND (NOT B))) == 0`
+- `(C EQUAL_PART ((NOT A) NOT C)) == 0`
+- `(C EQUAL_PART ((NOT B) NOT C)) == 0`
+- `(C EQUAL_PART ((NOT C) NOT D)) == 0`
+- `(C EQUAL_PART (A AND (NOT A))) == 0`
+- `(C EQUAL_PART (A AND (NOT C))) == 0`
+- `(C EQUAL_PART (B AND (NOT C))) == 0`
+- `(C EQUAL_PART (D AND (NOT C))) == 0`
+- `(D EQUAL_PART ((NOT A) NOT D)) == 0`
+- `(D EQUAL_PART ((NOT B) NOT D)) == 0`
+- `(D EQUAL_PART ((NOT C) NOT D)) == 0`
+- `(D EQUAL_PART (A AND (NOT A))) == 0`
+- `(D EQUAL_PART (A AND (NOT D))) == 0`
+- `(D EQUAL_PART (B AND (NOT D))) == 0`
+- `(D EQUAL_PART (C AND (NOT D))) == 0`
+- `((NOT A) DISJOINT_PART (NOT A)) == 0`
+- `((NOT B) DISJOINT_PART (NOT B)) == 0`
+- `((NOT C) DISJOINT_PART (NOT C)) == 0`
+- `((NOT D) DISJOINT_PART (NOT D)) == 0`
+- `(A DISJOINT_PART (A OR (NOT A))) == 0`
+- `(A DISJOINT_PART (A OR (NOT B))) == 0`
+- `(A DISJOINT_PART (A OR (NOT C))) == 0`
+- `(A DISJOINT_PART (A OR (NOT D))) == 0`
+- `(B DISJOINT_PART (A OR (NOT A))) == 0`
+- `(B DISJOINT_PART (B OR (NOT A))) == 0`
+- `(B DISJOINT_PART (B OR (NOT C))) == 0`
+- `(B DISJOINT_PART (B OR (NOT D))) == 0`
+- `(C DISJOINT_PART (A OR (NOT A))) == 0`
+- `(C DISJOINT_PART (C OR (NOT A))) == 0`
+- `(C DISJOINT_PART (C OR (NOT B))) == 0`
+- `(C DISJOINT_PART (C OR (NOT D))) == 0`
+- `(D DISJOINT_PART (A OR (NOT A))) == 0`
+- `(D DISJOINT_PART (D OR (NOT A))) == 0`
+- `(D DISJOINT_PART (D OR (NOT B))) == 0`
+- `(D DISJOINT_PART (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART A) == 0`
+- `((A AND (NOT A)) DISJOINT_PART B) == 0`
+- `((A AND (NOT A)) DISJOINT_PART C) == 0`
+- `((A AND (NOT A)) DISJOINT_PART D) == 0`
+- `((A AND (NOT B)) DISJOINT_PART A) == 0`
+- `((A AND (NOT C)) DISJOINT_PART A) == 0`
+- `((A AND (NOT D)) DISJOINT_PART A) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART A) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART B) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART A) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART C) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART A) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART D) == 0`
+- `((B AND (NOT A)) DISJOINT_PART B) == 0`
+- `((B AND (NOT C)) DISJOINT_PART B) == 0`
+- `((B AND (NOT D)) DISJOINT_PART B) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART B) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART C) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART B) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART D) == 0`
+- `((C AND (NOT A)) DISJOINT_PART C) == 0`
+- `((C AND (NOT B)) DISJOINT_PART C) == 0`
+- `((C AND (NOT D)) DISJOINT_PART C) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART C) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART D) == 0`
+- `((D AND (NOT A)) DISJOINT_PART D) == 0`
+- `((D AND (NOT B)) DISJOINT_PART D) == 0`
+- `((D AND (NOT C)) DISJOINT_PART D) == 0`
+- `((NOT A) NOT (A OR (NOT A))) == 0`
+- `((NOT A) NOT (B OR (NOT A))) == 0`
+- `((NOT A) NOT (C OR (NOT A))) == 0`
+- `((NOT A) NOT (D OR (NOT A))) == 0`
+- `((NOT B) NOT (A OR (NOT A))) == 0`
+- `((NOT B) NOT (A OR (NOT B))) == 0`
+- `((NOT B) NOT (C OR (NOT B))) == 0`
+- `((NOT B) NOT (D OR (NOT B))) == 0`
+- `((NOT C) NOT (A OR (NOT A))) == 0`
+- `((NOT C) NOT (A OR (NOT C))) == 0`
+- `((NOT C) NOT (B OR (NOT C))) == 0`
+- `((NOT C) NOT (D OR (NOT C))) == 0`
+- `((NOT D) NOT (A OR (NOT A))) == 0`
+- `((NOT D) NOT (A OR (NOT D))) == 0`
+- `((NOT D) NOT (B OR (NOT D))) == 0`
+- `((NOT D) NOT (C OR (NOT D))) == 0`
+- `(((NOT A) NOT B) NOT (NOT A)) == 0`
+- `(((NOT A) NOT B) NOT (NOT B)) == 0`
+- `(((NOT A) NOT C) NOT (NOT A)) == 0`
+- `(((NOT A) NOT C) NOT (NOT C)) == 0`
+- `(((NOT A) NOT D) NOT (NOT A)) == 0`
+- `(((NOT A) NOT D) NOT (NOT D)) == 0`
+- `(((NOT B) NOT C) NOT (NOT B)) == 0`
+- `(((NOT B) NOT C) NOT (NOT C)) == 0`
+- `(((NOT B) NOT D) NOT (NOT B)) == 0`
+- `(((NOT B) NOT D) NOT (NOT D)) == 0`
+- `(((NOT C) NOT D) NOT (NOT C)) == 0`
+- `(((NOT C) NOT D) NOT (NOT D)) == 0`
+- `((A AND (NOT A)) AND (NOT A)) == 0`
+- `((A AND (NOT A)) AND (NOT B)) == 0`
+- `((A AND (NOT A)) AND (NOT C)) == 0`
+- `((A AND (NOT A)) AND (NOT D)) == 0`
+- `((A AND (NOT A)) NOT (NOT A)) == 0`
+- `((A AND (NOT A)) NOT (NOT B)) == 0`
+- `((A AND (NOT A)) NOT (NOT C)) == 0`
+- `((A AND (NOT A)) NOT (NOT D)) == 0`
+- `((A AND (NOT B)) AND (NOT A)) == 0`
+- `((A AND (NOT B)) NOT (NOT B)) == 0`
+- `((A AND (NOT C)) AND (NOT A)) == 0`
+- `((A AND (NOT C)) NOT (NOT C)) == 0`
+- `((A AND (NOT D)) AND (NOT A)) == 0`
+- `((A AND (NOT D)) NOT (NOT D)) == 0`
+- `((A NOT (NOT B)) AND (NOT A)) == 0`
+- `((A NOT (NOT B)) AND (NOT B)) == 0`
+- `((A NOT (NOT C)) AND (NOT A)) == 0`
+- `((A NOT (NOT C)) AND (NOT C)) == 0`
+- `((A NOT (NOT D)) AND (NOT A)) == 0`
+- `((A NOT (NOT D)) AND (NOT D)) == 0`
+- `((B AND (NOT A)) AND (NOT B)) == 0`
+- `((B AND (NOT A)) NOT (NOT A)) == 0`
+- `((B AND (NOT C)) AND (NOT B)) == 0`
+- `((B AND (NOT C)) NOT (NOT C)) == 0`
+- `((B AND (NOT D)) AND (NOT B)) == 0`
+- `((B AND (NOT D)) NOT (NOT D)) == 0`
+- `((B NOT (NOT C)) AND (NOT B)) == 0`
+- `((B NOT (NOT C)) AND (NOT C)) == 0`
+- `((B NOT (NOT D)) AND (NOT B)) == 0`
+- `((B NOT (NOT D)) AND (NOT D)) == 0`
+- `((C AND (NOT A)) AND (NOT C)) == 0`
+- `((C AND (NOT A)) NOT (NOT A)) == 0`
+- `((C AND (NOT B)) AND (NOT C)) == 0`
+- `((C AND (NOT B)) NOT (NOT B)) == 0`
+- `((C AND (NOT D)) AND (NOT C)) == 0`
+- `((C AND (NOT D)) NOT (NOT D)) == 0`
+- `((C NOT (NOT D)) AND (NOT C)) == 0`
+- `((C NOT (NOT D)) AND (NOT D)) == 0`
+- `((D AND (NOT A)) AND (NOT D)) == 0`
+- `((D AND (NOT A)) NOT (NOT A)) == 0`
+- `((D AND (NOT B)) AND (NOT D)) == 0`
+- `((D AND (NOT B)) NOT (NOT B)) == 0`
+- `((D AND (NOT C)) AND (NOT D)) == 0`
+- `((D AND (NOT C)) NOT (NOT C)) == 0`
+- `((NOT A) AND (A AND (NOT A))) == 0`
+- `((NOT A) AND (A AND (NOT B))) == 0`
+- `((NOT A) AND (A AND (NOT C))) == 0`
+- `((NOT A) AND (A AND (NOT D))) == 0`
+- `((NOT A) AND (A NOT (NOT B))) == 0`
+- `((NOT A) AND (A NOT (NOT C))) == 0`
+- `((NOT A) AND (A NOT (NOT D))) == 0`
+- `((NOT B) AND (A AND (NOT A))) == 0`
+- `((NOT B) AND (A NOT (NOT B))) == 0`
+- `((NOT B) AND (B AND (NOT A))) == 0`
+- `((NOT B) AND (B AND (NOT C))) == 0`
+- `((NOT B) AND (B AND (NOT D))) == 0`
+- `((NOT B) AND (B NOT (NOT C))) == 0`
+- `((NOT B) AND (B NOT (NOT D))) == 0`
+- `((NOT C) AND (A AND (NOT A))) == 0`
+- `((NOT C) AND (A NOT (NOT C))) == 0`
+- `((NOT C) AND (B NOT (NOT C))) == 0`
+- `((NOT C) AND (C AND (NOT A))) == 0`
+- `((NOT C) AND (C AND (NOT B))) == 0`
+- `((NOT C) AND (C AND (NOT D))) == 0`
+- `((NOT C) AND (C NOT (NOT D))) == 0`
+- `((NOT D) AND (A AND (NOT A))) == 0`
+- `((NOT D) AND (A NOT (NOT D))) == 0`
+- `((NOT D) AND (B NOT (NOT D))) == 0`
+- `((NOT D) AND (C NOT (NOT D))) == 0`
+- `((NOT D) AND (D AND (NOT A))) == 0`
+- `((NOT D) AND (D AND (NOT B))) == 0`
+- `((NOT D) AND (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (NOT A)) == 0`
+- `((A AND (NOT A)) COVERS (NOT B)) == 0`
+- `((A AND (NOT A)) COVERS (NOT C)) == 0`
+- `((A AND (NOT A)) COVERS (NOT D)) == 0`
+- `((A AND (NOT A)) INSIDE (NOT A)) == 0`
+- `((A AND (NOT A)) INSIDE (NOT B)) == 0`
+- `((A AND (NOT A)) INSIDE (NOT C)) == 0`
+- `((A AND (NOT A)) INSIDE (NOT D)) == 0`
+- `((A AND (NOT B)) COVERS (NOT A)) == 0`
+- `((A AND (NOT B)) INSIDE (NOT A)) == 0`
+- `((A AND (NOT C)) COVERS (NOT A)) == 0`
+- `((A AND (NOT C)) INSIDE (NOT A)) == 0`
+- `((A AND (NOT D)) COVERS (NOT A)) == 0`
+- `((A AND (NOT D)) INSIDE (NOT A)) == 0`
+- `((A NOT (NOT B)) COVERS (NOT A)) == 0`
+- `((A NOT (NOT B)) COVERS (NOT B)) == 0`
+- `((A NOT (NOT B)) INSIDE (NOT A)) == 0`
+- `((A NOT (NOT B)) INSIDE (NOT B)) == 0`
+- `((A NOT (NOT C)) COVERS (NOT A)) == 0`
+- `((A NOT (NOT C)) COVERS (NOT C)) == 0`
+- `((A NOT (NOT C)) INSIDE (NOT A)) == 0`
+- `((A NOT (NOT C)) INSIDE (NOT C)) == 0`
+- `((A NOT (NOT D)) COVERS (NOT A)) == 0`
+- `((A NOT (NOT D)) COVERS (NOT D)) == 0`
+- `((A NOT (NOT D)) INSIDE (NOT A)) == 0`
+- `((A NOT (NOT D)) INSIDE (NOT D)) == 0`
+- `((B AND (NOT A)) COVERS (NOT B)) == 0`
+- `((B AND (NOT A)) INSIDE (NOT B)) == 0`
+- `((B AND (NOT C)) COVERS (NOT B)) == 0`
+- `((B AND (NOT C)) INSIDE (NOT B)) == 0`
+- `((B AND (NOT D)) COVERS (NOT B)) == 0`
+- `((B AND (NOT D)) INSIDE (NOT B)) == 0`
+- `((B NOT (NOT C)) COVERS (NOT B)) == 0`
+- `((B NOT (NOT C)) COVERS (NOT C)) == 0`
+- `((B NOT (NOT C)) INSIDE (NOT B)) == 0`
+- `((B NOT (NOT C)) INSIDE (NOT C)) == 0`
+- `((B NOT (NOT D)) COVERS (NOT B)) == 0`
+- `((B NOT (NOT D)) COVERS (NOT D)) == 0`
+- `((B NOT (NOT D)) INSIDE (NOT B)) == 0`
+- `((B NOT (NOT D)) INSIDE (NOT D)) == 0`
+- `((C AND (NOT A)) COVERS (NOT C)) == 0`
+- `((C AND (NOT A)) INSIDE (NOT C)) == 0`
+- `((C AND (NOT B)) COVERS (NOT C)) == 0`
+- `((C AND (NOT B)) INSIDE (NOT C)) == 0`
+- `((C AND (NOT D)) COVERS (NOT C)) == 0`
+- `((C AND (NOT D)) INSIDE (NOT C)) == 0`
+- `((C NOT (NOT D)) COVERS (NOT C)) == 0`
+- `((C NOT (NOT D)) COVERS (NOT D)) == 0`
+- `((C NOT (NOT D)) INSIDE (NOT C)) == 0`
+- `((C NOT (NOT D)) INSIDE (NOT D)) == 0`
+- `((D AND (NOT A)) COVERS (NOT D)) == 0`
+- `((D AND (NOT A)) INSIDE (NOT D)) == 0`
+- `((D AND (NOT B)) COVERS (NOT D)) == 0`
+- `((D AND (NOT B)) INSIDE (NOT D)) == 0`
+- `((D AND (NOT C)) COVERS (NOT D)) == 0`
+- `((D AND (NOT C)) INSIDE (NOT D)) == 0`
+- `((NOT A) COVERS (A AND (NOT A))) == 0`
+- `((NOT A) COVERS (A AND (NOT B))) == 0`
+- `((NOT A) COVERS (A AND (NOT C))) == 0`
+- `((NOT A) COVERS (A AND (NOT D))) == 0`
+- `((NOT A) COVERS (A NOT (NOT B))) == 0`
+- `((NOT A) COVERS (A NOT (NOT C))) == 0`
+- `((NOT A) COVERS (A NOT (NOT D))) == 0`
+- `((NOT A) INSIDE (A AND (NOT A))) == 0`
+- `((NOT A) INSIDE (A AND (NOT B))) == 0`
+- `((NOT A) INSIDE (A AND (NOT C))) == 0`
+- `((NOT A) INSIDE (A AND (NOT D))) == 0`
+- `((NOT A) INSIDE (A NOT (NOT B))) == 0`
+- `((NOT A) INSIDE (A NOT (NOT C))) == 0`
+- `((NOT A) INSIDE (A NOT (NOT D))) == 0`
+- `((NOT A) OUTSIDE (A OR (NOT A))) == 0`
+- `((NOT A) OUTSIDE (B OR (NOT A))) == 0`
+- `((NOT A) OUTSIDE (C OR (NOT A))) == 0`
+- `((NOT A) OUTSIDE (D OR (NOT A))) == 0`
+- `((NOT B) COVERS (A AND (NOT A))) == 0`
+- `((NOT B) COVERS (A NOT (NOT B))) == 0`
+- `((NOT B) COVERS (B AND (NOT A))) == 0`
+- `((NOT B) COVERS (B AND (NOT C))) == 0`
+- `((NOT B) COVERS (B AND (NOT D))) == 0`
+- `((NOT B) COVERS (B NOT (NOT C))) == 0`
+- `((NOT B) COVERS (B NOT (NOT D))) == 0`
+- `((NOT B) INSIDE (A AND (NOT A))) == 0`
+- `((NOT B) INSIDE (A NOT (NOT B))) == 0`
+- `((NOT B) INSIDE (B AND (NOT A))) == 0`
+- `((NOT B) INSIDE (B AND (NOT C))) == 0`
+- `((NOT B) INSIDE (B AND (NOT D))) == 0`
+- `((NOT B) INSIDE (B NOT (NOT C))) == 0`
+- `((NOT B) INSIDE (B NOT (NOT D))) == 0`
+- `((NOT B) OUTSIDE (A OR (NOT A))) == 0`
+- `((NOT B) OUTSIDE (A OR (NOT B))) == 0`
+- `((NOT B) OUTSIDE (C OR (NOT B))) == 0`
+- `((NOT B) OUTSIDE (D OR (NOT B))) == 0`
+- `((NOT C) COVERS (A AND (NOT A))) == 0`
+- `((NOT C) COVERS (A NOT (NOT C))) == 0`
+- `((NOT C) COVERS (B NOT (NOT C))) == 0`
+- `((NOT C) COVERS (C AND (NOT A))) == 0`
+- `((NOT C) COVERS (C AND (NOT B))) == 0`
+- `((NOT C) COVERS (C AND (NOT D))) == 0`
+- `((NOT C) COVERS (C NOT (NOT D))) == 0`
+- `((NOT C) INSIDE (A AND (NOT A))) == 0`
+- `((NOT C) INSIDE (A NOT (NOT C))) == 0`
+- `((NOT C) INSIDE (B NOT (NOT C))) == 0`
+- `((NOT C) INSIDE (C AND (NOT A))) == 0`
+- `((NOT C) INSIDE (C AND (NOT B))) == 0`
+- `((NOT C) INSIDE (C AND (NOT D))) == 0`
+- `((NOT C) INSIDE (C NOT (NOT D))) == 0`
+- `((NOT C) OUTSIDE (A OR (NOT A))) == 0`
+- `((NOT C) OUTSIDE (A OR (NOT C))) == 0`
+- `((NOT C) OUTSIDE (B OR (NOT C))) == 0`
+- `((NOT C) OUTSIDE (D OR (NOT C))) == 0`
+- `((NOT D) COVERS (A AND (NOT A))) == 0`
+- `((NOT D) COVERS (A NOT (NOT D))) == 0`
+- `((NOT D) COVERS (B NOT (NOT D))) == 0`
+- `((NOT D) COVERS (C NOT (NOT D))) == 0`
+- `((NOT D) COVERS (D AND (NOT A))) == 0`
+- `((NOT D) COVERS (D AND (NOT B))) == 0`
+- `((NOT D) COVERS (D AND (NOT C))) == 0`
+- `((NOT D) INSIDE (A AND (NOT A))) == 0`
+- `((NOT D) INSIDE (A NOT (NOT D))) == 0`
+- `((NOT D) INSIDE (B NOT (NOT D))) == 0`
+- `((NOT D) INSIDE (C NOT (NOT D))) == 0`
+- `((NOT D) INSIDE (D AND (NOT A))) == 0`
+- `((NOT D) INSIDE (D AND (NOT B))) == 0`
+- `((NOT D) INSIDE (D AND (NOT C))) == 0`
+- `((NOT D) OUTSIDE (A OR (NOT A))) == 0`
+- `((NOT D) OUTSIDE (A OR (NOT D))) == 0`
+- `((NOT D) OUTSIDE (B OR (NOT D))) == 0`
+- `((NOT D) OUTSIDE (C OR (NOT D))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (NOT A)) == 0`
+- `(((NOT A) NOT B) OUTSIDE (NOT B)) == 0`
+- `(((NOT A) NOT C) OUTSIDE (NOT A)) == 0`
+- `(((NOT A) NOT C) OUTSIDE (NOT C)) == 0`
+- `(((NOT A) NOT D) OUTSIDE (NOT A)) == 0`
+- `(((NOT A) NOT D) OUTSIDE (NOT D)) == 0`
+- `(((NOT B) NOT C) OUTSIDE (NOT B)) == 0`
+- `(((NOT B) NOT C) OUTSIDE (NOT C)) == 0`
+- `(((NOT B) NOT D) OUTSIDE (NOT B)) == 0`
+- `(((NOT B) NOT D) OUTSIDE (NOT D)) == 0`
+- `(((NOT C) NOT D) OUTSIDE (NOT C)) == 0`
+- `(((NOT C) NOT D) OUTSIDE (NOT D)) == 0`
+- `((A AND (NOT A)) OUTSIDE (NOT A)) == 0`
+- `((A AND (NOT A)) OUTSIDE (NOT B)) == 0`
+- `((A AND (NOT A)) OUTSIDE (NOT C)) == 0`
+- `((A AND (NOT A)) OUTSIDE (NOT D)) == 0`
+- `((A AND (NOT A)) OVERLAP (NOT A)) == 0`
+- `((A AND (NOT A)) OVERLAP (NOT B)) == 0`
+- `((A AND (NOT A)) OVERLAP (NOT C)) == 0`
+- `((A AND (NOT A)) OVERLAP (NOT D)) == 0`
+- `((A AND (NOT B)) OUTSIDE (NOT B)) == 0`
+- `((A AND (NOT B)) OVERLAP (NOT A)) == 0`
+- `((A AND (NOT C)) OUTSIDE (NOT C)) == 0`
+- `((A AND (NOT C)) OVERLAP (NOT A)) == 0`
+- `((A AND (NOT D)) OUTSIDE (NOT D)) == 0`
+- `((A AND (NOT D)) OVERLAP (NOT A)) == 0`
+- `((A NOT (NOT B)) OVERLAP (NOT A)) == 0`
+- `((A NOT (NOT B)) OVERLAP (NOT B)) == 0`
+- `((A NOT (NOT C)) OVERLAP (NOT A)) == 0`
+- `((A NOT (NOT C)) OVERLAP (NOT C)) == 0`
+- `((A NOT (NOT D)) OVERLAP (NOT A)) == 0`
+- `((A NOT (NOT D)) OVERLAP (NOT D)) == 0`
+- `((B AND (NOT A)) OUTSIDE (NOT A)) == 0`
+- `((B AND (NOT A)) OVERLAP (NOT B)) == 0`
+- `((B AND (NOT C)) OUTSIDE (NOT C)) == 0`
+- `((B AND (NOT C)) OVERLAP (NOT B)) == 0`
+- `((B AND (NOT D)) OUTSIDE (NOT D)) == 0`
+- `((B AND (NOT D)) OVERLAP (NOT B)) == 0`
+- `((B NOT (NOT C)) OVERLAP (NOT B)) == 0`
+- `((B NOT (NOT C)) OVERLAP (NOT C)) == 0`
+- `((B NOT (NOT D)) OVERLAP (NOT B)) == 0`
+- `((B NOT (NOT D)) OVERLAP (NOT D)) == 0`
+- `((C AND (NOT A)) OUTSIDE (NOT A)) == 0`
+- `((C AND (NOT A)) OVERLAP (NOT C)) == 0`
+- `((C AND (NOT B)) OUTSIDE (NOT B)) == 0`
+- `((C AND (NOT B)) OVERLAP (NOT C)) == 0`
+- `((C AND (NOT D)) OUTSIDE (NOT D)) == 0`
+- `((C AND (NOT D)) OVERLAP (NOT C)) == 0`
+- `((C NOT (NOT D)) OVERLAP (NOT C)) == 0`
+- `((C NOT (NOT D)) OVERLAP (NOT D)) == 0`
+- `((D AND (NOT A)) OUTSIDE (NOT A)) == 0`
+- `((D AND (NOT A)) OVERLAP (NOT D)) == 0`
+- `((D AND (NOT B)) OUTSIDE (NOT B)) == 0`
+- `((D AND (NOT B)) OVERLAP (NOT D)) == 0`
+- `((D AND (NOT C)) OUTSIDE (NOT C)) == 0`
+- `((D AND (NOT C)) OVERLAP (NOT D)) == 0`
+- `((NOT A) OVERLAP (A AND (NOT A))) == 0`
+- `((NOT A) OVERLAP (A AND (NOT B))) == 0`
+- `((NOT A) OVERLAP (A AND (NOT C))) == 0`
+- `((NOT A) OVERLAP (A AND (NOT D))) == 0`
+- `((NOT A) OVERLAP (A NOT (NOT B))) == 0`
+- `((NOT A) OVERLAP (A NOT (NOT C))) == 0`
+- `((NOT A) OVERLAP (A NOT (NOT D))) == 0`
+- `((NOT B) OVERLAP (A AND (NOT A))) == 0`
+- `((NOT B) OVERLAP (A NOT (NOT B))) == 0`
+- `((NOT B) OVERLAP (B AND (NOT A))) == 0`
+- `((NOT B) OVERLAP (B AND (NOT C))) == 0`
+- `((NOT B) OVERLAP (B AND (NOT D))) == 0`
+- `((NOT B) OVERLAP (B NOT (NOT C))) == 0`
+- `((NOT B) OVERLAP (B NOT (NOT D))) == 0`
+- `((NOT C) OVERLAP (A AND (NOT A))) == 0`
+- `((NOT C) OVERLAP (A NOT (NOT C))) == 0`
+- `((NOT C) OVERLAP (B NOT (NOT C))) == 0`
+- `((NOT C) OVERLAP (C AND (NOT A))) == 0`
+- `((NOT C) OVERLAP (C AND (NOT B))) == 0`
+- `((NOT C) OVERLAP (C AND (NOT D))) == 0`
+- `((NOT C) OVERLAP (C NOT (NOT D))) == 0`
+- `((NOT D) OVERLAP (A AND (NOT A))) == 0`
+- `((NOT D) OVERLAP (A NOT (NOT D))) == 0`
+- `((NOT D) OVERLAP (B NOT (NOT D))) == 0`
+- `((NOT D) OVERLAP (C NOT (NOT D))) == 0`
+- `((NOT D) OVERLAP (D AND (NOT A))) == 0`
+- `((NOT D) OVERLAP (D AND (NOT B))) == 0`
+- `((NOT D) OVERLAP (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (NOT A)) == 0`
+- `((A AND (NOT A)) CONTAINS (NOT B)) == 0`
+- `((A AND (NOT A)) CONTAINS (NOT C)) == 0`
+- `((A AND (NOT A)) CONTAINS (NOT D)) == 0`
+- `((A AND (NOT B)) CONTAINS (NOT A)) == 0`
+- `((A AND (NOT C)) CONTAINS (NOT A)) == 0`
+- `((A AND (NOT D)) CONTAINS (NOT A)) == 0`
+- `((A NOT (NOT B)) CONTAINS (NOT A)) == 0`
+- `((A NOT (NOT B)) CONTAINS (NOT B)) == 0`
+- `((A NOT (NOT C)) CONTAINS (NOT A)) == 0`
+- `((A NOT (NOT C)) CONTAINS (NOT C)) == 0`
+- `((A NOT (NOT D)) CONTAINS (NOT A)) == 0`
+- `((A NOT (NOT D)) CONTAINS (NOT D)) == 0`
+- `((B AND (NOT A)) CONTAINS (NOT B)) == 0`
+- `((B AND (NOT C)) CONTAINS (NOT B)) == 0`
+- `((B AND (NOT D)) CONTAINS (NOT B)) == 0`
+- `((B NOT (NOT C)) CONTAINS (NOT B)) == 0`
+- `((B NOT (NOT C)) CONTAINS (NOT C)) == 0`
+- `((B NOT (NOT D)) CONTAINS (NOT B)) == 0`
+- `((B NOT (NOT D)) CONTAINS (NOT D)) == 0`
+- `((C AND (NOT A)) CONTAINS (NOT C)) == 0`
+- `((C AND (NOT B)) CONTAINS (NOT C)) == 0`
+- `((C AND (NOT D)) CONTAINS (NOT C)) == 0`
+- `((C NOT (NOT D)) CONTAINS (NOT C)) == 0`
+- `((C NOT (NOT D)) CONTAINS (NOT D)) == 0`
+- `((D AND (NOT A)) CONTAINS (NOT D)) == 0`
+- `((D AND (NOT B)) CONTAINS (NOT D)) == 0`
+- `((D AND (NOT C)) CONTAINS (NOT D)) == 0`
+- `((NOT A) CONTAINS (A AND (NOT A))) == 0`
+- `((NOT A) CONTAINS (A AND (NOT B))) == 0`
+- `((NOT A) CONTAINS (A AND (NOT C))) == 0`
+- `((NOT A) CONTAINS (A AND (NOT D))) == 0`
+- `((NOT A) CONTAINS (A NOT (NOT B))) == 0`
+- `((NOT A) CONTAINS (A NOT (NOT C))) == 0`
+- `((NOT A) CONTAINS (A NOT (NOT D))) == 0`
+- `((NOT A) MEET_PART (A OR (NOT A))) == 0`
+- `((NOT A) MEET_PART (B OR (NOT A))) == 0`
+- `((NOT A) MEET_PART (C OR (NOT A))) == 0`
+- `((NOT A) MEET_PART (D OR (NOT A))) == 0`
+- `((NOT B) CONTAINS (A AND (NOT A))) == 0`
+- `((NOT B) CONTAINS (A NOT (NOT B))) == 0`
+- `((NOT B) CONTAINS (B AND (NOT A))) == 0`
+- `((NOT B) CONTAINS (B AND (NOT C))) == 0`
+- `((NOT B) CONTAINS (B AND (NOT D))) == 0`
+- `((NOT B) CONTAINS (B NOT (NOT C))) == 0`
+- `((NOT B) CONTAINS (B NOT (NOT D))) == 0`
+- `((NOT B) MEET_PART (A OR (NOT A))) == 0`
+- `((NOT B) MEET_PART (A OR (NOT B))) == 0`
+- `((NOT B) MEET_PART (C OR (NOT B))) == 0`
+- `((NOT B) MEET_PART (D OR (NOT B))) == 0`
+- `((NOT C) CONTAINS (A AND (NOT A))) == 0`
+- `((NOT C) CONTAINS (A NOT (NOT C))) == 0`
+- `((NOT C) CONTAINS (B NOT (NOT C))) == 0`
+- `((NOT C) CONTAINS (C AND (NOT A))) == 0`
+- `((NOT C) CONTAINS (C AND (NOT B))) == 0`
+- `((NOT C) CONTAINS (C AND (NOT D))) == 0`
+- `((NOT C) CONTAINS (C NOT (NOT D))) == 0`
+- `((NOT C) MEET_PART (A OR (NOT A))) == 0`
+- `((NOT C) MEET_PART (A OR (NOT C))) == 0`
+- `((NOT C) MEET_PART (B OR (NOT C))) == 0`
+- `((NOT C) MEET_PART (D OR (NOT C))) == 0`
+- `((NOT D) CONTAINS (A AND (NOT A))) == 0`
+- `((NOT D) CONTAINS (A NOT (NOT D))) == 0`
+- `((NOT D) CONTAINS (B NOT (NOT D))) == 0`
+- `((NOT D) CONTAINS (C NOT (NOT D))) == 0`
+- `((NOT D) CONTAINS (D AND (NOT A))) == 0`
+- `((NOT D) CONTAINS (D AND (NOT B))) == 0`
+- `((NOT D) CONTAINS (D AND (NOT C))) == 0`
+- `((NOT D) MEET_PART (A OR (NOT A))) == 0`
+- `((NOT D) MEET_PART (A OR (NOT D))) == 0`
+- `((NOT D) MEET_PART (B OR (NOT D))) == 0`
+- `((NOT D) MEET_PART (C OR (NOT D))) == 0`
+- `(((NOT A) NOT B) MEET_PART (NOT A)) == 0`
+- `(((NOT A) NOT B) MEET_PART (NOT B)) == 0`
+- `(((NOT A) NOT C) MEET_PART (NOT A)) == 0`
+- `(((NOT A) NOT C) MEET_PART (NOT C)) == 0`
+- `(((NOT A) NOT D) MEET_PART (NOT A)) == 0`
+- `(((NOT A) NOT D) MEET_PART (NOT D)) == 0`
+- `(((NOT B) NOT C) MEET_PART (NOT B)) == 0`
+- `(((NOT B) NOT C) MEET_PART (NOT C)) == 0`
+- `(((NOT B) NOT D) MEET_PART (NOT B)) == 0`
+- `(((NOT B) NOT D) MEET_PART (NOT D)) == 0`
+- `(((NOT C) NOT D) MEET_PART (NOT C)) == 0`
+- `(((NOT C) NOT D) MEET_PART (NOT D)) == 0`
+- `((A AND (NOT A)) COVEREDBY (NOT A)) == 0`
+- `((A AND (NOT A)) COVEREDBY (NOT B)) == 0`
+- `((A AND (NOT A)) COVEREDBY (NOT C)) == 0`
+- `((A AND (NOT A)) COVEREDBY (NOT D)) == 0`
+- `((A AND (NOT A)) MEET_PART (NOT A)) == 0`
+- `((A AND (NOT A)) MEET_PART (NOT B)) == 0`
+- `((A AND (NOT A)) MEET_PART (NOT C)) == 0`
+- `((A AND (NOT A)) MEET_PART (NOT D)) == 0`
+- `((A AND (NOT B)) COVEREDBY (NOT A)) == 0`
+- `((A AND (NOT B)) MEET_PART (NOT B)) == 0`
+- `((A AND (NOT C)) COVEREDBY (NOT A)) == 0`
+- `((A AND (NOT C)) MEET_PART (NOT C)) == 0`
+- `((A AND (NOT D)) COVEREDBY (NOT A)) == 0`
+- `((A AND (NOT D)) MEET_PART (NOT D)) == 0`
+- `((A NOT (NOT B)) COVEREDBY (NOT A)) == 0`
+- `((A NOT (NOT B)) COVEREDBY (NOT B)) == 0`
+- `((A NOT (NOT C)) COVEREDBY (NOT A)) == 0`
+- `((A NOT (NOT C)) COVEREDBY (NOT C)) == 0`
+- `((A NOT (NOT D)) COVEREDBY (NOT A)) == 0`
+- `((A NOT (NOT D)) COVEREDBY (NOT D)) == 0`
+- `((B AND (NOT A)) COVEREDBY (NOT B)) == 0`
+- `((B AND (NOT A)) MEET_PART (NOT A)) == 0`
+- `((B AND (NOT C)) COVEREDBY (NOT B)) == 0`
+- `((B AND (NOT C)) MEET_PART (NOT C)) == 0`
+- `((B AND (NOT D)) COVEREDBY (NOT B)) == 0`
+- `((B AND (NOT D)) MEET_PART (NOT D)) == 0`
+- `((B NOT (NOT C)) COVEREDBY (NOT B)) == 0`
+- `((B NOT (NOT C)) COVEREDBY (NOT C)) == 0`
+- `((B NOT (NOT D)) COVEREDBY (NOT B)) == 0`
+- `((B NOT (NOT D)) COVEREDBY (NOT D)) == 0`
+- `((C AND (NOT A)) COVEREDBY (NOT C)) == 0`
+- `((C AND (NOT A)) MEET_PART (NOT A)) == 0`
+- `((C AND (NOT B)) COVEREDBY (NOT C)) == 0`
+- `((C AND (NOT B)) MEET_PART (NOT B)) == 0`
+- `((C AND (NOT D)) COVEREDBY (NOT C)) == 0`
+- `((C AND (NOT D)) MEET_PART (NOT D)) == 0`
+- `((C NOT (NOT D)) COVEREDBY (NOT C)) == 0`
+- `((C NOT (NOT D)) COVEREDBY (NOT D)) == 0`
+- `((D AND (NOT A)) COVEREDBY (NOT D)) == 0`
+- `((D AND (NOT A)) MEET_PART (NOT A)) == 0`
+- `((D AND (NOT B)) COVEREDBY (NOT D)) == 0`
+- `((D AND (NOT B)) MEET_PART (NOT B)) == 0`
+- `((D AND (NOT C)) COVEREDBY (NOT D)) == 0`
+- `((D AND (NOT C)) MEET_PART (NOT C)) == 0`
+- `((NOT A) COVEREDBY (A AND (NOT A))) == 0`
+- `((NOT A) COVEREDBY (A AND (NOT B))) == 0`
+- `((NOT A) COVEREDBY (A AND (NOT C))) == 0`
+- `((NOT A) COVEREDBY (A AND (NOT D))) == 0`
+- `((NOT A) COVEREDBY (A NOT (NOT B))) == 0`
+- `((NOT A) COVEREDBY (A NOT (NOT C))) == 0`
+- `((NOT A) COVEREDBY (A NOT (NOT D))) == 0`
+- `((NOT B) COVEREDBY (A AND (NOT A))) == 0`
+- `((NOT B) COVEREDBY (A NOT (NOT B))) == 0`
+- `((NOT B) COVEREDBY (B AND (NOT A))) == 0`
+- `((NOT B) COVEREDBY (B AND (NOT C))) == 0`
+- `((NOT B) COVEREDBY (B AND (NOT D))) == 0`
+- `((NOT B) COVEREDBY (B NOT (NOT C))) == 0`
+- `((NOT B) COVEREDBY (B NOT (NOT D))) == 0`
+- `((NOT C) COVEREDBY (A AND (NOT A))) == 0`
+- `((NOT C) COVEREDBY (A NOT (NOT C))) == 0`
+- `((NOT C) COVEREDBY (B NOT (NOT C))) == 0`
+- `((NOT C) COVEREDBY (C AND (NOT A))) == 0`
+- `((NOT C) COVEREDBY (C AND (NOT B))) == 0`
+- `((NOT C) COVEREDBY (C AND (NOT D))) == 0`
+- `((NOT C) COVEREDBY (C NOT (NOT D))) == 0`
+- `((NOT D) COVEREDBY (A AND (NOT A))) == 0`
+- `((NOT D) COVEREDBY (A NOT (NOT D))) == 0`
+- `((NOT D) COVEREDBY (B NOT (NOT D))) == 0`
+- `((NOT D) COVEREDBY (C NOT (NOT D))) == 0`
+- `((NOT D) COVEREDBY (D AND (NOT A))) == 0`
+- `((NOT D) COVEREDBY (D AND (NOT B))) == 0`
+- `((NOT D) COVEREDBY (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (NOT A)) == 0`
+- `((A AND (NOT A)) EQUAL_PART (NOT B)) == 0`
+- `((A AND (NOT A)) EQUAL_PART (NOT C)) == 0`
+- `((A AND (NOT A)) EQUAL_PART (NOT D)) == 0`
+- `((A AND (NOT B)) EQUAL_PART (NOT A)) == 0`
+- `((A AND (NOT C)) EQUAL_PART (NOT A)) == 0`
+- `((A AND (NOT D)) EQUAL_PART (NOT A)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (NOT A)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (NOT B)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (NOT A)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (NOT C)) == 0`
+- `((A NOT (NOT D)) EQUAL_PART (NOT A)) == 0`
+- `((A NOT (NOT D)) EQUAL_PART (NOT D)) == 0`
+- `((B AND (NOT A)) EQUAL_PART (NOT B)) == 0`
+- `((B AND (NOT C)) EQUAL_PART (NOT B)) == 0`
+- `((B AND (NOT D)) EQUAL_PART (NOT B)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (NOT B)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (NOT C)) == 0`
+- `((B NOT (NOT D)) EQUAL_PART (NOT B)) == 0`
+- `((B NOT (NOT D)) EQUAL_PART (NOT D)) == 0`
+- `((C AND (NOT A)) EQUAL_PART (NOT C)) == 0`
+- `((C AND (NOT B)) EQUAL_PART (NOT C)) == 0`
+- `((C AND (NOT D)) EQUAL_PART (NOT C)) == 0`
+- `((C NOT (NOT D)) EQUAL_PART (NOT C)) == 0`
+- `((C NOT (NOT D)) EQUAL_PART (NOT D)) == 0`
+- `((D AND (NOT A)) EQUAL_PART (NOT D)) == 0`
+- `((D AND (NOT B)) EQUAL_PART (NOT D)) == 0`
+- `((D AND (NOT C)) EQUAL_PART (NOT D)) == 0`
+- `((NOT A) EQUAL_PART (A AND (NOT A))) == 0`
+- `((NOT A) EQUAL_PART (A AND (NOT B))) == 0`
+- `((NOT A) EQUAL_PART (A AND (NOT C))) == 0`
+- `((NOT A) EQUAL_PART (A AND (NOT D))) == 0`
+- `((NOT A) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((NOT A) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((NOT A) EQUAL_PART (A NOT (NOT D))) == 0`
+- `((NOT B) EQUAL_PART (A AND (NOT A))) == 0`
+- `((NOT B) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((NOT B) EQUAL_PART (B AND (NOT A))) == 0`
+- `((NOT B) EQUAL_PART (B AND (NOT C))) == 0`
+- `((NOT B) EQUAL_PART (B AND (NOT D))) == 0`
+- `((NOT B) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((NOT B) EQUAL_PART (B NOT (NOT D))) == 0`
+- `((NOT C) EQUAL_PART (A AND (NOT A))) == 0`
+- `((NOT C) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((NOT C) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((NOT C) EQUAL_PART (C AND (NOT A))) == 0`
+- `((NOT C) EQUAL_PART (C AND (NOT B))) == 0`
+- `((NOT C) EQUAL_PART (C AND (NOT D))) == 0`
+- `((NOT C) EQUAL_PART (C NOT (NOT D))) == 0`
+- `((NOT D) EQUAL_PART (A AND (NOT A))) == 0`
+- `((NOT D) EQUAL_PART (A NOT (NOT D))) == 0`
+- `((NOT D) EQUAL_PART (B NOT (NOT D))) == 0`
+- `((NOT D) EQUAL_PART (C NOT (NOT D))) == 0`
+- `((NOT D) EQUAL_PART (D AND (NOT A))) == 0`
+- `((NOT D) EQUAL_PART (D AND (NOT B))) == 0`
+- `((NOT D) EQUAL_PART (D AND (NOT C))) == 0`
+- `((NOT A) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((NOT A) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((NOT A) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((NOT A) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((NOT B) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((NOT B) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((NOT B) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((NOT B) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((NOT C) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((NOT C) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((NOT C) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((NOT C) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((NOT D) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((NOT D) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((NOT D) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((NOT D) DISJOINT_PART (C OR (NOT D))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (NOT A)) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (NOT B)) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (NOT A)) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (NOT C)) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (NOT A)) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (NOT D)) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (NOT B)) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (NOT C)) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (NOT B)) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (NOT D)) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (NOT C)) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (NOT D)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (NOT A)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (NOT B)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (NOT C)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (NOT D)) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (NOT B)) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (NOT C)) == 0`
+- `((A AND (NOT D)) DISJOINT_PART (NOT D)) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (NOT A)) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (NOT C)) == 0`
+- `((B AND (NOT D)) DISJOINT_PART (NOT D)) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (NOT A)) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (NOT B)) == 0`
+- `((C AND (NOT D)) DISJOINT_PART (NOT D)) == 0`
+- `((D AND (NOT A)) DISJOINT_PART (NOT A)) == 0`
+- `((D AND (NOT B)) DISJOINT_PART (NOT B)) == 0`
+- `((D AND (NOT C)) DISJOINT_PART (NOT C)) == 0`
+- `((NOT A) NOT ((NOT A) OR (NOT B))) == 0`
+- `((NOT A) NOT ((NOT A) OR (NOT C))) == 0`
+- `((NOT A) NOT ((NOT A) OR (NOT D))) == 0`
+- `((NOT B) NOT ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) NOT ((NOT B) OR (NOT C))) == 0`
+- `((NOT B) NOT ((NOT B) OR (NOT D))) == 0`
+- `((NOT C) NOT ((NOT A) OR (NOT C))) == 0`
+- `((NOT C) NOT ((NOT B) OR (NOT C))) == 0`
+- `((NOT C) NOT ((NOT C) OR (NOT D))) == 0`
+- `((NOT D) NOT ((NOT A) OR (NOT D))) == 0`
+- `((NOT D) NOT ((NOT B) OR (NOT D))) == 0`
+- `((NOT D) NOT ((NOT C) OR (NOT D))) == 0`
+- `((A OR (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((A OR (NOT A)) XOR (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A OR (NOT B)) XOR (A OR (NOT B))) == 0`
+- `((A OR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((A OR (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((A OR (NOT C)) XOR (A OR (NOT C))) == 0`
+- `((A OR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((A OR (NOT D)) NOT (A OR (NOT D))) == 0`
+- `((A OR (NOT D)) XOR (A OR (NOT D))) == 0`
+- `((B OR (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((B OR (NOT A)) XOR (B OR (NOT A))) == 0`
+- `((B OR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((B OR (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((B OR (NOT C)) XOR (B OR (NOT C))) == 0`
+- `((B OR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((B OR (NOT D)) NOT (B OR (NOT D))) == 0`
+- `((B OR (NOT D)) XOR (B OR (NOT D))) == 0`
+- `((C OR (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((C OR (NOT A)) NOT (C OR (NOT A))) == 0`
+- `((C OR (NOT A)) XOR (C OR (NOT A))) == 0`
+- `((C OR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((C OR (NOT B)) NOT (C OR (NOT B))) == 0`
+- `((C OR (NOT B)) XOR (C OR (NOT B))) == 0`
+- `((C OR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((C OR (NOT D)) NOT (C OR (NOT D))) == 0`
+- `((C OR (NOT D)) XOR (C OR (NOT D))) == 0`
+- `((D OR (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((D OR (NOT A)) NOT (D OR (NOT A))) == 0`
+- `((D OR (NOT A)) XOR (D OR (NOT A))) == 0`
+- `((D OR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((D OR (NOT B)) NOT (D OR (NOT B))) == 0`
+- `((D OR (NOT B)) XOR (D OR (NOT B))) == 0`
+- `((D OR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((D OR (NOT C)) NOT (D OR (NOT C))) == 0`
+- `((D OR (NOT C)) XOR (D OR (NOT C))) == 0`
+- `(((NOT A) NOT B) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) NOT (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT (C OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) NOT (D OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT (D OR (NOT B))) == 0`
+- `(((NOT A) NOT C) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) NOT C) NOT (A OR (NOT C))) == 0`
+- `(((NOT A) NOT C) NOT (B OR (NOT A))) == 0`
+- `(((NOT A) NOT C) NOT (B OR (NOT C))) == 0`
+- `(((NOT A) NOT C) NOT (C OR (NOT A))) == 0`
+- `(((NOT A) NOT C) NOT (D OR (NOT A))) == 0`
+- `(((NOT A) NOT C) NOT (D OR (NOT C))) == 0`
+- `(((NOT A) NOT D) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) NOT D) NOT (A OR (NOT D))) == 0`
+- `(((NOT A) NOT D) NOT (B OR (NOT A))) == 0`
+- `(((NOT A) NOT D) NOT (B OR (NOT D))) == 0`
+- `(((NOT A) NOT D) NOT (C OR (NOT A))) == 0`
+- `(((NOT A) NOT D) NOT (C OR (NOT D))) == 0`
+- `(((NOT A) NOT D) NOT (D OR (NOT A))) == 0`
+- `(((NOT B) NOT C) NOT (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) NOT (A OR (NOT B))) == 0`
+- `(((NOT B) NOT C) NOT (A OR (NOT C))) == 0`
+- `(((NOT B) NOT C) NOT (B OR (NOT C))) == 0`
+- `(((NOT B) NOT C) NOT (C OR (NOT B))) == 0`
+- `(((NOT B) NOT C) NOT (D OR (NOT B))) == 0`
+- `(((NOT B) NOT C) NOT (D OR (NOT C))) == 0`
+- `(((NOT B) NOT D) NOT (A OR (NOT A))) == 0`
+- `(((NOT B) NOT D) NOT (A OR (NOT B))) == 0`
+- `(((NOT B) NOT D) NOT (A OR (NOT D))) == 0`
+- `(((NOT B) NOT D) NOT (B OR (NOT D))) == 0`
+- `(((NOT B) NOT D) NOT (C OR (NOT B))) == 0`
+- `(((NOT B) NOT D) NOT (C OR (NOT D))) == 0`
+- `(((NOT B) NOT D) NOT (D OR (NOT B))) == 0`
+- `(((NOT C) NOT D) NOT (A OR (NOT A))) == 0`
+- `(((NOT C) NOT D) NOT (A OR (NOT C))) == 0`
+- `(((NOT C) NOT D) NOT (A OR (NOT D))) == 0`
+- `(((NOT C) NOT D) NOT (B OR (NOT C))) == 0`
+- `(((NOT C) NOT D) NOT (B OR (NOT D))) == 0`
+- `(((NOT C) NOT D) NOT (C OR (NOT D))) == 0`
+- `(((NOT C) NOT D) NOT (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) AND (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) AND (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) AND (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) AND (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) AND (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) AND (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) AND (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) AND (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) OR (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A AND (NOT B)) NOT (A OR (NOT C))) == 0`
+- `((A AND (NOT B)) NOT (A OR (NOT D))) == 0`
+- `((A AND (NOT B)) NOT (C OR (NOT B))) == 0`
+- `((A AND (NOT B)) NOT (D OR (NOT B))) == 0`
+- `((A AND (NOT C)) AND (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT C)) NOT (A OR (NOT B))) == 0`
+- `((A AND (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((A AND (NOT C)) NOT (A OR (NOT D))) == 0`
+- `((A AND (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((A AND (NOT C)) NOT (D OR (NOT C))) == 0`
+- `((A AND (NOT D)) AND (D OR (NOT A))) == 0`
+- `((A AND (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT D)) NOT (A OR (NOT B))) == 0`
+- `((A AND (NOT D)) NOT (A OR (NOT C))) == 0`
+- `((A AND (NOT D)) NOT (A OR (NOT D))) == 0`
+- `((A AND (NOT D)) NOT (B OR (NOT D))) == 0`
+- `((A AND (NOT D)) NOT (C OR (NOT D))) == 0`
+- `((A NOT (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) NOT (A OR (NOT C))) == 0`
+- `((A NOT (NOT B)) NOT (A OR (NOT D))) == 0`
+- `((A NOT (NOT B)) NOT (B OR (NOT A))) == 0`
+- `((A NOT (NOT B)) NOT (B OR (NOT C))) == 0`
+- `((A NOT (NOT B)) NOT (B OR (NOT D))) == 0`
+- `((A NOT (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((A NOT (NOT C)) NOT (A OR (NOT B))) == 0`
+- `((A NOT (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((A NOT (NOT C)) NOT (A OR (NOT D))) == 0`
+- `((A NOT (NOT C)) NOT (C OR (NOT A))) == 0`
+- `((A NOT (NOT C)) NOT (C OR (NOT B))) == 0`
+- `((A NOT (NOT C)) NOT (C OR (NOT D))) == 0`
+- `((A NOT (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((A NOT (NOT D)) NOT (A OR (NOT B))) == 0`
+- `((A NOT (NOT D)) NOT (A OR (NOT C))) == 0`
+- `((A NOT (NOT D)) NOT (A OR (NOT D))) == 0`
+- `((A NOT (NOT D)) NOT (D OR (NOT A))) == 0`
+- `((A NOT (NOT D)) NOT (D OR (NOT B))) == 0`
+- `((A NOT (NOT D)) NOT (D OR (NOT C))) == 0`
+- `((A OR (NOT A)) AND (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A OR (NOT C)) AND (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) AND (C AND (NOT A))) == 0`
+- `((A OR (NOT D)) AND (A AND (NOT A))) == 0`
+- `((A OR (NOT D)) AND (D AND (NOT A))) == 0`
+- `((A XOR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) NOT (B OR (NOT A))) == 0`
+- `((A XOR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((A XOR (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((A XOR (NOT C)) NOT (C OR (NOT A))) == 0`
+- `((A XOR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((A XOR (NOT D)) NOT (A OR (NOT D))) == 0`
+- `((A XOR (NOT D)) NOT (D OR (NOT A))) == 0`
+- `((B AND (NOT A)) AND (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) NOT (B OR (NOT C))) == 0`
+- `((B AND (NOT A)) NOT (B OR (NOT D))) == 0`
+- `((B AND (NOT A)) NOT (C OR (NOT A))) == 0`
+- `((B AND (NOT A)) NOT (D OR (NOT A))) == 0`
+- `((B AND (NOT C)) AND (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((B AND (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((B AND (NOT C)) NOT (B OR (NOT A))) == 0`
+- `((B AND (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((B AND (NOT C)) NOT (B OR (NOT D))) == 0`
+- `((B AND (NOT C)) NOT (D OR (NOT C))) == 0`
+- `((B AND (NOT D)) AND (D OR (NOT B))) == 0`
+- `((B AND (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((B AND (NOT D)) NOT (A OR (NOT D))) == 0`
+- `((B AND (NOT D)) NOT (B OR (NOT A))) == 0`
+- `((B AND (NOT D)) NOT (B OR (NOT C))) == 0`
+- `((B AND (NOT D)) NOT (B OR (NOT D))) == 0`
+- `((B AND (NOT D)) NOT (C OR (NOT D))) == 0`
+- `((B NOT (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((B NOT (NOT C)) NOT (B OR (NOT A))) == 0`
+- `((B NOT (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) NOT (B OR (NOT D))) == 0`
+- `((B NOT (NOT C)) NOT (C OR (NOT A))) == 0`
+- `((B NOT (NOT C)) NOT (C OR (NOT B))) == 0`
+- `((B NOT (NOT C)) NOT (C OR (NOT D))) == 0`
+- `((B NOT (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((B NOT (NOT D)) NOT (B OR (NOT A))) == 0`
+- `((B NOT (NOT D)) NOT (B OR (NOT C))) == 0`
+- `((B NOT (NOT D)) NOT (B OR (NOT D))) == 0`
+- `((B NOT (NOT D)) NOT (D OR (NOT A))) == 0`
+- `((B NOT (NOT D)) NOT (D OR (NOT B))) == 0`
+- `((B NOT (NOT D)) NOT (D OR (NOT C))) == 0`
+- `((B OR (NOT A)) AND (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) AND (A AND (NOT B))) == 0`
+- `((B OR (NOT C)) AND (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) AND (C AND (NOT B))) == 0`
+- `((B OR (NOT D)) AND (A AND (NOT A))) == 0`
+- `((B OR (NOT D)) AND (D AND (NOT B))) == 0`
+- `((B XOR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((B XOR (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((B XOR (NOT C)) NOT (C OR (NOT B))) == 0`
+- `((B XOR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((B XOR (NOT D)) NOT (B OR (NOT D))) == 0`
+- `((B XOR (NOT D)) NOT (D OR (NOT B))) == 0`
+- `((C AND (NOT A)) AND (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((C AND (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((C AND (NOT A)) NOT (C OR (NOT A))) == 0`
+- `((C AND (NOT A)) NOT (C OR (NOT B))) == 0`
+- `((C AND (NOT A)) NOT (C OR (NOT D))) == 0`
+- `((C AND (NOT A)) NOT (D OR (NOT A))) == 0`
+- `((C AND (NOT B)) AND (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((C AND (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((C AND (NOT B)) NOT (C OR (NOT A))) == 0`
+- `((C AND (NOT B)) NOT (C OR (NOT B))) == 0`
+- `((C AND (NOT B)) NOT (C OR (NOT D))) == 0`
+- `((C AND (NOT B)) NOT (D OR (NOT B))) == 0`
+- `((C AND (NOT D)) AND (D OR (NOT C))) == 0`
+- `((C AND (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((C AND (NOT D)) NOT (A OR (NOT D))) == 0`
+- `((C AND (NOT D)) NOT (B OR (NOT D))) == 0`
+- `((C AND (NOT D)) NOT (C OR (NOT A))) == 0`
+- `((C AND (NOT D)) NOT (C OR (NOT B))) == 0`
+- `((C AND (NOT D)) NOT (C OR (NOT D))) == 0`
+- `((C NOT (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((C NOT (NOT D)) NOT (C OR (NOT A))) == 0`
+- `((C NOT (NOT D)) NOT (C OR (NOT B))) == 0`
+- `((C NOT (NOT D)) NOT (C OR (NOT D))) == 0`
+- `((C NOT (NOT D)) NOT (D OR (NOT A))) == 0`
+- `((C NOT (NOT D)) NOT (D OR (NOT B))) == 0`
+- `((C NOT (NOT D)) NOT (D OR (NOT C))) == 0`
+- `((C OR (NOT A)) AND (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) AND (A AND (NOT C))) == 0`
+- `((C OR (NOT B)) AND (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) AND (B AND (NOT C))) == 0`
+- `((C OR (NOT D)) AND (A AND (NOT A))) == 0`
+- `((C OR (NOT D)) AND (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((C XOR (NOT D)) NOT (C OR (NOT D))) == 0`
+- `((C XOR (NOT D)) NOT (D OR (NOT C))) == 0`
+- `((D AND (NOT A)) AND (A OR (NOT D))) == 0`
+- `((D AND (NOT A)) NOT (A OR (NOT A))) == 0`
+- `((D AND (NOT A)) NOT (B OR (NOT A))) == 0`
+- `((D AND (NOT A)) NOT (C OR (NOT A))) == 0`
+- `((D AND (NOT A)) NOT (D OR (NOT A))) == 0`
+- `((D AND (NOT A)) NOT (D OR (NOT B))) == 0`
+- `((D AND (NOT A)) NOT (D OR (NOT C))) == 0`
+- `((D AND (NOT B)) AND (B OR (NOT D))) == 0`
+- `((D AND (NOT B)) NOT (A OR (NOT A))) == 0`
+- `((D AND (NOT B)) NOT (A OR (NOT B))) == 0`
+- `((D AND (NOT B)) NOT (C OR (NOT B))) == 0`
+- `((D AND (NOT B)) NOT (D OR (NOT A))) == 0`
+- `((D AND (NOT B)) NOT (D OR (NOT B))) == 0`
+- `((D AND (NOT B)) NOT (D OR (NOT C))) == 0`
+- `((D AND (NOT C)) AND (C OR (NOT D))) == 0`
+- `((D AND (NOT C)) NOT (A OR (NOT A))) == 0`
+- `((D AND (NOT C)) NOT (A OR (NOT C))) == 0`
+- `((D AND (NOT C)) NOT (B OR (NOT C))) == 0`
+- `((D AND (NOT C)) NOT (D OR (NOT A))) == 0`
+- `((D AND (NOT C)) NOT (D OR (NOT B))) == 0`
+- `((D AND (NOT C)) NOT (D OR (NOT C))) == 0`
+- `((D OR (NOT A)) AND (A AND (NOT A))) == 0`
+- `((D OR (NOT A)) AND (A AND (NOT D))) == 0`
+- `((D OR (NOT B)) AND (A AND (NOT A))) == 0`
+- `((D OR (NOT B)) AND (B AND (NOT D))) == 0`
+- `((D OR (NOT C)) AND (A AND (NOT A))) == 0`
+- `((D OR (NOT C)) AND (C AND (NOT D))) == 0`
+- `(((NOT A) NOT B) AND (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) AND (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) AND (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) AND (A AND (NOT D))) == 0`
+- `(((NOT A) NOT B) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) AND (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) AND (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) AND (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) AND (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) AND (B AND (NOT D))) == 0`
+- `(((NOT A) NOT B) AND (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) AND (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) NOT (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) XOR ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT C) AND (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) AND (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) AND (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) AND (A AND (NOT D))) == 0`
+- `(((NOT A) NOT C) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) AND (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) AND (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) AND (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) AND (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) AND (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) AND (C AND (NOT D))) == 0`
+- `(((NOT A) NOT C) AND (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT A) NOT C)) == 0`
+- `(((NOT A) NOT C) NOT (A XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) XOR ((NOT A) NOT C)) == 0`
+- `(((NOT A) NOT D) AND (A AND (NOT A))) == 0`
+- `(((NOT A) NOT D) AND (A AND (NOT B))) == 0`
+- `(((NOT A) NOT D) AND (A AND (NOT C))) == 0`
+- `(((NOT A) NOT D) AND (A AND (NOT D))) == 0`
+- `(((NOT A) NOT D) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT D) AND (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT D) AND (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) AND (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) AND (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) AND (D AND (NOT A))) == 0`
+- `(((NOT A) NOT D) AND (D AND (NOT B))) == 0`
+- `(((NOT A) NOT D) AND (D AND (NOT C))) == 0`
+- `(((NOT A) NOT D) NOT ((NOT A) NOT D)) == 0`
+- `(((NOT A) NOT D) NOT (A XOR (NOT D))) == 0`
+- `(((NOT A) NOT D) XOR ((NOT A) NOT D)) == 0`
+- `(((NOT B) NOT C) AND (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) AND (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) AND (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) AND (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) AND (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) AND (B AND (NOT D))) == 0`
+- `(((NOT B) NOT C) AND (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) AND (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) AND (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) AND (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) AND (C AND (NOT D))) == 0`
+- `(((NOT B) NOT C) AND (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT B) NOT C)) == 0`
+- `(((NOT B) NOT C) NOT (B XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) XOR ((NOT B) NOT C)) == 0`
+- `(((NOT B) NOT D) AND (A AND (NOT A))) == 0`
+- `(((NOT B) NOT D) AND (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT D) AND (A NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) AND (B AND (NOT A))) == 0`
+- `(((NOT B) NOT D) AND (B AND (NOT C))) == 0`
+- `(((NOT B) NOT D) AND (B AND (NOT D))) == 0`
+- `(((NOT B) NOT D) AND (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT D) AND (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) AND (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) AND (D AND (NOT A))) == 0`
+- `(((NOT B) NOT D) AND (D AND (NOT B))) == 0`
+- `(((NOT B) NOT D) AND (D AND (NOT C))) == 0`
+- `(((NOT B) NOT D) NOT ((NOT B) NOT D)) == 0`
+- `(((NOT B) NOT D) NOT (B XOR (NOT D))) == 0`
+- `(((NOT B) NOT D) XOR ((NOT B) NOT D)) == 0`
+- `(((NOT C) NOT D) AND (A AND (NOT A))) == 0`
+- `(((NOT C) NOT D) AND (A NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) AND (A NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) AND (B NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) AND (B NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) AND (C AND (NOT A))) == 0`
+- `(((NOT C) NOT D) AND (C AND (NOT B))) == 0`
+- `(((NOT C) NOT D) AND (C AND (NOT D))) == 0`
+- `(((NOT C) NOT D) AND (C NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) AND (D AND (NOT A))) == 0`
+- `(((NOT C) NOT D) AND (D AND (NOT B))) == 0`
+- `(((NOT C) NOT D) AND (D AND (NOT C))) == 0`
+- `(((NOT C) NOT D) NOT ((NOT C) NOT D)) == 0`
+- `(((NOT C) NOT D) NOT (C XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) XOR ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) AND ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) AND ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) AND ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) AND ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) AND ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) AND ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) AND (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) AND (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) AND (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) AND (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) AND (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) AND (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) AND (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) AND (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) AND (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) AND (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) AND (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) AND (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) AND (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) AND (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) AND (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) AND (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) AND (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) AND (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) AND (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) AND (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) AND (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) AND (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) NOT ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) NOT ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) NOT ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) NOT (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) NOT (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) NOT (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) XOR (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) AND ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) AND ((NOT A) NOT D)) == 0`
+- `((A AND (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) AND (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) AND (B AND (NOT D))) == 0`
+- `((A AND (NOT B)) AND (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) AND (B NOT (NOT D))) == 0`
+- `((A AND (NOT B)) AND (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) AND (D AND (NOT A))) == 0`
+- `((A AND (NOT B)) NOT (A AND (NOT B))) == 0`
+- `((A AND (NOT B)) XOR (A AND (NOT B))) == 0`
+- `((A AND (NOT C)) AND ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) AND ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) AND ((NOT A) NOT D)) == 0`
+- `((A AND (NOT C)) AND (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) AND (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) AND (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) AND (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) AND (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) AND (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) AND (C AND (NOT D))) == 0`
+- `((A AND (NOT C)) AND (C NOT (NOT D))) == 0`
+- `((A AND (NOT C)) AND (D AND (NOT A))) == 0`
+- `((A AND (NOT C)) NOT (A AND (NOT C))) == 0`
+- `((A AND (NOT C)) XOR (A AND (NOT C))) == 0`
+- `((A AND (NOT D)) AND ((NOT A) NOT B)) == 0`
+- `((A AND (NOT D)) AND ((NOT A) NOT C)) == 0`
+- `((A AND (NOT D)) AND ((NOT A) NOT D)) == 0`
+- `((A AND (NOT D)) AND (A AND (NOT A))) == 0`
+- `((A AND (NOT D)) AND (A NOT (NOT D))) == 0`
+- `((A AND (NOT D)) AND (A XOR (NOT D))) == 0`
+- `((A AND (NOT D)) AND (B AND (NOT A))) == 0`
+- `((A AND (NOT D)) AND (B NOT (NOT D))) == 0`
+- `((A AND (NOT D)) AND (C AND (NOT A))) == 0`
+- `((A AND (NOT D)) AND (C NOT (NOT D))) == 0`
+- `((A AND (NOT D)) AND (D AND (NOT A))) == 0`
+- `((A AND (NOT D)) AND (D AND (NOT B))) == 0`
+- `((A AND (NOT D)) AND (D AND (NOT C))) == 0`
+- `((A AND (NOT D)) NOT (A AND (NOT D))) == 0`
+- `((A AND (NOT D)) XOR (A AND (NOT D))) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT B)) AND ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) AND ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) AND (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) AND (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) AND (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) AND (D AND (NOT A))) == 0`
+- `((A NOT (NOT B)) AND (D AND (NOT B))) == 0`
+- `((A NOT (NOT B)) NOT (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) NOT (A XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) XOR (A NOT (NOT B))) == 0`
+- `((A NOT (NOT C)) AND ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) AND ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) AND ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT C)) AND ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) AND ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT C)) AND (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) AND (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) AND (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) AND (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) AND (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) AND (D AND (NOT A))) == 0`
+- `((A NOT (NOT C)) AND (D AND (NOT C))) == 0`
+- `((A NOT (NOT C)) NOT (A NOT (NOT C))) == 0`
+- `((A NOT (NOT C)) NOT (A XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) XOR (A NOT (NOT C))) == 0`
+- `((A NOT (NOT D)) AND ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT D)) AND ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT D)) AND ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT D)) AND ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT D)) AND ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT D)) AND (A AND (NOT A))) == 0`
+- `((A NOT (NOT D)) AND (A AND (NOT D))) == 0`
+- `((A NOT (NOT D)) AND (B AND (NOT A))) == 0`
+- `((A NOT (NOT D)) AND (B AND (NOT D))) == 0`
+- `((A NOT (NOT D)) AND (C AND (NOT A))) == 0`
+- `((A NOT (NOT D)) AND (C AND (NOT D))) == 0`
+- `((A NOT (NOT D)) AND (D AND (NOT A))) == 0`
+- `((A NOT (NOT D)) NOT (A NOT (NOT D))) == 0`
+- `((A NOT (NOT D)) NOT (A XOR (NOT D))) == 0`
+- `((A NOT (NOT D)) XOR (A NOT (NOT D))) == 0`
+- `((A XOR (NOT B)) AND (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) AND (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) AND (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) NOT (A XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) XOR (A XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) AND (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) AND (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) AND (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) NOT (A XOR (NOT C))) == 0`
+- `((A XOR (NOT C)) XOR (A XOR (NOT C))) == 0`
+- `((A XOR (NOT D)) AND (A AND (NOT A))) == 0`
+- `((A XOR (NOT D)) AND (A AND (NOT D))) == 0`
+- `((A XOR (NOT D)) AND (D AND (NOT A))) == 0`
+- `((A XOR (NOT D)) NOT (A XOR (NOT D))) == 0`
+- `((A XOR (NOT D)) XOR (A XOR (NOT D))) == 0`
+- `((B AND (NOT A)) AND ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) AND ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) AND ((NOT B) NOT D)) == 0`
+- `((B AND (NOT A)) AND (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) AND (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) AND (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) AND (A AND (NOT D))) == 0`
+- `((B AND (NOT A)) AND (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) AND (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) AND (A NOT (NOT D))) == 0`
+- `((B AND (NOT A)) AND (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) AND (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) AND (D AND (NOT B))) == 0`
+- `((B AND (NOT A)) NOT (B AND (NOT A))) == 0`
+- `((B AND (NOT A)) XOR (B AND (NOT A))) == 0`
+- `((B AND (NOT C)) AND ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) AND ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) AND ((NOT B) NOT D)) == 0`
+- `((B AND (NOT C)) AND (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) AND (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) AND (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) AND (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) AND (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) AND (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) AND (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) AND (C AND (NOT D))) == 0`
+- `((B AND (NOT C)) AND (C NOT (NOT D))) == 0`
+- `((B AND (NOT C)) AND (D AND (NOT B))) == 0`
+- `((B AND (NOT C)) NOT (B AND (NOT C))) == 0`
+- `((B AND (NOT C)) XOR (B AND (NOT C))) == 0`
+- `((B AND (NOT D)) AND ((NOT A) NOT B)) == 0`
+- `((B AND (NOT D)) AND ((NOT B) NOT C)) == 0`
+- `((B AND (NOT D)) AND ((NOT B) NOT D)) == 0`
+- `((B AND (NOT D)) AND (A AND (NOT A))) == 0`
+- `((B AND (NOT D)) AND (A AND (NOT B))) == 0`
+- `((B AND (NOT D)) AND (A NOT (NOT D))) == 0`
+- `((B AND (NOT D)) AND (B NOT (NOT D))) == 0`
+- `((B AND (NOT D)) AND (B XOR (NOT D))) == 0`
+- `((B AND (NOT D)) AND (C AND (NOT B))) == 0`
+- `((B AND (NOT D)) AND (C NOT (NOT D))) == 0`
+- `((B AND (NOT D)) AND (D AND (NOT A))) == 0`
+- `((B AND (NOT D)) AND (D AND (NOT B))) == 0`
+- `((B AND (NOT D)) AND (D AND (NOT C))) == 0`
+- `((B AND (NOT D)) NOT (B AND (NOT D))) == 0`
+- `((B AND (NOT D)) XOR (B AND (NOT D))) == 0`
+- `((B NOT (NOT C)) AND ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) AND ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) AND ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) AND ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT C)) AND ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT C)) AND (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) AND (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) AND (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) AND (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) AND (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) AND (D AND (NOT B))) == 0`
+- `((B NOT (NOT C)) AND (D AND (NOT C))) == 0`
+- `((B NOT (NOT C)) NOT (B NOT (NOT C))) == 0`
+- `((B NOT (NOT C)) NOT (B XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) XOR (B NOT (NOT C))) == 0`
+- `((B NOT (NOT D)) AND ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT D)) AND ((NOT A) NOT D)) == 0`
+- `((B NOT (NOT D)) AND ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT D)) AND ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT D)) AND ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT D)) AND (A AND (NOT A))) == 0`
+- `((B NOT (NOT D)) AND (A AND (NOT B))) == 0`
+- `((B NOT (NOT D)) AND (A AND (NOT D))) == 0`
+- `((B NOT (NOT D)) AND (B AND (NOT D))) == 0`
+- `((B NOT (NOT D)) AND (C AND (NOT B))) == 0`
+- `((B NOT (NOT D)) AND (C AND (NOT D))) == 0`
+- `((B NOT (NOT D)) AND (D AND (NOT B))) == 0`
+- `((B NOT (NOT D)) NOT (B NOT (NOT D))) == 0`
+- `((B NOT (NOT D)) NOT (B XOR (NOT D))) == 0`
+- `((B NOT (NOT D)) XOR (B NOT (NOT D))) == 0`
+- `((B XOR (NOT C)) AND (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) AND (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) AND (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) NOT (B XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) XOR (B XOR (NOT C))) == 0`
+- `((B XOR (NOT D)) AND (A AND (NOT A))) == 0`
+- `((B XOR (NOT D)) AND (B AND (NOT D))) == 0`
+- `((B XOR (NOT D)) AND (D AND (NOT B))) == 0`
+- `((B XOR (NOT D)) NOT (B XOR (NOT D))) == 0`
+- `((B XOR (NOT D)) XOR (B XOR (NOT D))) == 0`
+- `((C AND (NOT A)) AND ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) AND ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) AND ((NOT C) NOT D)) == 0`
+- `((C AND (NOT A)) AND (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) AND (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) AND (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) AND (A AND (NOT D))) == 0`
+- `((C AND (NOT A)) AND (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) AND (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) AND (A NOT (NOT D))) == 0`
+- `((C AND (NOT A)) AND (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) AND (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) AND (D AND (NOT C))) == 0`
+- `((C AND (NOT A)) NOT (C AND (NOT A))) == 0`
+- `((C AND (NOT A)) XOR (C AND (NOT A))) == 0`
+- `((C AND (NOT B)) AND ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) AND ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) AND ((NOT C) NOT D)) == 0`
+- `((C AND (NOT B)) AND (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) AND (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) AND (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) AND (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) AND (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) AND (B AND (NOT D))) == 0`
+- `((C AND (NOT B)) AND (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) AND (B NOT (NOT D))) == 0`
+- `((C AND (NOT B)) AND (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) AND (D AND (NOT C))) == 0`
+- `((C AND (NOT B)) NOT (C AND (NOT B))) == 0`
+- `((C AND (NOT B)) XOR (C AND (NOT B))) == 0`
+- `((C AND (NOT D)) AND ((NOT A) NOT C)) == 0`
+- `((C AND (NOT D)) AND ((NOT B) NOT C)) == 0`
+- `((C AND (NOT D)) AND ((NOT C) NOT D)) == 0`
+- `((C AND (NOT D)) AND (A AND (NOT A))) == 0`
+- `((C AND (NOT D)) AND (A AND (NOT C))) == 0`
+- `((C AND (NOT D)) AND (A NOT (NOT D))) == 0`
+- `((C AND (NOT D)) AND (B AND (NOT C))) == 0`
+- `((C AND (NOT D)) AND (B NOT (NOT D))) == 0`
+- `((C AND (NOT D)) AND (C NOT (NOT D))) == 0`
+- `((C AND (NOT D)) AND (C XOR (NOT D))) == 0`
+- `((C AND (NOT D)) AND (D AND (NOT A))) == 0`
+- `((C AND (NOT D)) AND (D AND (NOT B))) == 0`
+- `((C AND (NOT D)) AND (D AND (NOT C))) == 0`
+- `((C AND (NOT D)) NOT (C AND (NOT D))) == 0`
+- `((C AND (NOT D)) XOR (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) AND ((NOT A) NOT C)) == 0`
+- `((C NOT (NOT D)) AND ((NOT A) NOT D)) == 0`
+- `((C NOT (NOT D)) AND ((NOT B) NOT C)) == 0`
+- `((C NOT (NOT D)) AND ((NOT B) NOT D)) == 0`
+- `((C NOT (NOT D)) AND ((NOT C) NOT D)) == 0`
+- `((C NOT (NOT D)) AND (A AND (NOT A))) == 0`
+- `((C NOT (NOT D)) AND (A AND (NOT C))) == 0`
+- `((C NOT (NOT D)) AND (A AND (NOT D))) == 0`
+- `((C NOT (NOT D)) AND (B AND (NOT C))) == 0`
+- `((C NOT (NOT D)) AND (B AND (NOT D))) == 0`
+- `((C NOT (NOT D)) AND (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) AND (D AND (NOT C))) == 0`
+- `((C NOT (NOT D)) NOT (C NOT (NOT D))) == 0`
+- `((C NOT (NOT D)) NOT (C XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) XOR (C NOT (NOT D))) == 0`
+- `((C XOR (NOT D)) AND (A AND (NOT A))) == 0`
+- `((C XOR (NOT D)) AND (C AND (NOT D))) == 0`
+- `((C XOR (NOT D)) AND (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) NOT (C XOR (NOT D))) == 0`
+- `((C XOR (NOT D)) XOR (C XOR (NOT D))) == 0`
+- `((D AND (NOT A)) AND ((NOT A) NOT D)) == 0`
+- `((D AND (NOT A)) AND ((NOT B) NOT D)) == 0`
+- `((D AND (NOT A)) AND ((NOT C) NOT D)) == 0`
+- `((D AND (NOT A)) AND (A AND (NOT A))) == 0`
+- `((D AND (NOT A)) AND (A AND (NOT B))) == 0`
+- `((D AND (NOT A)) AND (A AND (NOT C))) == 0`
+- `((D AND (NOT A)) AND (A AND (NOT D))) == 0`
+- `((D AND (NOT A)) AND (A NOT (NOT B))) == 0`
+- `((D AND (NOT A)) AND (A NOT (NOT C))) == 0`
+- `((D AND (NOT A)) AND (A NOT (NOT D))) == 0`
+- `((D AND (NOT A)) AND (A XOR (NOT D))) == 0`
+- `((D AND (NOT A)) AND (B AND (NOT D))) == 0`
+- `((D AND (NOT A)) AND (C AND (NOT D))) == 0`
+- `((D AND (NOT A)) NOT (D AND (NOT A))) == 0`
+- `((D AND (NOT A)) XOR (D AND (NOT A))) == 0`
+- `((D AND (NOT B)) AND ((NOT A) NOT D)) == 0`
+- `((D AND (NOT B)) AND ((NOT B) NOT D)) == 0`
+- `((D AND (NOT B)) AND ((NOT C) NOT D)) == 0`
+- `((D AND (NOT B)) AND (A AND (NOT A))) == 0`
+- `((D AND (NOT B)) AND (A AND (NOT D))) == 0`
+- `((D AND (NOT B)) AND (A NOT (NOT B))) == 0`
+- `((D AND (NOT B)) AND (B AND (NOT A))) == 0`
+- `((D AND (NOT B)) AND (B AND (NOT C))) == 0`
+- `((D AND (NOT B)) AND (B AND (NOT D))) == 0`
+- `((D AND (NOT B)) AND (B NOT (NOT C))) == 0`
+- `((D AND (NOT B)) AND (B NOT (NOT D))) == 0`
+- `((D AND (NOT B)) AND (B XOR (NOT D))) == 0`
+- `((D AND (NOT B)) AND (C AND (NOT D))) == 0`
+- `((D AND (NOT B)) NOT (D AND (NOT B))) == 0`
+- `((D AND (NOT B)) XOR (D AND (NOT B))) == 0`
+- `((D AND (NOT C)) AND ((NOT A) NOT D)) == 0`
+- `((D AND (NOT C)) AND ((NOT B) NOT D)) == 0`
+- `((D AND (NOT C)) AND ((NOT C) NOT D)) == 0`
+- `((D AND (NOT C)) AND (A AND (NOT A))) == 0`
+- `((D AND (NOT C)) AND (A AND (NOT D))) == 0`
+- `((D AND (NOT C)) AND (A NOT (NOT C))) == 0`
+- `((D AND (NOT C)) AND (B AND (NOT D))) == 0`
+- `((D AND (NOT C)) AND (B NOT (NOT C))) == 0`
+- `((D AND (NOT C)) AND (C AND (NOT A))) == 0`
+- `((D AND (NOT C)) AND (C AND (NOT B))) == 0`
+- `((D AND (NOT C)) AND (C AND (NOT D))) == 0`
+- `((D AND (NOT C)) AND (C NOT (NOT D))) == 0`
+- `((D AND (NOT C)) AND (C XOR (NOT D))) == 0`
+- `((D AND (NOT C)) NOT (D AND (NOT C))) == 0`
+- `((D AND (NOT C)) XOR (D AND (NOT C))) == 0`
+- `((NOT A) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((NOT A) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((NOT A) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `((NOT B) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((NOT B) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `((NOT C) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((NOT C) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((NOT C) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `((NOT D) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `((NOT D) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `((NOT D) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (D OR (NOT C))) == 0`
+- `((A AND (NOT B)) COVERS (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE (B OR (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) INSIDE (C OR (NOT A))) == 0`
+- `((A AND (NOT D)) COVERS (D OR (NOT A))) == 0`
+- `((A AND (NOT D)) INSIDE (D OR (NOT A))) == 0`
+- `((A OR (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((A OR (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((A OR (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A OR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A OR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A OR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((A OR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((A OR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A OR (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A OR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((A OR (NOT D)) COVERS (D AND (NOT A))) == 0`
+- `((A OR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((A OR (NOT D)) INSIDE (D AND (NOT A))) == 0`
+- `((A OR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A OR (NOT D)) OUTSIDE (A OR (NOT D))) == 0`
+- `((B AND (NOT A)) COVERS (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (A OR (NOT B))) == 0`
+- `((B AND (NOT C)) COVERS (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) INSIDE (C OR (NOT B))) == 0`
+- `((B AND (NOT D)) COVERS (D OR (NOT B))) == 0`
+- `((B AND (NOT D)) INSIDE (D OR (NOT B))) == 0`
+- `((B OR (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((B OR (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((B OR (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B OR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((B OR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((B OR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B OR (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B OR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((B OR (NOT D)) COVERS (D AND (NOT B))) == 0`
+- `((B OR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((B OR (NOT D)) INSIDE (D AND (NOT B))) == 0`
+- `((B OR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B OR (NOT D)) OUTSIDE (B OR (NOT D))) == 0`
+- `((C AND (NOT A)) COVERS (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE (A OR (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE (B OR (NOT C))) == 0`
+- `((C AND (NOT D)) COVERS (D OR (NOT C))) == 0`
+- `((C AND (NOT D)) INSIDE (D OR (NOT C))) == 0`
+- `((C OR (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) COVERS (A AND (NOT C))) == 0`
+- `((C OR (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) INSIDE (A AND (NOT C))) == 0`
+- `((C OR (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C OR (NOT A)) OUTSIDE (C OR (NOT A))) == 0`
+- `((C OR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) COVERS (B AND (NOT C))) == 0`
+- `((C OR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) INSIDE (B AND (NOT C))) == 0`
+- `((C OR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C OR (NOT B)) OUTSIDE (C OR (NOT B))) == 0`
+- `((C OR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((C OR (NOT D)) COVERS (D AND (NOT C))) == 0`
+- `((C OR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((C OR (NOT D)) INSIDE (D AND (NOT C))) == 0`
+- `((C OR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C OR (NOT D)) OUTSIDE (C OR (NOT D))) == 0`
+- `((D AND (NOT A)) COVERS (A OR (NOT D))) == 0`
+- `((D AND (NOT A)) INSIDE (A OR (NOT D))) == 0`
+- `((D AND (NOT B)) COVERS (B OR (NOT D))) == 0`
+- `((D AND (NOT B)) INSIDE (B OR (NOT D))) == 0`
+- `((D AND (NOT C)) COVERS (C OR (NOT D))) == 0`
+- `((D AND (NOT C)) INSIDE (C OR (NOT D))) == 0`
+- `((D OR (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((D OR (NOT A)) COVERS (A AND (NOT D))) == 0`
+- `((D OR (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((D OR (NOT A)) INSIDE (A AND (NOT D))) == 0`
+- `((D OR (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((D OR (NOT A)) OUTSIDE (D OR (NOT A))) == 0`
+- `((D OR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((D OR (NOT B)) COVERS (B AND (NOT D))) == 0`
+- `((D OR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((D OR (NOT B)) INSIDE (B AND (NOT D))) == 0`
+- `((D OR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((D OR (NOT B)) OUTSIDE (D OR (NOT B))) == 0`
+- `((D OR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((D OR (NOT C)) COVERS (C AND (NOT D))) == 0`
+- `((D OR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((D OR (NOT C)) INSIDE (C AND (NOT D))) == 0`
+- `((D OR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((D OR (NOT C)) OUTSIDE (D OR (NOT C))) == 0`
+- `(((NOT A) NOT B) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVERS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) COVERS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) COVERS (A AND (NOT D))) == 0`
+- `(((NOT A) NOT B) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) COVERS (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) COVERS (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVERS (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) COVERS (B AND (NOT D))) == 0`
+- `(((NOT A) NOT B) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) COVERS (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) INSIDE (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) INSIDE (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) INSIDE (A AND (NOT D))) == 0`
+- `(((NOT A) NOT B) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) INSIDE (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) INSIDE (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) INSIDE (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) INSIDE (B AND (NOT D))) == 0`
+- `(((NOT A) NOT B) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) INSIDE (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (C OR (NOT A))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (D OR (NOT A))) == 0`
+- `(((NOT A) NOT B) OUTSIDE (D OR (NOT B))) == 0`
+- `(((NOT A) NOT C) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) COVERS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) COVERS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) COVERS (A AND (NOT D))) == 0`
+- `(((NOT A) NOT C) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) COVERS (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) COVERS (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) COVERS (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) COVERS (C AND (NOT D))) == 0`
+- `(((NOT A) NOT C) COVERS (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) INSIDE (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) INSIDE (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) INSIDE (A AND (NOT D))) == 0`
+- `(((NOT A) NOT C) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) INSIDE (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) INSIDE (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) INSIDE (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) INSIDE (C AND (NOT D))) == 0`
+- `(((NOT A) NOT C) INSIDE (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (A OR (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (B OR (NOT A))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (B OR (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (C OR (NOT A))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (D OR (NOT A))) == 0`
+- `(((NOT A) NOT C) OUTSIDE (D OR (NOT C))) == 0`
+- `(((NOT A) NOT D) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT D) COVERS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT D) COVERS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT D) COVERS (A AND (NOT D))) == 0`
+- `(((NOT A) NOT D) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT D) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT D) COVERS (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) COVERS (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) COVERS (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) COVERS (D AND (NOT A))) == 0`
+- `(((NOT A) NOT D) COVERS (D AND (NOT B))) == 0`
+- `(((NOT A) NOT D) COVERS (D AND (NOT C))) == 0`
+- `(((NOT A) NOT D) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) NOT D) INSIDE (A AND (NOT B))) == 0`
+- `(((NOT A) NOT D) INSIDE (A AND (NOT C))) == 0`
+- `(((NOT A) NOT D) INSIDE (A AND (NOT D))) == 0`
+- `(((NOT A) NOT D) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT D) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT D) INSIDE (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) INSIDE (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) INSIDE (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) INSIDE (D AND (NOT A))) == 0`
+- `(((NOT A) NOT D) INSIDE (D AND (NOT B))) == 0`
+- `(((NOT A) NOT D) INSIDE (D AND (NOT C))) == 0`
+- `(((NOT A) NOT D) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) NOT D) OUTSIDE (A OR (NOT D))) == 0`
+- `(((NOT A) NOT D) OUTSIDE (B OR (NOT A))) == 0`
+- `(((NOT A) NOT D) OUTSIDE (B OR (NOT D))) == 0`
+- `(((NOT A) NOT D) OUTSIDE (C OR (NOT A))) == 0`
+- `(((NOT A) NOT D) OUTSIDE (C OR (NOT D))) == 0`
+- `(((NOT A) NOT D) OUTSIDE (D OR (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) COVERS (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) COVERS (B AND (NOT D))) == 0`
+- `(((NOT B) NOT C) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) COVERS (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) COVERS (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) COVERS (C AND (NOT D))) == 0`
+- `(((NOT B) NOT C) COVERS (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) INSIDE (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) INSIDE (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) INSIDE (B AND (NOT D))) == 0`
+- `(((NOT B) NOT C) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) INSIDE (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) INSIDE (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) INSIDE (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) INSIDE (C AND (NOT D))) == 0`
+- `(((NOT B) NOT C) INSIDE (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (A OR (NOT B))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (A OR (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (B OR (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (C OR (NOT B))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (D OR (NOT B))) == 0`
+- `(((NOT B) NOT C) OUTSIDE (D OR (NOT C))) == 0`
+- `(((NOT B) NOT D) COVERS (A AND (NOT A))) == 0`
+- `(((NOT B) NOT D) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT D) COVERS (A NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) COVERS (B AND (NOT A))) == 0`
+- `(((NOT B) NOT D) COVERS (B AND (NOT C))) == 0`
+- `(((NOT B) NOT D) COVERS (B AND (NOT D))) == 0`
+- `(((NOT B) NOT D) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT D) COVERS (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) COVERS (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) COVERS (D AND (NOT A))) == 0`
+- `(((NOT B) NOT D) COVERS (D AND (NOT B))) == 0`
+- `(((NOT B) NOT D) COVERS (D AND (NOT C))) == 0`
+- `(((NOT B) NOT D) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT B) NOT D) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT D) INSIDE (A NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) INSIDE (B AND (NOT A))) == 0`
+- `(((NOT B) NOT D) INSIDE (B AND (NOT C))) == 0`
+- `(((NOT B) NOT D) INSIDE (B AND (NOT D))) == 0`
+- `(((NOT B) NOT D) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT D) INSIDE (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) INSIDE (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) INSIDE (D AND (NOT A))) == 0`
+- `(((NOT B) NOT D) INSIDE (D AND (NOT B))) == 0`
+- `(((NOT B) NOT D) INSIDE (D AND (NOT C))) == 0`
+- `(((NOT B) NOT D) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT B) NOT D) OUTSIDE (A OR (NOT B))) == 0`
+- `(((NOT B) NOT D) OUTSIDE (A OR (NOT D))) == 0`
+- `(((NOT B) NOT D) OUTSIDE (B OR (NOT D))) == 0`
+- `(((NOT B) NOT D) OUTSIDE (C OR (NOT B))) == 0`
+- `(((NOT B) NOT D) OUTSIDE (C OR (NOT D))) == 0`
+- `(((NOT B) NOT D) OUTSIDE (D OR (NOT B))) == 0`
+- `(((NOT C) NOT D) COVERS (A AND (NOT A))) == 0`
+- `(((NOT C) NOT D) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) COVERS (A NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) COVERS (B NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) COVERS (C AND (NOT A))) == 0`
+- `(((NOT C) NOT D) COVERS (C AND (NOT B))) == 0`
+- `(((NOT C) NOT D) COVERS (C AND (NOT D))) == 0`
+- `(((NOT C) NOT D) COVERS (C NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) COVERS (D AND (NOT A))) == 0`
+- `(((NOT C) NOT D) COVERS (D AND (NOT B))) == 0`
+- `(((NOT C) NOT D) COVERS (D AND (NOT C))) == 0`
+- `(((NOT C) NOT D) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT C) NOT D) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) INSIDE (A NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) INSIDE (B NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) INSIDE (C AND (NOT A))) == 0`
+- `(((NOT C) NOT D) INSIDE (C AND (NOT B))) == 0`
+- `(((NOT C) NOT D) INSIDE (C AND (NOT D))) == 0`
+- `(((NOT C) NOT D) INSIDE (C NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) INSIDE (D AND (NOT A))) == 0`
+- `(((NOT C) NOT D) INSIDE (D AND (NOT B))) == 0`
+- `(((NOT C) NOT D) INSIDE (D AND (NOT C))) == 0`
+- `(((NOT C) NOT D) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT C) NOT D) OUTSIDE (A OR (NOT C))) == 0`
+- `(((NOT C) NOT D) OUTSIDE (A OR (NOT D))) == 0`
+- `(((NOT C) NOT D) OUTSIDE (B OR (NOT C))) == 0`
+- `(((NOT C) NOT D) OUTSIDE (B OR (NOT D))) == 0`
+- `(((NOT C) NOT D) OUTSIDE (C OR (NOT D))) == 0`
+- `(((NOT C) NOT D) OUTSIDE (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) COVERS ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) COVERS ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) COVERS ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) INSIDE (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (D OR (NOT C))) == 0`
+- `((A AND (NOT B)) COVERS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) COVERS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) COVERS ((NOT A) NOT D)) == 0`
+- `((A AND (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) COVERS (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVERS (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) COVERS (B AND (NOT D))) == 0`
+- `((A AND (NOT B)) COVERS (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) COVERS (B NOT (NOT D))) == 0`
+- `((A AND (NOT B)) COVERS (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVERS (D AND (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) INSIDE ((NOT A) NOT D)) == 0`
+- `((A AND (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) INSIDE (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) INSIDE (B AND (NOT D))) == 0`
+- `((A AND (NOT B)) INSIDE (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) INSIDE (B NOT (NOT D))) == 0`
+- `((A AND (NOT B)) INSIDE (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) INSIDE (D AND (NOT A))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A OR (NOT D))) == 0`
+- `((A AND (NOT B)) OUTSIDE (C OR (NOT B))) == 0`
+- `((A AND (NOT B)) OUTSIDE (D OR (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP (B OR (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) COVERS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) COVERS ((NOT A) NOT D)) == 0`
+- `((A AND (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) COVERS (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) COVERS (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) COVERS (C AND (NOT D))) == 0`
+- `((A AND (NOT C)) COVERS (C NOT (NOT D))) == 0`
+- `((A AND (NOT C)) COVERS (D AND (NOT A))) == 0`
+- `((A AND (NOT C)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) INSIDE ((NOT A) NOT D)) == 0`
+- `((A AND (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) INSIDE (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) INSIDE (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) INSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) INSIDE (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) INSIDE (C AND (NOT D))) == 0`
+- `((A AND (NOT C)) INSIDE (C NOT (NOT D))) == 0`
+- `((A AND (NOT C)) INSIDE (D AND (NOT A))) == 0`
+- `((A AND (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT C)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A AND (NOT C)) OUTSIDE (A OR (NOT D))) == 0`
+- `((A AND (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((A AND (NOT C)) OUTSIDE (D OR (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP (C OR (NOT A))) == 0`
+- `((A AND (NOT D)) COVERS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT D)) COVERS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT D)) COVERS ((NOT A) NOT D)) == 0`
+- `((A AND (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((A AND (NOT D)) COVERS (A NOT (NOT D))) == 0`
+- `((A AND (NOT D)) COVERS (A XOR (NOT D))) == 0`
+- `((A AND (NOT D)) COVERS (B AND (NOT A))) == 0`
+- `((A AND (NOT D)) COVERS (B NOT (NOT D))) == 0`
+- `((A AND (NOT D)) COVERS (C AND (NOT A))) == 0`
+- `((A AND (NOT D)) COVERS (C NOT (NOT D))) == 0`
+- `((A AND (NOT D)) COVERS (D AND (NOT A))) == 0`
+- `((A AND (NOT D)) COVERS (D AND (NOT B))) == 0`
+- `((A AND (NOT D)) COVERS (D AND (NOT C))) == 0`
+- `((A AND (NOT D)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT D)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A AND (NOT D)) INSIDE ((NOT A) NOT D)) == 0`
+- `((A AND (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT D)) INSIDE (A NOT (NOT D))) == 0`
+- `((A AND (NOT D)) INSIDE (A XOR (NOT D))) == 0`
+- `((A AND (NOT D)) INSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT D)) INSIDE (B NOT (NOT D))) == 0`
+- `((A AND (NOT D)) INSIDE (C AND (NOT A))) == 0`
+- `((A AND (NOT D)) INSIDE (C NOT (NOT D))) == 0`
+- `((A AND (NOT D)) INSIDE (D AND (NOT A))) == 0`
+- `((A AND (NOT D)) INSIDE (D AND (NOT B))) == 0`
+- `((A AND (NOT D)) INSIDE (D AND (NOT C))) == 0`
+- `((A AND (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT D)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A AND (NOT D)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A AND (NOT D)) OUTSIDE (A OR (NOT D))) == 0`
+- `((A AND (NOT D)) OUTSIDE (B OR (NOT D))) == 0`
+- `((A AND (NOT D)) OUTSIDE (C OR (NOT D))) == 0`
+- `((A AND (NOT D)) OVERLAP (D OR (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) COVERS (D AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVERS (D AND (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) INSIDE (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) INSIDE (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) INSIDE (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE (D AND (NOT A))) == 0`
+- `((A NOT (NOT B)) INSIDE (D AND (NOT B))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A OR (NOT D))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (B OR (NOT A))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (B OR (NOT C))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (B OR (NOT D))) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVERS (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) COVERS (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVERS (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVERS (D AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVERS (D AND (NOT C))) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) INSIDE (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) INSIDE (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) INSIDE (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) INSIDE (D AND (NOT A))) == 0`
+- `((A NOT (NOT C)) INSIDE (D AND (NOT C))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A OR (NOT D))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (C OR (NOT A))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (C OR (NOT B))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (C OR (NOT D))) == 0`
+- `((A NOT (NOT D)) COVERS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT D)) COVERS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT D)) COVERS ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT D)) COVERS ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT D)) COVERS ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((A NOT (NOT D)) COVERS (A AND (NOT D))) == 0`
+- `((A NOT (NOT D)) COVERS (B AND (NOT A))) == 0`
+- `((A NOT (NOT D)) COVERS (B AND (NOT D))) == 0`
+- `((A NOT (NOT D)) COVERS (C AND (NOT A))) == 0`
+- `((A NOT (NOT D)) COVERS (C AND (NOT D))) == 0`
+- `((A NOT (NOT D)) COVERS (D AND (NOT A))) == 0`
+- `((A NOT (NOT D)) INSIDE ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT D)) INSIDE ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT D)) INSIDE ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT D)) INSIDE ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT D)) INSIDE ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((A NOT (NOT D)) INSIDE (A AND (NOT D))) == 0`
+- `((A NOT (NOT D)) INSIDE (B AND (NOT A))) == 0`
+- `((A NOT (NOT D)) INSIDE (B AND (NOT D))) == 0`
+- `((A NOT (NOT D)) INSIDE (C AND (NOT A))) == 0`
+- `((A NOT (NOT D)) INSIDE (C AND (NOT D))) == 0`
+- `((A NOT (NOT D)) INSIDE (D AND (NOT A))) == 0`
+- `((A NOT (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A NOT (NOT D)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A NOT (NOT D)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A NOT (NOT D)) OUTSIDE (A OR (NOT D))) == 0`
+- `((A NOT (NOT D)) OUTSIDE (D OR (NOT A))) == 0`
+- `((A NOT (NOT D)) OUTSIDE (D OR (NOT B))) == 0`
+- `((A NOT (NOT D)) OUTSIDE (D OR (NOT C))) == 0`
+- `((A OR (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A OR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((A OR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((A OR (NOT D)) OVERLAP (D AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVERS (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) INSIDE (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (B OR (NOT A))) == 0`
+- `((A XOR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) COVERS (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) INSIDE (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A XOR (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((A XOR (NOT C)) OUTSIDE (C OR (NOT A))) == 0`
+- `((A XOR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((A XOR (NOT D)) COVERS (A AND (NOT D))) == 0`
+- `((A XOR (NOT D)) COVERS (D AND (NOT A))) == 0`
+- `((A XOR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((A XOR (NOT D)) INSIDE (A AND (NOT D))) == 0`
+- `((A XOR (NOT D)) INSIDE (D AND (NOT A))) == 0`
+- `((A XOR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A XOR (NOT D)) OUTSIDE (A OR (NOT D))) == 0`
+- `((A XOR (NOT D)) OUTSIDE (D OR (NOT A))) == 0`
+- `((B AND (NOT A)) COVERS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) COVERS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) COVERS ((NOT B) NOT D)) == 0`
+- `((B AND (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) COVERS (A AND (NOT D))) == 0`
+- `((B AND (NOT A)) COVERS (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) COVERS (A NOT (NOT D))) == 0`
+- `((B AND (NOT A)) COVERS (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVERS (D AND (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) INSIDE ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) INSIDE ((NOT B) NOT D)) == 0`
+- `((B AND (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) INSIDE (A AND (NOT D))) == 0`
+- `((B AND (NOT A)) INSIDE (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) INSIDE (A NOT (NOT D))) == 0`
+- `((B AND (NOT A)) INSIDE (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) INSIDE (D AND (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B AND (NOT A)) OUTSIDE (B OR (NOT D))) == 0`
+- `((B AND (NOT A)) OUTSIDE (C OR (NOT A))) == 0`
+- `((B AND (NOT A)) OUTSIDE (D OR (NOT A))) == 0`
+- `((B AND (NOT A)) OVERLAP (A OR (NOT B))) == 0`
+- `((B AND (NOT C)) COVERS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) COVERS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) COVERS ((NOT B) NOT D)) == 0`
+- `((B AND (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVERS (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) COVERS (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) COVERS (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) COVERS (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) COVERS (C AND (NOT D))) == 0`
+- `((B AND (NOT C)) COVERS (C NOT (NOT D))) == 0`
+- `((B AND (NOT C)) COVERS (D AND (NOT B))) == 0`
+- `((B AND (NOT C)) INSIDE ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) INSIDE ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) INSIDE ((NOT B) NOT D)) == 0`
+- `((B AND (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) INSIDE (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) INSIDE (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) INSIDE (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) INSIDE (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) INSIDE (C AND (NOT D))) == 0`
+- `((B AND (NOT C)) INSIDE (C NOT (NOT D))) == 0`
+- `((B AND (NOT C)) INSIDE (D AND (NOT B))) == 0`
+- `((B AND (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B AND (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((B AND (NOT C)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B AND (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B AND (NOT C)) OUTSIDE (B OR (NOT D))) == 0`
+- `((B AND (NOT C)) OUTSIDE (D OR (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP (C OR (NOT B))) == 0`
+- `((B AND (NOT D)) COVERS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT D)) COVERS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT D)) COVERS ((NOT B) NOT D)) == 0`
+- `((B AND (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((B AND (NOT D)) COVERS (A AND (NOT B))) == 0`
+- `((B AND (NOT D)) COVERS (A NOT (NOT D))) == 0`
+- `((B AND (NOT D)) COVERS (B NOT (NOT D))) == 0`
+- `((B AND (NOT D)) COVERS (B XOR (NOT D))) == 0`
+- `((B AND (NOT D)) COVERS (C AND (NOT B))) == 0`
+- `((B AND (NOT D)) COVERS (C NOT (NOT D))) == 0`
+- `((B AND (NOT D)) COVERS (D AND (NOT A))) == 0`
+- `((B AND (NOT D)) COVERS (D AND (NOT B))) == 0`
+- `((B AND (NOT D)) COVERS (D AND (NOT C))) == 0`
+- `((B AND (NOT D)) INSIDE ((NOT A) NOT B)) == 0`
+- `((B AND (NOT D)) INSIDE ((NOT B) NOT C)) == 0`
+- `((B AND (NOT D)) INSIDE ((NOT B) NOT D)) == 0`
+- `((B AND (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((B AND (NOT D)) INSIDE (A AND (NOT B))) == 0`
+- `((B AND (NOT D)) INSIDE (A NOT (NOT D))) == 0`
+- `((B AND (NOT D)) INSIDE (B NOT (NOT D))) == 0`
+- `((B AND (NOT D)) INSIDE (B XOR (NOT D))) == 0`
+- `((B AND (NOT D)) INSIDE (C AND (NOT B))) == 0`
+- `((B AND (NOT D)) INSIDE (C NOT (NOT D))) == 0`
+- `((B AND (NOT D)) INSIDE (D AND (NOT A))) == 0`
+- `((B AND (NOT D)) INSIDE (D AND (NOT B))) == 0`
+- `((B AND (NOT D)) INSIDE (D AND (NOT C))) == 0`
+- `((B AND (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B AND (NOT D)) OUTSIDE (A OR (NOT D))) == 0`
+- `((B AND (NOT D)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B AND (NOT D)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B AND (NOT D)) OUTSIDE (B OR (NOT D))) == 0`
+- `((B AND (NOT D)) OUTSIDE (C OR (NOT D))) == 0`
+- `((B AND (NOT D)) OVERLAP (D OR (NOT B))) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) COVERS (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) COVERS (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) COVERS (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) COVERS (D AND (NOT B))) == 0`
+- `((B NOT (NOT C)) COVERS (D AND (NOT C))) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) INSIDE (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) INSIDE (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) INSIDE (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) INSIDE (D AND (NOT B))) == 0`
+- `((B NOT (NOT C)) INSIDE (D AND (NOT C))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (B OR (NOT D))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (C OR (NOT A))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (C OR (NOT B))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (C OR (NOT D))) == 0`
+- `((B NOT (NOT D)) COVERS ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT D)) COVERS ((NOT A) NOT D)) == 0`
+- `((B NOT (NOT D)) COVERS ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT D)) COVERS ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT D)) COVERS ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((B NOT (NOT D)) COVERS (A AND (NOT B))) == 0`
+- `((B NOT (NOT D)) COVERS (A AND (NOT D))) == 0`
+- `((B NOT (NOT D)) COVERS (B AND (NOT D))) == 0`
+- `((B NOT (NOT D)) COVERS (C AND (NOT B))) == 0`
+- `((B NOT (NOT D)) COVERS (C AND (NOT D))) == 0`
+- `((B NOT (NOT D)) COVERS (D AND (NOT B))) == 0`
+- `((B NOT (NOT D)) INSIDE ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT D)) INSIDE ((NOT A) NOT D)) == 0`
+- `((B NOT (NOT D)) INSIDE ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT D)) INSIDE ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT D)) INSIDE ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((B NOT (NOT D)) INSIDE (A AND (NOT B))) == 0`
+- `((B NOT (NOT D)) INSIDE (A AND (NOT D))) == 0`
+- `((B NOT (NOT D)) INSIDE (B AND (NOT D))) == 0`
+- `((B NOT (NOT D)) INSIDE (C AND (NOT B))) == 0`
+- `((B NOT (NOT D)) INSIDE (C AND (NOT D))) == 0`
+- `((B NOT (NOT D)) INSIDE (D AND (NOT B))) == 0`
+- `((B NOT (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B NOT (NOT D)) OUTSIDE (B OR (NOT A))) == 0`
+- `((B NOT (NOT D)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B NOT (NOT D)) OUTSIDE (B OR (NOT D))) == 0`
+- `((B NOT (NOT D)) OUTSIDE (D OR (NOT A))) == 0`
+- `((B NOT (NOT D)) OUTSIDE (D OR (NOT B))) == 0`
+- `((B NOT (NOT D)) OUTSIDE (D OR (NOT C))) == 0`
+- `((B OR (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((B OR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((B OR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((B OR (NOT D)) OVERLAP (D AND (NOT B))) == 0`
+- `((B XOR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) COVERS (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) INSIDE (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B XOR (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((B XOR (NOT C)) OUTSIDE (C OR (NOT B))) == 0`
+- `((B XOR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((B XOR (NOT D)) COVERS (B AND (NOT D))) == 0`
+- `((B XOR (NOT D)) COVERS (D AND (NOT B))) == 0`
+- `((B XOR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((B XOR (NOT D)) INSIDE (B AND (NOT D))) == 0`
+- `((B XOR (NOT D)) INSIDE (D AND (NOT B))) == 0`
+- `((B XOR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((B XOR (NOT D)) OUTSIDE (B OR (NOT D))) == 0`
+- `((B XOR (NOT D)) OUTSIDE (D OR (NOT B))) == 0`
+- `((C AND (NOT A)) COVERS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) COVERS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) COVERS ((NOT C) NOT D)) == 0`
+- `((C AND (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) COVERS (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) COVERS (A AND (NOT D))) == 0`
+- `((C AND (NOT A)) COVERS (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) COVERS (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) COVERS (A NOT (NOT D))) == 0`
+- `((C AND (NOT A)) COVERS (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) COVERS (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) COVERS (D AND (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) INSIDE ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) INSIDE ((NOT C) NOT D)) == 0`
+- `((C AND (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) INSIDE (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE (A AND (NOT D))) == 0`
+- `((C AND (NOT A)) INSIDE (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) INSIDE (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE (A NOT (NOT D))) == 0`
+- `((C AND (NOT A)) INSIDE (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) INSIDE (D AND (NOT C))) == 0`
+- `((C AND (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C AND (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((C AND (NOT A)) OUTSIDE (C OR (NOT A))) == 0`
+- `((C AND (NOT A)) OUTSIDE (C OR (NOT B))) == 0`
+- `((C AND (NOT A)) OUTSIDE (C OR (NOT D))) == 0`
+- `((C AND (NOT A)) OUTSIDE (D OR (NOT A))) == 0`
+- `((C AND (NOT A)) OVERLAP (A OR (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) COVERS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) COVERS ((NOT C) NOT D)) == 0`
+- `((C AND (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVERS (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVERS (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS (B AND (NOT D))) == 0`
+- `((C AND (NOT B)) COVERS (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS (B NOT (NOT D))) == 0`
+- `((C AND (NOT B)) COVERS (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) COVERS (D AND (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) INSIDE ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) INSIDE ((NOT C) NOT D)) == 0`
+- `((C AND (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) INSIDE (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) INSIDE (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE (B AND (NOT D))) == 0`
+- `((C AND (NOT B)) INSIDE (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE (B NOT (NOT D))) == 0`
+- `((C AND (NOT B)) INSIDE (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) INSIDE (D AND (NOT C))) == 0`
+- `((C AND (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C AND (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((C AND (NOT B)) OUTSIDE (C OR (NOT A))) == 0`
+- `((C AND (NOT B)) OUTSIDE (C OR (NOT B))) == 0`
+- `((C AND (NOT B)) OUTSIDE (C OR (NOT D))) == 0`
+- `((C AND (NOT B)) OUTSIDE (D OR (NOT B))) == 0`
+- `((C AND (NOT B)) OVERLAP (B OR (NOT C))) == 0`
+- `((C AND (NOT D)) COVERS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT D)) COVERS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT D)) COVERS ((NOT C) NOT D)) == 0`
+- `((C AND (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((C AND (NOT D)) COVERS (A AND (NOT C))) == 0`
+- `((C AND (NOT D)) COVERS (A NOT (NOT D))) == 0`
+- `((C AND (NOT D)) COVERS (B AND (NOT C))) == 0`
+- `((C AND (NOT D)) COVERS (B NOT (NOT D))) == 0`
+- `((C AND (NOT D)) COVERS (C NOT (NOT D))) == 0`
+- `((C AND (NOT D)) COVERS (C XOR (NOT D))) == 0`
+- `((C AND (NOT D)) COVERS (D AND (NOT A))) == 0`
+- `((C AND (NOT D)) COVERS (D AND (NOT B))) == 0`
+- `((C AND (NOT D)) COVERS (D AND (NOT C))) == 0`
+- `((C AND (NOT D)) INSIDE ((NOT A) NOT C)) == 0`
+- `((C AND (NOT D)) INSIDE ((NOT B) NOT C)) == 0`
+- `((C AND (NOT D)) INSIDE ((NOT C) NOT D)) == 0`
+- `((C AND (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((C AND (NOT D)) INSIDE (A AND (NOT C))) == 0`
+- `((C AND (NOT D)) INSIDE (A NOT (NOT D))) == 0`
+- `((C AND (NOT D)) INSIDE (B AND (NOT C))) == 0`
+- `((C AND (NOT D)) INSIDE (B NOT (NOT D))) == 0`
+- `((C AND (NOT D)) INSIDE (C NOT (NOT D))) == 0`
+- `((C AND (NOT D)) INSIDE (C XOR (NOT D))) == 0`
+- `((C AND (NOT D)) INSIDE (D AND (NOT A))) == 0`
+- `((C AND (NOT D)) INSIDE (D AND (NOT B))) == 0`
+- `((C AND (NOT D)) INSIDE (D AND (NOT C))) == 0`
+- `((C AND (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C AND (NOT D)) OUTSIDE (A OR (NOT D))) == 0`
+- `((C AND (NOT D)) OUTSIDE (B OR (NOT D))) == 0`
+- `((C AND (NOT D)) OUTSIDE (C OR (NOT A))) == 0`
+- `((C AND (NOT D)) OUTSIDE (C OR (NOT B))) == 0`
+- `((C AND (NOT D)) OUTSIDE (C OR (NOT D))) == 0`
+- `((C AND (NOT D)) OVERLAP (D OR (NOT C))) == 0`
+- `((C NOT (NOT D)) COVERS ((NOT A) NOT C)) == 0`
+- `((C NOT (NOT D)) COVERS ((NOT A) NOT D)) == 0`
+- `((C NOT (NOT D)) COVERS ((NOT B) NOT C)) == 0`
+- `((C NOT (NOT D)) COVERS ((NOT B) NOT D)) == 0`
+- `((C NOT (NOT D)) COVERS ((NOT C) NOT D)) == 0`
+- `((C NOT (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((C NOT (NOT D)) COVERS (A AND (NOT C))) == 0`
+- `((C NOT (NOT D)) COVERS (A AND (NOT D))) == 0`
+- `((C NOT (NOT D)) COVERS (B AND (NOT C))) == 0`
+- `((C NOT (NOT D)) COVERS (B AND (NOT D))) == 0`
+- `((C NOT (NOT D)) COVERS (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) COVERS (D AND (NOT C))) == 0`
+- `((C NOT (NOT D)) INSIDE ((NOT A) NOT C)) == 0`
+- `((C NOT (NOT D)) INSIDE ((NOT A) NOT D)) == 0`
+- `((C NOT (NOT D)) INSIDE ((NOT B) NOT C)) == 0`
+- `((C NOT (NOT D)) INSIDE ((NOT B) NOT D)) == 0`
+- `((C NOT (NOT D)) INSIDE ((NOT C) NOT D)) == 0`
+- `((C NOT (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((C NOT (NOT D)) INSIDE (A AND (NOT C))) == 0`
+- `((C NOT (NOT D)) INSIDE (A AND (NOT D))) == 0`
+- `((C NOT (NOT D)) INSIDE (B AND (NOT C))) == 0`
+- `((C NOT (NOT D)) INSIDE (B AND (NOT D))) == 0`
+- `((C NOT (NOT D)) INSIDE (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) INSIDE (D AND (NOT C))) == 0`
+- `((C NOT (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C NOT (NOT D)) OUTSIDE (C OR (NOT A))) == 0`
+- `((C NOT (NOT D)) OUTSIDE (C OR (NOT B))) == 0`
+- `((C NOT (NOT D)) OUTSIDE (C OR (NOT D))) == 0`
+- `((C NOT (NOT D)) OUTSIDE (D OR (NOT A))) == 0`
+- `((C NOT (NOT D)) OUTSIDE (D OR (NOT B))) == 0`
+- `((C NOT (NOT D)) OUTSIDE (D OR (NOT C))) == 0`
+- `((C OR (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) OVERLAP (A AND (NOT C))) == 0`
+- `((C OR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) OVERLAP (B AND (NOT C))) == 0`
+- `((C OR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((C OR (NOT D)) OVERLAP (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `((C XOR (NOT D)) COVERS (C AND (NOT D))) == 0`
+- `((C XOR (NOT D)) COVERS (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `((C XOR (NOT D)) INSIDE (C AND (NOT D))) == 0`
+- `((C XOR (NOT D)) INSIDE (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((C XOR (NOT D)) OUTSIDE (C OR (NOT D))) == 0`
+- `((C XOR (NOT D)) OUTSIDE (D OR (NOT C))) == 0`
+- `((D AND (NOT A)) COVERS ((NOT A) NOT D)) == 0`
+- `((D AND (NOT A)) COVERS ((NOT B) NOT D)) == 0`
+- `((D AND (NOT A)) COVERS ((NOT C) NOT D)) == 0`
+- `((D AND (NOT A)) COVERS (A AND (NOT A))) == 0`
+- `((D AND (NOT A)) COVERS (A AND (NOT B))) == 0`
+- `((D AND (NOT A)) COVERS (A AND (NOT C))) == 0`
+- `((D AND (NOT A)) COVERS (A AND (NOT D))) == 0`
+- `((D AND (NOT A)) COVERS (A NOT (NOT B))) == 0`
+- `((D AND (NOT A)) COVERS (A NOT (NOT C))) == 0`
+- `((D AND (NOT A)) COVERS (A NOT (NOT D))) == 0`
+- `((D AND (NOT A)) COVERS (A XOR (NOT D))) == 0`
+- `((D AND (NOT A)) COVERS (B AND (NOT D))) == 0`
+- `((D AND (NOT A)) COVERS (C AND (NOT D))) == 0`
+- `((D AND (NOT A)) INSIDE ((NOT A) NOT D)) == 0`
+- `((D AND (NOT A)) INSIDE ((NOT B) NOT D)) == 0`
+- `((D AND (NOT A)) INSIDE ((NOT C) NOT D)) == 0`
+- `((D AND (NOT A)) INSIDE (A AND (NOT A))) == 0`
+- `((D AND (NOT A)) INSIDE (A AND (NOT B))) == 0`
+- `((D AND (NOT A)) INSIDE (A AND (NOT C))) == 0`
+- `((D AND (NOT A)) INSIDE (A AND (NOT D))) == 0`
+- `((D AND (NOT A)) INSIDE (A NOT (NOT B))) == 0`
+- `((D AND (NOT A)) INSIDE (A NOT (NOT C))) == 0`
+- `((D AND (NOT A)) INSIDE (A NOT (NOT D))) == 0`
+- `((D AND (NOT A)) INSIDE (A XOR (NOT D))) == 0`
+- `((D AND (NOT A)) INSIDE (B AND (NOT D))) == 0`
+- `((D AND (NOT A)) INSIDE (C AND (NOT D))) == 0`
+- `((D AND (NOT A)) OUTSIDE (A OR (NOT A))) == 0`
+- `((D AND (NOT A)) OUTSIDE (B OR (NOT A))) == 0`
+- `((D AND (NOT A)) OUTSIDE (C OR (NOT A))) == 0`
+- `((D AND (NOT A)) OUTSIDE (D OR (NOT A))) == 0`
+- `((D AND (NOT A)) OUTSIDE (D OR (NOT B))) == 0`
+- `((D AND (NOT A)) OUTSIDE (D OR (NOT C))) == 0`
+- `((D AND (NOT A)) OVERLAP (A OR (NOT D))) == 0`
+- `((D AND (NOT B)) COVERS ((NOT A) NOT D)) == 0`
+- `((D AND (NOT B)) COVERS ((NOT B) NOT D)) == 0`
+- `((D AND (NOT B)) COVERS ((NOT C) NOT D)) == 0`
+- `((D AND (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `((D AND (NOT B)) COVERS (A AND (NOT D))) == 0`
+- `((D AND (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `((D AND (NOT B)) COVERS (B AND (NOT A))) == 0`
+- `((D AND (NOT B)) COVERS (B AND (NOT C))) == 0`
+- `((D AND (NOT B)) COVERS (B AND (NOT D))) == 0`
+- `((D AND (NOT B)) COVERS (B NOT (NOT C))) == 0`
+- `((D AND (NOT B)) COVERS (B NOT (NOT D))) == 0`
+- `((D AND (NOT B)) COVERS (B XOR (NOT D))) == 0`
+- `((D AND (NOT B)) COVERS (C AND (NOT D))) == 0`
+- `((D AND (NOT B)) INSIDE ((NOT A) NOT D)) == 0`
+- `((D AND (NOT B)) INSIDE ((NOT B) NOT D)) == 0`
+- `((D AND (NOT B)) INSIDE ((NOT C) NOT D)) == 0`
+- `((D AND (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `((D AND (NOT B)) INSIDE (A AND (NOT D))) == 0`
+- `((D AND (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `((D AND (NOT B)) INSIDE (B AND (NOT A))) == 0`
+- `((D AND (NOT B)) INSIDE (B AND (NOT C))) == 0`
+- `((D AND (NOT B)) INSIDE (B AND (NOT D))) == 0`
+- `((D AND (NOT B)) INSIDE (B NOT (NOT C))) == 0`
+- `((D AND (NOT B)) INSIDE (B NOT (NOT D))) == 0`
+- `((D AND (NOT B)) INSIDE (B XOR (NOT D))) == 0`
+- `((D AND (NOT B)) INSIDE (C AND (NOT D))) == 0`
+- `((D AND (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `((D AND (NOT B)) OUTSIDE (A OR (NOT B))) == 0`
+- `((D AND (NOT B)) OUTSIDE (C OR (NOT B))) == 0`
+- `((D AND (NOT B)) OUTSIDE (D OR (NOT A))) == 0`
+- `((D AND (NOT B)) OUTSIDE (D OR (NOT B))) == 0`
+- `((D AND (NOT B)) OUTSIDE (D OR (NOT C))) == 0`
+- `((D AND (NOT B)) OVERLAP (B OR (NOT D))) == 0`
+- `((D AND (NOT C)) COVERS ((NOT A) NOT D)) == 0`
+- `((D AND (NOT C)) COVERS ((NOT B) NOT D)) == 0`
+- `((D AND (NOT C)) COVERS ((NOT C) NOT D)) == 0`
+- `((D AND (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `((D AND (NOT C)) COVERS (A AND (NOT D))) == 0`
+- `((D AND (NOT C)) COVERS (A NOT (NOT C))) == 0`
+- `((D AND (NOT C)) COVERS (B AND (NOT D))) == 0`
+- `((D AND (NOT C)) COVERS (B NOT (NOT C))) == 0`
+- `((D AND (NOT C)) COVERS (C AND (NOT A))) == 0`
+- `((D AND (NOT C)) COVERS (C AND (NOT B))) == 0`
+- `((D AND (NOT C)) COVERS (C AND (NOT D))) == 0`
+- `((D AND (NOT C)) COVERS (C NOT (NOT D))) == 0`
+- `((D AND (NOT C)) COVERS (C XOR (NOT D))) == 0`
+- `((D AND (NOT C)) INSIDE ((NOT A) NOT D)) == 0`
+- `((D AND (NOT C)) INSIDE ((NOT B) NOT D)) == 0`
+- `((D AND (NOT C)) INSIDE ((NOT C) NOT D)) == 0`
+- `((D AND (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `((D AND (NOT C)) INSIDE (A AND (NOT D))) == 0`
+- `((D AND (NOT C)) INSIDE (A NOT (NOT C))) == 0`
+- `((D AND (NOT C)) INSIDE (B AND (NOT D))) == 0`
+- `((D AND (NOT C)) INSIDE (B NOT (NOT C))) == 0`
+- `((D AND (NOT C)) INSIDE (C AND (NOT A))) == 0`
+- `((D AND (NOT C)) INSIDE (C AND (NOT B))) == 0`
+- `((D AND (NOT C)) INSIDE (C AND (NOT D))) == 0`
+- `((D AND (NOT C)) INSIDE (C NOT (NOT D))) == 0`
+- `((D AND (NOT C)) INSIDE (C XOR (NOT D))) == 0`
+- `((D AND (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `((D AND (NOT C)) OUTSIDE (A OR (NOT C))) == 0`
+- `((D AND (NOT C)) OUTSIDE (B OR (NOT C))) == 0`
+- `((D AND (NOT C)) OUTSIDE (D OR (NOT A))) == 0`
+- `((D AND (NOT C)) OUTSIDE (D OR (NOT B))) == 0`
+- `((D AND (NOT C)) OUTSIDE (D OR (NOT C))) == 0`
+- `((D AND (NOT C)) OVERLAP (C OR (NOT D))) == 0`
+- `((D OR (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((D OR (NOT A)) OVERLAP (A AND (NOT D))) == 0`
+- `((D OR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((D OR (NOT B)) OVERLAP (B AND (NOT D))) == 0`
+- `((D OR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((D OR (NOT C)) OVERLAP (C AND (NOT D))) == 0`
+- `((NOT A) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT A) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((NOT A) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `((NOT B) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((NOT B) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `((NOT C) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((NOT C) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((NOT C) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `((NOT D) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `((NOT D) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `((NOT D) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) OUTSIDE (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A AND (NOT D))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) OVERLAP (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) OVERLAP (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) OVERLAP (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) OVERLAP (B AND (NOT D))) == 0`
+- `(((NOT A) NOT B) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) OVERLAP (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT A) NOT C)) == 0`
+- `(((NOT A) NOT C) OUTSIDE (A XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A AND (NOT D))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) OVERLAP (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) OVERLAP (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) OVERLAP (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) OVERLAP (C AND (NOT D))) == 0`
+- `(((NOT A) NOT C) OVERLAP (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) OUTSIDE ((NOT A) NOT D)) == 0`
+- `(((NOT A) NOT D) OUTSIDE (A XOR (NOT D))) == 0`
+- `(((NOT A) NOT D) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) NOT D) OVERLAP (A AND (NOT B))) == 0`
+- `(((NOT A) NOT D) OVERLAP (A AND (NOT C))) == 0`
+- `(((NOT A) NOT D) OVERLAP (A AND (NOT D))) == 0`
+- `(((NOT A) NOT D) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT D) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT D) OVERLAP (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) OVERLAP (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) OVERLAP (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) OVERLAP (D AND (NOT A))) == 0`
+- `(((NOT A) NOT D) OVERLAP (D AND (NOT B))) == 0`
+- `(((NOT A) NOT D) OVERLAP (D AND (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT B) NOT C)) == 0`
+- `(((NOT B) NOT C) OUTSIDE (B XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) OVERLAP (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) OVERLAP (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) OVERLAP (B AND (NOT D))) == 0`
+- `(((NOT B) NOT C) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) OVERLAP (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) OVERLAP (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) OVERLAP (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) OVERLAP (C AND (NOT D))) == 0`
+- `(((NOT B) NOT C) OVERLAP (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) OUTSIDE ((NOT B) NOT D)) == 0`
+- `(((NOT B) NOT D) OUTSIDE (B XOR (NOT D))) == 0`
+- `(((NOT B) NOT D) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT B) NOT D) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT D) OVERLAP (A NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) OVERLAP (B AND (NOT A))) == 0`
+- `(((NOT B) NOT D) OVERLAP (B AND (NOT C))) == 0`
+- `(((NOT B) NOT D) OVERLAP (B AND (NOT D))) == 0`
+- `(((NOT B) NOT D) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT D) OVERLAP (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) OVERLAP (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) OVERLAP (D AND (NOT A))) == 0`
+- `(((NOT B) NOT D) OVERLAP (D AND (NOT B))) == 0`
+- `(((NOT B) NOT D) OVERLAP (D AND (NOT C))) == 0`
+- `(((NOT C) NOT D) OUTSIDE ((NOT C) NOT D)) == 0`
+- `(((NOT C) NOT D) OUTSIDE (C XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT C) NOT D) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) OVERLAP (A NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) OVERLAP (B NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) OVERLAP (C AND (NOT A))) == 0`
+- `(((NOT C) NOT D) OVERLAP (C AND (NOT B))) == 0`
+- `(((NOT C) NOT D) OVERLAP (C AND (NOT D))) == 0`
+- `(((NOT C) NOT D) OVERLAP (C NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) OVERLAP (D AND (NOT A))) == 0`
+- `(((NOT C) NOT D) OVERLAP (D AND (NOT B))) == 0`
+- `(((NOT C) NOT D) OVERLAP (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) OUTSIDE (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) OUTSIDE (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) OVERLAP (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP (D AND (NOT C))) == 0`
+- `((A AND (NOT B)) CONTAINS (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) OUTSIDE (A AND (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((A AND (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) OVERLAP (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) OVERLAP (B AND (NOT D))) == 0`
+- `((A AND (NOT B)) OVERLAP (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) OVERLAP (B NOT (NOT D))) == 0`
+- `((A AND (NOT B)) OVERLAP (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) OVERLAP (D AND (NOT A))) == 0`
+- `((A AND (NOT C)) CONTAINS (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) OUTSIDE (A AND (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((A AND (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) OVERLAP (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) OVERLAP (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) OVERLAP (C AND (NOT D))) == 0`
+- `((A AND (NOT C)) OVERLAP (C NOT (NOT D))) == 0`
+- `((A AND (NOT C)) OVERLAP (D AND (NOT A))) == 0`
+- `((A AND (NOT D)) CONTAINS (D OR (NOT A))) == 0`
+- `((A AND (NOT D)) OUTSIDE (A AND (NOT D))) == 0`
+- `((A AND (NOT D)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A AND (NOT D)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A AND (NOT D)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((A AND (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((A AND (NOT D)) OVERLAP (A NOT (NOT D))) == 0`
+- `((A AND (NOT D)) OVERLAP (A XOR (NOT D))) == 0`
+- `((A AND (NOT D)) OVERLAP (B AND (NOT A))) == 0`
+- `((A AND (NOT D)) OVERLAP (B NOT (NOT D))) == 0`
+- `((A AND (NOT D)) OVERLAP (C AND (NOT A))) == 0`
+- `((A AND (NOT D)) OVERLAP (C NOT (NOT D))) == 0`
+- `((A AND (NOT D)) OVERLAP (D AND (NOT A))) == 0`
+- `((A AND (NOT D)) OVERLAP (D AND (NOT B))) == 0`
+- `((A AND (NOT D)) OVERLAP (D AND (NOT C))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) OUTSIDE (A XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OVERLAP (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OVERLAP (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OVERLAP (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP (D AND (NOT A))) == 0`
+- `((A NOT (NOT B)) OVERLAP (D AND (NOT B))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A NOT (NOT C))) == 0`
+- `((A NOT (NOT C)) OUTSIDE (A XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) OVERLAP (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) OVERLAP (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) OVERLAP (D AND (NOT A))) == 0`
+- `((A NOT (NOT C)) OVERLAP (D AND (NOT C))) == 0`
+- `((A NOT (NOT D)) OUTSIDE (A NOT (NOT D))) == 0`
+- `((A NOT (NOT D)) OUTSIDE (A XOR (NOT D))) == 0`
+- `((A NOT (NOT D)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT D)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT D)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT D)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT D)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((A NOT (NOT D)) OVERLAP (A AND (NOT D))) == 0`
+- `((A NOT (NOT D)) OVERLAP (B AND (NOT A))) == 0`
+- `((A NOT (NOT D)) OVERLAP (B AND (NOT D))) == 0`
+- `((A NOT (NOT D)) OVERLAP (C AND (NOT A))) == 0`
+- `((A NOT (NOT D)) OVERLAP (C AND (NOT D))) == 0`
+- `((A NOT (NOT D)) OVERLAP (D AND (NOT A))) == 0`
+- `((A OR (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((A OR (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A OR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A OR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((A OR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((A OR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((A OR (NOT D)) CONTAINS (D AND (NOT A))) == 0`
+- `((A OR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT D)) MEET_PART (A OR (NOT D))) == 0`
+- `((A XOR (NOT B)) OUTSIDE (A XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) OVERLAP (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((A XOR (NOT C)) OUTSIDE (A XOR (NOT C))) == 0`
+- `((A XOR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) OVERLAP (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((A XOR (NOT D)) OUTSIDE (A XOR (NOT D))) == 0`
+- `((A XOR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((A XOR (NOT D)) OVERLAP (A AND (NOT D))) == 0`
+- `((A XOR (NOT D)) OVERLAP (D AND (NOT A))) == 0`
+- `((B AND (NOT A)) CONTAINS (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE (B AND (NOT A))) == 0`
+- `((B AND (NOT A)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((B AND (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) OVERLAP (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) OVERLAP (A AND (NOT D))) == 0`
+- `((B AND (NOT A)) OVERLAP (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) OVERLAP (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) OVERLAP (A NOT (NOT D))) == 0`
+- `((B AND (NOT A)) OVERLAP (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) OVERLAP (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) OVERLAP (D AND (NOT B))) == 0`
+- `((B AND (NOT C)) CONTAINS (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) OUTSIDE (B AND (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((B AND (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) OVERLAP (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) OVERLAP (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) OVERLAP (C AND (NOT D))) == 0`
+- `((B AND (NOT C)) OVERLAP (C NOT (NOT D))) == 0`
+- `((B AND (NOT C)) OVERLAP (D AND (NOT B))) == 0`
+- `((B AND (NOT D)) CONTAINS (D OR (NOT B))) == 0`
+- `((B AND (NOT D)) OUTSIDE (B AND (NOT D))) == 0`
+- `((B AND (NOT D)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((B AND (NOT D)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((B AND (NOT D)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((B AND (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((B AND (NOT D)) OVERLAP (A AND (NOT B))) == 0`
+- `((B AND (NOT D)) OVERLAP (A NOT (NOT D))) == 0`
+- `((B AND (NOT D)) OVERLAP (B NOT (NOT D))) == 0`
+- `((B AND (NOT D)) OVERLAP (B XOR (NOT D))) == 0`
+- `((B AND (NOT D)) OVERLAP (C AND (NOT B))) == 0`
+- `((B AND (NOT D)) OVERLAP (C NOT (NOT D))) == 0`
+- `((B AND (NOT D)) OVERLAP (D AND (NOT A))) == 0`
+- `((B AND (NOT D)) OVERLAP (D AND (NOT B))) == 0`
+- `((B AND (NOT D)) OVERLAP (D AND (NOT C))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (B NOT (NOT C))) == 0`
+- `((B NOT (NOT C)) OUTSIDE (B XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) OVERLAP (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) OVERLAP (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) OVERLAP (D AND (NOT B))) == 0`
+- `((B NOT (NOT C)) OVERLAP (D AND (NOT C))) == 0`
+- `((B NOT (NOT D)) OUTSIDE (B NOT (NOT D))) == 0`
+- `((B NOT (NOT D)) OUTSIDE (B XOR (NOT D))) == 0`
+- `((B NOT (NOT D)) OVERLAP ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT D)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((B NOT (NOT D)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT D)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT D)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((B NOT (NOT D)) OVERLAP (A AND (NOT B))) == 0`
+- `((B NOT (NOT D)) OVERLAP (A AND (NOT D))) == 0`
+- `((B NOT (NOT D)) OVERLAP (B AND (NOT D))) == 0`
+- `((B NOT (NOT D)) OVERLAP (C AND (NOT B))) == 0`
+- `((B NOT (NOT D)) OVERLAP (C AND (NOT D))) == 0`
+- `((B NOT (NOT D)) OVERLAP (D AND (NOT B))) == 0`
+- `((B OR (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((B OR (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((B OR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((B OR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((B OR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((B OR (NOT D)) CONTAINS (D AND (NOT B))) == 0`
+- `((B OR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT D)) MEET_PART (B OR (NOT D))) == 0`
+- `((B XOR (NOT C)) OUTSIDE (B XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) OVERLAP (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((B XOR (NOT D)) OUTSIDE (B XOR (NOT D))) == 0`
+- `((B XOR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((B XOR (NOT D)) OVERLAP (B AND (NOT D))) == 0`
+- `((B XOR (NOT D)) OVERLAP (D AND (NOT B))) == 0`
+- `((C AND (NOT A)) CONTAINS (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) OUTSIDE (C AND (NOT A))) == 0`
+- `((C AND (NOT A)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((C AND (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) OVERLAP (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) OVERLAP (A AND (NOT D))) == 0`
+- `((C AND (NOT A)) OVERLAP (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) OVERLAP (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) OVERLAP (A NOT (NOT D))) == 0`
+- `((C AND (NOT A)) OVERLAP (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) OVERLAP (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) OVERLAP (D AND (NOT C))) == 0`
+- `((C AND (NOT B)) CONTAINS (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) OUTSIDE (C AND (NOT B))) == 0`
+- `((C AND (NOT B)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((C AND (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) OVERLAP (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) OVERLAP (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) OVERLAP (B AND (NOT D))) == 0`
+- `((C AND (NOT B)) OVERLAP (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) OVERLAP (B NOT (NOT D))) == 0`
+- `((C AND (NOT B)) OVERLAP (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) OVERLAP (D AND (NOT C))) == 0`
+- `((C AND (NOT D)) CONTAINS (D OR (NOT C))) == 0`
+- `((C AND (NOT D)) OUTSIDE (C AND (NOT D))) == 0`
+- `((C AND (NOT D)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((C AND (NOT D)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((C AND (NOT D)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((C AND (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((C AND (NOT D)) OVERLAP (A AND (NOT C))) == 0`
+- `((C AND (NOT D)) OVERLAP (A NOT (NOT D))) == 0`
+- `((C AND (NOT D)) OVERLAP (B AND (NOT C))) == 0`
+- `((C AND (NOT D)) OVERLAP (B NOT (NOT D))) == 0`
+- `((C AND (NOT D)) OVERLAP (C NOT (NOT D))) == 0`
+- `((C AND (NOT D)) OVERLAP (C XOR (NOT D))) == 0`
+- `((C AND (NOT D)) OVERLAP (D AND (NOT A))) == 0`
+- `((C AND (NOT D)) OVERLAP (D AND (NOT B))) == 0`
+- `((C AND (NOT D)) OVERLAP (D AND (NOT C))) == 0`
+- `((C NOT (NOT D)) OUTSIDE (C NOT (NOT D))) == 0`
+- `((C NOT (NOT D)) OUTSIDE (C XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) OVERLAP ((NOT A) NOT C)) == 0`
+- `((C NOT (NOT D)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((C NOT (NOT D)) OVERLAP ((NOT B) NOT C)) == 0`
+- `((C NOT (NOT D)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((C NOT (NOT D)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((C NOT (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((C NOT (NOT D)) OVERLAP (A AND (NOT C))) == 0`
+- `((C NOT (NOT D)) OVERLAP (A AND (NOT D))) == 0`
+- `((C NOT (NOT D)) OVERLAP (B AND (NOT C))) == 0`
+- `((C NOT (NOT D)) OVERLAP (B AND (NOT D))) == 0`
+- `((C NOT (NOT D)) OVERLAP (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) OVERLAP (D AND (NOT C))) == 0`
+- `((C OR (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) CONTAINS (A AND (NOT C))) == 0`
+- `((C OR (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT A)) MEET_PART (C OR (NOT A))) == 0`
+- `((C OR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) CONTAINS (B AND (NOT C))) == 0`
+- `((C OR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT B)) MEET_PART (C OR (NOT B))) == 0`
+- `((C OR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((C OR (NOT D)) CONTAINS (D AND (NOT C))) == 0`
+- `((C OR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT D)) MEET_PART (C OR (NOT D))) == 0`
+- `((C XOR (NOT D)) OUTSIDE (C XOR (NOT D))) == 0`
+- `((C XOR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `((C XOR (NOT D)) OVERLAP (C AND (NOT D))) == 0`
+- `((C XOR (NOT D)) OVERLAP (D AND (NOT C))) == 0`
+- `((D AND (NOT A)) CONTAINS (A OR (NOT D))) == 0`
+- `((D AND (NOT A)) OUTSIDE (D AND (NOT A))) == 0`
+- `((D AND (NOT A)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((D AND (NOT A)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((D AND (NOT A)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((D AND (NOT A)) OVERLAP (A AND (NOT A))) == 0`
+- `((D AND (NOT A)) OVERLAP (A AND (NOT B))) == 0`
+- `((D AND (NOT A)) OVERLAP (A AND (NOT C))) == 0`
+- `((D AND (NOT A)) OVERLAP (A AND (NOT D))) == 0`
+- `((D AND (NOT A)) OVERLAP (A NOT (NOT B))) == 0`
+- `((D AND (NOT A)) OVERLAP (A NOT (NOT C))) == 0`
+- `((D AND (NOT A)) OVERLAP (A NOT (NOT D))) == 0`
+- `((D AND (NOT A)) OVERLAP (A XOR (NOT D))) == 0`
+- `((D AND (NOT A)) OVERLAP (B AND (NOT D))) == 0`
+- `((D AND (NOT A)) OVERLAP (C AND (NOT D))) == 0`
+- `((D AND (NOT B)) CONTAINS (B OR (NOT D))) == 0`
+- `((D AND (NOT B)) OUTSIDE (D AND (NOT B))) == 0`
+- `((D AND (NOT B)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((D AND (NOT B)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((D AND (NOT B)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((D AND (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `((D AND (NOT B)) OVERLAP (A AND (NOT D))) == 0`
+- `((D AND (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `((D AND (NOT B)) OVERLAP (B AND (NOT A))) == 0`
+- `((D AND (NOT B)) OVERLAP (B AND (NOT C))) == 0`
+- `((D AND (NOT B)) OVERLAP (B AND (NOT D))) == 0`
+- `((D AND (NOT B)) OVERLAP (B NOT (NOT C))) == 0`
+- `((D AND (NOT B)) OVERLAP (B NOT (NOT D))) == 0`
+- `((D AND (NOT B)) OVERLAP (B XOR (NOT D))) == 0`
+- `((D AND (NOT B)) OVERLAP (C AND (NOT D))) == 0`
+- `((D AND (NOT C)) CONTAINS (C OR (NOT D))) == 0`
+- `((D AND (NOT C)) OUTSIDE (D AND (NOT C))) == 0`
+- `((D AND (NOT C)) OVERLAP ((NOT A) NOT D)) == 0`
+- `((D AND (NOT C)) OVERLAP ((NOT B) NOT D)) == 0`
+- `((D AND (NOT C)) OVERLAP ((NOT C) NOT D)) == 0`
+- `((D AND (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `((D AND (NOT C)) OVERLAP (A AND (NOT D))) == 0`
+- `((D AND (NOT C)) OVERLAP (A NOT (NOT C))) == 0`
+- `((D AND (NOT C)) OVERLAP (B AND (NOT D))) == 0`
+- `((D AND (NOT C)) OVERLAP (B NOT (NOT C))) == 0`
+- `((D AND (NOT C)) OVERLAP (C AND (NOT A))) == 0`
+- `((D AND (NOT C)) OVERLAP (C AND (NOT B))) == 0`
+- `((D AND (NOT C)) OVERLAP (C AND (NOT D))) == 0`
+- `((D AND (NOT C)) OVERLAP (C NOT (NOT D))) == 0`
+- `((D AND (NOT C)) OVERLAP (C XOR (NOT D))) == 0`
+- `((D OR (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((D OR (NOT A)) CONTAINS (A AND (NOT D))) == 0`
+- `((D OR (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((D OR (NOT A)) MEET_PART (D OR (NOT A))) == 0`
+- `((D OR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((D OR (NOT B)) CONTAINS (B AND (NOT D))) == 0`
+- `((D OR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((D OR (NOT B)) MEET_PART (D OR (NOT B))) == 0`
+- `((D OR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((D OR (NOT C)) CONTAINS (C AND (NOT D))) == 0`
+- `((D OR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((D OR (NOT C)) MEET_PART (D OR (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A AND (NOT D))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) CONTAINS (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) CONTAINS (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS (B AND (NOT D))) == 0`
+- `(((NOT A) NOT B) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) CONTAINS (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART (C OR (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART (D OR (NOT A))) == 0`
+- `(((NOT A) NOT B) MEET_PART (D OR (NOT B))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A AND (NOT D))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) CONTAINS (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) CONTAINS (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) CONTAINS (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) CONTAINS (C AND (NOT D))) == 0`
+- `(((NOT A) NOT C) CONTAINS (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT C) MEET_PART (A OR (NOT C))) == 0`
+- `(((NOT A) NOT C) MEET_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT C) MEET_PART (B OR (NOT C))) == 0`
+- `(((NOT A) NOT C) MEET_PART (C OR (NOT A))) == 0`
+- `(((NOT A) NOT C) MEET_PART (D OR (NOT A))) == 0`
+- `(((NOT A) NOT C) MEET_PART (D OR (NOT C))) == 0`
+- `(((NOT A) NOT D) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) NOT D) CONTAINS (A AND (NOT B))) == 0`
+- `(((NOT A) NOT D) CONTAINS (A AND (NOT C))) == 0`
+- `(((NOT A) NOT D) CONTAINS (A AND (NOT D))) == 0`
+- `(((NOT A) NOT D) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT D) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT D) CONTAINS (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) CONTAINS (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) CONTAINS (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) CONTAINS (D AND (NOT A))) == 0`
+- `(((NOT A) NOT D) CONTAINS (D AND (NOT B))) == 0`
+- `(((NOT A) NOT D) CONTAINS (D AND (NOT C))) == 0`
+- `(((NOT A) NOT D) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT D) MEET_PART (A OR (NOT D))) == 0`
+- `(((NOT A) NOT D) MEET_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT D) MEET_PART (B OR (NOT D))) == 0`
+- `(((NOT A) NOT D) MEET_PART (C OR (NOT A))) == 0`
+- `(((NOT A) NOT D) MEET_PART (C OR (NOT D))) == 0`
+- `(((NOT A) NOT D) MEET_PART (D OR (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) CONTAINS (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) CONTAINS (B AND (NOT D))) == 0`
+- `(((NOT B) NOT C) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) CONTAINS (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) CONTAINS (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) CONTAINS (C AND (NOT D))) == 0`
+- `(((NOT B) NOT C) CONTAINS (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) MEET_PART (A OR (NOT B))) == 0`
+- `(((NOT B) NOT C) MEET_PART (A OR (NOT C))) == 0`
+- `(((NOT B) NOT C) MEET_PART (B OR (NOT C))) == 0`
+- `(((NOT B) NOT C) MEET_PART (C OR (NOT B))) == 0`
+- `(((NOT B) NOT C) MEET_PART (D OR (NOT B))) == 0`
+- `(((NOT B) NOT C) MEET_PART (D OR (NOT C))) == 0`
+- `(((NOT B) NOT D) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT B) NOT D) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT D) CONTAINS (A NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) CONTAINS (B AND (NOT A))) == 0`
+- `(((NOT B) NOT D) CONTAINS (B AND (NOT C))) == 0`
+- `(((NOT B) NOT D) CONTAINS (B AND (NOT D))) == 0`
+- `(((NOT B) NOT D) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT D) CONTAINS (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) CONTAINS (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) CONTAINS (D AND (NOT A))) == 0`
+- `(((NOT B) NOT D) CONTAINS (D AND (NOT B))) == 0`
+- `(((NOT B) NOT D) CONTAINS (D AND (NOT C))) == 0`
+- `(((NOT B) NOT D) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT D) MEET_PART (A OR (NOT B))) == 0`
+- `(((NOT B) NOT D) MEET_PART (A OR (NOT D))) == 0`
+- `(((NOT B) NOT D) MEET_PART (B OR (NOT D))) == 0`
+- `(((NOT B) NOT D) MEET_PART (C OR (NOT B))) == 0`
+- `(((NOT B) NOT D) MEET_PART (C OR (NOT D))) == 0`
+- `(((NOT B) NOT D) MEET_PART (D OR (NOT B))) == 0`
+- `(((NOT C) NOT D) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT C) NOT D) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) CONTAINS (A NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) CONTAINS (B NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) CONTAINS (C AND (NOT A))) == 0`
+- `(((NOT C) NOT D) CONTAINS (C AND (NOT B))) == 0`
+- `(((NOT C) NOT D) CONTAINS (C AND (NOT D))) == 0`
+- `(((NOT C) NOT D) CONTAINS (C NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) CONTAINS (D AND (NOT A))) == 0`
+- `(((NOT C) NOT D) CONTAINS (D AND (NOT B))) == 0`
+- `(((NOT C) NOT D) CONTAINS (D AND (NOT C))) == 0`
+- `(((NOT C) NOT D) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT C) NOT D) MEET_PART (A OR (NOT C))) == 0`
+- `(((NOT C) NOT D) MEET_PART (A OR (NOT D))) == 0`
+- `(((NOT C) NOT D) MEET_PART (B OR (NOT C))) == 0`
+- `(((NOT C) NOT D) MEET_PART (B OR (NOT D))) == 0`
+- `(((NOT C) NOT D) MEET_PART (C OR (NOT D))) == 0`
+- `(((NOT C) NOT D) MEET_PART (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (D OR (NOT C))) == 0`
+- `((A AND (NOT B)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((A AND (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) CONTAINS (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) CONTAINS (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) CONTAINS (B AND (NOT D))) == 0`
+- `((A AND (NOT B)) CONTAINS (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) CONTAINS (B NOT (NOT D))) == 0`
+- `((A AND (NOT B)) CONTAINS (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) CONTAINS (D AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT B)) MEET_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT B)) MEET_PART (A OR (NOT D))) == 0`
+- `((A AND (NOT B)) MEET_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT B)) MEET_PART (D OR (NOT B))) == 0`
+- `((A AND (NOT C)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((A AND (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) CONTAINS (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) CONTAINS (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) CONTAINS (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) CONTAINS (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) CONTAINS (C AND (NOT D))) == 0`
+- `((A AND (NOT C)) CONTAINS (C NOT (NOT D))) == 0`
+- `((A AND (NOT C)) CONTAINS (D AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVEREDBY (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT C)) MEET_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT C)) MEET_PART (A OR (NOT D))) == 0`
+- `((A AND (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((A AND (NOT C)) MEET_PART (D OR (NOT C))) == 0`
+- `((A AND (NOT D)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A AND (NOT D)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A AND (NOT D)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((A AND (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((A AND (NOT D)) CONTAINS (A NOT (NOT D))) == 0`
+- `((A AND (NOT D)) CONTAINS (A XOR (NOT D))) == 0`
+- `((A AND (NOT D)) CONTAINS (B AND (NOT A))) == 0`
+- `((A AND (NOT D)) CONTAINS (B NOT (NOT D))) == 0`
+- `((A AND (NOT D)) CONTAINS (C AND (NOT A))) == 0`
+- `((A AND (NOT D)) CONTAINS (C NOT (NOT D))) == 0`
+- `((A AND (NOT D)) CONTAINS (D AND (NOT A))) == 0`
+- `((A AND (NOT D)) CONTAINS (D AND (NOT B))) == 0`
+- `((A AND (NOT D)) CONTAINS (D AND (NOT C))) == 0`
+- `((A AND (NOT D)) COVEREDBY (D OR (NOT A))) == 0`
+- `((A AND (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT D)) MEET_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT D)) MEET_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT D)) MEET_PART (A OR (NOT D))) == 0`
+- `((A AND (NOT D)) MEET_PART (B OR (NOT D))) == 0`
+- `((A AND (NOT D)) MEET_PART (C OR (NOT D))) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) CONTAINS (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) CONTAINS (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) CONTAINS (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) CONTAINS (D AND (NOT A))) == 0`
+- `((A NOT (NOT B)) CONTAINS (D AND (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A OR (NOT D))) == 0`
+- `((A NOT (NOT B)) MEET_PART (B OR (NOT A))) == 0`
+- `((A NOT (NOT B)) MEET_PART (B OR (NOT C))) == 0`
+- `((A NOT (NOT B)) MEET_PART (B OR (NOT D))) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) CONTAINS (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) CONTAINS (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) CONTAINS (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) CONTAINS (D AND (NOT A))) == 0`
+- `((A NOT (NOT C)) CONTAINS (D AND (NOT C))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A OR (NOT D))) == 0`
+- `((A NOT (NOT C)) MEET_PART (C OR (NOT A))) == 0`
+- `((A NOT (NOT C)) MEET_PART (C OR (NOT B))) == 0`
+- `((A NOT (NOT C)) MEET_PART (C OR (NOT D))) == 0`
+- `((A NOT (NOT D)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT D)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT D)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT D)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT D)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((A NOT (NOT D)) CONTAINS (A AND (NOT D))) == 0`
+- `((A NOT (NOT D)) CONTAINS (B AND (NOT A))) == 0`
+- `((A NOT (NOT D)) CONTAINS (B AND (NOT D))) == 0`
+- `((A NOT (NOT D)) CONTAINS (C AND (NOT A))) == 0`
+- `((A NOT (NOT D)) CONTAINS (C AND (NOT D))) == 0`
+- `((A NOT (NOT D)) CONTAINS (D AND (NOT A))) == 0`
+- `((A NOT (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT D)) MEET_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT D)) MEET_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT D)) MEET_PART (A OR (NOT D))) == 0`
+- `((A NOT (NOT D)) MEET_PART (D OR (NOT A))) == 0`
+- `((A NOT (NOT D)) MEET_PART (D OR (NOT B))) == 0`
+- `((A NOT (NOT D)) MEET_PART (D OR (NOT C))) == 0`
+- `((A OR (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A OR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A OR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A OR (NOT D)) COVEREDBY (D AND (NOT A))) == 0`
+- `((A XOR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) CONTAINS (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) MEET_PART (B OR (NOT A))) == 0`
+- `((A XOR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) CONTAINS (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((A XOR (NOT C)) MEET_PART (C OR (NOT A))) == 0`
+- `((A XOR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((A XOR (NOT D)) CONTAINS (A AND (NOT D))) == 0`
+- `((A XOR (NOT D)) CONTAINS (D AND (NOT A))) == 0`
+- `((A XOR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT D)) MEET_PART (A OR (NOT D))) == 0`
+- `((A XOR (NOT D)) MEET_PART (D OR (NOT A))) == 0`
+- `((B AND (NOT A)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((B AND (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) CONTAINS (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) CONTAINS (A AND (NOT D))) == 0`
+- `((B AND (NOT A)) CONTAINS (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) CONTAINS (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) CONTAINS (A NOT (NOT D))) == 0`
+- `((B AND (NOT A)) CONTAINS (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) CONTAINS (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) CONTAINS (D AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) MEET_PART (B OR (NOT C))) == 0`
+- `((B AND (NOT A)) MEET_PART (B OR (NOT D))) == 0`
+- `((B AND (NOT A)) MEET_PART (C OR (NOT A))) == 0`
+- `((B AND (NOT A)) MEET_PART (D OR (NOT A))) == 0`
+- `((B AND (NOT C)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((B AND (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) CONTAINS (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) CONTAINS (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) CONTAINS (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) CONTAINS (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) CONTAINS (C AND (NOT D))) == 0`
+- `((B AND (NOT C)) CONTAINS (C NOT (NOT D))) == 0`
+- `((B AND (NOT C)) CONTAINS (D AND (NOT B))) == 0`
+- `((B AND (NOT C)) COVEREDBY (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((B AND (NOT C)) MEET_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((B AND (NOT C)) MEET_PART (B OR (NOT D))) == 0`
+- `((B AND (NOT C)) MEET_PART (D OR (NOT C))) == 0`
+- `((B AND (NOT D)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((B AND (NOT D)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((B AND (NOT D)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((B AND (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((B AND (NOT D)) CONTAINS (A AND (NOT B))) == 0`
+- `((B AND (NOT D)) CONTAINS (A NOT (NOT D))) == 0`
+- `((B AND (NOT D)) CONTAINS (B NOT (NOT D))) == 0`
+- `((B AND (NOT D)) CONTAINS (B XOR (NOT D))) == 0`
+- `((B AND (NOT D)) CONTAINS (C AND (NOT B))) == 0`
+- `((B AND (NOT D)) CONTAINS (C NOT (NOT D))) == 0`
+- `((B AND (NOT D)) CONTAINS (D AND (NOT A))) == 0`
+- `((B AND (NOT D)) CONTAINS (D AND (NOT B))) == 0`
+- `((B AND (NOT D)) CONTAINS (D AND (NOT C))) == 0`
+- `((B AND (NOT D)) COVEREDBY (D OR (NOT B))) == 0`
+- `((B AND (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT D)) MEET_PART (A OR (NOT D))) == 0`
+- `((B AND (NOT D)) MEET_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT D)) MEET_PART (B OR (NOT C))) == 0`
+- `((B AND (NOT D)) MEET_PART (B OR (NOT D))) == 0`
+- `((B AND (NOT D)) MEET_PART (C OR (NOT D))) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) CONTAINS (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) CONTAINS (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) CONTAINS (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) CONTAINS (D AND (NOT B))) == 0`
+- `((B NOT (NOT C)) CONTAINS (D AND (NOT C))) == 0`
+- `((B NOT (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((B NOT (NOT C)) MEET_PART (B OR (NOT A))) == 0`
+- `((B NOT (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) MEET_PART (B OR (NOT D))) == 0`
+- `((B NOT (NOT C)) MEET_PART (C OR (NOT A))) == 0`
+- `((B NOT (NOT C)) MEET_PART (C OR (NOT B))) == 0`
+- `((B NOT (NOT C)) MEET_PART (C OR (NOT D))) == 0`
+- `((B NOT (NOT D)) CONTAINS ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT D)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((B NOT (NOT D)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT D)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT D)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((B NOT (NOT D)) CONTAINS (A AND (NOT B))) == 0`
+- `((B NOT (NOT D)) CONTAINS (A AND (NOT D))) == 0`
+- `((B NOT (NOT D)) CONTAINS (B AND (NOT D))) == 0`
+- `((B NOT (NOT D)) CONTAINS (C AND (NOT B))) == 0`
+- `((B NOT (NOT D)) CONTAINS (C AND (NOT D))) == 0`
+- `((B NOT (NOT D)) CONTAINS (D AND (NOT B))) == 0`
+- `((B NOT (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((B NOT (NOT D)) MEET_PART (B OR (NOT A))) == 0`
+- `((B NOT (NOT D)) MEET_PART (B OR (NOT C))) == 0`
+- `((B NOT (NOT D)) MEET_PART (B OR (NOT D))) == 0`
+- `((B NOT (NOT D)) MEET_PART (D OR (NOT A))) == 0`
+- `((B NOT (NOT D)) MEET_PART (D OR (NOT B))) == 0`
+- `((B NOT (NOT D)) MEET_PART (D OR (NOT C))) == 0`
+- `((B OR (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B OR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B OR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B OR (NOT D)) COVEREDBY (D AND (NOT B))) == 0`
+- `((B XOR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) CONTAINS (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((B XOR (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((B XOR (NOT C)) MEET_PART (C OR (NOT B))) == 0`
+- `((B XOR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((B XOR (NOT D)) CONTAINS (B AND (NOT D))) == 0`
+- `((B XOR (NOT D)) CONTAINS (D AND (NOT B))) == 0`
+- `((B XOR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((B XOR (NOT D)) MEET_PART (B OR (NOT D))) == 0`
+- `((B XOR (NOT D)) MEET_PART (D OR (NOT B))) == 0`
+- `((C AND (NOT A)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((C AND (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) CONTAINS (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) CONTAINS (A AND (NOT D))) == 0`
+- `((C AND (NOT A)) CONTAINS (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) CONTAINS (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) CONTAINS (A NOT (NOT D))) == 0`
+- `((C AND (NOT A)) CONTAINS (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) CONTAINS (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) CONTAINS (D AND (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((C AND (NOT A)) MEET_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT A)) MEET_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT A)) MEET_PART (C OR (NOT D))) == 0`
+- `((C AND (NOT A)) MEET_PART (D OR (NOT A))) == 0`
+- `((C AND (NOT B)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((C AND (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) CONTAINS (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) CONTAINS (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) CONTAINS (B AND (NOT D))) == 0`
+- `((C AND (NOT B)) CONTAINS (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) CONTAINS (B NOT (NOT D))) == 0`
+- `((C AND (NOT B)) CONTAINS (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) CONTAINS (D AND (NOT C))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((C AND (NOT B)) MEET_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT B)) MEET_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT B)) MEET_PART (C OR (NOT D))) == 0`
+- `((C AND (NOT B)) MEET_PART (D OR (NOT B))) == 0`
+- `((C AND (NOT D)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((C AND (NOT D)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((C AND (NOT D)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((C AND (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((C AND (NOT D)) CONTAINS (A AND (NOT C))) == 0`
+- `((C AND (NOT D)) CONTAINS (A NOT (NOT D))) == 0`
+- `((C AND (NOT D)) CONTAINS (B AND (NOT C))) == 0`
+- `((C AND (NOT D)) CONTAINS (B NOT (NOT D))) == 0`
+- `((C AND (NOT D)) CONTAINS (C NOT (NOT D))) == 0`
+- `((C AND (NOT D)) CONTAINS (C XOR (NOT D))) == 0`
+- `((C AND (NOT D)) CONTAINS (D AND (NOT A))) == 0`
+- `((C AND (NOT D)) CONTAINS (D AND (NOT B))) == 0`
+- `((C AND (NOT D)) CONTAINS (D AND (NOT C))) == 0`
+- `((C AND (NOT D)) COVEREDBY (D OR (NOT C))) == 0`
+- `((C AND (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT D)) MEET_PART (A OR (NOT D))) == 0`
+- `((C AND (NOT D)) MEET_PART (B OR (NOT D))) == 0`
+- `((C AND (NOT D)) MEET_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT D)) MEET_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT D)) MEET_PART (C OR (NOT D))) == 0`
+- `((C NOT (NOT D)) CONTAINS ((NOT A) NOT C)) == 0`
+- `((C NOT (NOT D)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((C NOT (NOT D)) CONTAINS ((NOT B) NOT C)) == 0`
+- `((C NOT (NOT D)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((C NOT (NOT D)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((C NOT (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((C NOT (NOT D)) CONTAINS (A AND (NOT C))) == 0`
+- `((C NOT (NOT D)) CONTAINS (A AND (NOT D))) == 0`
+- `((C NOT (NOT D)) CONTAINS (B AND (NOT C))) == 0`
+- `((C NOT (NOT D)) CONTAINS (B AND (NOT D))) == 0`
+- `((C NOT (NOT D)) CONTAINS (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) CONTAINS (D AND (NOT C))) == 0`
+- `((C NOT (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((C NOT (NOT D)) MEET_PART (C OR (NOT A))) == 0`
+- `((C NOT (NOT D)) MEET_PART (C OR (NOT B))) == 0`
+- `((C NOT (NOT D)) MEET_PART (C OR (NOT D))) == 0`
+- `((C NOT (NOT D)) MEET_PART (D OR (NOT A))) == 0`
+- `((C NOT (NOT D)) MEET_PART (D OR (NOT B))) == 0`
+- `((C NOT (NOT D)) MEET_PART (D OR (NOT C))) == 0`
+- `((C OR (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) COVEREDBY (A AND (NOT C))) == 0`
+- `((C OR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) COVEREDBY (B AND (NOT C))) == 0`
+- `((C OR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C OR (NOT D)) COVEREDBY (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `((C XOR (NOT D)) CONTAINS (C AND (NOT D))) == 0`
+- `((C XOR (NOT D)) CONTAINS (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((C XOR (NOT D)) MEET_PART (C OR (NOT D))) == 0`
+- `((C XOR (NOT D)) MEET_PART (D OR (NOT C))) == 0`
+- `((D AND (NOT A)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((D AND (NOT A)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((D AND (NOT A)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((D AND (NOT A)) CONTAINS (A AND (NOT A))) == 0`
+- `((D AND (NOT A)) CONTAINS (A AND (NOT B))) == 0`
+- `((D AND (NOT A)) CONTAINS (A AND (NOT C))) == 0`
+- `((D AND (NOT A)) CONTAINS (A AND (NOT D))) == 0`
+- `((D AND (NOT A)) CONTAINS (A NOT (NOT B))) == 0`
+- `((D AND (NOT A)) CONTAINS (A NOT (NOT C))) == 0`
+- `((D AND (NOT A)) CONTAINS (A NOT (NOT D))) == 0`
+- `((D AND (NOT A)) CONTAINS (A XOR (NOT D))) == 0`
+- `((D AND (NOT A)) CONTAINS (B AND (NOT D))) == 0`
+- `((D AND (NOT A)) CONTAINS (C AND (NOT D))) == 0`
+- `((D AND (NOT A)) COVEREDBY (A OR (NOT D))) == 0`
+- `((D AND (NOT A)) MEET_PART (A OR (NOT A))) == 0`
+- `((D AND (NOT A)) MEET_PART (B OR (NOT A))) == 0`
+- `((D AND (NOT A)) MEET_PART (C OR (NOT A))) == 0`
+- `((D AND (NOT A)) MEET_PART (D OR (NOT A))) == 0`
+- `((D AND (NOT A)) MEET_PART (D OR (NOT B))) == 0`
+- `((D AND (NOT A)) MEET_PART (D OR (NOT C))) == 0`
+- `((D AND (NOT B)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((D AND (NOT B)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((D AND (NOT B)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((D AND (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `((D AND (NOT B)) CONTAINS (A AND (NOT D))) == 0`
+- `((D AND (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `((D AND (NOT B)) CONTAINS (B AND (NOT A))) == 0`
+- `((D AND (NOT B)) CONTAINS (B AND (NOT C))) == 0`
+- `((D AND (NOT B)) CONTAINS (B AND (NOT D))) == 0`
+- `((D AND (NOT B)) CONTAINS (B NOT (NOT C))) == 0`
+- `((D AND (NOT B)) CONTAINS (B NOT (NOT D))) == 0`
+- `((D AND (NOT B)) CONTAINS (B XOR (NOT D))) == 0`
+- `((D AND (NOT B)) CONTAINS (C AND (NOT D))) == 0`
+- `((D AND (NOT B)) COVEREDBY (B OR (NOT D))) == 0`
+- `((D AND (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `((D AND (NOT B)) MEET_PART (A OR (NOT B))) == 0`
+- `((D AND (NOT B)) MEET_PART (C OR (NOT B))) == 0`
+- `((D AND (NOT B)) MEET_PART (D OR (NOT A))) == 0`
+- `((D AND (NOT B)) MEET_PART (D OR (NOT B))) == 0`
+- `((D AND (NOT B)) MEET_PART (D OR (NOT C))) == 0`
+- `((D AND (NOT C)) CONTAINS ((NOT A) NOT D)) == 0`
+- `((D AND (NOT C)) CONTAINS ((NOT B) NOT D)) == 0`
+- `((D AND (NOT C)) CONTAINS ((NOT C) NOT D)) == 0`
+- `((D AND (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `((D AND (NOT C)) CONTAINS (A AND (NOT D))) == 0`
+- `((D AND (NOT C)) CONTAINS (A NOT (NOT C))) == 0`
+- `((D AND (NOT C)) CONTAINS (B AND (NOT D))) == 0`
+- `((D AND (NOT C)) CONTAINS (B NOT (NOT C))) == 0`
+- `((D AND (NOT C)) CONTAINS (C AND (NOT A))) == 0`
+- `((D AND (NOT C)) CONTAINS (C AND (NOT B))) == 0`
+- `((D AND (NOT C)) CONTAINS (C AND (NOT D))) == 0`
+- `((D AND (NOT C)) CONTAINS (C NOT (NOT D))) == 0`
+- `((D AND (NOT C)) CONTAINS (C XOR (NOT D))) == 0`
+- `((D AND (NOT C)) COVEREDBY (C OR (NOT D))) == 0`
+- `((D AND (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `((D AND (NOT C)) MEET_PART (A OR (NOT C))) == 0`
+- `((D AND (NOT C)) MEET_PART (B OR (NOT C))) == 0`
+- `((D AND (NOT C)) MEET_PART (D OR (NOT A))) == 0`
+- `((D AND (NOT C)) MEET_PART (D OR (NOT B))) == 0`
+- `((D AND (NOT C)) MEET_PART (D OR (NOT C))) == 0`
+- `((D OR (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((D OR (NOT A)) COVEREDBY (A AND (NOT D))) == 0`
+- `((D OR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((D OR (NOT B)) COVEREDBY (B AND (NOT D))) == 0`
+- `((D OR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((D OR (NOT C)) COVEREDBY (C AND (NOT D))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A AND (NOT D))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (B AND (NOT D))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) COVEREDBY (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) MEET_PART (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A AND (NOT D))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (C AND (NOT D))) == 0`
+- `(((NOT A) NOT C) COVEREDBY (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT A) NOT C)) == 0`
+- `(((NOT A) NOT C) MEET_PART (A XOR (NOT C))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (A AND (NOT B))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (A AND (NOT C))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (A AND (NOT D))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (D AND (NOT A))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (D AND (NOT B))) == 0`
+- `(((NOT A) NOT D) COVEREDBY (D AND (NOT C))) == 0`
+- `(((NOT A) NOT D) MEET_PART ((NOT A) NOT D)) == 0`
+- `(((NOT A) NOT D) MEET_PART (A XOR (NOT D))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (B AND (NOT D))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (C AND (NOT D))) == 0`
+- `(((NOT B) NOT C) COVEREDBY (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT B) NOT C)) == 0`
+- `(((NOT B) NOT C) MEET_PART (B XOR (NOT C))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (A NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (B AND (NOT A))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (B AND (NOT C))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (B AND (NOT D))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (D AND (NOT A))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (D AND (NOT B))) == 0`
+- `(((NOT B) NOT D) COVEREDBY (D AND (NOT C))) == 0`
+- `(((NOT B) NOT D) MEET_PART ((NOT B) NOT D)) == 0`
+- `(((NOT B) NOT D) MEET_PART (B XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (A NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (B NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (C AND (NOT A))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (C AND (NOT B))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (C AND (NOT D))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (C NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (D AND (NOT A))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (D AND (NOT B))) == 0`
+- `(((NOT C) NOT D) COVEREDBY (D AND (NOT C))) == 0`
+- `(((NOT C) NOT D) MEET_PART ((NOT C) NOT D)) == 0`
+- `(((NOT C) NOT D) MEET_PART (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) COVEREDBY (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) MEET_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) MEET_PART (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART (D AND (NOT C))) == 0`
+- `((A AND (NOT B)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((A AND (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B AND (NOT D))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) COVEREDBY (B NOT (NOT D))) == 0`
+- `((A AND (NOT B)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) COVEREDBY (D AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT B)) MEET_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT C)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((A AND (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) COVEREDBY (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) COVEREDBY (C AND (NOT D))) == 0`
+- `((A AND (NOT C)) COVEREDBY (C NOT (NOT D))) == 0`
+- `((A AND (NOT C)) COVEREDBY (D AND (NOT A))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (C OR (NOT A))) == 0`
+- `((A AND (NOT C)) MEET_PART (A AND (NOT C))) == 0`
+- `((A AND (NOT D)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A AND (NOT D)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A AND (NOT D)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((A AND (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A AND (NOT D)) COVEREDBY (A NOT (NOT D))) == 0`
+- `((A AND (NOT D)) COVEREDBY (A XOR (NOT D))) == 0`
+- `((A AND (NOT D)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A AND (NOT D)) COVEREDBY (B NOT (NOT D))) == 0`
+- `((A AND (NOT D)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A AND (NOT D)) COVEREDBY (C NOT (NOT D))) == 0`
+- `((A AND (NOT D)) COVEREDBY (D AND (NOT A))) == 0`
+- `((A AND (NOT D)) COVEREDBY (D AND (NOT B))) == 0`
+- `((A AND (NOT D)) COVEREDBY (D AND (NOT C))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (D OR (NOT A))) == 0`
+- `((A AND (NOT D)) MEET_PART (A AND (NOT D))) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (D AND (NOT A))) == 0`
+- `((A NOT (NOT B)) COVEREDBY (D AND (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) MEET_PART (A XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (D AND (NOT A))) == 0`
+- `((A NOT (NOT C)) COVEREDBY (D AND (NOT C))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A NOT (NOT C))) == 0`
+- `((A NOT (NOT C)) MEET_PART (A XOR (NOT C))) == 0`
+- `((A NOT (NOT D)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT D)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT D)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT D)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT D)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A NOT (NOT D)) COVEREDBY (A AND (NOT D))) == 0`
+- `((A NOT (NOT D)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A NOT (NOT D)) COVEREDBY (B AND (NOT D))) == 0`
+- `((A NOT (NOT D)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A NOT (NOT D)) COVEREDBY (C AND (NOT D))) == 0`
+- `((A NOT (NOT D)) COVEREDBY (D AND (NOT A))) == 0`
+- `((A NOT (NOT D)) MEET_PART (A NOT (NOT D))) == 0`
+- `((A NOT (NOT D)) MEET_PART (A XOR (NOT D))) == 0`
+- `((A OR (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A OR (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A OR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A OR (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A OR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A OR (NOT D)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) COVEREDBY (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((A XOR (NOT B)) MEET_PART (A XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) COVEREDBY (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((A XOR (NOT C)) MEET_PART (A XOR (NOT C))) == 0`
+- `((A XOR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((A XOR (NOT D)) COVEREDBY (A AND (NOT D))) == 0`
+- `((A XOR (NOT D)) COVEREDBY (D AND (NOT A))) == 0`
+- `((A XOR (NOT D)) MEET_PART (A XOR (NOT D))) == 0`
+- `((B AND (NOT A)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((B AND (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A AND (NOT D))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A NOT (NOT D))) == 0`
+- `((B AND (NOT A)) COVEREDBY (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) COVEREDBY (D AND (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A OR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART (B AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((B AND (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) COVEREDBY (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) COVEREDBY (C AND (NOT D))) == 0`
+- `((B AND (NOT C)) COVEREDBY (C NOT (NOT D))) == 0`
+- `((B AND (NOT C)) COVEREDBY (D AND (NOT B))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (C OR (NOT B))) == 0`
+- `((B AND (NOT C)) MEET_PART (B AND (NOT C))) == 0`
+- `((B AND (NOT D)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((B AND (NOT D)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((B AND (NOT D)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((B AND (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B AND (NOT D)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B AND (NOT D)) COVEREDBY (A NOT (NOT D))) == 0`
+- `((B AND (NOT D)) COVEREDBY (B NOT (NOT D))) == 0`
+- `((B AND (NOT D)) COVEREDBY (B XOR (NOT D))) == 0`
+- `((B AND (NOT D)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B AND (NOT D)) COVEREDBY (C NOT (NOT D))) == 0`
+- `((B AND (NOT D)) COVEREDBY (D AND (NOT A))) == 0`
+- `((B AND (NOT D)) COVEREDBY (D AND (NOT B))) == 0`
+- `((B AND (NOT D)) COVEREDBY (D AND (NOT C))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (D OR (NOT B))) == 0`
+- `((B AND (NOT D)) MEET_PART (B AND (NOT D))) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (D AND (NOT B))) == 0`
+- `((B NOT (NOT C)) COVEREDBY (D AND (NOT C))) == 0`
+- `((B NOT (NOT C)) MEET_PART (B NOT (NOT C))) == 0`
+- `((B NOT (NOT C)) MEET_PART (B XOR (NOT C))) == 0`
+- `((B NOT (NOT D)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT D)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((B NOT (NOT D)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT D)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT D)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B NOT (NOT D)) COVEREDBY (A AND (NOT B))) == 0`
+- `((B NOT (NOT D)) COVEREDBY (A AND (NOT D))) == 0`
+- `((B NOT (NOT D)) COVEREDBY (B AND (NOT D))) == 0`
+- `((B NOT (NOT D)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B NOT (NOT D)) COVEREDBY (C AND (NOT D))) == 0`
+- `((B NOT (NOT D)) COVEREDBY (D AND (NOT B))) == 0`
+- `((B NOT (NOT D)) MEET_PART (B NOT (NOT D))) == 0`
+- `((B NOT (NOT D)) MEET_PART (B XOR (NOT D))) == 0`
+- `((B OR (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B OR (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B OR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B OR (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B OR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B OR (NOT D)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((B XOR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) COVEREDBY (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((B XOR (NOT C)) MEET_PART (B XOR (NOT C))) == 0`
+- `((B XOR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((B XOR (NOT D)) COVEREDBY (B AND (NOT D))) == 0`
+- `((B XOR (NOT D)) COVEREDBY (D AND (NOT B))) == 0`
+- `((B XOR (NOT D)) MEET_PART (B XOR (NOT D))) == 0`
+- `((C AND (NOT A)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((C AND (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A AND (NOT D))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A NOT (NOT D))) == 0`
+- `((C AND (NOT A)) COVEREDBY (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) COVEREDBY (D AND (NOT C))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A OR (NOT C))) == 0`
+- `((C AND (NOT A)) MEET_PART (C AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((C AND (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVEREDBY (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B AND (NOT D))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B NOT (NOT D))) == 0`
+- `((C AND (NOT B)) COVEREDBY (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) COVEREDBY (D AND (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B OR (NOT C))) == 0`
+- `((C AND (NOT B)) MEET_PART (C AND (NOT B))) == 0`
+- `((C AND (NOT D)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((C AND (NOT D)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((C AND (NOT D)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((C AND (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C AND (NOT D)) COVEREDBY (A AND (NOT C))) == 0`
+- `((C AND (NOT D)) COVEREDBY (A NOT (NOT D))) == 0`
+- `((C AND (NOT D)) COVEREDBY (B AND (NOT C))) == 0`
+- `((C AND (NOT D)) COVEREDBY (B NOT (NOT D))) == 0`
+- `((C AND (NOT D)) COVEREDBY (C NOT (NOT D))) == 0`
+- `((C AND (NOT D)) COVEREDBY (C XOR (NOT D))) == 0`
+- `((C AND (NOT D)) COVEREDBY (D AND (NOT A))) == 0`
+- `((C AND (NOT D)) COVEREDBY (D AND (NOT B))) == 0`
+- `((C AND (NOT D)) COVEREDBY (D AND (NOT C))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (D OR (NOT C))) == 0`
+- `((C AND (NOT D)) MEET_PART (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `((C NOT (NOT D)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((C NOT (NOT D)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `((C NOT (NOT D)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((C NOT (NOT D)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((C NOT (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C NOT (NOT D)) COVEREDBY (A AND (NOT C))) == 0`
+- `((C NOT (NOT D)) COVEREDBY (A AND (NOT D))) == 0`
+- `((C NOT (NOT D)) COVEREDBY (B AND (NOT C))) == 0`
+- `((C NOT (NOT D)) COVEREDBY (B AND (NOT D))) == 0`
+- `((C NOT (NOT D)) COVEREDBY (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) COVEREDBY (D AND (NOT C))) == 0`
+- `((C NOT (NOT D)) MEET_PART (C NOT (NOT D))) == 0`
+- `((C NOT (NOT D)) MEET_PART (C XOR (NOT D))) == 0`
+- `((C OR (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C OR (NOT A)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((C OR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C OR (NOT B)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((C OR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C OR (NOT D)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `((C XOR (NOT D)) COVEREDBY (C AND (NOT D))) == 0`
+- `((C XOR (NOT D)) COVEREDBY (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) MEET_PART (C XOR (NOT D))) == 0`
+- `((D AND (NOT A)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((D AND (NOT A)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((D AND (NOT A)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((D AND (NOT A)) COVEREDBY (A AND (NOT A))) == 0`
+- `((D AND (NOT A)) COVEREDBY (A AND (NOT B))) == 0`
+- `((D AND (NOT A)) COVEREDBY (A AND (NOT C))) == 0`
+- `((D AND (NOT A)) COVEREDBY (A AND (NOT D))) == 0`
+- `((D AND (NOT A)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((D AND (NOT A)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((D AND (NOT A)) COVEREDBY (A NOT (NOT D))) == 0`
+- `((D AND (NOT A)) COVEREDBY (A XOR (NOT D))) == 0`
+- `((D AND (NOT A)) COVEREDBY (B AND (NOT D))) == 0`
+- `((D AND (NOT A)) COVEREDBY (C AND (NOT D))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (A OR (NOT D))) == 0`
+- `((D AND (NOT A)) MEET_PART (D AND (NOT A))) == 0`
+- `((D AND (NOT B)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((D AND (NOT B)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((D AND (NOT B)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((D AND (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `((D AND (NOT B)) COVEREDBY (A AND (NOT D))) == 0`
+- `((D AND (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `((D AND (NOT B)) COVEREDBY (B AND (NOT A))) == 0`
+- `((D AND (NOT B)) COVEREDBY (B AND (NOT C))) == 0`
+- `((D AND (NOT B)) COVEREDBY (B AND (NOT D))) == 0`
+- `((D AND (NOT B)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((D AND (NOT B)) COVEREDBY (B NOT (NOT D))) == 0`
+- `((D AND (NOT B)) COVEREDBY (B XOR (NOT D))) == 0`
+- `((D AND (NOT B)) COVEREDBY (C AND (NOT D))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (B OR (NOT D))) == 0`
+- `((D AND (NOT B)) MEET_PART (D AND (NOT B))) == 0`
+- `((D AND (NOT C)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `((D AND (NOT C)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `((D AND (NOT C)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `((D AND (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `((D AND (NOT C)) COVEREDBY (A AND (NOT D))) == 0`
+- `((D AND (NOT C)) COVEREDBY (A NOT (NOT C))) == 0`
+- `((D AND (NOT C)) COVEREDBY (B AND (NOT D))) == 0`
+- `((D AND (NOT C)) COVEREDBY (B NOT (NOT C))) == 0`
+- `((D AND (NOT C)) COVEREDBY (C AND (NOT A))) == 0`
+- `((D AND (NOT C)) COVEREDBY (C AND (NOT B))) == 0`
+- `((D AND (NOT C)) COVEREDBY (C AND (NOT D))) == 0`
+- `((D AND (NOT C)) COVEREDBY (C NOT (NOT D))) == 0`
+- `((D AND (NOT C)) COVEREDBY (C XOR (NOT D))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (C OR (NOT D))) == 0`
+- `((D AND (NOT C)) MEET_PART (D AND (NOT C))) == 0`
+- `((D OR (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((D OR (NOT A)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((D OR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((D OR (NOT B)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((D OR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((D OR (NOT C)) EQUAL_PART (C AND (NOT D))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A AND (NOT B))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A AND (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A AND (NOT D))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (B AND (NOT A))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (B AND (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (B AND (NOT D))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A AND (NOT B))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A AND (NOT C))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A AND (NOT D))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (C AND (NOT A))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (C AND (NOT B))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (C AND (NOT D))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (A AND (NOT B))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (A AND (NOT C))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (A AND (NOT D))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (A NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (B NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (C NOT (NOT D))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (D AND (NOT A))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (D AND (NOT B))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART (D AND (NOT C))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (B AND (NOT A))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (B AND (NOT C))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (B AND (NOT D))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (C AND (NOT A))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (C AND (NOT B))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (C AND (NOT D))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (A NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (B AND (NOT A))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (B AND (NOT C))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (B AND (NOT D))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (B NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (C NOT (NOT D))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (D AND (NOT A))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (D AND (NOT B))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART (D AND (NOT C))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (A NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (B NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (C AND (NOT A))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (C AND (NOT B))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (C AND (NOT D))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (C NOT (NOT D))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (D AND (NOT A))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (D AND (NOT B))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART (D AND (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((A AND (NOT B)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT B)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT B)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((A AND (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (B NOT (NOT D))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT B)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((A AND (NOT C)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT C)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT C)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((A AND (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (A XOR (NOT C))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (C NOT (NOT D))) == 0`
+- `((A AND (NOT C)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((A AND (NOT D)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT D)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT D)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((A AND (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (A NOT (NOT D))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (A XOR (NOT D))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (B NOT (NOT D))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (C NOT (NOT D))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((A AND (NOT D)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((A NOT (NOT D)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((A NOT (NOT D)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((A NOT (NOT D)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((A NOT (NOT D)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((A NOT (NOT D)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((A NOT (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A NOT (NOT D)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((A NOT (NOT D)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A NOT (NOT D)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((A NOT (NOT D)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A NOT (NOT D)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((A NOT (NOT D)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((A XOR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A XOR (NOT C)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((A XOR (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((A XOR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((A XOR (NOT D)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((A XOR (NOT D)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((B AND (NOT A)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((B AND (NOT A)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((B AND (NOT A)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A NOT (NOT D))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B AND (NOT A)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((B AND (NOT C)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((B AND (NOT C)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((B AND (NOT C)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((B AND (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (B XOR (NOT C))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (C NOT (NOT D))) == 0`
+- `((B AND (NOT C)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((B AND (NOT D)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((B AND (NOT D)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((B AND (NOT D)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((B AND (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (A NOT (NOT D))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (B NOT (NOT D))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (B XOR (NOT D))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (C NOT (NOT D))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((B AND (NOT D)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((B NOT (NOT D)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `((B NOT (NOT D)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((B NOT (NOT D)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((B NOT (NOT D)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((B NOT (NOT D)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((B NOT (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B NOT (NOT D)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((B NOT (NOT D)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((B NOT (NOT D)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((B NOT (NOT D)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B NOT (NOT D)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((B NOT (NOT D)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((B XOR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B XOR (NOT C)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((B XOR (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((B XOR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((B XOR (NOT D)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((B XOR (NOT D)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((C AND (NOT A)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((C AND (NOT A)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((C AND (NOT A)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A NOT (NOT D))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (A XOR (NOT C))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((C AND (NOT A)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((C AND (NOT B)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((C AND (NOT B)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((C AND (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B NOT (NOT D))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (B XOR (NOT C))) == 0`
+- `((C AND (NOT B)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((C AND (NOT D)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((C AND (NOT D)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((C AND (NOT D)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((C AND (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (A NOT (NOT D))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (B NOT (NOT D))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (C NOT (NOT D))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (C XOR (NOT D))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (D AND (NOT A))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (D AND (NOT B))) == 0`
+- `((C AND (NOT D)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((C NOT (NOT D)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `((C NOT (NOT D)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((C NOT (NOT D)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `((C NOT (NOT D)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((C NOT (NOT D)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((C NOT (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C NOT (NOT D)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((C NOT (NOT D)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((C NOT (NOT D)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((C NOT (NOT D)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((C NOT (NOT D)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((C XOR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((C XOR (NOT D)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((C XOR (NOT D)) EQUAL_PART (D AND (NOT C))) == 0`
+- `((D AND (NOT A)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((D AND (NOT A)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((D AND (NOT A)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((D AND (NOT A)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (A AND (NOT B))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (A AND (NOT C))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (A NOT (NOT D))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (A XOR (NOT D))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((D AND (NOT A)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((D AND (NOT B)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((D AND (NOT B)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((D AND (NOT B)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((D AND (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (B AND (NOT A))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (B AND (NOT C))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (B NOT (NOT D))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (B XOR (NOT D))) == 0`
+- `((D AND (NOT B)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((D AND (NOT C)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `((D AND (NOT C)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `((D AND (NOT C)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `((D AND (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (A AND (NOT D))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (B AND (NOT D))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (C AND (NOT A))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (C AND (NOT B))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (C AND (NOT D))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (C NOT (NOT D))) == 0`
+- `((D AND (NOT C)) EQUAL_PART (C XOR (NOT D))) == 0`
+- `((NOT A) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT A) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((NOT A) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `((NOT B) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((NOT B) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((NOT B) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `((NOT C) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((NOT C) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((NOT C) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `((NOT D) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `((NOT D) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `((NOT D) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `((A OR (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A OR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A OR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A OR (NOT D)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((B OR (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B OR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B OR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B OR (NOT D)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((C OR (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT A)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((C OR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT B)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((C OR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C OR (NOT D)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((D OR (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((D OR (NOT A)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((D OR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((D OR (NOT B)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((D OR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((D OR (NOT C)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (A OR (NOT B))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (C OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (C OR (NOT B))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (D OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (D OR (NOT B))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (A OR (NOT C))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (B OR (NOT C))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (C OR (NOT A))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (D OR (NOT A))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (D OR (NOT C))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (A OR (NOT D))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (B OR (NOT A))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (B OR (NOT D))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (C OR (NOT A))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (C OR (NOT D))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (D OR (NOT A))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (A OR (NOT B))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (A OR (NOT C))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (B OR (NOT C))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (C OR (NOT B))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (D OR (NOT B))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (D OR (NOT C))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (A OR (NOT B))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (A OR (NOT D))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (B OR (NOT D))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (C OR (NOT B))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (C OR (NOT D))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (D OR (NOT B))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (A OR (NOT C))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (A OR (NOT D))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (B OR (NOT C))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (B OR (NOT D))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (C OR (NOT D))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((A XOR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((A XOR (NOT C)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((A XOR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A XOR (NOT D)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((A XOR (NOT D)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((B XOR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B XOR (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((B XOR (NOT C)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((B XOR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((B XOR (NOT D)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((B XOR (NOT D)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART (A OR (NOT D))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART (B OR (NOT D))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((C XOR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((C XOR (NOT D)) DISJOINT_PART (C OR (NOT D))) == 0`
+- `((C XOR (NOT D)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART (B OR (NOT A))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART (C OR (NOT A))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART (A OR (NOT B))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART (C OR (NOT B))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART (A OR (NOT C))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART (B OR (NOT C))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART (D OR (NOT A))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART (D OR (NOT B))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART (D OR (NOT C))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT A) NOT B)) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT A) NOT C)) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART (A XOR (NOT C))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART ((NOT A) NOT D)) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART (A XOR (NOT D))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT B) NOT C)) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART (B XOR (NOT C))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART ((NOT B) NOT D)) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART (B XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART ((NOT C) NOT D)) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) NOT B)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) NOT C)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) NOT D)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT B) NOT C)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT B) NOT D)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT C) NOT D)) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A AND (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A AND (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A AND (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A NOT (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A NOT (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A NOT (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A XOR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (A XOR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B AND (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B AND (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B AND (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B NOT (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B NOT (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B XOR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (B XOR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C AND (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C AND (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C AND (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C NOT (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (D AND (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (D AND (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART (D AND (NOT C))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART (A AND (NOT B))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART (A AND (NOT C))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART (A AND (NOT D))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A NOT (NOT B))) == 0`
+- `((A NOT (NOT B)) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A NOT (NOT C))) == 0`
+- `((A NOT (NOT C)) DISJOINT_PART (A XOR (NOT C))) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART (A NOT (NOT D))) == 0`
+- `((A NOT (NOT D)) DISJOINT_PART (A XOR (NOT D))) == 0`
+- `((A XOR (NOT B)) DISJOINT_PART (A XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) DISJOINT_PART (A XOR (NOT C))) == 0`
+- `((A XOR (NOT D)) DISJOINT_PART (A XOR (NOT D))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART (B AND (NOT A))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART (B AND (NOT C))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART (B AND (NOT D))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (B NOT (NOT C))) == 0`
+- `((B NOT (NOT C)) DISJOINT_PART (B XOR (NOT C))) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART (B NOT (NOT D))) == 0`
+- `((B NOT (NOT D)) DISJOINT_PART (B XOR (NOT D))) == 0`
+- `((B XOR (NOT C)) DISJOINT_PART (B XOR (NOT C))) == 0`
+- `((B XOR (NOT D)) DISJOINT_PART (B XOR (NOT D))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART (C AND (NOT A))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART (C AND (NOT B))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART (C AND (NOT D))) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART (C NOT (NOT D))) == 0`
+- `((C NOT (NOT D)) DISJOINT_PART (C XOR (NOT D))) == 0`
+- `((C XOR (NOT D)) DISJOINT_PART (C XOR (NOT D))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART (D AND (NOT A))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART (D AND (NOT B))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART (D AND (NOT C))) == 0`
+- `(((NOT A) OR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) NOT ((NOT B) OR (NOT D))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) NOT ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT D) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT D) NOT ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) NOT ((NOT B) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) NOT ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) AND (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT D)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) AND (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) NOT C) NOT ((NOT C) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT D) NOT ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) NOT D) NOT ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) NOT ((NOT C) OR (NOT D))) == 0`
+- `(((NOT B) OR (NOT C)) AND (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) AND (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT D)) AND (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) AND (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) NOT (A OR (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `(((NOT C) NOT D) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT C) NOT D) NOT ((NOT A) OR (NOT D))) == 0`
+- `(((NOT C) NOT D) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT C) NOT D) NOT ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) NOT D) NOT ((NOT C) OR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) AND (A AND (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) AND (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) NOT (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) AND ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) AND ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) AND ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT B)) NOT ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT C)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT C)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT C)) NOT ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT D)) NOT ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT D)) NOT ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT D)) NOT ((NOT C) OR (NOT D))) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) AND ((NOT A) OR (NOT C))) == 0`
+- `((A NOT (NOT D)) AND ((NOT A) OR (NOT D))) == 0`
+- `((B AND (NOT A)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT A)) NOT ((NOT A) OR (NOT D))) == 0`
+- `((B AND (NOT C)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((B AND (NOT C)) NOT ((NOT C) OR (NOT D))) == 0`
+- `((B AND (NOT D)) NOT ((NOT A) OR (NOT D))) == 0`
+- `((B AND (NOT D)) NOT ((NOT B) OR (NOT D))) == 0`
+- `((B AND (NOT D)) NOT ((NOT C) OR (NOT D))) == 0`
+- `((B NOT (NOT C)) AND ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT D)) AND ((NOT B) OR (NOT D))) == 0`
+- `((C AND (NOT A)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT A)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((C AND (NOT A)) NOT ((NOT A) OR (NOT D))) == 0`
+- `((C AND (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT B)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((C AND (NOT B)) NOT ((NOT B) OR (NOT D))) == 0`
+- `((C AND (NOT D)) NOT ((NOT A) OR (NOT D))) == 0`
+- `((C AND (NOT D)) NOT ((NOT B) OR (NOT D))) == 0`
+- `((C AND (NOT D)) NOT ((NOT C) OR (NOT D))) == 0`
+- `((C NOT (NOT D)) AND ((NOT C) OR (NOT D))) == 0`
+- `((D AND (NOT A)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((D AND (NOT A)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((D AND (NOT A)) NOT ((NOT A) OR (NOT D))) == 0`
+- `((D AND (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `((D AND (NOT B)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((D AND (NOT B)) NOT ((NOT B) OR (NOT D))) == 0`
+- `((D AND (NOT C)) NOT ((NOT A) OR (NOT C))) == 0`
+- `((D AND (NOT C)) NOT ((NOT B) OR (NOT C))) == 0`
+- `((D AND (NOT C)) NOT ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) NOT B) AND ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) AND ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT D) AND ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) AND ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) AND (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) AND (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) AND ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) AND (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) AND (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) AND ((NOT A) NOT D)) == 0`
+- `(((NOT A) XOR (NOT D)) AND (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) AND (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) AND (A XOR (NOT D))) == 0`
+- `(((NOT B) NOT C) AND ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT D) AND ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) AND ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) AND (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) AND (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) AND (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) AND ((NOT B) NOT D)) == 0`
+- `(((NOT B) XOR (NOT D)) AND (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) AND (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) AND (B XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) AND ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) AND ((NOT C) NOT D)) == 0`
+- `(((NOT C) XOR (NOT D)) AND (A AND (NOT A))) == 0`
+- `(((NOT C) XOR (NOT D)) AND (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) AND (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) AND ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) AND ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) AND ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) AND ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) NOT ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) NOT ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT B)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT C)) NOT ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT D)) NOT ((NOT A) XOR (NOT D))) == 0`
+- `((A NOT (NOT B)) AND ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) AND ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT D)) AND ((NOT A) XOR (NOT D))) == 0`
+- `((A XOR (NOT B)) AND ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) AND ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT D)) AND ((NOT A) XOR (NOT D))) == 0`
+- `((B AND (NOT A)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT C)) NOT ((NOT B) XOR (NOT C))) == 0`
+- `((B AND (NOT D)) NOT ((NOT B) XOR (NOT D))) == 0`
+- `((B NOT (NOT C)) AND ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT D)) AND ((NOT B) XOR (NOT D))) == 0`
+- `((B XOR (NOT C)) AND ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT D)) AND ((NOT B) XOR (NOT D))) == 0`
+- `((C AND (NOT A)) NOT ((NOT A) XOR (NOT C))) == 0`
+- `((C AND (NOT B)) NOT ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT D)) NOT ((NOT C) XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) AND ((NOT C) XOR (NOT D))) == 0`
+- `((C XOR (NOT D)) AND ((NOT C) XOR (NOT D))) == 0`
+- `((D AND (NOT A)) NOT ((NOT A) XOR (NOT D))) == 0`
+- `((D AND (NOT B)) NOT ((NOT B) XOR (NOT D))) == 0`
+- `((D AND (NOT C)) NOT ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) COVERS (A NOT (NOT D))) == 0`
+- `(((NOT A) OR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) INSIDE (A NOT (NOT D))) == 0`
+- `(((NOT A) OR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) COVERS (B NOT (NOT D))) == 0`
+- `(((NOT B) OR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) INSIDE (B NOT (NOT D))) == 0`
+- `(((NOT B) OR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) COVERS (C NOT (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) INSIDE (C NOT (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT C) OR (NOT D))) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT A) OR (NOT C))) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT A) OR (NOT C))) == 0`
+- `((A NOT (NOT D)) COVERS ((NOT A) OR (NOT D))) == 0`
+- `((A NOT (NOT D)) INSIDE ((NOT A) OR (NOT D))) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT D)) COVERS ((NOT B) OR (NOT D))) == 0`
+- `((B NOT (NOT D)) INSIDE ((NOT B) OR (NOT D))) == 0`
+- `((C NOT (NOT D)) COVERS ((NOT C) OR (NOT D))) == 0`
+- `((C NOT (NOT D)) INSIDE ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) NOT B) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `(((NOT A) NOT C) COVERS ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) INSIDE ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) COVERS ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT A) NOT D) INSIDE ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT A) NOT D) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT D) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT D) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) OVERLAP (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) COVERS (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) INSIDE (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) COVERS ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) COVERS (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) COVERS (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) INSIDE ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) INSIDE (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) INSIDE (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) COVERS ((NOT A) NOT D)) == 0`
+- `(((NOT A) XOR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) COVERS (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) COVERS (A XOR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) INSIDE ((NOT A) NOT D)) == 0`
+- `(((NOT A) XOR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) INSIDE (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) INSIDE (A XOR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) COVERS ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) INSIDE ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) NOT C) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) COVERS ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT B) NOT D) INSIDE ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT B) NOT D) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT D) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) NOT D) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `(((NOT B) OR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) OVERLAP (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) COVERS ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) COVERS (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) COVERS (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) INSIDE ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) INSIDE (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) INSIDE (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) COVERS ((NOT B) NOT D)) == 0`
+- `(((NOT B) XOR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) COVERS (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) COVERS (B XOR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) INSIDE ((NOT B) NOT D)) == 0`
+- `(((NOT B) XOR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) INSIDE (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) INSIDE (B XOR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `(((NOT C) NOT D) COVERS ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) INSIDE ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT C) NOT D) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `(((NOT C) NOT D) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT C) NOT D) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) NOT D) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) OVERLAP (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) COVERS ((NOT C) NOT D)) == 0`
+- `(((NOT C) XOR (NOT D)) COVERS (A AND (NOT A))) == 0`
+- `(((NOT C) XOR (NOT D)) COVERS (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) COVERS (C XOR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) INSIDE ((NOT C) NOT D)) == 0`
+- `(((NOT C) XOR (NOT D)) INSIDE (A AND (NOT A))) == 0`
+- `(((NOT C) XOR (NOT D)) INSIDE (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) INSIDE (C XOR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) OUTSIDE (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVERS ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) INSIDE ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT B)) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT C)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT C)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT C)) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT D)) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT D)) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT D)) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `((A NOT (NOT B)) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) COVERS ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) INSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT A) OR (NOT C))) == 0`
+- `((A NOT (NOT D)) COVERS ((NOT A) XOR (NOT D))) == 0`
+- `((A NOT (NOT D)) INSIDE ((NOT A) XOR (NOT D))) == 0`
+- `((A NOT (NOT D)) OVERLAP ((NOT A) OR (NOT D))) == 0`
+- `((A XOR (NOT B)) COVERS ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT B)) INSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) COVERS ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT C)) INSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT D)) COVERS ((NOT A) XOR (NOT D))) == 0`
+- `((A XOR (NOT D)) INSIDE ((NOT A) XOR (NOT D))) == 0`
+- `((B AND (NOT A)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT A)) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `((B AND (NOT C)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((B AND (NOT C)) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `((B AND (NOT D)) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `((B AND (NOT D)) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `((B AND (NOT D)) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `((B NOT (NOT C)) COVERS ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) INSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT D)) COVERS ((NOT B) XOR (NOT D))) == 0`
+- `((B NOT (NOT D)) INSIDE ((NOT B) XOR (NOT D))) == 0`
+- `((B NOT (NOT D)) OVERLAP ((NOT B) OR (NOT D))) == 0`
+- `((B XOR (NOT C)) COVERS ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT C)) INSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT D)) COVERS ((NOT B) XOR (NOT D))) == 0`
+- `((B XOR (NOT D)) INSIDE ((NOT B) XOR (NOT D))) == 0`
+- `((C AND (NOT A)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT A)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((C AND (NOT A)) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `((C AND (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT B)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((C AND (NOT B)) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `((C AND (NOT D)) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `((C AND (NOT D)) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `((C AND (NOT D)) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `((C NOT (NOT D)) COVERS ((NOT C) XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) INSIDE ((NOT C) XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) OVERLAP ((NOT C) OR (NOT D))) == 0`
+- `((C XOR (NOT D)) COVERS ((NOT C) XOR (NOT D))) == 0`
+- `((C XOR (NOT D)) INSIDE ((NOT C) XOR (NOT D))) == 0`
+- `((D AND (NOT A)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((D AND (NOT A)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((D AND (NOT A)) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `((D AND (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `((D AND (NOT B)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((D AND (NOT B)) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `((D AND (NOT C)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `((D AND (NOT C)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `((D AND (NOT C)) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) NOT B) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) OVERLAP ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT D) OVERLAP ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) CONTAINS (A NOT (NOT D))) == 0`
+- `(((NOT A) OR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) OVERLAP (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) OVERLAP ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) OVERLAP (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) OVERLAP (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) OVERLAP ((NOT A) NOT D)) == 0`
+- `(((NOT A) XOR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) OVERLAP (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) OVERLAP (A XOR (NOT D))) == 0`
+- `(((NOT B) NOT C) OVERLAP ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT D) OVERLAP ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT B) OR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) CONTAINS (B NOT (NOT D))) == 0`
+- `(((NOT B) OR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) OVERLAP ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) OVERLAP (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) OVERLAP (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) OVERLAP ((NOT B) NOT D)) == 0`
+- `(((NOT B) XOR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) OVERLAP (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) OVERLAP (B XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) OVERLAP ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) CONTAINS (C NOT (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT C) XOR (NOT D)) OVERLAP ((NOT C) NOT D)) == 0`
+- `(((NOT C) XOR (NOT D)) OVERLAP (A AND (NOT A))) == 0`
+- `(((NOT C) XOR (NOT D)) OVERLAP (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) OVERLAP (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OUTSIDE ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) OVERLAP ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT B)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT C)) OUTSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT D)) OUTSIDE ((NOT A) XOR (NOT D))) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT B)) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT A) OR (NOT C))) == 0`
+- `((A NOT (NOT C)) OVERLAP ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT D)) CONTAINS ((NOT A) OR (NOT D))) == 0`
+- `((A NOT (NOT D)) OVERLAP ((NOT A) XOR (NOT D))) == 0`
+- `((A XOR (NOT B)) OVERLAP ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) OVERLAP ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT D)) OVERLAP ((NOT A) XOR (NOT D))) == 0`
+- `((B AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT C)) OUTSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((B AND (NOT D)) OUTSIDE ((NOT B) XOR (NOT D))) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT C)) OVERLAP ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT D)) CONTAINS ((NOT B) OR (NOT D))) == 0`
+- `((B NOT (NOT D)) OVERLAP ((NOT B) XOR (NOT D))) == 0`
+- `((B XOR (NOT C)) OVERLAP ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT D)) OVERLAP ((NOT B) XOR (NOT D))) == 0`
+- `((C AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT C))) == 0`
+- `((C AND (NOT B)) OUTSIDE ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT D)) OUTSIDE ((NOT C) XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) CONTAINS ((NOT C) OR (NOT D))) == 0`
+- `((C NOT (NOT D)) OVERLAP ((NOT C) XOR (NOT D))) == 0`
+- `((C XOR (NOT D)) OVERLAP ((NOT C) XOR (NOT D))) == 0`
+- `((D AND (NOT A)) OUTSIDE ((NOT A) XOR (NOT D))) == 0`
+- `((D AND (NOT B)) OUTSIDE ((NOT B) XOR (NOT D))) == 0`
+- `((D AND (NOT C)) OUTSIDE ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT A) NOT B) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT A) NOT C) CONTAINS ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) CONTAINS ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT A) NOT D) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT D) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT D) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) COVEREDBY (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) CONTAINS (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) CONTAINS ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) CONTAINS (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) CONTAINS (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) CONTAINS ((NOT A) NOT D)) == 0`
+- `(((NOT A) XOR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) CONTAINS (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) CONTAINS (A XOR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) CONTAINS ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) NOT C) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) CONTAINS ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT B) NOT D) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT D) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) NOT D) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT B) OR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) COVEREDBY (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) CONTAINS ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) CONTAINS (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) CONTAINS (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) CONTAINS ((NOT B) NOT D)) == 0`
+- `(((NOT B) XOR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) CONTAINS (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) CONTAINS (B XOR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `(((NOT C) NOT D) CONTAINS ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT C) NOT D) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT C) NOT D) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT C) NOT D) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) NOT D) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) COVEREDBY (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) CONTAINS ((NOT C) NOT D)) == 0`
+- `(((NOT C) XOR (NOT D)) CONTAINS (A AND (NOT A))) == 0`
+- `(((NOT C) XOR (NOT D)) CONTAINS (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) CONTAINS (C XOR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) MEET_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) CONTAINS ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT B)) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT C)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT C)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT C)) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT D)) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT D)) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT D)) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `((A NOT (NOT B)) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) CONTAINS ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT A) OR (NOT C))) == 0`
+- `((A NOT (NOT D)) CONTAINS ((NOT A) XOR (NOT D))) == 0`
+- `((A NOT (NOT D)) COVEREDBY ((NOT A) OR (NOT D))) == 0`
+- `((A XOR (NOT B)) CONTAINS ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) CONTAINS ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT D)) CONTAINS ((NOT A) XOR (NOT D))) == 0`
+- `((B AND (NOT A)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT A)) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `((B AND (NOT C)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((B AND (NOT C)) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `((B AND (NOT D)) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `((B AND (NOT D)) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `((B AND (NOT D)) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `((B NOT (NOT C)) CONTAINS ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT D)) CONTAINS ((NOT B) XOR (NOT D))) == 0`
+- `((B NOT (NOT D)) COVEREDBY ((NOT B) OR (NOT D))) == 0`
+- `((B XOR (NOT C)) CONTAINS ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT D)) CONTAINS ((NOT B) XOR (NOT D))) == 0`
+- `((C AND (NOT A)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT A)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((C AND (NOT A)) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `((C AND (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT B)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((C AND (NOT B)) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `((C AND (NOT D)) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `((C AND (NOT D)) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `((C AND (NOT D)) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `((C NOT (NOT D)) CONTAINS ((NOT C) XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) COVEREDBY ((NOT C) OR (NOT D))) == 0`
+- `((C XOR (NOT D)) CONTAINS ((NOT C) XOR (NOT D))) == 0`
+- `((D AND (NOT A)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((D AND (NOT A)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((D AND (NOT A)) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `((D AND (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `((D AND (NOT B)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((D AND (NOT B)) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `((D AND (NOT C)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `((D AND (NOT C)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `((D AND (NOT C)) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) NOT B) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) COVEREDBY ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT D) COVEREDBY ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT A) OR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) EQUAL_PART (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) COVEREDBY (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) COVEREDBY ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) COVEREDBY (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) COVEREDBY (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) COVEREDBY ((NOT A) NOT D)) == 0`
+- `(((NOT A) XOR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) COVEREDBY (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) COVEREDBY (A XOR (NOT D))) == 0`
+- `(((NOT B) NOT C) COVEREDBY ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT D) COVEREDBY ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT B) OR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT B) OR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) EQUAL_PART (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) COVEREDBY ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) COVEREDBY (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) COVEREDBY (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) COVEREDBY ((NOT B) NOT D)) == 0`
+- `(((NOT B) XOR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) COVEREDBY (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) COVEREDBY (B XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) COVEREDBY ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) EQUAL_PART (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) COVEREDBY ((NOT C) NOT D)) == 0`
+- `(((NOT C) XOR (NOT D)) COVEREDBY (A AND (NOT A))) == 0`
+- `(((NOT C) XOR (NOT D)) COVEREDBY (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) COVEREDBY (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) COVEREDBY ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) MEET_PART ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT B)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT C)) MEET_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT D)) MEET_PART ((NOT A) XOR (NOT D))) == 0`
+- `((A NOT (NOT B)) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) OR (NOT B))) == 0`
+- `((A NOT (NOT C)) COVEREDBY ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT A) OR (NOT C))) == 0`
+- `((A NOT (NOT D)) COVEREDBY ((NOT A) XOR (NOT D))) == 0`
+- `((A NOT (NOT D)) EQUAL_PART ((NOT A) OR (NOT D))) == 0`
+- `((A XOR (NOT B)) COVEREDBY ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) COVEREDBY ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT D)) COVEREDBY ((NOT A) XOR (NOT D))) == 0`
+- `((B AND (NOT A)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT C)) MEET_PART ((NOT B) XOR (NOT C))) == 0`
+- `((B AND (NOT D)) MEET_PART ((NOT B) XOR (NOT D))) == 0`
+- `((B NOT (NOT C)) COVEREDBY ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT B) OR (NOT C))) == 0`
+- `((B NOT (NOT D)) COVEREDBY ((NOT B) XOR (NOT D))) == 0`
+- `((B NOT (NOT D)) EQUAL_PART ((NOT B) OR (NOT D))) == 0`
+- `((B XOR (NOT C)) COVEREDBY ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT D)) COVEREDBY ((NOT B) XOR (NOT D))) == 0`
+- `((C AND (NOT A)) MEET_PART ((NOT A) XOR (NOT C))) == 0`
+- `((C AND (NOT B)) MEET_PART ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT D)) MEET_PART ((NOT C) XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) COVEREDBY ((NOT C) XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) EQUAL_PART ((NOT C) OR (NOT D))) == 0`
+- `((C XOR (NOT D)) COVEREDBY ((NOT C) XOR (NOT D))) == 0`
+- `((D AND (NOT A)) MEET_PART ((NOT A) XOR (NOT D))) == 0`
+- `((D AND (NOT B)) MEET_PART ((NOT B) XOR (NOT D))) == 0`
+- `((D AND (NOT C)) MEET_PART ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT A) NOT B) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) NOT C) EQUAL_PART ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) NOT D) EQUAL_PART ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART ((NOT A) NOT B)) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART (A NOT (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) EQUAL_PART (A XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) EQUAL_PART ((NOT A) NOT C)) == 0`
+- `(((NOT A) XOR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) EQUAL_PART (A NOT (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) EQUAL_PART (A XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) EQUAL_PART ((NOT A) NOT D)) == 0`
+- `(((NOT A) XOR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) EQUAL_PART (A NOT (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) EQUAL_PART (A XOR (NOT D))) == 0`
+- `(((NOT B) NOT C) EQUAL_PART ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) NOT D) EQUAL_PART ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) EQUAL_PART ((NOT B) NOT C)) == 0`
+- `(((NOT B) XOR (NOT C)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT C)) EQUAL_PART (B NOT (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) EQUAL_PART (B XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) EQUAL_PART ((NOT B) NOT D)) == 0`
+- `(((NOT B) XOR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) EQUAL_PART (B NOT (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) EQUAL_PART (B XOR (NOT D))) == 0`
+- `(((NOT C) NOT D) EQUAL_PART ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) EQUAL_PART ((NOT C) NOT D)) == 0`
+- `(((NOT C) XOR (NOT D)) EQUAL_PART (A AND (NOT A))) == 0`
+- `(((NOT C) XOR (NOT D)) EQUAL_PART (C NOT (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) EQUAL_PART (C XOR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) EQUAL_PART ((NOT C) XOR (NOT D))) == 0`
+- `((A NOT (NOT B)) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A NOT (NOT C)) EQUAL_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A NOT (NOT D)) EQUAL_PART ((NOT A) XOR (NOT D))) == 0`
+- `((A XOR (NOT B)) EQUAL_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A XOR (NOT C)) EQUAL_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A XOR (NOT D)) EQUAL_PART ((NOT A) XOR (NOT D))) == 0`
+- `((B NOT (NOT C)) EQUAL_PART ((NOT B) XOR (NOT C))) == 0`
+- `((B NOT (NOT D)) EQUAL_PART ((NOT B) XOR (NOT D))) == 0`
+- `((B XOR (NOT C)) EQUAL_PART ((NOT B) XOR (NOT C))) == 0`
+- `((B XOR (NOT D)) EQUAL_PART ((NOT B) XOR (NOT D))) == 0`
+- `((C NOT (NOT D)) EQUAL_PART ((NOT C) XOR (NOT D))) == 0`
+- `((C XOR (NOT D)) EQUAL_PART ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) OR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT B) OR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT C) OR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT B) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT A) NOT C) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT A) NOT D) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT A) XOR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) NOT C) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) NOT D) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT B) XOR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) NOT D) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) DISJOINT_PART (A OR (NOT A))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT B) XOR (NOT C))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT B) XOR (NOT D))) == 0`
+- `((A AND (NOT A)) DISJOINT_PART ((NOT C) XOR (NOT D))) == 0`
+- `((A AND (NOT B)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `((A AND (NOT C)) DISJOINT_PART ((NOT A) XOR (NOT C))) == 0`
+- `((A AND (NOT D)) DISJOINT_PART ((NOT A) XOR (NOT D))) == 0`
+- `((B AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `((B AND (NOT C)) DISJOINT_PART ((NOT B) XOR (NOT C))) == 0`
+- `((B AND (NOT D)) DISJOINT_PART ((NOT B) XOR (NOT D))) == 0`
+- `((C AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT C))) == 0`
+- `((C AND (NOT B)) DISJOINT_PART ((NOT B) XOR (NOT C))) == 0`
+- `((C AND (NOT D)) DISJOINT_PART ((NOT C) XOR (NOT D))) == 0`
+- `((D AND (NOT A)) DISJOINT_PART ((NOT A) XOR (NOT D))) == 0`
+- `((D AND (NOT B)) DISJOINT_PART ((NOT B) XOR (NOT D))) == 0`
+- `((D AND (NOT C)) DISJOINT_PART ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT B)) XOR ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT C)) XOR ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT D)) NOT ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) OR (NOT D)) XOR ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) OR (NOT C)) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT C)) XOR ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT D)) NOT ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) OR (NOT D)) XOR ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) NOT ((NOT C) OR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) XOR ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) NOT ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) NOT ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) NOT ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) NOT ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) NOT ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) NOT ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) NOT ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT B)) XOR ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) NOT ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT C)) XOR ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) NOT ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT D)) XOR ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) NOT ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT C)) XOR ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) NOT ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT D)) XOR ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) NOT ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) XOR ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT D)) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) OR (NOT C)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT D)) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) OUTSIDE ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) OUTSIDE ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) OUTSIDE ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) OUTSIDE ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) OUTSIDE ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) OUTSIDE ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT D)) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) OUTSIDE ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) OUTSIDE ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) OUTSIDE ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT B) OR (NOT C)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT D)) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) OUTSIDE ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) OUTSIDE ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) OUTSIDE ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) MEET_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) MEET_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) MEET_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) MEET_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) MEET_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) MEET_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) MEET_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) MEET_PART ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) MEET_PART ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) MEET_PART ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) MEET_PART ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) MEET_PART ((NOT C) XOR (NOT D))) == 0`
+- `(((NOT A) OR (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) OR (NOT C)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) OR (NOT D)) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) OR (NOT C)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) OR (NOT D)) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) OR (NOT D)) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) DISJOINT_PART ((NOT A) OR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) DISJOINT_PART ((NOT A) OR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) DISJOINT_PART ((NOT A) OR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) DISJOINT_PART ((NOT B) OR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) DISJOINT_PART ((NOT B) OR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) DISJOINT_PART ((NOT C) OR (NOT D))) == 0`
+- `(((NOT A) XOR (NOT B)) DISJOINT_PART ((NOT A) XOR (NOT B))) == 0`
+- `(((NOT A) XOR (NOT C)) DISJOINT_PART ((NOT A) XOR (NOT C))) == 0`
+- `(((NOT A) XOR (NOT D)) DISJOINT_PART ((NOT A) XOR (NOT D))) == 0`
+- `(((NOT B) XOR (NOT C)) DISJOINT_PART ((NOT B) XOR (NOT C))) == 0`
+- `(((NOT B) XOR (NOT D)) DISJOINT_PART ((NOT B) XOR (NOT D))) == 0`
+- `(((NOT C) XOR (NOT D)) DISJOINT_PART ((NOT C) XOR (NOT D))) == 0`

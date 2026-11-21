@@ -886,7 +886,7 @@ contains
                            ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
                         end do
                         call CalculateGROWLayer( rhs1_layer, lhs_layer, ivar(1:4) )
-                     case ('SHRINK') !> SHRINK is morphological dilation (per spec): supports 4-directional args like GROW
+                     case ('SHRINK') !> SHRINK: morphological erosion/inset. Supports 4-directional args (E N W S) or single value.
                         if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) &
                              error stop "SHRINK must use nothing as second layer"
                         rvar = 0.0_real64
@@ -898,15 +898,24 @@ contains
                         do i=1,4
                            ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
                         end do
-                        call CalculateGROWLayer( rhs1_layer, lhs_layer, ivar(1:4) )
+                        if( ivar(1)==ivar(2) .and. ivar(2)==ivar(3) .and. ivar(3)==ivar(4) ) then
+                           call CalculateSHRINKLayer( rhs1_layer, ivar(1), lhs_layer )
+                        else
+                           call CalculateSHRINKDirectional( rhs1_layer, lhs_layer, ivar(1:4) )
+                        end if
                      case ('SIZE')
                         if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) &
                              error stop "SIZE must use nothing as second layer"
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1)
                         !write(*,*) 'Found PRIMARY_OPERATOR = SIZE ', rvar(1)
                         ivar(1) = int( rvar(1)*used_precision, kind=K_COORDINATE_KIND )
-                        call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, &
-                             K_BOOST_CONTROL_SIZE, int( ivar(1), kind=int64 ) )
+                        if( associated(rhs2_layer) ) then
+                           call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, &
+                                K_BOOST_CONTROL_SIZE, int( ivar(1), kind=int64 ) )
+                        else
+                           call CalculateBoostOperation( rhs1_layer, rhs1_layer, lhs_layer, &
+                                K_BOOST_CONTROL_SIZE, int( ivar(1), kind=int64 ) )
+                        end if
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case ('WORMHOLE')
                         write(*,*) 'Found PRIMARY_OPERATOR = WORMHOLE'

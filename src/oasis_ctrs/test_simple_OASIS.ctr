@@ -1,0 +1,12 @@
+# Repurposed from test_simple.ctr: KLBIN/MAG design references replaced with OASIS files from /scratch1/skoranne/DESIGNS/
+program test_simple
+systeminfo
+var temporary_layers 2
+decl design d1_input = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW_FLAT.oas
+decl memory d1 = nothing
+decl memory t1 = nothing
+info
+exec init t1:nothing
+exec run d1:poly = d1_input:poly COPY nothing
+exec run t1:poly_1 = d1:poly GROW t1:nothing 0.001 0.001 0.001 0.001
+end

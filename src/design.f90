@@ -26,7 +26,7 @@ module DesignModule
        get_equal_key_segments, GetSortPermutation, calculate_union_area_by_polygon, &
        PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
        CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, &
-       CalculateGROWLayer, CalculateSHRINKLayer, CreateGRID, CreateEXTENT,&
+       CalculateGROWLayer, CalculateSHRINKLayer, CalculateSHRINKDirectional, CreateGRID, CreateEXTENT,&
        RemoveIdentical, CalculateOverlapCount, ClearLayer, AssignFromBox, CopyLayer,&
        CalculateFrameNOT, CalculateBoostOperation, FilterLayer, push_box, FinalizeLayer,&
        DeleteDesign, SaveLayerToSnap, RestoreSnapToLayer, RestoreSnapToDLayer, BuildTree, PerformOperation,&
@@ -256,6 +256,12 @@ module DesignModule
        type(Layer), intent(inout)   :: output_layer
        integer(kind=K_COORDINATE_KIND), intent(in) :: shrink_value
      end subroutine CalculateSHRINKLayer
+
+     module subroutine CalculateSHRINKDirectional( input_layer, output_layer, ivar )
+       type(Layer), intent(in) :: input_layer
+       type(Layer), intent(inout) :: output_layer
+       integer(kind=K_COORDINATE_KIND), intent(in) :: ivar(4)
+     end subroutine CalculateSHRINKDirectional
 
      module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
        type(Layer), intent(inout) :: input_layer_A
@@ -990,6 +996,10 @@ contains
          input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
          !input_layer%n_used = output_box_count
        end block
+       if( input_layer%n_used == 0 ) then
+          input_layer%layerState = 31
+          return
+       end if
     end if
 #else
     if( NeedsHealing( input_layer ) ) then
@@ -1002,6 +1012,10 @@ contains
          input_layer%layerState = LAYER_STATE_HEAL !> we wipe everything else
          input_layer%n_used = output_box_count
        end block
+       if( input_layer%n_used == 0 ) then
+          input_layer%layerState = 31
+          return
+       end if
     end if
 #endif
     if( NeedsSorting( input_layer ) ) then

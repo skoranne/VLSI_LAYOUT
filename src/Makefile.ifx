@@ -40,6 +40,10 @@ endif
 ifeq ($(PROFILE),1)
    FCFLAGS += -pg
 endif
+ifeq ($(COVERAGE),1)
+   FCFLAGS += -fprofile-instr-generate -fcoverage-mapping
+   LDFLAGS += -fprofile-instr-generate -fcoverage-mapping
+endif
 
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables (override LDFLAGS/LDLIBS for local machine) ---
