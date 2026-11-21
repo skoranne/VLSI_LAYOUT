@@ -176,6 +176,20 @@ function iterate_boxes(lf::LayoutFile)
     return boxes
 end
 
+function iterate_boxes_flat(lf::LayoutFile)
+    lf.handle == C_NULL && error("Layout file is closed")
+    boxes = BoxElem[]
+    cb = @cfunction(_box_cb, Cvoid, (Ptr{Cvoid}, Cstring, Cint, Cint, Cint, Int64, Int64, Int64, Int64))
+    GC.@preserve boxes begin
+        libpath()
+        rc = ccall((:ldb_iterate_boxes_flat, LIB_PATH), Cint,
+            (LdbFilePtr, Ptr{Cvoid}, Ptr{Cvoid}),
+            lf.handle, cb, pointer_from_objref(boxes))
+        rc != 0 && error("ldb_iterate_boxes_flat failed")
+    end
+    return boxes
+end
+
 # --- Cell/layer extent iteration ---
 
 function _cell_layer_cb(ud::Ptr{Cvoid}, cell::Cstring, layer::Cint, datatype::Cint, ext::LdbExtent)::Cvoid

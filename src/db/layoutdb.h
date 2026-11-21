@@ -43,6 +43,8 @@ int ldb_extent_by_cell_layer(ldb_file_t* f, ldb_cell_layer_cb cb, void* ud);
 typedef void (*ldb_box_cb)(void* ud, const char* cell, int layer, int datatype, int element_kind,
                            int64_t x1, int64_t y1, int64_t x2, int64_t y2);
 int ldb_iterate_boxes(ldb_file_t* f, ldb_box_cb cb, void* ud);
+/* Iterate geometry as boxes with hierarchy flattened (SREF/AREF expanded). */
+int ldb_iterate_boxes_flat(ldb_file_t* f, ldb_box_cb cb, void* ud);
 /* 3) print cell hierarchy to FILE* as text */
 int ldb_print_hierarchy(ldb_file_t* f, void* out_fp);
 /* 4) print property name table */

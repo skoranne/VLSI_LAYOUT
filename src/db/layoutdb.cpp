@@ -8,6 +8,8 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -329,6 +331,112 @@ extern "C" int ldb_iterate_boxes(ldb_file_t* fh, ldb_box_cb cb, void* ud){
             // low-memory/compressed view: disk-access/on-demand decode
             auto decoded = load_boxes_on_demand(c);
             for(auto& b: decoded){ cb(ud, c.name.c_str(), b.layer, b.datatype, b.kind, b.x1,b.y1,b.x2,b.y2); }
+        }
+    }
+    return 0;
+}
+
+static inline void ldb_xform_point(const LdbTransform& t, int64_t col, int64_t row,
+                                   int64_t x, int64_t y, int64_t& ox, int64_t& oy){
+    double px = (double)x, py = (double)y;
+    if(t.mirror_x) py = -py;
+    double ang = t.angle_deg * M_PI / 180.0;
+    double ca = std::cos(ang), sa = std::sin(ang);
+    double rx = ca*px - sa*py;
+    double ry = sa*px + ca*py;
+    rx *= t.mag; ry *= t.mag;
+    rx += (double)t.ox + (double)col * (double)t.dx + (double)row * (double)t.row_dx;
+    ry += (double)t.oy + (double)col * (double)t.dy + (double)row * (double)t.row_dy;
+    ox = (int64_t)std::llround(rx);
+    oy = (int64_t)std::llround(ry);
+}
+
+extern "C" int ldb_iterate_boxes_flat(ldb_file_t* fh, ldb_box_cb cb, void* ud){
+    auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
+    std::function<void(size_t,const char*,int64_t,int64_t,double,double,int,bool,
+                       int64_t,int64_t,int64_t,int64_t,int,std::set<size_t>&)> emit;
+    // Simplified: expand with accumulated transform by recursive walk
+    std::function<void(size_t,const LdbTransform&,const char*,std::set<size_t>&)> walk;
+    walk = [&](size_t ci, const LdbTransform& acc, const char* top_cell, std::set<size_t>& stack){
+        if(ci >= f->cells.size()) return;
+        if(stack.count(ci)) return; // cycle guard
+        stack.insert(ci);
+        auto& c = f->cells[ci];
+        // emit local boxes transformed by acc
+        auto emit_boxes = [&](const std::vector<LdbBoxElem>& bs){
+            for(const auto& b: bs){
+                // transform all 4 corners to get bbox
+                int64_t xs[4], ys[4];
+                ldb_xform_point(acc,0,0,b.x1,b.y1,xs[0],ys[0]);
+                ldb_xform_point(acc,0,0,b.x2,b.y1,xs[1],ys[1]);
+                ldb_xform_point(acc,0,0,b.x2,b.y2,xs[2],ys[2]);
+                ldb_xform_point(acc,0,0,b.x1,b.y2,xs[3],ys[3]);
+                int64_t x1=xs[0],x2=xs[0],y1=ys[0],y2=ys[0];
+                for(int k=1;k<4;k++){ if(xs[k]<x1)x1=xs[k]; if(xs[k]>x2)x2=xs[k]; if(ys[k]<y1)y1=ys[k]; if(ys[k]>y2)y2=ys[k]; }
+                cb(ud, top_cell, b.layer, b.datatype, b.kind, x1,y1,x2,y2);
+            }
+        };
+        if(!c.boxes.empty()) emit_boxes(c.boxes);
+        else if(!c.boxes_compact.empty() || c.boxes_on_disk) emit_boxes(load_boxes_on_demand(c));
+        // recurse into instances
+        for(const auto& inst: c.instances){
+            auto it = f->cell_index.find(inst.ref_name);
+            if(it == f->cell_index.end()) continue;
+            for(int64_t row=0; row<inst.tr.rows; row++){
+                for(int64_t col=0; col<inst.tr.cols; col++){
+                    // compose acc then inst.tr at (col,row)
+                    LdbTransform t2;
+                    // point p in child -> inst.tr applied at col,row -> acc applied at 0,0
+                    // We do it by transforming child points through inst.tr(col,row) then acc(0,0).
+                    // So create a combined transform by emitting via wrapper: easier to just build combined.
+                    // Combined: mirror/rot/mag of inst then translate, then acc.
+                    double px0=0,py0=0;
+                    // compose as: apply inst (with col,row offset) then acc
+                    // We'll compute combined by transforming a test basis; simpler: create lambda.
+                    LdbTransform comb = acc;
+                    // compute combined origin: inst origin at col,row transformed by acc
+                    int64_t iox,ioy;
+                    ldb_xform_point(inst.tr,col,row,0,0,iox,ioy);
+                    ldb_xform_point(acc,0,0,iox,ioy,comb.ox,comb.oy);
+                    // combined mag/angle/mirror: approximate for general case
+                    comb.mag = acc.mag * inst.tr.mag;
+                    bool acc_m = acc.mirror_x!=0;
+                    bool inst_m = inst.tr.mirror_x!=0;
+                    comb.mirror_x = (acc_m ^ inst_m) ? 1 : 0;
+                    comb.angle_deg = acc.angle_deg + (acc.mirror_x ? -inst.tr.angle_deg : inst.tr.angle_deg);
+                    comb.cols=1; comb.rows=1; comb.dx=0; comb.dy=0; comb.row_dx=0; comb.row_dy=0;
+                    walk(it->second, comb, top_cell, stack);
+                }
+            }
+        }
+        stack.erase(ci);
+    };
+    // flatten from each top-level cell? or from all cells; better flatten all, emitting as top cell name
+    // But iterate_boxes gives local boxes with their cell name. For flat, emit with root cell context.
+    // Simple: walk every cell as root with identity transform.
+    LdbTransform id; id.mag=1.0; id.angle_deg=0; id.mirror_x=0; id.ox=0; id.oy=0; id.cols=1; id.rows=1;
+    for(size_t ci=0; ci<f->cells.size(); ci++){
+        std::set<size_t> stack;
+        // emit only local boxes of this cell? No, flat should include descendants.
+        // We want all geometry flattened. Emit once per top cell? Better: emit each cell's flattened content labeled with that cell.
+        // But that duplicates geometry. Alternatively, only emit top cells (not referenced).
+        // Find top cells: not in any refs.
+        bool referenced=false;
+        for(auto& c2: f->cells){ if(c2.refs.count(f->cells[ci].name)) { referenced=true; break; } }
+        if(referenced) continue;
+        walk(ci, id, f->cells[ci].name.c_str(), stack);
+    }
+    // If no top cells found, fall back to all
+    bool any=false;
+    for(size_t ci=0; ci<f->cells.size(); ci++){
+        bool referenced=false;
+        for(auto& c2: f->cells){ if(c2.refs.count(f->cells[ci].name)) { referenced=true; break; } }
+        if(!referenced) { any=true; break; }
+    }
+    if(!any){
+        for(size_t ci=0; ci<f->cells.size(); ci++){
+            std::set<size_t> stack;
+            walk(ci, id, f->cells[ci].name.c_str(), stack);
         }
     }
     return 0;

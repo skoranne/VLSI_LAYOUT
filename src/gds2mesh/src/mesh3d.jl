@@ -16,7 +16,9 @@ Physical volumes are created per layer name.
 """
 function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDef}, outpath::String;
                               opts::MeshOptions=MeshOptions(), air_margin::Float64=0.0,
-                              air_box::Union{NTuple{6,Float64},Nothing}=nothing)
+                              air_box::Union{NTuple{6,Float64},Nothing}=nothing,
+                              absorbing_surfaces::Bool=false,
+                              pec_volume_names::Vector{String}=String[])
     grouped = collect_layer_boxes(boxes, layer_defs)
     dbu = opts.dbu
     us = opts.unit_scale
@@ -192,6 +194,89 @@ function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDe
                 tag_list = join(tags, ", ")
                 println(io, @sprintf("Physical Volume(%d) = {%s}; // %s", phy_tag, tag_list, ld.name))
                 phy_tag += 1
+            end
+        end
+
+        # Optional Palace physical surface tagging
+        if absorbing_surfaces || !isempty(pec_volume_names)
+            println(io, "")
+            println(io, "// Physical surface tagging (Palace)")
+            # collect all boundary surfaces
+            println(io, "allSurfs() = {};" )
+            # use all volumes
+            println(io, "allVolsList() = {};")
+            if length(all_vol_tags) > 1
+                println(io, "allVolsList() += v();")
+            else
+                if air_tag > 0
+                    println(io, @sprintf("allVolsList() += {%d};", air_tag))
+                end
+                for ld in layer_defs
+                    tags = get(layer_vol_tags, ld.name, Int[])
+                    isempty(tags) && continue
+                    println(io, @sprintf("allVolsList() += {%s};", join(tags, ", ")))
+                end
+            end
+            println(io, "For i In {0:#allVolsList()-1}")
+            println(io, "  allSurfs() += Boundary{ Volume{allVolsList(i)}; };")
+            println(io, "EndFor")
+            println(io, "absbSurfs() = {};")
+            println(io, "pecSurfs() = {};")
+            surf_eps = 1e-6 * us
+            println(io, @sprintf("seps = %.10g;", surf_eps))
+            # outer boundary -> absorbing
+            if absorbing_surfaces
+                # compute model bounds in model units
+                if !isfinite(gxmin)
+                    gxmin2,gymin2,gzmin2,gxmax2,gymax2,gzmax2 = 0.0,0.0,0.0,0.0,0.0,0.0
+                else
+                    gxmin2,gymin2,gzmin2 = gxmin,gymin,gzmin
+                    gxmax2,gymax2,gzmax2 = gxmax,gymax,gzmax
+                end
+                am = air_margin > 0 ? air_margin : 0.0
+                println(io, @sprintf("bxmin=%.10g; bxmax=%.10g; bymin=%.10g; bymax=%.10g; bzmin=%.10g; bzmax=%.10g;", (gxmin2-am)*us, (gxmax2+am)*us, (gymin2-am)*us, (gymax2+am)*us, (gzmin2-am)*us, (gzmax2+am)*us))
+                println(io, "For i In {0:#allSurfs()-1}")
+                println(io, "  ss = Abs(allSurfs(i));")
+                println(io, "  bb() = BoundingBox Surface{ss};")
+                println(io, "  onOuter = (bb(0) < bxmin+seps || bb(3) > bxmax-seps || bb(1) < bymin+seps || bb(4) > bymax-seps || bb(2) < bzmin+seps || bb(5) > bzmax-seps);")
+                println(io, "  If (onOuter) absbSurfs() += {ss}; EndIf")
+                println(io, "EndFor")
+                println(io, "If (#absbSurfs() > 0)")
+                println(io, @sprintf("  Physical Surface(%d) = {absbSurfs()}; // absorbing", phy_tag))
+                println(io, "EndIf")
+                phy_tag += 1
+            end
+            # PEC from named volumes
+            if !isempty(pec_volume_names)
+                for pname in pec_volume_names
+                    safe = replace(replace(pname, "\"" => ""), r"[^A-Za-z0-9_]" => "_")
+                    println(io, @sprintf("pecS_%s() = {};", safe))
+                    if length(all_vol_tags) > 1
+                        # after fragment, find volumes by zc matching layer
+                        ld_match = findfirst(ld -> ld.name == pname, layer_defs)
+                        if ld_match !== nothing
+                            ld = layer_defs[ld_match]
+                            println(io, "For i In {0:#v()-1}")
+                            println(io, "  bb() = BoundingBox Volume{v(i)};")
+                            println(io, "  zc = (bb(2)+bb(5))/2;")
+                            println(io, @sprintf("  If (zc >= %.10g-seps && zc <= %.10g+seps)", ld.zmin*us, ld.zmax*us))
+                            println(io, "    pecS_$(safe)() += Boundary{ Volume{v(i)}; };")
+                            println(io, "  EndIf")
+                            println(io, "EndFor")
+                        end
+                    else
+                        tags = get(layer_vol_tags, pname, Int[])
+                        if !isempty(tags)
+                            println(io, @sprintf("For k In {%s}", join(tags, ",")))
+                            println(io, "  pecS_$(safe)() += Boundary{ Volume{k}; };")
+                            println(io, "EndFor")
+                        end
+                    end
+                    println(io, @sprintf("If (#pecS_%s() > 0)", safe))
+                    println(io, @sprintf("  Physical Surface(%d) = {pecS_%s()}; // pec:%s", phy_tag, safe, pname))
+                    println(io, "EndIf")
+                    phy_tag += 1
+                end
             end
         end
 

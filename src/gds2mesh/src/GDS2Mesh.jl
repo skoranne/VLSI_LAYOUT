@@ -40,7 +40,7 @@ module GDS2Mesh
 using Printf
 
 export LayoutDB, LayoutFile, BoxElem, CellLayerExtent, Property, LdbExtent
-export open_layout, close_layout, get_boxes, get_extent, get_layers
+export open_layout, close_layout, get_boxes, get_boxes_flat, get_extent, get_layers
 export LayerDef, MeshOptions
 export write_geo_2d, write_geo_2d_simple, write_geo_3d_extrude
 export mesh2d, mesh3d, run_gmsh
@@ -50,7 +50,7 @@ include("layoutdb.jl")
 using .LayoutDB: LayoutFile, BoxElem, CellLayerExtent, Property, LdbExtent,
                  LDB_OPEN_DEFAULT, LDB_OPEN_STRICT, LDB_OPEN_PROPERTY, LDB_OPEN_LOW_MEMORY,
                  libpath, format_name, memory_bytes, extent_whole,
-                 iterate_boxes, extent_by_cell_layer, iterate_properties,
+                 iterate_boxes, iterate_boxes_flat, extent_by_cell_layer, iterate_properties,
                  print_hierarchy, layer_datatypes, filter_boxes, close_layout
 
 include("mesh2d.jl")
@@ -78,6 +78,16 @@ function get_boxes(lf::LayoutFile)
 end
 
 """
+    get_boxes_flat(lf::LayoutFile)
+
+Iterate all box elements with hierarchy flattened (SREF/AREF expanded).
+Returns `Vector{BoxElem}`.
+"""
+function get_boxes_flat(lf::LayoutFile)
+    return iterate_boxes_flat(lf)
+end
+
+"""
     get_extent(lf::LayoutFile)
 
 Get the whole-file extent. Returns `LdbExtent`.
@@ -98,14 +108,15 @@ end
 
 """
     mesh2d(lf::LayoutFile, layer_defs::Vector{LayerDef}, outpath::String;
-           opts::MeshOptions=MeshOptions(), simple::Bool=true)
+           opts::MeshOptions=MeshOptions(), simple::Bool=true, flatten::Bool=false)
 
 Generate a 2D Gmsh .geo file from a layout file.
 If `simple=true` (default), uses direct rectangle creation (no BooleanFragments).
+If `flatten=true`, expands SREF/AREF hierarchy before meshing.
 """
 function mesh2d(lf::LayoutFile, layer_defs::Vector{LayerDef}, outpath::String;
-                opts::MeshOptions=MeshOptions(), simple::Bool=true)
-    boxes = get_boxes(lf)
+                opts::MeshOptions=MeshOptions(), simple::Bool=true, flatten::Bool=false)
+    boxes = flatten ? get_boxes_flat(lf) : get_boxes(lf)
     if simple
         return write_geo_2d_simple(boxes, layer_defs, outpath; opts=opts)
     else
@@ -116,16 +127,19 @@ end
 """
     mesh3d(lf::LayoutFile, layer_defs::Vector{LayerDef}, outpath::String;
            opts::MeshOptions=MeshOptions(), air_margin::Float64=0.0,
-           air_box=nothing)
+           air_box=nothing, flatten::Bool=false)
 
 Generate a 3D extruded Gmsh .geo file from a layout file.
+If `flatten=true`, expands SREF/AREF hierarchy before meshing.
 """
 function mesh3d(lf::LayoutFile, layer_defs::Vector{LayerDef}, outpath::String;
                 opts::MeshOptions=MeshOptions(), air_margin::Float64=0.0,
-                air_box::Union{NTuple{6,Float64},Nothing}=nothing)
-    boxes = get_boxes(lf)
+                air_box::Union{NTuple{6,Float64},Nothing}=nothing, flatten::Bool=false,
+                absorbing_surfaces::Bool=false, pec_volume_names::Vector{String}=String[])
+    boxes = flatten ? get_boxes_flat(lf) : get_boxes(lf)
     return write_geo_3d_extrude(boxes, layer_defs, outpath; opts=opts,
-                                air_margin=air_margin, air_box=air_box)
+                                air_margin=air_margin, air_box=air_box,
+                                absorbing_surfaces=absorbing_surfaces, pec_volume_names=pec_volume_names)
 end
 
 """
