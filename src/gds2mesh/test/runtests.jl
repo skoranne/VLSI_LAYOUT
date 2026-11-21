@@ -202,4 +202,24 @@ end
         @test xs[1] == 0
         @test xs[2] == 20
     end
+
+    @testset "Polygon iteration API" begin
+        gds = find_test_gds()
+        if gds !== nothing
+            lf = open_layout(gds)
+            try
+                polys = get_polygons(lf)
+                @test length(polys) >= 0
+                if !isempty(polys)
+                    p = polys[1]
+                    @test length(p.xs) == length(p.ys)
+                    @test length(p.xs) >= 3
+                end
+                pflat = get_polygons_flat(lf)
+                @test length(pflat) >= 0
+            finally
+                close(lf)
+            end
+        end
+    end
 end
