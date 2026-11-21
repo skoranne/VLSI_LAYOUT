@@ -621,7 +621,7 @@ contains
        output_layer%layerState = LAYER_STATE_NONE
        output_layer%layer_boxes = input_layer%layer_boxes
        output_layer%n_used = input_layer%n_used
-       call box_grow_directional(output_layer%layer_boxes, ivar(1), ivar(2), ivar(3), ivar(4) )
+       call box_grow_directional(output_layer%layer_boxes(1:output_layer%n_used), ivar(1), ivar(2), ivar(3), ivar(4) )
        output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_SORT )
        call BuildTree( output_layer )
        call MergeHealLayer( output_layer )
