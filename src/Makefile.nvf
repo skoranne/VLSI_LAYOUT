@@ -4,9 +4,19 @@
 # ml /opt/nvidia/hpc_sdk/modulefiles/nvhpc-hpcx-cuda13/26.1
 ################################################################################
 
+# --- Auto-detect NVIDIA HPC SDK & CUDA toolchains ---
+UNAME_M := $(shell uname -m)
+NVHPC_ROOT ?= /opt/nvidia/hpc_sdk
+NVHPC_BIN := $(shell if command -v nvfortran >/dev/null 2>&1; then dirname "$$(command -v nvfortran)"; else ls -d $(NVHPC_ROOT)/Linux_$(UNAME_M)/[0-9][0-9].[0-9]*/compilers/bin $(NVHPC_ROOT)/Linux_$(UNAME_M)/20*/compilers/bin 2>/dev/null | sort -V | tail -n 1; fi)
+NVHPC_CUDA_BIN := $(shell if [ -n "$(NVHPC_BIN)" ] && [ -d "$(NVHPC_BIN)/../../cuda/bin" ]; then cd "$(NVHPC_BIN)/../../cuda/bin" && pwd; elif [ -d /usr/local/cuda/bin ]; then echo /usr/local/cuda/bin; fi)
+ifneq ($(NVHPC_BIN),)
+export PATH := $(NVHPC_BIN):$(NVHPC_CUDA_BIN):/usr/local/cuda/bin:$(PATH)
+endif
+
 # --- Compiler & Flags ---
-HDF5_FC=nvfortran
-FORTRAN_COMPILER =nvfortran
+HDF5_FC ?= $(if $(NVHPC_BIN),$(NVHPC_BIN)/nvfortran,nvfortran)
+FORTRAN_COMPILER ?= $(if $(NVHPC_BIN),$(NVHPC_BIN)/nvfortran,nvfortran)
+NVCC ?= $(if $(wildcard $(NVHPC_CUDA_BIN)/nvcc),$(NVHPC_CUDA_BIN)/nvcc,nvcc)
 # Debug flags (commented out, but easily swappable)
 # FCFLAGS = -check bounds -check all -traceback -O3 -parallel -qopenmp -qopt-report=3 -xHost 
 # Use -pg
@@ -41,7 +51,7 @@ LIBRARY = libmagparser.a
 include DEPENDENCIES.txt
 #skiplist_module.o
 box_codec.o:	box_codec.f90
-	nvfortran -Mpreprocess -c -O1 -g -cuda box_codec.f90
+	$(FORTRAN_COMPILER) -Mpreprocess -c -O1 -g -cuda box_codec.f90
 
 # Create a list of all object files that will be compiled
 ALL_OBJS = $(LIB_OBJS) mainmagparser.o test_contour.o
@@ -118,9 +128,9 @@ snappy_api.o:	       snappy_api.cpp
 boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost boost_polygon_api.cpp -c
 event_sorter.o:	       event_sorter.cu
-		       nvcc -arch=sm_121 -DUSE_GPU -O3 -c event_sorter.cu
+		       $(NVCC) -arch=sm_121 -DUSE_GPU -O3 -c event_sorter.cu
 gpu_morton.o:   gpu_morton.cu
-		       nvcc -arch=sm_121 -DUSE_GPU -O3 -c gpu_morton.cu
+		       $(NVCC) -arch=sm_121 -DUSE_GPU -O3 -c gpu_morton.cu
 # Nsight Systems profiling for nvfortran+OpenMP target offload (GB10). Example:
 #   make -f Makefile.nvf profile CTR=check_interactions.ctr LAYERS=10
 #   make -f Makefile.nvf profile-delayed NSYS_DELAY=30 NSYS_DUR=60 CTR=check_interactions.ctr LAYERS=10
