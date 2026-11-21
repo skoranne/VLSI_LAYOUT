@@ -1,0 +1,25 @@
+# This file is machine-generated - editing it directly is not advised
+
+julia_version = "1.13.4"
+manifest_format = "2.1"
+project_hash = "0d3505223e5c3fba0455aaad827902c3010ecdf0"
+
+[[deps.Dates]]
+deps = ["Printf"]
+uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
+version = "1.11.0"
+
+[[deps.GDS2Mesh]]
+deps = ["Dates", "Printf"]
+path = "."
+uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+version = "0.1.0"
+
+[[deps.Printf]]
+deps = ["Unicode"]
+uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+version = "1.11.0"
+
+[[deps.Unicode]]
+uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
+version = "1.11.0"
