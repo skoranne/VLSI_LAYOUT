@@ -17,6 +17,13 @@ struct LdbBoxElem {
     int64_t x1=0,y1=0,x2=0,y2=0;
 };
 
+struct LdbPoint { int64_t x=0, y=0; };
+
+struct LdbPolyElem {
+    int layer=0, datatype=0, kind=0; // kind: 0=boundary/polygon,1=path,2=box/rect
+    std::vector<LdbPoint> pts; // vertices in DBU, may be closed or open per source
+};
+
 struct LdbTransform {
     int64_t ox=0, oy=0;      // origin/translation
     double mag=1.0;
@@ -48,6 +55,7 @@ struct LdbCell {
     std::vector<uint8_t> boxes_compact; // delta+varint entropy-encoded box stream
     std::string boxes_spill_path;       // low-memory mode: disk-backed compact box storage
     bool boxes_on_disk = false;
+    std::vector<LdbPolyElem> polys; // polygon/path vertices (local), optional
     std::vector<LdbInstance> instances; // hierarchical placements (repeated layout preserved)
     std::vector<LdbProperty> properties;
 };

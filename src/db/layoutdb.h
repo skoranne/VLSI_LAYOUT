@@ -45,6 +45,14 @@ typedef void (*ldb_box_cb)(void* ud, const char* cell, int layer, int datatype, 
 int ldb_iterate_boxes(ldb_file_t* f, ldb_box_cb cb, void* ud);
 /* Iterate geometry as boxes with hierarchy flattened (SREF/AREF expanded). */
 int ldb_iterate_boxes_flat(ldb_file_t* f, ldb_box_cb cb, void* ud);
+
+/* Iterate geometry as polygons with explicit vertices (DBU coordinates).
+   xs/ys have npts entries. For bbox-only elements, a 4-point closed rectangle is emitted.
+   element_kind: 0=boundary/polygon,1=path,2=box/rect */
+typedef void (*ldb_poly_cb)(void* ud, const char* cell, int layer, int datatype, int element_kind,
+                            int npts, const int64_t* xs, const int64_t* ys);
+int ldb_iterate_polygons(ldb_file_t* f, ldb_poly_cb cb, void* ud);
+int ldb_iterate_polygons_flat(ldb_file_t* f, ldb_poly_cb cb, void* ud);
 /* 3) print cell hierarchy to FILE* as text */
 int ldb_print_hierarchy(ldb_file_t* f, void* out_fp);
 /* 4) print property name table */

@@ -441,3 +441,90 @@ extern "C" int ldb_iterate_boxes_flat(ldb_file_t* fh, ldb_box_cb cb, void* ud){
     }
     return 0;
 }
+
+static void ldb_emit_poly_as_rect(ldb_poly_cb cb, void* ud, const char* cell,
+                                  int layer,int datatype,int kind,
+                                  int64_t x1,int64_t y1,int64_t x2,int64_t y2){
+    int64_t xs[4]={x1,x2,x2,x1};
+    int64_t ys[4]={y1,y1,y2,y2};
+    cb(ud, cell, layer, datatype, kind, 4, xs, ys);
+}
+
+extern "C" int ldb_iterate_polygons(ldb_file_t* fh, ldb_poly_cb cb, void* ud){
+    auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
+    for(auto& c: f->cells){
+        if(!c.polys.empty()){
+            for(auto& p: c.polys){
+                if(p.pts.empty()) continue;
+                std::vector<int64_t> xs, ys;
+                xs.reserve(p.pts.size()); ys.reserve(p.pts.size());
+                for(auto& pt: p.pts){ xs.push_back(pt.x); ys.push_back(pt.y); }
+                cb(ud, c.name.c_str(), p.layer, p.datatype, p.kind, (int)xs.size(), xs.data(), ys.data());
+            }
+        } else if(!c.boxes.empty()){
+            for(auto& b: c.boxes){ ldb_emit_poly_as_rect(cb,ud,c.name.c_str(),b.layer,b.datatype,b.kind,b.x1,b.y1,b.x2,b.y2); }
+        } else if(!c.boxes_compact.empty() || c.boxes_on_disk){
+            auto decoded = load_boxes_on_demand(c);
+            for(auto& b: decoded){ ldb_emit_poly_as_rect(cb,ud,c.name.c_str(),b.layer,b.datatype,b.kind,b.x1,b.y1,b.x2,b.y2); }
+        }
+    }
+    return 0;
+}
+
+extern "C" int ldb_iterate_polygons_flat(ldb_file_t* fh, ldb_poly_cb cb, void* ud){
+    auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
+    std::function<void(size_t,const LdbTransform&,const char*,std::set<size_t>&)> walk;
+    walk = [&](size_t ci, const LdbTransform& acc, const char* top_cell, std::set<size_t>& stack){
+        if(ci >= f->cells.size()) return;
+        if(stack.count(ci)) return;
+        stack.insert(ci);
+        auto& c = f->cells[ci];
+        auto emit_poly_pts = [&](int layer,int datatype,int kind,const std::vector<LdbPoint>& pts){
+            std::vector<int64_t> xs(pts.size()), ys(pts.size());
+            for(size_t i=0;i<pts.size();i++) ldb_xform_point(acc,0,0,pts[i].x,pts[i].y,xs[i],ys[i]);
+            cb(ud, top_cell, layer, datatype, kind, (int)xs.size(), xs.data(), ys.data());
+        };
+        auto emit_box = [&](const LdbBoxElem& b){
+            LdbPoint p1{b.x1,b.y1}, p2{b.x2,b.y1}, p3{b.x2,b.y2}, p4{b.x1,b.y2};
+            std::vector<LdbPoint> pts={p1,p2,p3,p4};
+            emit_poly_pts(b.layer,b.datatype,b.kind,pts);
+        };
+        if(!c.polys.empty()){
+            for(auto& p: c.polys) emit_poly_pts(p.layer,p.datatype,p.kind,p.pts);
+        } else if(!c.boxes.empty()){
+            for(auto& b: c.boxes) emit_box(b);
+        } else if(!c.boxes_compact.empty() || c.boxes_on_disk){
+            auto decoded = load_boxes_on_demand(c);
+            for(auto& b: decoded) emit_box(b);
+        }
+        for(const auto& inst: c.instances){
+            auto it = f->cell_index.find(inst.ref_name);
+            if(it == f->cell_index.end()) continue;
+            for(int64_t row=0; row<inst.tr.rows; row++){
+                for(int64_t col=0; col<inst.tr.cols; col++){
+                    LdbTransform comb = acc;
+                    int64_t iox,ioy;
+                    ldb_xform_point(inst.tr,col,row,0,0,iox,ioy);
+                    ldb_xform_point(acc,0,0,iox,ioy,comb.ox,comb.oy);
+                    comb.mag = acc.mag * inst.tr.mag;
+                    bool acc_m = acc.mirror_x!=0;
+                    bool inst_m = inst.tr.mirror_x!=0;
+                    comb.mirror_x = (acc_m ^ inst_m) ? 1 : 0;
+                    comb.angle_deg = acc.angle_deg + (acc.mirror_x ? -inst.tr.angle_deg : inst.tr.angle_deg);
+                    comb.cols=1; comb.rows=1; comb.dx=0; comb.dy=0; comb.row_dx=0; comb.row_dy=0;
+                    walk(it->second, comb, top_cell, stack);
+                }
+            }
+        }
+        stack.erase(ci);
+    };
+    LdbTransform id; id.mag=1.0; id.angle_deg=0; id.mirror_x=0; id.ox=0; id.oy=0; id.cols=1; id.rows=1;
+    bool any=false;
+    for(size_t ci=0; ci<f->cells.size(); ci++){
+        bool referenced=false;
+        for(auto& c2: f->cells){ if(c2.refs.count(f->cells[ci].name)) { referenced=true; break; } }
+        if(!referenced){ any=true; std::set<size_t> st; walk(ci,id,f->cells[ci].name.c_str(),st); }
+    }
+    if(!any){ for(size_t ci=0; ci<f->cells.size(); ci++){ std::set<size_t> st; walk(ci,id,f->cells[ci].name.c_str(),st); } }
+    return 0;
+}

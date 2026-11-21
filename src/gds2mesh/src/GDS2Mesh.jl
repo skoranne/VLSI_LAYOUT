@@ -39,10 +39,10 @@ module GDS2Mesh
 
 using Printf
 
-export LayoutDB, LayoutFile, BoxElem, CellLayerExtent, Property, LdbExtent
-export open_layout, close_layout, get_boxes, get_boxes_flat, get_extent, get_layers
-export LayerDef, MeshOptions
-export write_geo_2d, write_geo_2d_simple, write_geo_3d_extrude
+export LayoutDB, LayoutFile, BoxElem, PolyElem, CellLayerExtent, Property, LdbExtent
+export open_layout, close_layout, get_boxes, get_boxes_flat, get_polygons, get_polygons_flat, get_extent, get_layers
+export LayerDef, MeshOptions, PolygonElem
+export write_geo_2d, write_geo_2d_simple, write_geo_2d_polygons, write_geo_3d_extrude
 export mesh2d, mesh3d, run_gmsh
 export layer_datatypes, filter_boxes, merge_overlapping_boxes
 
@@ -50,7 +50,7 @@ include("layoutdb.jl")
 using .LayoutDB: LayoutFile, BoxElem, CellLayerExtent, Property, LdbExtent,
                  LDB_OPEN_DEFAULT, LDB_OPEN_STRICT, LDB_OPEN_PROPERTY, LDB_OPEN_LOW_MEMORY,
                  libpath, format_name, memory_bytes, extent_whole,
-                 iterate_boxes, iterate_boxes_flat, extent_by_cell_layer, iterate_properties,
+                 iterate_boxes, iterate_boxes_flat, iterate_polygons, iterate_polygons_flat, extent_by_cell_layer, iterate_properties,
                  print_hierarchy, layer_datatypes, filter_boxes, close_layout
 
 include("mesh2d.jl")
@@ -86,6 +86,11 @@ Returns `Vector{BoxElem}`.
 function get_boxes_flat(lf::LayoutFile)
     return iterate_boxes_flat(lf)
 end
+
+"""Get polygon elements (explicit vertices when available, else bbox rectangles)."""
+get_polygons(lf::LayoutFile) = iterate_polygons(lf)
+"""Get flattened polygon elements with hierarchy expanded."""
+get_polygons_flat(lf::LayoutFile) = iterate_polygons_flat(lf)
 
 """
     get_extent(lf::LayoutFile)

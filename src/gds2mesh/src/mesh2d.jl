@@ -284,3 +284,81 @@ function write_geo_2d_simple(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDef
     opts.verbose && println("Wrote 2D Gmsh geometry: $outpath")
     return outpath
 end
+
+
+"""
+    PolygonElem
+
+Polygon element with explicit vertices in DBU coordinates.
+`points` is a vector of (x,y) tuples in database units.
+"""
+struct PolygonElem
+    cell::String
+    layer::Int
+    datatype::Int
+    points::Vector{Tuple{Int64,Int64}}
+end
+
+"""
+    write_geo_2d_polygons(polygons::Vector{PolygonElem}, layer_defs::Vector{LayerDef}, outpath::String;
+                          opts::MeshOptions=MeshOptions())
+
+Write 2D Gmsh .geo using explicit polygon vertices (preserves polygon shape).
+Falls back to bbox rectangle if polygon has < 3 points.
+"""
+function write_geo_2d_polygons(polygons::Vector{PolygonElem}, layer_defs::Vector{LayerDef}, outpath::String;
+                               opts::MeshOptions=MeshOptions())
+    dbu = opts.dbu
+    us = opts.unit_scale
+    io = open(outpath, "w")
+    try
+        println(io, "SetFactory(\"OpenCASCADE\");")
+        println(io, @sprintf("Mesh.CharacteristicLengthMin = %.6g;", opts.mesh_size_min * us))
+        println(io, @sprintf("Mesh.CharacteristicLengthMax = %.6g;", opts.mesh_size_max * us))
+        println(io, @sprintf("Mesh.Algorithm = %d;", opts.algorithm_2d))
+        println(io, @sprintf("// Model units: 1 meter = %.6g model-units", us))
+        println(io, "")
+        phy_tag = 1
+        pt_tag = 1
+        ln_tag = 1
+        ll_tag = 1
+        ps_tag = 1
+        for ld in layer_defs
+            surf_tags = Int[]
+            for p in polygons
+                if p.layer == ld.layer && (ld.datatype == -1 || p.datatype == ld.datatype)
+                    pts = p.points
+                    length(pts) < 3 && continue
+                    # close polygon if needed
+                    if pts[1] != pts[end]
+                        pts = vcat(pts, [pts[1]])
+                    end
+                    point_ids = Int[]
+                    for (x,y) in pts[1:end-1]
+                        println(io, @sprintf("Point(%d) = {%.10g, %.10g, 0, %.6g};", pt_tag, x*dbu*us, y*dbu*us, opts.mesh_size_max*us))
+                        push!(point_ids, pt_tag); pt_tag += 1
+                    end
+                    line_ids = Int[]
+                    n = length(point_ids)
+                    for i in 1:n
+                        j = i == n ? 1 : i+1
+                        println(io, @sprintf("Line(%d) = {%d, %d};", ln_tag, point_ids[i], point_ids[j]))
+                        push!(line_ids, ln_tag); ln_tag += 1
+                    end
+                    println(io, @sprintf("Curve Loop(%d) = {%s};", ll_tag, join(line_ids, ", ")))
+                    println(io, @sprintf("Plane Surface(%d) = {%d};", ps_tag, ll_tag))
+                    push!(surf_tags, ps_tag)
+                    ll_tag += 1; ps_tag += 1
+                end
+            end
+            if !isempty(surf_tags)
+                println(io, @sprintf("Physical Surface(%d) = {%s}; // %s", phy_tag, join(surf_tags, ", "), ld.name))
+                phy_tag += 1
+            end
+        end
+    finally
+        close(io)
+    end
+    opts.verbose && println("Wrote 2D polygon Gmsh geometry: $outpath")
+    return outpath
+end

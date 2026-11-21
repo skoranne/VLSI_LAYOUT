@@ -190,6 +190,51 @@ function iterate_boxes_flat(lf::LayoutFile)
     return boxes
 end
 
+struct PolyElem
+    cell::String
+    layer::Int
+    datatype::Int
+    kind::Int
+    xs::Vector{Int64}
+    ys::Vector{Int64}
+end
+
+function _poly_cb(ud::Ptr{Cvoid}, cell::Cstring, layer::Cint, datatype::Cint, kind::Cint,
+                  npts::Cint, xs::Ptr{Int64}, ys::Ptr{Int64})::Cvoid
+    ref = unsafe_pointer_to_objref(ud)::Vector{PolyElem}
+    n = Int(npts)
+    xv = Vector{Int64}(undef, n); yv = Vector{Int64}(undef, n)
+    for i in 1:n
+        xv[i] = unsafe_load(xs, i); yv[i] = unsafe_load(ys, i)
+    end
+    push!(ref, PolyElem(unsafe_string(cell), Int(layer), Int(datatype), Int(kind), xv, yv))
+    return nothing
+end
+
+function iterate_polygons(lf::LayoutFile)
+    lf.handle == C_NULL && error("Layout file is closed")
+    polys = PolyElem[]
+    cb = @cfunction(_poly_cb, Cvoid, (Ptr{Cvoid}, Cstring, Cint, Cint, Cint, Cint, Ptr{Int64}, Ptr{Int64}))
+    GC.@preserve polys begin
+        libpath()
+        rc = ccall((:ldb_iterate_polygons, LIB_PATH), Cint, (LdbFilePtr, Ptr{Cvoid}, Ptr{Cvoid}), lf.handle, cb, pointer_from_objref(polys))
+        rc != 0 && error("ldb_iterate_polygons failed")
+    end
+    return polys
+end
+
+function iterate_polygons_flat(lf::LayoutFile)
+    lf.handle == C_NULL && error("Layout file is closed")
+    polys = PolyElem[]
+    cb = @cfunction(_poly_cb, Cvoid, (Ptr{Cvoid}, Cstring, Cint, Cint, Cint, Cint, Ptr{Int64}, Ptr{Int64}))
+    GC.@preserve polys begin
+        libpath()
+        rc = ccall((:ldb_iterate_polygons_flat, LIB_PATH), Cint, (LdbFilePtr, Ptr{Cvoid}, Ptr{Cvoid}), lf.handle, cb, pointer_from_objref(polys))
+        rc != 0 && error("ldb_iterate_polygons_flat failed")
+    end
+    return polys
+end
+
 # --- Cell/layer extent iteration ---
 
 function _cell_layer_cb(ud::Ptr{Cvoid}, cell::Cstring, layer::Cint, datatype::Cint, ext::LdbExtent)::Cvoid

@@ -104,8 +104,16 @@ bool parse_gdsii(LdbFile* f) {
                     }
                 }
                 if(bvalid && (elem_type==0x08 || elem_type==0x09 || elem_type==0x2D || elem_type==0x0C || elem_type==0x0F)){
-                    LdbBoxElem be; be.layer=cur_layer; be.datatype=cur_dtype; be.kind=(elem_type==0x08)?0:(elem_type==0x09?1:2);
+                    int kind=(elem_type==0x08)?0:(elem_type==0x09?1:2);
+                    LdbBoxElem be; be.layer=cur_layer; be.datatype=cur_dtype; be.kind=kind;
                     be.x1=bx1; be.y1=by1; be.x2=bx2; be.y2=by2; cur->boxes.push_back(be);
+                    if(elem_type==0x08 || elem_type==0x09 || elem_type==0x2D){
+                        LdbPolyElem pe; pe.layer=cur_layer; pe.datatype=cur_dtype; pe.kind=kind;
+                        pe.pts.reserve(xypts.size());
+                        for(auto& pxy: xypts) pe.pts.push_back({pxy.first, pxy.second});
+                        // drop closing duplicate for storage consistency? keep as-is
+                        if(!pe.pts.empty()) cur->polys.push_back(std::move(pe));
+                    }
                 }
             }
         } else if (rtype==0x12 && dlen>0) { // SNAME
