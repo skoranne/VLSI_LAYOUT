@@ -158,6 +158,28 @@ end
                     run_gmsh(outgeo; dim=3, out=outmsh)
                     @test isfile(outmsh)
                     @test filesize(outmsh) > 0
+                    msh = read(outmsh, String)
+                    # Ensure physical volume groups were written (not all untagged)
+                    has_phys = occursin("\$PhysicalNames", msh) || occursin("PhysicalNames", msh)
+                    has_tagged_elems = occursin("\n4 ", msh) # tet elements present
+                    @test has_phys || has_tagged_elems
+                    # Verify at least some elements have nonzero physical tag
+                    phys_tags = Set{Int}()
+                    in_elems = false
+                    for ln in split(msh, '\n')
+                        if startswith(ln, "\$Elements"); in_elems=true; continue; end
+                        if startswith(ln, "\$EndElements"); break; end
+                        if in_elems
+                            p = split(ln)
+                            length(p) < 4 && continue
+                            et = tryparse(Int, p[2]); nt = tryparse(Int, p[3])
+                            (et===nothing || nt===nothing) && continue
+                            if nt > 0 && length(p) >= 3+nt
+                                ph = tryparse(Int, p[4]); ph!==nothing && push!(phys_tags, ph)
+                            end
+                        end
+                    end
+                    @test any(t -> t != 0, phys_tags)
                 end
             finally
                 rm(outgeo; force=true)

@@ -5,11 +5,13 @@
                          opts::MeshOptions=MeshOptions(), air_margin::Float64=0.0)
 
 Generate a Gmsh .geo file for 3D mesh by extruding 2D layout boxes.
-Each box on a layer is extruded from zmin to zmax (defined in LayerDef).
+Each box on a layer is extruded from zmin to zmax (defined in LayerDef, meters).
 
-If `air_margin > 0`, an air box surrounding the entire structure is added
-(margin in meters on each side).
+Geometry is written in model units scaled by `opts.unit_scale` (default 1e6 => microns)
+to avoid OpenCASCADE tolerance issues with meter-scale micron features. Set `opts.unit_scale=1.0`
+to write meters.
 
+If `air_margin > 0`, an air box surrounding the entire structure is added (meters).
 Physical volumes are created per layer name.
 """
 function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDef}, outpath::String;
@@ -17,6 +19,7 @@ function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDe
                               air_box::Union{NTuple{6,Float64},Nothing}=nothing)
     grouped = collect_layer_boxes(boxes, layer_defs)
     dbu = opts.dbu
+    us = opts.unit_scale
 
     if opts.merge_boxes
         for (k, v) in grouped
@@ -46,10 +49,11 @@ function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDe
         println(io, "SetFactory(\"OpenCASCADE\");")
         println(io, "")
         println(io, "// Mesh options")
-        println(io, @sprintf("Mesh.CharacteristicLengthMin = %.6g;", opts.mesh_size_min))
-        println(io, @sprintf("Mesh.CharacteristicLengthMax = %.6g;", opts.mesh_size_max))
+        println(io, @sprintf("Mesh.CharacteristicLengthMin = %.6g;", opts.mesh_size_min * us))
+        println(io, @sprintf("Mesh.CharacteristicLengthMax = %.6g;", opts.mesh_size_max * us))
         println(io, @sprintf("Mesh.Algorithm = %d;", opts.algorithm_2d))
         println(io, @sprintf("Mesh.Algorithm3D = %d;", opts.algorithm_3d))
+        println(io, @sprintf("// Model units: 1 meter = %.6g model-units", us))
         println(io, "")
 
         vol_tag = 1
@@ -58,20 +62,20 @@ function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDe
         # Air box (optional)
         air_tag = -1
         if air_box !== nothing
-            ax, ay, az, adx, ady, adz = air_box
+            ax, ay, az, adx, ady, adz = air_box .* us
             println(io, @sprintf("// Air box"))
             println(io, @sprintf("Box(%d) = {%.10g, %.10g, %.10g, %.10g, %.10g, %.10g};", vol_tag, ax, ay, az, adx, ady, adz))
             air_tag = vol_tag
             vol_tag += 1
             println(io, "")
         elseif air_margin > 0
-            ax = gxmin - air_margin
-            ay = gymin - air_margin
-            az = gzmin - air_margin
-            adx = (gxmax - gxmin) + 2 * air_margin
-            ady = (gymax - gymin) + 2 * air_margin
-            adz = (gzmax - gzmin) + 2 * air_margin
-            println(io, @sprintf("// Air box (margin=%.6g)", air_margin))
+            ax = (gxmin - air_margin) * us
+            ay = (gymin - air_margin) * us
+            az = (gzmin - air_margin) * us
+            adx = ((gxmax - gxmin) + 2 * air_margin) * us
+            ady = ((gymax - gymin) + 2 * air_margin) * us
+            adz = ((gzmax - gzmin) + 2 * air_margin) * us
+            println(io, @sprintf("// Air box (margin=%.6g m)", air_margin))
             println(io, @sprintf("Box(%d) = {%.10g, %.10g, %.10g, %.10g, %.10g, %.10g};", vol_tag, ax, ay, az, adx, ady, adz))
             air_tag = vol_tag
             vol_tag += 1
@@ -98,7 +102,7 @@ function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDe
                 h = y2 - y1
                 (w <= 0 || h <= 0) && continue
                 println(io, @sprintf("Box(%d) = {%.10g, %.10g, %.10g, %.10g, %.10g, %.10g};",
-                                     vol_tag, x1, y1, z0, w, h, dz))
+                                     vol_tag, x1*us, y1*us, z0*us, w*us, h*us, dz*us))
                 push!(tags, vol_tag)
                 vol_tag += 1
             end
@@ -127,17 +131,17 @@ function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDe
             # Strategy: use bounding box matching on the resulting volumes.
             # We'll generate Gmsh script that does this.
             println(io, "// Identify volumes by bounding box after fragmentation")
-            println(io, "eps = 1e-12;")
+            println(io, @sprintf("eps = %.6g;", 1e-9 * us))
 
             phy_tag = 1
             # Collect layer volume tags; anything not in a layer becomes air
-            println(io, "assigned[] = {};")
+            println(io, "assigned() = {};")
             # For each layer, find volumes inside the layer's z range
             for ld in layer_defs
                 tags = get(layer_vol_tags, ld.name, Int[])
                 isempty(tags) && continue
-                z0 = ld.zmin
-                z1 = ld.zmax
+                z0 = ld.zmin * us
+                z1 = ld.zmax * us
                 safe_name = replace(ld.name, "\"" => "")
                 lname = replace(safe_name, r"[^A-Za-z0-9_]" => "_")
                 println(io, @sprintf("layerVols_%s() = {};", lname))
@@ -146,7 +150,7 @@ function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDe
                 println(io, @sprintf("  zc = (bb(2) + bb(5)) / 2;"))
                 println(io, @sprintf("  If (zc >= %.10g - eps && zc <= %.10g + eps)", z0, z1))
                 println(io, @sprintf("    layerVols_%s() += {v(i)};", lname))
-                println(io, @sprintf("    assigned[] += {v(i)};"))
+                println(io, @sprintf("    assigned() += {v(i)};"))
                 println(io, @sprintf("  EndIf"))
                 println(io, @sprintf("EndFor"))
                 println(io, @sprintf("If (#layerVols_%s() > 0)", lname))
@@ -160,8 +164,8 @@ function write_geo_3d_extrude(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDe
                 println(io, "airVols() = {};")
                 println(io, "For i In {0 : #v()-1}")
                 println(io, "  found = 0;")
-                println(io, "  For j In {0 : #assigned[]-1}")
-                println(io, "    If (assigned[j] == v(i))")
+                println(io, "  For j In {0 : #assigned()-1}")
+                println(io, "    If (assigned(j) == v(i))")
                 println(io, "      found = 1;")
                 println(io, "    EndIf")
                 println(io, "  EndFor")

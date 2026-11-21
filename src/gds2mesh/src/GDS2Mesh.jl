@@ -145,12 +145,12 @@ function run_gmsh(geopath::String; dim::Int=3, out::String="", format::String="m
     append!(args, extra_args)
     opts = MeshOptions() # dummy, just for verbose check
     println("Running: ", join(args, " "))
-    cmd = ignorestatus(Cmd(args))
-    result = run(pipeline(cmd, stdout=stdout, stderr=stderr))
+    cmd = Cmd(args)
+    result = run(pipeline(ignorestatus(cmd), stdout=stdout, stderr=stderr))
     if !isfile(out) || filesize(out) == 0
         error("Gmsh failed (exit=$(result.exitcode)) and did not produce output: $out")
     elseif !success(result)
-        @warn "Gmsh exited with code $(result.exitcode) but produced output: $out"
+        error("Gmsh exited with code $(result.exitcode) while generating $out; refusing to accept possibly invalid mesh")
     end
     println("Mesh written: $out ($(filesize(out)) bytes)")
     return out

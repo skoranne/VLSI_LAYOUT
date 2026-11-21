@@ -26,6 +26,7 @@ LayerDef(layer::Int, name::String; datatype::Int=-1, zmin::Float64=0.0, zmax::Fl
 
 Options for mesh generation.
 - `dbu`: database unit in meters (e.g., 1e-9 for nm)
+- `unit_scale`: multiply meters by this factor for Gmsh model units (1e6 => microns, default)
 - `mesh_size_min`: minimum mesh element size (meters)
 - `mesh_size_max`: maximum mesh element size (meters)
 - `algorithm_2d`: Gmsh 2D algorithm (default 6 = Frontal-Delaunay)
@@ -35,6 +36,7 @@ Options for mesh generation.
 """
 Base.@kwdef struct MeshOptions
     dbu::Float64 = 1e-9           # database unit in meters
+    unit_scale::Float64 = 1e6     # model units per meter (1e6 = microns)
     mesh_size_min::Float64 = 0.1e-6
     mesh_size_max::Float64 = 5.0e-6
     algorithm_2d::Int = 6
@@ -134,6 +136,7 @@ function write_geo_2d(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDef}, outp
                       opts::MeshOptions=MeshOptions())
     grouped = collect_layer_boxes(boxes, layer_defs)
     dbu = opts.dbu
+    us = opts.unit_scale
 
     # Optionally merge boxes
     if opts.merge_boxes
@@ -149,9 +152,10 @@ function write_geo_2d(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDef}, outp
 
         # Define mesh sizes
         println(io, "// Mesh options")
-        println(io, @sprintf("Mesh.CharacteristicLengthMin = %.6g;", opts.mesh_size_min))
-        println(io, @sprintf("Mesh.CharacteristicLengthMax = %.6g;", opts.mesh_size_max))
+        println(io, @sprintf("Mesh.CharacteristicLengthMin = %.6g;", opts.mesh_size_min * us))
+        println(io, @sprintf("Mesh.CharacteristicLengthMax = %.6g;", opts.mesh_size_max * us))
         println(io, @sprintf("Mesh.Algorithm = %d;", opts.algorithm_2d))
+        println(io, @sprintf("// Model units: 1 meter = %.6g model-units", us))
         println(io, "")
 
         surface_tags = Dict{String, Vector{Int}}()
@@ -170,7 +174,7 @@ function write_geo_2d(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDef}, outp
                 if w <= 0 || h <= 0
                     continue
                 end
-                println(io, @sprintf("Rectangle(%d) = {%.10g, %.10g, 0, %.10g, %.10g};", tag, x1, y1, w, h))
+                println(io, @sprintf("Rectangle(%d) = {%.10g, %.10g, 0, %.10g, %.10g};", tag, x1*us, y1*us, w*us, h*us))
                 push!(tags, tag)
                 tag += 1
             end
@@ -232,6 +236,7 @@ function write_geo_2d_simple(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDef
                               opts::MeshOptions=MeshOptions())
     grouped = collect_layer_boxes(boxes, layer_defs)
     dbu = opts.dbu
+    us = opts.unit_scale
 
     if opts.merge_boxes
         for (k, v) in grouped
@@ -242,9 +247,10 @@ function write_geo_2d_simple(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDef
     io = open(outpath, "w")
     try
         println(io, "SetFactory(\"OpenCASCADE\");")
-        println(io, @sprintf("Mesh.CharacteristicLengthMin = %.6g;", opts.mesh_size_min))
-        println(io, @sprintf("Mesh.CharacteristicLengthMax = %.6g;", opts.mesh_size_max))
+        println(io, @sprintf("Mesh.CharacteristicLengthMin = %.6g;", opts.mesh_size_min * us))
+        println(io, @sprintf("Mesh.CharacteristicLengthMax = %.6g;", opts.mesh_size_max * us))
         println(io, @sprintf("Mesh.Algorithm = %d;", opts.algorithm_2d))
+        println(io, @sprintf("// Model units: 1 meter = %.6g model-units", us))
         println(io, "")
 
         phy_tag = 1
@@ -260,7 +266,7 @@ function write_geo_2d_simple(boxes::Vector{BoxElem}, layer_defs::Vector{LayerDef
                 w = x2 - x1
                 h = y2 - y1
                 (w <= 0 || h <= 0) && continue
-                println(io, @sprintf("Rectangle(%d) = {%.10g, %.10g, 0, %.10g, %.10g};", tag, x1, y1, w, h))
+                println(io, @sprintf("Rectangle(%d) = {%.10g, %.10g, 0, %.10g, %.10g};", tag, x1*us, y1*us, w*us, h*us))
                 push!(tags, tag)
                 tag += 1
             end
