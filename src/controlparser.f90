@@ -29,6 +29,7 @@ module ControlModule
   use SystemInformationModule
   use MagicVLSILayoutParser
   use LayoutDBLoaderModule
+  use TRSOptimizerModule
   use iso_fortran_env, only: int32, int64, real64
   implicit none
   public :: ParseControlFile, GetLayerFromDBName
@@ -212,15 +213,98 @@ contains
     real(kind=real64)  :: rvar(16)
     integer(kind=K_COORDINATE_KIND):: ivar(16)
     integer(kind=K_COORDINATE_KIND) :: used_precision
+    character(len=1024) :: m4_cmd, expanded_file, echo_line, helper_name
+    integer :: m4_stat, echo_unit, echo_ios, pid_self, pid_unit, helper_unit, helper_ios
+    character(len=1024) :: trs_rules_file, trs_file
+    integer :: trs_status
+    interface
+       function c_getpid() bind(C, name="getpid") result(pid)
+         use, intrinsic :: iso_c_binding, only: c_int
+         integer(c_int) :: pid
+       end function c_getpid
+    end interface
     db_count = 1
     TEMPORARY_FOLDER = ''
     TEMPORARY_LAYER_PREFIX = "MTL_"
     call hash_create(ht,K_MAX_DBS)
     allocate( design_dbs( K_MAX_DBS ) )
-    ! Open the file
-    open(newunit=unit, file=fileName, status='old', action='read', iostat=ios)
+
+    ! Preprocess control file through m4, echo expanded content to stdout, then parse it.
+    ! Use mktemp under /tmp/MAGPARSER/ to avoid conflicts between concurrent users/runs.
+    pid_self = int( c_getpid() )   ! POSIX; /proc/self/stat exists only on Linux
+
+    call execute_command_line('mkdir -p /tmp/MAGPARSER')
+    write(helper_name, '(A,I0,A)') '/tmp/MAGPARSER/.m4name_', pid_self, '.tmp'
+    expanded_file = ''
+    m4_cmd = 'sh -c ''f=$(mktemp /tmp/MAGPARSER/magparser_m4_ctr_XXXXXX) && m4 "$1" > "$f" && printf "%s\n" "$f" > "$2"'' sh "' &
+         // trim(fileName) // '" "' // trim(helper_name) // '"'
+    call execute_command_line(trim(m4_cmd), exitstat=m4_stat)
+    if (m4_stat /= 0) then
+       write(*,*) 'ERROR: m4 preprocessing failed for control file: ', trim(fileName)
+       write(*,*) '       m4 exit status: ', m4_stat
+       call execute_command_line('rm -f "' // trim(helper_name) // '"')
+       stop
+    end if
+
+    open(newunit=helper_unit, file=trim(helper_name), status='old', action='read', iostat=helper_ios)
+    if (helper_ios /= 0) then
+       write(*,*) 'ERROR: Could not read temporary m4 filename for control file: ', trim(fileName)
+       call execute_command_line('rm -f "' // trim(helper_name) // '"')
+       stop
+    end if
+    read(helper_unit, '(A)', iostat=helper_ios) expanded_file
+    close(helper_unit)
+    call execute_command_line('rm -f "' // trim(helper_name) // '"')
+    if (helper_ios /= 0 .or. len_trim(expanded_file) == 0) then
+       write(*,*) 'ERROR: Could not determine expanded control file name for: ', trim(fileName)
+       stop
+    end if
+
+    write(*,'(A)') '--- BEGIN M4-EXPANDED CONTROL FILE: ' // trim(fileName) // ' ---'
+    open(newunit=echo_unit, file=trim(expanded_file), status='old', action='read', iostat=echo_ios)
+    if (echo_ios /= 0) then
+       write(*,*) 'ERROR: Could not open m4-expanded control file: ', trim(expanded_file)
+       call execute_command_line('rm -f "' // trim(expanded_file) // '"')
+       stop
+    end if
+    do
+       read(echo_unit, '(A)', iostat=echo_ios) echo_line
+       if (echo_ios /= 0) exit
+       write(*,'(A)') trim(echo_line)
+    end do
+    close(echo_unit)
+    write(*,'(A)') '--- END M4-EXPANDED CONTROL FILE ---'
+
+    ! Compile-time DAG analysis + term rewriting (trs_optimizer.f90), enabled by
+    ! `var trs_rules <file>` in the CTR or MAGPARSER_TRS_RULES in the environment.
+    call TRSFindRulesFile(trim(expanded_file), trs_rules_file)
+    if (len_trim(trs_rules_file) > 0) then
+       trs_file = trim(expanded_file) // '.trs.ctr'
+       write(*,'(A)') '--- BEGIN TRS OPTIMIZATION, rules: ' // trim(trs_rules_file) // ' ---'
+       call TRSOptimizeFile(trim(trs_rules_file), trim(expanded_file), trim(trs_file), .true., trs_status)
+       if (trs_status == 0) then
+          write(*,'(A)') 'INFO: TRS optimized control file: ' // trim(trs_file)
+          open(newunit=echo_unit, file=trim(trs_file), status='old', action='read', iostat=echo_ios)
+          if (echo_ios == 0) then
+             do
+                read(echo_unit, '(A)', iostat=echo_ios) echo_line
+                if (echo_ios /= 0) exit
+                write(*,'(A)') trim(echo_line)
+             end do
+             close(echo_unit)
+          end if
+          expanded_file = trs_file
+       else
+          write(*,'(A)') 'WARNING: TRS optimization failed; running the control file unoptimized.'
+       end if
+       write(*,'(A)') '--- END TRS OPTIMIZATION ---'
+    end if
+
+    ! Open the expanded file for parsing
+    open(newunit=unit, file=trim(expanded_file), status='old', action='read', iostat=ios)
     if (ios /= 0) then
-       print *, "Error: Could not open file."
+       print *, "Error: Could not open expanded control file."
+       call execute_command_line('rm -f "' // trim(expanded_file) // '"')
        stop
     end if
     call InitPrecision(1000) !> read it from CTR file to override
@@ -295,6 +379,9 @@ contains
              else
                 write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
              end if             
+          else if( trim(rest(1:pos-1)) == 'trs_rules' .or. trim(rest(1:pos-1)) == 'trs_enable' ) then
+             !> consumed at compile time by TRSFindRulesFile / TRSOptimizeFile
+             write(*,*) 'INFO: TRS directive (handled before execution): ', trim(rest)
           else if( trim(rest(1:pos-1)) == 'temporary_layers' ) then             
              rest = adjustl(rest)
              pos = index( rest, ' ' )
@@ -570,7 +657,7 @@ contains
                      operator_char, &
                      design_dbs(rhs2_db_index)%designName,':',trim(design_dbs(rhs2_db_index)%layerNames(rhs2_layer_index))
                 if( rhs1_layer%n_used == 0 ) call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
-                if( rhs2_layer%n_used == 0 ) call RestoreSnapToLayer( rhs2_layer, rhs2_layer%fileName )                
+                if( rhs2_layer%n_used == 0 ) call RestoreSnapToLayer( rhs2_layer, rhs2_layer%fileName )
                 select case (operator_char)
                 case('+')
                    call StartMarkTime("OR")
@@ -621,8 +708,62 @@ contains
                   read(rest, *, iostat=ios) buf1, buf2 !> now rest is at the COMMAND options
                   if( ios == 0 ) then
                      !> we got z = x OP y
-                     primary_operator = trim( adjustl( buf1 ) )
+                     primary_operator = to_upper_f(trim( adjustl( buf1 ) ))
                      rhs2_source_name = trim( adjustl( buf2 ) )
+                     !> Support multi-word topological operators, e.g. INSIDE EDGE, NOT INSIDE EDGE,
+                     !> COINCIDENT INSIDE EDGE, NOT COINCIDENT OUTSIDE EDGE. Normalize to underscore form.
+                     block
+                       character(len=:), allocatable :: rest_u, op_cand
+                       character(len=64) :: u1,u2,u3,u4,u5,o1,o2,o3,o4,o5
+                       integer :: ios3
+                       rest_u = to_upper_f( trim(adjustl(rest)) )
+                       u1='';u2='';u3='';u4='';u5='';o1='';o2='';o3='';o4='';o5=''
+                       read(rest_u, *, iostat=ios3) u1,u2,u3,u4,u5
+                       read(rest,   *, iostat=ios3) o1,o2,o3,o4,o5
+                       op_cand = ''
+                       if( trim(u1)=='NOT' .and. trim(u2)=='COINCIDENT' .and. trim(u3)=='INSIDE' .and. trim(u4)=='EDGE' ) then
+                          op_cand='NOT_COINCIDENT_INSIDE_EDGE'; rhs2_source_name=trim(adjustl(o5))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='COINCIDENT' .and. trim(u3)=='OUTSIDE' .and. trim(u4)=='EDGE' ) then
+                          op_cand='NOT_COINCIDENT_OUTSIDE_EDGE'; rhs2_source_name=trim(adjustl(o5))
+                       else if( trim(u1)=='COINCIDENT' .and. trim(u2)=='INSIDE' .and. trim(u3)=='EDGE' ) then
+                          op_cand='COINCIDENT_INSIDE_EDGE'; rhs2_source_name=trim(adjustl(o4))
+                       else if( trim(u1)=='COINCIDENT' .and. trim(u2)=='OUTSIDE' .and. trim(u3)=='EDGE' ) then
+                          op_cand='COINCIDENT_OUTSIDE_EDGE'; rhs2_source_name=trim(adjustl(o4))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='INSIDE' .and. trim(u3)=='EDGE' ) then
+                          op_cand='NOT_INSIDE_EDGE'; rhs2_source_name=trim(adjustl(o4))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='OUTSIDE' .and. trim(u3)=='EDGE' ) then
+                          op_cand='NOT_OUTSIDE_EDGE'; rhs2_source_name=trim(adjustl(o4))
+                       else if( trim(u1)=='INSIDE' .and. trim(u2)=='EDGE' ) then
+                          op_cand='INSIDE_EDGE'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='OUTSIDE' .and. trim(u2)=='EDGE' ) then
+                          op_cand='OUTSIDE_EDGE'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='INTERACT' ) then
+                          op_cand='NOT_INTERACT'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='CUT' ) then
+                          op_cand='NOT_CUT'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='TOUCH' ) then
+                          op_cand='NOT_TOUCH'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='INSIDE' ) then
+                          op_cand='NOT_INSIDE'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='OUTSIDE' ) then
+                          op_cand='NOT_OUTSIDE'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='EQUAL' ) then
+                          op_cand='NOT_EQUAL'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='DISJOINT' ) then
+                          op_cand='NOT_DISJOINT'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='MEET' ) then
+                          op_cand='NOT_MEET'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='OVERLAPS' ) then
+                          op_cand='NOT_OVERLAPS'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='COVERS' ) then
+                          op_cand='NOT_COVERS'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='COVEREDBY' ) then
+                          op_cand='NOT_COVEREDBY'; rhs2_source_name=trim(adjustl(o3))
+                       else if( trim(u1)=='NOT' .and. trim(u2)=='CONTAINS' ) then
+                          op_cand='NOT_CONTAINS'; rhs2_source_name=trim(adjustl(o3))
+                       end if
+                       if( len_trim(op_cand) > 0 ) primary_operator = op_cand
+                     end block
                      if( .not. associated( rhs1_layer ) ) error stop "RHS1 layer not associated"
                      if( .not. associated( lhs_layer ) )  error stop "LHS  layer not associated"                     
                      if( rhs2_source_name /= 'nothing' ) then
@@ -709,6 +850,50 @@ contains
                         call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_OUTSIDE)
                      case ('NOT_OUTSIDE')
                         call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_OUTSIDE)
+                     case ('INSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_INSIDE_EDGE)
+                     case ('NOT_INSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_INSIDE_EDGE)
+                     case ('OUTSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_OUTSIDE_EDGE)
+                     case ('NOT_OUTSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_OUTSIDE_EDGE)
+                     case ('COINCIDENT_INSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_COINCIDENT_INSIDE_EDGE)
+                     case ('NOT_COINCIDENT_INSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_COINCIDENT_INSIDE_EDGE)
+                     case ('COINCIDENT_OUTSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_COINCIDENT_OUTSIDE_EDGE)
+                     case ('NOT_COINCIDENT_OUTSIDE_EDGE')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_COINCIDENT_OUTSIDE_EDGE)
+                     case ('EQUAL')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_EQUAL)
+                     case ('NOT_EQUAL')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_EQUAL)
+                     case ('DISJOINT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_DISJOINT)
+                     case ('NOT_DISJOINT')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_DISJOINT)
+                     case ('MEET')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_MEET)
+                     case ('NOT_MEET')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_MEET)
+                     case ('OVERLAPS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_OVERLAPS)
+                     case ('NOT_OVERLAPS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_OVERLAPS)
+                     case ('COVERS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_COVERS)
+                     case ('NOT_COVERS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_COVERS)
+                     case ('COVEREDBY')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_COVEREDBY)
+                     case ('NOT_COVEREDBY')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_COVEREDBY)
+                     case ('CONTAINS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_CONTAINS)
+                     case ('NOT_CONTAINS')
+                        call CalculateTopologicalSelect(rhs1_layer, rhs2_layer, lhs_layer, K_TOPO_NOT_CONTAINS)
                      case ('COPY')
                         !> d1:poly COPY nothing
                         !if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"
@@ -728,14 +913,36 @@ contains
                            ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
                         end do
                         call CalculateGROWLayer( rhs1_layer, lhs_layer, ivar(1:4) )
+                     case ('SHRINK') !> SHRINK: morphological erosion/inset. Supports 4-directional args (E N W S) or single value.
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) &
+                             error stop "SHRINK must use nothing as second layer"
+                        rvar = 0.0_real64
+                        read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
+                        if( ios /= 0 ) then
+                           read(rest, *, iostat=ios) buf1, buf2, rvar(1)
+                           rvar(2)=rvar(1); rvar(3)=rvar(1); rvar(4)=rvar(1)
+                        end if
+                        do i=1,4
+                           ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
+                        end do
+                        if( ivar(1)==ivar(2) .and. ivar(2)==ivar(3) .and. ivar(3)==ivar(4) ) then
+                           call CalculateSHRINKLayer( rhs1_layer, ivar(1), lhs_layer )
+                        else
+                           call CalculateSHRINKDirectional( rhs1_layer, lhs_layer, ivar(1:4) )
+                        end if
                      case ('SIZE')
                         if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing' ) &
                              error stop "SIZE must use nothing as second layer"
                         read(rest, *, iostat=ios) buf1, buf2, rvar(1)
                         !write(*,*) 'Found PRIMARY_OPERATOR = SIZE ', rvar(1)
                         ivar(1) = int( rvar(1)*used_precision, kind=K_COORDINATE_KIND )
-                        call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, &
-                             K_BOOST_CONTROL_SIZE, int( ivar(1), kind=int64 ) )
+                        if( associated(rhs2_layer) ) then
+                           call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, &
+                                K_BOOST_CONTROL_SIZE, int( ivar(1), kind=int64 ) )
+                        else
+                           call CalculateBoostOperation( rhs1_layer, rhs1_layer, lhs_layer, &
+                                K_BOOST_CONTROL_SIZE, int( ivar(1), kind=int64 ) )
+                        end if
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |O1| = ', lhs_layer%n_used
                      case ('WORMHOLE')
                         write(*,*) 'Found PRIMARY_OPERATOR = WORMHOLE'
@@ -811,7 +1018,7 @@ contains
        end select
     end do read_loop
 100 continue !end of file
-    close(unit)
+    close(unit, status='delete')
   end subroutine ParseControlFile
 
   !> helper function, hopefully we do not have to debug them often
@@ -1090,5 +1297,17 @@ contains
     allocate(character(len=n) :: str)   ! allocate the right‑sized block
     str = tmp
   end subroutine shrink_to_fit
+
+  pure function to_upper_f(s) result(r)
+    character(len=*), intent(in) :: s
+    character(len=:), allocatable :: r
+    integer :: i, c
+    allocate(character(len=len(s)) :: r)
+    r = s
+    do i=1,len(s)
+      c = iachar(s(i:i))
+      if(c>=iachar('a') .and. c<=iachar('z')) r(i:i)=achar(c-32)
+    end do
+  end function to_upper_f
 end module ControlModule
 

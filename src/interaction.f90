@@ -3,7 +3,8 @@
 ! Purpose: The RTree for GPU has to be thought from groudup in NVFORTRAN GPU
 !        : as there are several challenges, such as non-allocate, no procs.
 module RTreeBuilderGPU
-  use iso_fortran_env, only: int32, int64, real64
+  use iso_fortran_env, only: int8, int32, int64, real64
+  use iso_c_binding, only: c_loc, c_int32_t
   use omp_lib
   use CommonModule
   use Utilities
@@ -11,16 +12,53 @@ module RTreeBuilderGPU
   !use DesignModule
   use DataStructuresModule
   use RTreeBuilder
+  use MortonSortOMT, only: thrust_exclusive_scan_i64
   implicit none
   private
 
-  public :: ComputeInteractionsGPU, CertifyHealingGPU, &
-       ComputeANDPairsCountGPU, ComputeANDPairsFillGPU, ComputeANDPairsGPU
+  public :: gpu_offload_enabled, ComputeInteractionsGPU, CertifyHealingGPU, &
+       ComputeANDPairsCountGPU, ComputeANDPairsFillGPU, ComputeANDPairsGPU, &
+       ComputeTopoSelectGPU, ComputeMergeEdgesGPU
 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024
+  integer(kind=int64), parameter, public :: K_GPU_MIN_BOXES = 4096_int64
 
 
 contains
+
+  !> Runtime GPU offload policy:
+  !> - Returns .false. on non-GPU builds, if no OpenMP target device exists, or if OMP_TARGET_OFFLOAD=DISABLED.
+  !> - Returns .true. for any n_work > 0 if OMP_TARGET_OFFLOAD=MANDATORY (ensures small regressions test GPU paths).
+  !> - Otherwise requires n_work >= threshold to avoid H2D/launch overhead on tiny layers.
+  logical function gpu_offload_enabled(n_work, threshold) result(use_gpu)
+    integer(kind=int64), intent(in) :: n_work
+    integer(kind=int64), intent(in), optional :: threshold
+    integer(kind=int64) :: min_work
+#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
+    character(len=32) :: offload_env
+    integer :: offload_len, offload_stat
+#endif
+
+    use_gpu = .false.
+    if (n_work <= 0_int64) return
+    min_work = K_GPU_MIN_BOXES
+    if (present(threshold)) min_work = threshold
+
+#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
+    if (omp_get_num_devices() <= 0) return
+    call get_environment_variable('OMP_TARGET_OFFLOAD', offload_env, length=offload_len, status=offload_stat)
+    if (offload_stat == 0 .and. offload_len > 0) then
+       if (trim(offload_env) == 'DISABLED' .or. trim(offload_env) == 'disabled') then
+          use_gpu = .false.
+          return
+       else if (trim(offload_env) == 'MANDATORY' .or. trim(offload_env) == 'mandatory') then
+          use_gpu = .true.
+          return
+       end if
+    end if
+    use_gpu = (n_work >= min_work)
+#endif
+  end function gpu_offload_enabled
 #ifdef WORK_IN_PROGRESS
   subroutine PerformMergeGPU_OMP(sorted_boxes, tree_nodes, root_index, max_expected_edges, &
        overlap_area, overlap_perimeter, area_overlap_roots)
@@ -442,123 +480,93 @@ contains
     integer(kind=int64), intent(in) :: RootIndex
     integer(kind=int64) :: I, J, K, ChildIdx, CurrNode
 
-    ! 3. Stack size of 64 is safe for R-Trees up to 2^64 elements
-    integer(kind=int64), parameter :: K_STACK_SIZE = 16
-    integer(kind=int64) :: Stack(K_STACK_SIZE) 
-    integer(kind=int64) :: StackPtr
+    integer(kind=int32), parameter :: K_STACK_SIZE = 128_int32
+    integer(kind=int32) :: Stack(K_STACK_SIZE), StackPtr
+    integer(kind=int64) :: Width64, Height64
 
     type(Box) :: QBox, NodeMbr, TargetBox
     logical :: OverlapX, OverlapY
     integer(kind=K_COORDINATE_KIND) :: InterX1, InterX2, InterY1, InterY2
-    integer(kind=K_COORDINATE_KIND) :: Width, Height
     ! GPU-safe global flag for short-circuiting across all threads
-    integer :: GlobalAbortFlag
+    integer :: GlobalAbortFlag, LocalAbort
 
     GlobalAbortFlag = 0
     IsValid = .true.
+    if (NumBoxes < 2_int64 .or. NumNodes <= 0_int64) return
 
     ! Map the explicit bounds and the abort flag
-    !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
-    !$omp target data map(tofrom: GlobalAbortFlag)
+    !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes)) &
+    !$omp map(tofrom: GlobalAbortFlag)
 
-    ! Launch kernel
-    !$omp target teams distribute parallel do &
+    ! Launch kernel (explicit map(tofrom: GlobalAbortFlag) required so scalar is not firstprivate!)
+    !$omp target teams distribute parallel do map(tofrom: GlobalAbortFlag) &
     !$omp private(I, J, K, ChildIdx, CurrNode, Stack, StackPtr, &
-    !$omp         InterX1, InterX2, InterY1, InterY2, Width, Height,&
-    !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY)
+    !$omp         InterX1, InterX2, InterY1, InterY2, Width64, Height64, &
+    !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY, LocalAbort)
     do I = 1, NumBoxes
-       ! =======================================================
-       ! FAST ABORT: If another thread found an overlap, do nothing
-       ! =======================================================
-       if (GlobalAbortFlag == 1) cycle
+       !$omp atomic read
+       LocalAbort = GlobalAbortFlag
+       if (LocalAbort /= 0) cycle
 
        QBox = SortedBoxes(I)
 
        ! Pre-Check the Root Node
        NodeMbr = TreeNodes(RootIndex)%Mbr
-       OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2) !> SKORANNE: was <= 
+       OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2)
        if (OverlapX) then
-          OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2) !> SKORANNE: was <=
+          OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
        else
           OverlapY = .false.
        end if
 
        if (.not. (OverlapX .and. OverlapY)) cycle
 
-       ! Initialize static stack
-       StackPtr = 1
-       Stack(StackPtr) = RootIndex
+       StackPtr = 1_int32
+       Stack(1) = int(RootIndex, kind=int32)
 
-       ! Iterative Depth-First Search (Check Abort Flag here too!)
-       do while (StackPtr > 0 .and. GlobalAbortFlag == 0)
-          CurrNode = Stack(StackPtr)
-          StackPtr = StackPtr - 1
+       do while (StackPtr > 0_int32)
+          !$omp atomic read
+          LocalAbort = GlobalAbortFlag
+          if (LocalAbort /= 0) exit
+
+          CurrNode = int(Stack(StackPtr), kind=int64)
+          StackPtr = StackPtr - 1_int32
 
           if (TreeNodes(CurrNode)%IsLeaf) then
-             ! Leaf Node: Check exact geometry intersections
-             do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+             do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
                 J = TreeNodes(CurrNode)%ChildStart + K
-
-                if (J <= I) cycle                
+                if (J <= I) cycle
                 TargetBox = SortedBoxes(J)
 
-                ! =======================================================
-                ! FINITE AREA CHECK: Strict inequality (<) guarantees 
-                ! there is a physical area overlap. If boxes merely touch 
-                ! edges, max == min, and (<) evaluates to .false.
-                ! =======================================================
-                OverlapX = max(TargetBox%X1, QBox%X1) <= min(TargetBox%X2, QBox%X2) 
-                if (OverlapX) then
-                   OverlapY = max(TargetBox%Y1, QBox%Y1) <= min(TargetBox%Y2, QBox%Y2) 
-
-                   if (OverlapY) then
-                      InterX1 = max(TargetBox%X1, QBox%X1)
-                      InterY1 = max(TargetBox%Y1, QBox%Y1)
-
-                      ! Min of the ends
-                      InterX2 = min(TargetBox%X2, QBox%X2)
-                      InterY2 = min(TargetBox%Y2, QBox%Y2)
-
-                      ! 2. Calculate dimensions of the intersection
-                      ! For inclusive coordinates, Width is (End - Start + 1)
-                      Width  = InterX2 - InterX1 
-                      Height = InterY2 - InterY1 
-
-                      ! 3. Check for finite area
-                      ! Area is finite only if Width > 0 AND Height > 0.
-                      ! If either is <= 0, the boxes are either separated or touch only at edges/corners.
-                      if (Width > 0 .and. Height > 0) then
-                         ! Fatal overlap detected
-                         !$omp atomic write
-                         GlobalAbortFlag = 1
-
-                         ! Kill the local stack to break this thread's traversal
-                         StackPtr = 0
-                      end if
+                InterX1 = max(TargetBox%X1, QBox%X1)
+                InterX2 = min(TargetBox%X2, QBox%X2)
+                if (InterX2 > InterX1) then
+                   InterY1 = max(TargetBox%Y1, QBox%Y1)
+                   InterY2 = min(TargetBox%Y2, QBox%Y2)
+                   Width64  = int(InterX2, kind=int64) - int(InterX1, kind=int64)
+                   Height64 = int(InterY2, kind=int64) - int(InterY1, kind=int64)
+                   if (Width64 > 0_int64 .and. Height64 > 0_int64) then
+                      !$omp atomic write
+                      GlobalAbortFlag = 1
+                      StackPtr = 0_int32
+                      exit
                    end if
                 end if
              end do
           else
-             ! Internal Node traversal: MUST use (<=) because boxes 
-             ! are allowed to touch internal bounding volumes.
-             do K = 0, TreeNodes(CurrNode)%NumChildren - 1
+             do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
                 ChildIdx = TreeNodes(CurrNode)%ChildStart + K
                 NodeMbr = TreeNodes(ChildIdx)%Mbr
-
-                OverlapX = max(NodeMbr%X1, QBox%X1) <= min(NodeMbr%X2, QBox%X2)
-                if (OverlapX) then
-                   OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
-
-                   if (OverlapY) then
-                      StackPtr = StackPtr + 1
-                      if (StackPtr <= K_STACK_SIZE) then
-                         Stack(StackPtr) = ChildIdx
-                      else
-                         !$omp atomic write
-                         GlobalAbortFlag = 1
-                         ! Kill the local stack to break this thread's traversal
-                         StackPtr = 0
-                      end if
+                if (NodeMbr%X1 <= QBox%X2 .and. NodeMbr%X2 >= QBox%X1 .and. &
+                    NodeMbr%Y1 <= QBox%Y2 .and. NodeMbr%Y2 >= QBox%Y1) then
+                   if (StackPtr < K_STACK_SIZE) then
+                      StackPtr = StackPtr + 1_int32
+                      Stack(StackPtr) = int(ChildIdx, kind=int32)
+                   else
+                      !$omp atomic write
+                      GlobalAbortFlag = 1
+                      StackPtr = 0_int32
+                      exit
                    end if
                 end if
              end do
@@ -566,10 +574,9 @@ contains
        end do
     end do
     !$omp end target data
-    !$omp target exit data map(release:  TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
 
-    ! If the abort flag was triggered on the GPU, return false
-    if (GlobalAbortFlag == 1) IsValid = .false.
+    ! If overlap or stack overflow was triggered on the GPU, return false (safe conservative)
+    if (GlobalAbortFlag /= 0) IsValid = .false.
 
   end function CertifyHealingGPU
 
@@ -768,11 +775,12 @@ contains
     integer(kind=int64), intent(out):: OutCount
     integer(kind=int32), intent(out):: OverflowFlag
 
-    integer(kind=int64), allocatable :: Counts(:), Offsets(:)
+    integer(kind=int64), allocatable, target :: Counts(:), Offsets(:)
     integer(kind=int64) :: I, J, K, ChildIdx, CurrNode, LocalCount, WriteIdx
     integer(kind=int32), parameter :: K_STACK_SIZE = 128_int32
     integer(kind=int32) :: Stack(K_STACK_SIZE), StackPtr
     integer :: alloc_status
+    integer(c_int32_t) :: scan_rc
     type(Box) :: QBox, NodeMbr, TargetBox
 
     OutCount = 0_int64
@@ -788,15 +796,14 @@ contains
        allocate(OutBoxes(0))
        return
     end if
-    Counts = 0_int64
 
-    ! Single persistent device data region for both count and fill passes (halves H2D bandwidth)
+    ! Single persistent device data region: Counts & Offsets stay resident on GPU (zero D2H/H2D roundtrip)
     !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA)) &
+    !$omp map(alloc: Counts(1:NumBoxesA), Offsets(1:NumBoxesA)) &
     !$omp map(tofrom: OverflowFlag)
 
     ! --- Pass 1: count intersections per A box ---
-    !$omp target data map(from: Counts(1:NumBoxesA))
-    !$omp target teams distribute parallel do &
+    !$omp target teams distribute parallel do map(tofrom: OverflowFlag) &
     !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,LocalCount,QBox,NodeMbr,TargetBox)
     do I = 1, NumBoxesA
        QBox = BoxesA(I)
@@ -838,26 +845,26 @@ contains
        end if
        Counts(I) = LocalCount
     end do
-    !$omp end target data
 
     !$omp target update from(OverflowFlag)
     if (OverflowFlag == 0_int32) then
-       ! Exclusive prefix sum on host
-       Offsets(1) = 0_int64
-       do I = 2, NumBoxesA
-          Offsets(I) = Offsets(I - 1) + Counts(I - 1)
-       end do
-       OutCount = Offsets(NumBoxesA) + Counts(NumBoxesA)
-
-       if (OutCount > 0_int64) then
+       ! Device-side exclusive prefix sum via Thrust (eliminates D2H Counts + host scan + H2D Offsets)
+       !$omp target data use_device_addr(Counts, Offsets)
+       scan_rc = thrust_exclusive_scan_i64(c_loc(Counts(1)), c_loc(Offsets(1)), NumBoxesA, OutCount)
+       !$omp end target data
+       if (scan_rc /= 0_c_int32_t) then
+          OverflowFlag = 1_int32
+          OutCount = 0_int64
+          allocate(OutBoxes(0))
+       else if (OutCount > 0_int64) then
           allocate(OutBoxes(OutCount), stat=alloc_status)
           if (alloc_status /= 0) then
              OverflowFlag = 1_int32
              OutCount = 0_int64
              allocate(OutBoxes(0))
           else
-             ! --- Pass 2: fill output boxes (skips zero-count A boxes!) ---
-             !$omp target data map(to: Counts(1:NumBoxesA), Offsets(1:NumBoxesA)) map(from: OutBoxes(1:OutCount))
+             ! --- Pass 2: fill output boxes (Counts & Offsets already resident on GPU!) ---
+             !$omp target data map(from: OutBoxes(1:OutCount))
              !$omp target teams distribute parallel do &
              !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,WriteIdx,QBox,NodeMbr,TargetBox)
              do I = 1, NumBoxesA
@@ -911,5 +918,313 @@ contains
     !$omp end target data
     deallocate(Counts, Offsets)
   end subroutine ComputeANDPairsGPU
+
+  !> Single-pass GPU topological selection for all 10 K_TOPO_* predicates.
+  !> Produces int8 KeepMask(1:NumBoxesA) with zero atomics and exact CPU parity.
+  subroutine ComputeTopoSelectGPU(TreeNodesB, NumNodesB, SortedBoxesB, NumBoxesB, RootIndexB, &
+       BoxesA, NumBoxesA, TopoOp, KeepMask, OverflowFlag)
+    integer(kind=int64), intent(in) :: NumNodesB, NumBoxesB, NumBoxesA, RootIndexB, TopoOp
+    type(RTreeNode), intent(in)     :: TreeNodesB(NumNodesB)
+    type(Box), intent(in)           :: SortedBoxesB(NumBoxesB)
+    type(Box), intent(in)           :: BoxesA(NumBoxesA)
+    integer(kind=int8), intent(out) :: KeepMask(NumBoxesA)
+    integer(kind=int32), intent(out):: OverflowFlag
+
+    integer(kind=int64) :: I, J, K, ChildIdx, CurrNode
+    integer(kind=int32), parameter :: K_STACK_SIZE = 128_int32
+    integer(kind=int32) :: Stack(K_STACK_SIZE), StackPtr
+    type(Box) :: QBox, NodeMbr, TargetBox
+    integer(kind=K_COORDINATE_KIND) :: ix1, iy1, ix2, iy2
+    logical :: overlap_any, touch_any, inside_any, outside_all, early_done, select_it
+
+    OverflowFlag = 0_int32
+    if (NumBoxesA <= 0_int64 .or. NumBoxesB <= 0_int64 .or. NumNodesB <= 0_int64) return
+
+    !$omp target data map(to: TreeNodesB(1:NumNodesB), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA)) &
+    !$omp map(from: KeepMask(1:NumBoxesA)) map(tofrom: OverflowFlag)
+
+    !$omp target teams distribute parallel do map(tofrom: OverflowFlag) &
+    !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,QBox,NodeMbr,TargetBox, &
+    !$omp         ix1,iy1,ix2,iy2,overlap_any,touch_any,inside_any,outside_all,early_done,select_it)
+    do I = 1, NumBoxesA
+       QBox = BoxesA(I)
+       overlap_any = .false.
+       touch_any   = .false.
+       inside_any  = .false.
+       outside_all = .true.
+       early_done  = .false.
+
+       NodeMbr = TreeNodesB(RootIndexB)%Mbr
+       if (QBox%X1 <= NodeMbr%X2 .and. QBox%X2 >= NodeMbr%X1 .and. &
+           QBox%Y1 <= NodeMbr%Y2 .and. QBox%Y2 >= NodeMbr%Y1) then
+          StackPtr = 1_int32
+          Stack(1) = int(RootIndexB, kind=int32)
+          do while (StackPtr > 0_int32 .and. .not. early_done)
+             CurrNode = int(Stack(StackPtr), kind=int64)
+             StackPtr = StackPtr - 1_int32
+             if (TreeNodesB(CurrNode)%IsLeaf) then
+                do K = 0_int64, int(TreeNodesB(CurrNode)%NumChildren, kind=int64) - 1_int64
+                   J = TreeNodesB(CurrNode)%ChildStart + K
+                   if (J > NumBoxesB) exit
+                   TargetBox = SortedBoxesB(J)
+                   if (QBox%X1 > TargetBox%X2 .or. QBox%X2 < TargetBox%X1 .or. &
+                       QBox%Y1 > TargetBox%Y2 .or. QBox%Y2 < TargetBox%Y1) cycle
+
+                   if (QBox%X1 >= TargetBox%X1 .and. QBox%Y1 >= TargetBox%Y1 .and. &
+                       QBox%X2 <= TargetBox%X2 .and. QBox%Y2 <= TargetBox%Y2) then
+                      inside_any = .true.
+                   end if
+
+                   ix1 = max(QBox%X1, TargetBox%X1)
+                   iy1 = max(QBox%Y1, TargetBox%Y1)
+                   ix2 = min(QBox%X2, TargetBox%X2)
+                   iy2 = min(QBox%Y2, TargetBox%Y2)
+                   if (ix1 < ix2 .and. iy1 < iy2) then
+                      overlap_any = .true.
+                      outside_all = .false.
+                   else if (ix1 <= ix2 .and. iy1 <= iy2 .and. .not. (ix1 == ix2 .and. iy1 == iy2)) then
+                      touch_any = .true.
+                      outside_all = .false.
+                   end if
+
+                   if (TopoOp == K_TOPO_INTERACT .or. TopoOp == K_TOPO_NOT_INTERACT) then
+                      if (overlap_any) then; early_done = .true.; exit; end if
+                   else if (TopoOp == K_TOPO_INSIDE .or. TopoOp == K_TOPO_NOT_INSIDE) then
+                      if (inside_any) then; early_done = .true.; exit; end if
+                   else if (TopoOp == K_TOPO_OUTSIDE .or. TopoOp == K_TOPO_NOT_OUTSIDE) then
+                      if (.not. outside_all) then; early_done = .true.; exit; end if
+                   else if (TopoOp == K_TOPO_TOUCH .or. TopoOp == K_TOPO_NOT_TOUCH) then
+                      if (overlap_any) then; early_done = .true.; exit; end if
+                   else if (TopoOp == K_TOPO_CUT .or. TopoOp == K_TOPO_NOT_CUT) then
+                      if (inside_any) then; early_done = .true.; exit; end if
+                   end if
+                end do
+             else
+                do K = 0_int64, int(TreeNodesB(CurrNode)%NumChildren, kind=int64) - 1_int64
+                   ChildIdx = TreeNodesB(CurrNode)%ChildStart + K
+                   NodeMbr = TreeNodesB(ChildIdx)%Mbr
+                   if (QBox%X1 <= NodeMbr%X2 .and. QBox%X2 >= NodeMbr%X1 .and. &
+                       QBox%Y1 <= NodeMbr%Y2 .and. QBox%Y2 >= NodeMbr%Y1) then
+                      if (StackPtr < K_STACK_SIZE) then
+                         StackPtr = StackPtr + 1_int32
+                         Stack(StackPtr) = int(ChildIdx, kind=int32)
+                      else
+                         !$omp atomic write
+                         OverflowFlag = 1_int32
+                         early_done = .true.
+                         exit
+                      end if
+                   end if
+                end do
+             end if
+          end do
+       end if
+
+       if (TopoOp == K_TOPO_INTERACT) then
+          select_it = overlap_any
+       else if (TopoOp == K_TOPO_NOT_INTERACT) then
+          select_it = .not. overlap_any
+       else if (TopoOp == K_TOPO_INSIDE) then
+          select_it = inside_any
+       else if (TopoOp == K_TOPO_NOT_INSIDE) then
+          select_it = .not. inside_any
+       else if (TopoOp == K_TOPO_OUTSIDE) then
+          select_it = outside_all
+       else if (TopoOp == K_TOPO_NOT_OUTSIDE) then
+          select_it = .not. outside_all
+       else if (TopoOp == K_TOPO_TOUCH) then
+          select_it = touch_any .and. .not. overlap_any
+       else if (TopoOp == K_TOPO_NOT_TOUCH) then
+          select_it = .not. (touch_any .and. .not. overlap_any)
+       else if (TopoOp == K_TOPO_CUT) then
+          select_it = overlap_any .and. .not. inside_any
+       else if (TopoOp == K_TOPO_NOT_CUT) then
+          select_it = .not. (overlap_any .and. .not. inside_any)
+       else
+          select_it = .false.
+       end if
+
+       if (select_it) then
+          KeepMask(I) = 1_int8
+       else
+          KeepMask(I) = 0_int8
+       end if
+    end do
+
+    !$omp end target data
+  end subroutine ComputeTopoSelectGPU
+
+  !> Fused 2-pass GPU edge extraction + overlap area/perimeter reduction for PerformMerge.
+  !> Exact <= edge-touch + overlap parity with CPU PerformMerge, child-MBR pruning,
+  !> int32(128) stack + OverflowFlag, device Thrust exclusive_scan (zero global atomics).
+  subroutine ComputeMergeEdgesGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex, &
+       OutEdges, OutCount, OverlapArea, OverlapPerimeter, OverflowFlag)
+    integer(kind=int64), intent(in) :: NumNodes, NumBoxes, RootIndex
+    type(RTreeNode), intent(in)     :: TreeNodes(NumNodes)
+    type(Box), intent(in)           :: SortedBoxes(NumBoxes)
+    integer(kind=int64), allocatable, intent(out) :: OutEdges(:,:)
+    integer(kind=int64), intent(out):: OutCount
+    real(kind=real64), intent(out)  :: OverlapArea, OverlapPerimeter
+    integer(kind=int32), intent(out):: OverflowFlag
+
+    integer(kind=int64), allocatable, target :: Counts(:), Offsets(:)
+    integer(kind=int64), parameter :: K_MAX_GPU_EDGES = 250000000_int64
+    integer(kind=int32), parameter :: K_STACK_SIZE = 128_int32
+    integer(kind=int32) :: Stack(K_STACK_SIZE), StackPtr
+    integer(kind=int64) :: I, J, K, ChildIdx, CurrNode, LocalCount, WriteIdx
+    integer(kind=K_COORDINATE_KIND) :: ix1, iy1, ix2, iy2
+    real(kind=real64) :: w, h
+    integer :: alloc_status
+    integer(c_int32_t) :: scan_rc
+    type(Box) :: QBox, NodeMbr, TargetBox
+
+    OutCount = 0_int64
+    OverlapArea = 0.0_real64
+    OverlapPerimeter = 0.0_real64
+    OverflowFlag = 0_int32
+
+    if (NumBoxes <= 1_int64 .or. NumNodes <= 0_int64) then
+       allocate(OutEdges(2, 0))
+       return
+    end if
+
+    allocate(Counts(NumBoxes), Offsets(NumBoxes), stat=alloc_status)
+    if (alloc_status /= 0) then
+       OverflowFlag = 1_int32
+       allocate(OutEdges(2, 0))
+       return
+    end if
+
+    !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes)) &
+    !$omp map(alloc: Counts(1:NumBoxes), Offsets(1:NumBoxes)) &
+    !$omp map(tofrom: OverflowFlag)
+
+    ! --- Pass 1: count interacting pairs (J > I) + accumulate area/perimeter ---
+    !$omp target teams distribute parallel do map(tofrom: OverflowFlag) &
+    !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,LocalCount,QBox,NodeMbr,TargetBox,ix1,iy1,ix2,iy2,w,h) &
+    !$omp reduction(+:OverlapArea, OverlapPerimeter)
+    do I = 1, NumBoxes
+       QBox = SortedBoxes(I)
+       LocalCount = 0_int64
+       NodeMbr = TreeNodes(RootIndex)%Mbr
+       if (QBox%X1 <= NodeMbr%X2 .and. QBox%X2 >= NodeMbr%X1 .and. &
+           QBox%Y1 <= NodeMbr%Y2 .and. QBox%Y2 >= NodeMbr%Y1) then
+          StackPtr = 1_int32
+          Stack(1) = int(RootIndex, kind=int32)
+          do while (StackPtr > 0_int32)
+             CurrNode = int(Stack(StackPtr), kind=int64)
+             StackPtr = StackPtr - 1_int32
+             if (TreeNodes(CurrNode)%IsLeaf) then
+                do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
+                   J = TreeNodes(CurrNode)%ChildStart + K
+                   if (J <= I) cycle
+                   TargetBox = SortedBoxes(J)
+                   if (QBox%X1 <= TargetBox%X2 .and. QBox%X2 >= TargetBox%X1 .and. &
+                       QBox%Y1 <= TargetBox%Y2 .and. QBox%Y2 >= TargetBox%Y1) then
+                      LocalCount = LocalCount + 1_int64
+                      ix1 = max(QBox%X1, TargetBox%X1)
+                      iy1 = max(QBox%Y1, TargetBox%Y1)
+                      ix2 = min(QBox%X2, TargetBox%X2)
+                      iy2 = min(QBox%Y2, TargetBox%Y2)
+                      w = real(int(ix2, kind=int64) - int(ix1, kind=int64), kind=real64)
+                      h = real(int(iy2, kind=int64) - int(iy1, kind=int64), kind=real64)
+                      if (ix2 > ix1 .and. iy2 > iy1) then
+                         OverlapArea = OverlapArea + w * h
+                      else
+                         OverlapPerimeter = OverlapPerimeter + 2.0_real64 * (w + h)
+                      end if
+                   end if
+                end do
+             else
+                do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
+                   ChildIdx = TreeNodes(CurrNode)%ChildStart + K
+                   NodeMbr = TreeNodes(ChildIdx)%Mbr
+                   if (QBox%X1 <= NodeMbr%X2 .and. QBox%X2 >= NodeMbr%X1 .and. &
+                       QBox%Y1 <= NodeMbr%Y2 .and. QBox%Y2 >= NodeMbr%Y1) then
+                      if (StackPtr < K_STACK_SIZE) then
+                         StackPtr = StackPtr + 1_int32
+                         Stack(StackPtr) = int(ChildIdx, kind=int32)
+                      else
+                         !$omp atomic write
+                         OverflowFlag = 1_int32
+                      end if
+                   end if
+                end do
+             end if
+          end do
+       end if
+       Counts(I) = LocalCount
+    end do
+
+    !$omp target update from(OverflowFlag)
+    if (OverflowFlag == 0_int32) then
+       !$omp target data use_device_addr(Counts, Offsets)
+       scan_rc = thrust_exclusive_scan_i64(c_loc(Counts(1)), c_loc(Offsets(1)), NumBoxes, OutCount)
+       !$omp end target data
+       if (scan_rc /= 0_c_int32_t .or. OutCount > K_MAX_GPU_EDGES) then
+          OverflowFlag = 1_int32
+          OutCount = 0_int64
+          allocate(OutEdges(2, 0))
+       else if (OutCount > 0_int64) then
+          allocate(OutEdges(2, OutCount), stat=alloc_status)
+          if (alloc_status /= 0) then
+             OverflowFlag = 1_int32
+             OutCount = 0_int64
+             allocate(OutEdges(2, 0))
+          else
+             ! --- Pass 2: fill exact edge list (skips zero-count boxes, zero atomics) ---
+             !$omp target data map(from: OutEdges(1:2, 1:OutCount))
+             !$omp target teams distribute parallel do &
+             !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,WriteIdx,QBox,NodeMbr,TargetBox)
+             do I = 1, NumBoxes
+                if (Counts(I) == 0_int64) cycle
+                QBox = SortedBoxes(I)
+                WriteIdx = Offsets(I)
+                StackPtr = 1_int32
+                Stack(1) = int(RootIndex, kind=int32)
+                do while (StackPtr > 0_int32)
+                   CurrNode = int(Stack(StackPtr), kind=int64)
+                   StackPtr = StackPtr - 1_int32
+                   if (TreeNodes(CurrNode)%IsLeaf) then
+                      do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
+                         J = TreeNodes(CurrNode)%ChildStart + K
+                         if (J <= I) cycle
+                         TargetBox = SortedBoxes(J)
+                         if (QBox%X1 <= TargetBox%X2 .and. QBox%X2 >= TargetBox%X1 .and. &
+                             QBox%Y1 <= TargetBox%Y2 .and. QBox%Y2 >= TargetBox%Y1) then
+                            WriteIdx = WriteIdx + 1_int64
+                            if (WriteIdx <= OutCount) then
+                               OutEdges(1, WriteIdx) = I
+                               OutEdges(2, WriteIdx) = J
+                            end if
+                         end if
+                      end do
+                   else
+                      do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
+                         ChildIdx = TreeNodes(CurrNode)%ChildStart + K
+                         NodeMbr = TreeNodes(ChildIdx)%Mbr
+                         if (QBox%X1 <= NodeMbr%X2 .and. QBox%X2 >= NodeMbr%X1 .and. &
+                             QBox%Y1 <= NodeMbr%Y2 .and. QBox%Y2 >= NodeMbr%Y1) then
+                            if (StackPtr < K_STACK_SIZE) then
+                               StackPtr = StackPtr + 1_int32
+                               Stack(StackPtr) = int(ChildIdx, kind=int32)
+                            end if
+                         end if
+                      end do
+                   end if
+                end do
+             end do
+             !$omp end target data
+          end if
+       else
+          allocate(OutEdges(2, 0))
+       end if
+    else
+       allocate(OutEdges(2, 0))
+    end if
+
+    !$omp end target data
+    deallocate(Counts, Offsets)
+  end subroutine ComputeMergeEdgesGPU
 
 end module RTreeBuilderGPU

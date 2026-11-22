@@ -13,6 +13,7 @@ module PNumMergeModule
   use CommonModule
   use GeometryModule
   use RTreeBuilder
+  use RTreeBuilderGPU, only: gpu_offload_enabled, ComputeMergeEdgesGPU
   use DataStructuresModule
   use Utilities
   use omp_lib
@@ -149,13 +150,14 @@ contains
     num_boxes = size(sorted_boxes, kind=int64)
     call uf%init(num_boxes)
 
-    if( num_boxes == 1 ) then
-       uf%arr(1) = 0
+    if( num_boxes <= 1 ) then
+       if( num_boxes == 1 ) uf%arr(1) = 0
        overlap_area = 0.0_real64
        overlap_perimeter = 0.0_real64
-       allocate(area_overlap_roots(0)) ! Return empty
+       allocate(area_overlap_roots(0))
        return
     end if
+    if( root_index == 0 ) error stop "ERROR: No PNUM processing without RTree"
 
     !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, &
     !$omp   overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
@@ -297,6 +299,38 @@ contains
 
     real(kind=real64), allocatable :: overlap_areas(:), overlap_perimeters(:)
     integer :: nthreads, tid
+    integer(kind=int64) :: num_nodes, gpu_edge_count, e
+    integer(kind=int64), allocatable :: gpu_edges(:,:)
+    integer(kind=int32) :: gpu_overflow
+
+    num_boxes = size(sorted_boxes, kind=int64)
+    call uf%init(num_boxes)
+    if( num_boxes <= 1 ) then
+       if( num_boxes == 1 ) uf%arr(1) = 0
+       overlap_area = 0.0_real64
+       overlap_perimeter = 0.0_real64
+       return
+    end if
+    if( root_index == 0 ) error stop "ERROR: No PNUM processing without RTree"
+
+    num_nodes = size(tree_nodes, kind=int64)
+    if( num_nodes > 0 .and. gpu_offload_enabled(num_boxes) ) then
+       gpu_overflow = 0_int32
+       call ComputeMergeEdgesGPU(tree_nodes, num_nodes, sorted_boxes, num_boxes, root_index, &
+            gpu_edges, gpu_edge_count, overlap_area, overlap_perimeter, gpu_overflow)
+       if( gpu_overflow == 0_int32 ) then
+          if (abs(overlap_area) > K_SMALL_EPSILON) overlap_perimeter = 0.0_real64
+          do e = 1_int64, gpu_edge_count
+             call uf%insert(gpu_edges(1, e))
+             call uf%insert(gpu_edges(2, e))
+             call uf%merge(gpu_edges(1, e), gpu_edges(2, e))
+          end do
+          call uf%fullreduce()
+          if (allocated(gpu_edges)) deallocate(gpu_edges)
+          return
+       end if
+       if (allocated(gpu_edges)) deallocate(gpu_edges)
+    end if
 
     nthreads = omp_get_max_threads()
     allocate(buffers(nthreads), overlap_areas(nthreads), overlap_perimeters(nthreads))
@@ -307,17 +341,8 @@ contains
        overlap_perimeters(i) = 0.0
     end do
 
-    num_boxes = size(sorted_boxes, kind=int64)
-    call uf%init(num_boxes)
-    if( num_boxes == 1 ) then
-       uf%arr(1) = 0
-       overlap_area = 0.0_real64
-       overlap_perimeter = 0.0_real64
-       return
-    end if
-    if( root_index == 0 ) error stop "ERROR: No PNUM proceessing without RTRee"
     !$omp parallel do private(i, k, Stack, StackPtr, curr_index, child_idx, &
-    !$omp   overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic)
+    !$omp   overlapx, overlapy, currNode, childNode, boxI, boxK, tempBox, tid) schedule(dynamic, 1024)
     do i = 1, num_boxes
        tid = omp_get_thread_num() + 1
        boxI = sorted_boxes(i)

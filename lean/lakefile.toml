@@ -1,0 +1,5 @@
+name = "trs"
+defaultTargets = ["Trs"]
+
+[[lean_lib]]
+name = "Trs"

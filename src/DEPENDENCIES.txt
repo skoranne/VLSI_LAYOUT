@@ -6,7 +6,7 @@ LIB_OBJS = commonmodule.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o
 	   boost_polygon_apif.o boost_polygon_api.o boxbytestream.o box_compression.o\
 	   snappy_api.o snappy_apif.o layout_statistics.o box_codec.o serialization.o\
 	   diskdesign_impl.o gridlayer.o utilities.o event_sorter_apif.o event_sorter.o\
-	   gpu_morton.o layoutdb_f_api.o layoutdb_loader.o profiler.o
+	   gpu_morton.o layoutdb_f_api.o compressed_spatial_index.o layoutdb_loader.o profiler.o trs_optimizer.o
 
 
 boxbytestream.o: commonmodule.o
@@ -27,18 +27,19 @@ contour.o: geometry.o polygon_fracture.o
 hdfdata.o: geometry.o
 kldata.o: geometry.o
 datastructures.o: commonmodule.o
-pnummerge.o: datastructures.o rtree.o geometry.o gpu_pnummerge.o utilities.o
+pnummerge.o: datastructures.o rtree.o geometry.o gpu_pnummerge.o interaction.o utilities.o
 gpu_pnummerge.o: interaction.o
 polygon_fracture.o: commonmodule.o hdfdata.o
 design.o: datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o profiler.o
 design_impl.o: commonmodule.o design.o geometry.o boost_polygon_apif.o diskdesign_impl.o
 design_boolean_impl.o: commonmodule.o design.o geometry.o rtree.o interaction.o polygon_fracture.o profiler.o
-design_topo_impl.o: commonmodule.o design.o geometry.o rtree.o
+design_topo_impl.o: commonmodule.o design.o geometry.o rtree.o interaction.o
 diskdesign_impl.o: design.o serialization.o box_codec.o snappy_apif.o utilities.o
 magparser.o: polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
 mainmagparser.o: magparser.o controlparser.o
-controlparser.o: design.o layoutdb_loader.o
-layoutdb_loader.o: layoutdb_f_api.o design.o geometry.o commonmodule.o hashtable.o
+controlparser.o: design.o layoutdb_loader.o trs_optimizer.o
+compressed_spatial_index.o: commonmodule.o geometry.o morton.o box_codec.o snappy_apif.o
+layoutdb_loader.o: layoutdb_f_api.o design.o geometry.o commonmodule.o hashtable.o compressed_spatial_index.o
 systeminfo_gpu.o: systeminfo.o
 interaction.o: gpu_morton_sort.o utilities.o
 RLEMerge.o: gpu_morton_sort.o interaction.o

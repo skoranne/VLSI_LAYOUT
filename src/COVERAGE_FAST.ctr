@@ -1,0 +1,110 @@
+# Fast coverage CTR using small designs
+program coverage_fast
+var temp_folder /tmp/coverage_fast/
+var temporary_layers 2
+var abort_on_assert_zero 2
+var debug 1
+systeminfo
+decl design d = ../examples/INV.mag
+decl memory m = nothing
+info
+
+# Boolean
+exec run m:or = d:poly + d:ndiff
+exec run m:and = d:poly * d:ndiff
+exec run m:not = d:poly @ d:ndiff
+exec run m:xor = d:poly ^ d:ndiff
+exec run m:or2 = d:poly OR2 d:ndiff
+exec run m:and2 = d:poly AND2 d:ndiff
+exec run m:fnot = d:poly ~ d:ndiff
+exec run m:bnot = d:poly ! d:ndiff
+
+# Self-test A AND (B NOT A) == 0
+exec run m:bna = d:ndiff @ d:poly
+exec run m:self = d:poly * m:bna
+exec run m:az_self = m:self ASSERT_ZERO nothing
+
+# Identities
+exec run m:xs = d:poly ^ d:poly
+exec run m:az_xs = m:xs ASSERT_ZERO nothing
+exec run m:ns = d:poly @ d:poly
+exec run m:az_ns = m:ns ASSERT_ZERO nothing
+exec run m:as_ = d:poly * d:poly
+exec run m:asid = m:as_ ^ d:poly
+exec run m:az_as = m:asid ASSERT_ZERO nothing
+exec run m:os_ = d:poly + d:poly
+exec run m:osid = m:os_ ^ d:poly
+exec run m:az_os = m:osid ASSERT_ZERO nothing
+
+# Morphological
+exec run m:g = d:poly GROW nothing 1 1 1 1
+exec run m:sh = d:poly SHRINK nothing 1 1 1 1
+exec run m:sz = d:poly SIZE nothing 0.001
+exec run m:ring = m:g ~ d:poly
+
+# EXTENT/COPY
+exec run m:ext = d:poly EXTENT nothing
+exec run m:cp = d:poly COPY nothing
+
+# Topological
+exec run m:ti = d:poly INTERACT d:ndiff
+exec run m:tni = d:poly NOT_INTERACT d:ndiff
+exec run m:tic = m:ti * m:tni
+exec run m:tiaz = m:tic ASSERT_ZERO nothing
+exec run m:tc = d:poly CUT d:ndiff
+exec run m:tnc = d:poly NOT_CUT d:ndiff
+exec run m:tcc = m:tc * m:tnc
+exec run m:tcaz = m:tcc ASSERT_ZERO nothing
+exec run m:tt = d:poly TOUCH d:ndiff
+exec run m:tnt = d:poly NOT_TOUCH d:ndiff
+exec run m:ttc = m:tt * m:tnt
+exec run m:ttaz = m:ttc ASSERT_ZERO nothing
+exec run m:tin = d:poly INSIDE m:g
+exec run m:tnin = d:poly NOT_INSIDE m:g
+exec run m:tinc = m:tin * m:tnin
+exec run m:tinaz = m:tinc ASSERT_ZERO nothing
+exec run m:to = d:poly OUTSIDE d:nwell
+exec run m:tno = d:poly NOT_OUTSIDE d:nwell
+exec run m:toc = m:to * m:tno
+exec run m:toaz = m:toc ASSERT_ZERO nothing
+
+# Egenhofer
+exec run m:dis = d:poly DISJOINT d:nwell
+exec run m:ndis = d:poly NOT_DISJOINT d:nwell
+exec run m:disc = m:dis * m:ndis
+exec run m:disaz = m:disc ASSERT_ZERO nothing
+exec run m:me = d:poly MEET d:ndiff
+exec run m:nme = d:poly NOT_MEET d:ndiff
+exec run m:mec = m:me * m:nme
+exec run m:meaz = m:mec ASSERT_ZERO nothing
+exec run m:ov = d:poly OVERLAPS d:ndiff
+exec run m:nov = d:poly NOT_OVERLAPS d:ndiff
+exec run m:ovc = m:ov * m:nov
+exec run m:ovaz = m:ovc ASSERT_ZERO nothing
+exec run m:eq = d:poly EQUAL d:poly
+exec run m:neq = d:poly NOT_EQUAL d:poly
+exec run m:eqc = m:eq * m:neq
+exec run m:eqaz = m:eqc ASSERT_ZERO nothing
+exec run m:con = m:g CONTAINS d:poly
+exec run m:ncon = m:g NOT_CONTAINS d:poly
+exec run m:conc = m:con * m:ncon
+exec run m:conaz = m:conc ASSERT_ZERO nothing
+exec run m:cby = d:poly COVEREDBY m:g
+exec run m:ncby = d:poly NOT_COVEREDBY m:g
+exec run m:cbyc = m:cby * m:ncby
+exec run m:cbyaz = m:cbyc ASSERT_ZERO nothing
+
+# Edge topological
+exec run m:ie = d:poly INSIDE_EDGE m:g
+exec run m:nie = d:poly NOT_INSIDE_EDGE m:g
+exec run m:oe = d:poly OUTSIDE_EDGE m:g
+exec run m:noe = d:poly NOT_OUTSIDE_EDGE m:g
+exec run m:cie = d:poly COINCIDENT_INSIDE_EDGE m:g
+exec run m:ncie = d:poly NOT_COINCIDENT_INSIDE_EDGE m:g
+exec run m:coe = d:poly COINCIDENT_OUTSIDE_EDGE m:g
+exec run m:ncoe = d:poly NOT_COINCIDENT_OUTSIDE_EDGE m:g
+exec run m:oeaz = m:oe ASSERT_ZERO nothing
+exec run m:coeaz = m:coe ASSERT_ZERO nothing
+
+flush
+end

@@ -44,7 +44,7 @@ module DesignModule
        BuildTree, MergeHealLayer, CertifyHealing, PerformMergeLayer, RemoveIdentical
   public :: CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, CalculateXOR, &
        CalculateFrameAND, CalculateFrameNOT, CalculateBoostOperation, CalculateTopologicalSelect, &
-       CalculateGROWLayer, CalculateSHRINKLayer, CalculateOverlapCount, &
+       CalculateGROWLayer, CalculateSHRINKLayer, CalculateSHRINKDirectional, CalculateOverlapCount, &
        CreateGRID, CreateEXTENT, FilterLayer, PerformOperation
   public :: SaveLayerToSnap, RestoreSnapToLayer, RestoreSnapToDLayer
   ! Re-exported from DataStructuresModule for existing callers.
@@ -241,6 +241,12 @@ module DesignModule
        integer(kind=K_COORDINATE_KIND), intent(in) :: shrink_value
      end subroutine CalculateSHRINKLayer
 
+     module subroutine CalculateSHRINKDirectional( input_layer, output_layer, ivar )
+       type(Layer), intent(in) :: input_layer
+       type(Layer), intent(inout) :: output_layer
+       integer(kind=K_COORDINATE_KIND), intent(in) :: ivar(4)
+     end subroutine CalculateSHRINKDirectional
+
      module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
        type(Layer), intent(inout) :: input_layer_A
        integer(kind=int64) :: interaction_count
@@ -419,9 +425,12 @@ contains
   !> Deep copy of the geometry and derived structures (not of the
   !> measurements or the backing store).
   subroutine CopyLayer( output_layer, input_layer_A )
-    type(Layer), intent(inout) :: output_layer
-    type(Layer), intent(in) :: input_layer_A
+    type(Layer), intent(inout), target :: output_layer
+    type(Layer), intent(in), target :: input_layer_A
     integer(kind=int64) :: n
+    !> Self-copy (e.g. `X = X COPY nothing`, or `X = X NOT Y` with empty Y via CalculateNOT):
+    !> the deallocations below would free the input before it is read.
+    if( c_associated( c_loc(output_layer), c_loc(input_layer_A) ) ) return
     n = input_layer_A%n_used
     if( n == 0 ) then
        call ClearLayer( output_layer )
@@ -803,6 +812,10 @@ contains
        input_layer%n_used = output_box_count
        input_layer%n_alloc = size( input_layer%layer_boxes, kind=int64 )
        input_layer%layerState = LAYER_STATE_HEAL !> the boxes changed: everything else is stale
+       if( input_layer%n_used == 0 ) then
+          input_layer%layerState = LAYER_STATE_PREPROCESSED
+          return
+       end if
     end if
     if( NeedsSorting( input_layer ) ) call sort_layer_boxes( input_layer, use_morton=.false. )
     if( NeedsRTree( input_layer ) ) call rebuild_rtree( input_layer )

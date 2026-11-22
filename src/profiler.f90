@@ -27,10 +27,13 @@ module ProfilerModule
     end function get_cpu_time
 
     subroutine InitProfiler()
-       if (profiler_initialized) return
-       allocate(profiles(1000))
-       num_profiles = 0
-       profiler_initialized = .true.
+       !$omp critical(profiler_lock)
+       if (.not. profiler_initialized) then
+          allocate(profiles(1000))
+          num_profiles = 0
+          profiler_initialized = .true.
+       end if
+       !$omp end critical(profiler_lock)
     end subroutine InitProfiler
 
     subroutine RecordTime(name, duration)
@@ -38,12 +41,15 @@ module ProfilerModule
        real(kind=real64), intent(in) :: duration
        integer :: i
        logical :: found
+       type(ProfileEntry), allocatable :: tmp(:)
 
-       ! Initialisation must happen under the lock too: RecordTime is called
-       ! from concurrent tasks, and two threads racing through InitProfiler
-       ! abort with "allocatable array is already allocated".
-       !$omp critical (profiler_table)
-       if (.not. profiler_initialized) call InitProfiler()
+       !$omp critical(profiler_lock)
+       if (.not. profiler_initialized) then
+          allocate(profiles(1000))
+          num_profiles = 0
+          profiler_initialized = .true.
+       end if
+
        found = .false.
        do i = 1, num_profiles
           if (profiles(i)%name == name) then
@@ -59,18 +65,15 @@ module ProfilerModule
           num_profiles = num_profiles + 1
           if (num_profiles > size(profiles)) then
              ! Expand array
-             block
-                type(ProfileEntry), allocatable :: tmp(:)
-                allocate(tmp(size(profiles) * 2))
-                tmp(1:num_profiles-1) = profiles(1:num_profiles-1)
-                call move_alloc(tmp, profiles)
-             end block
+             allocate(tmp(size(profiles) * 2))
+             tmp(1:num_profiles-1) = profiles(1:num_profiles-1)
+             call move_alloc(tmp, profiles)
           end if
           profiles(num_profiles)%name = name
           profiles(num_profiles)%total_time = duration
           profiles(num_profiles)%call_count = 1
        end if
-       !$omp end critical (profiler_table)
+       !$omp end critical(profiler_lock)
     end subroutine RecordTime
 
     subroutine PrintProfileSummary()

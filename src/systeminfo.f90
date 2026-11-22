@@ -121,6 +121,8 @@ contains
     ! -----------------------------------------------------------------
     virtual_memory_used = -1
     rss_used = -1
+    rss_bytes = -1_c_int64_t
+    virt_bytes = -1_c_int64_t
     got = .false.
 
     ! Try macOS-native path (returns bytes; convert to kB)

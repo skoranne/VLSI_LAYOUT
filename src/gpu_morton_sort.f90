@@ -15,7 +15,7 @@ module MortonSortOMT
    integer(kind=int64), parameter :: MASK3 = int(Z'0F0F0F0F0F0F0F0F', kind=int64)
    integer(kind=int64), parameter :: MASK4 = int(Z'3333333333333333', kind=int64)
    integer(kind=int64), parameter :: MASK5 = int(Z'5555555555555555', kind=int64)
-   public:: SortBoxesDirect, SortBoxesIndirect
+   public:: SortBoxesDirect, SortBoxesIndirect, thrust_exclusive_scan_i64
 
    ! ---------------------------------------------------------------------------
    ! C/C++ Interface Bindings to Thrust Wrappers
@@ -33,6 +33,30 @@ module MortonSortOMT
          type(c_ptr), value :: d_indices
          integer(c_int64_t), value :: n
       end subroutine thrust_sort_boxes_indirect
+
+      function thrust_sort_boxes_direct_host(h_boxes, n) result(rc) bind(c, name="thrust_sort_boxes_direct_host")
+         import :: c_ptr, c_int64_t, c_int32_t
+         type(c_ptr), value :: h_boxes
+         integer(c_int64_t), value :: n
+         integer(c_int32_t) :: rc
+      end function thrust_sort_boxes_direct_host
+
+      function thrust_sort_boxes_indirect_host(h_boxes, h_indices, n) result(rc) bind(c, name="thrust_sort_boxes_indirect_host")
+         import :: c_ptr, c_int64_t, c_int32_t
+         type(c_ptr), value :: h_boxes
+         type(c_ptr), value :: h_indices
+         integer(c_int64_t), value :: n
+         integer(c_int32_t) :: rc
+      end function thrust_sort_boxes_indirect_host
+
+      function thrust_exclusive_scan_i64(d_in, d_out, n, h_total) result(rc) bind(c, name="thrust_exclusive_scan_i64")
+         import :: c_ptr, c_int64_t, c_int32_t
+         type(c_ptr), value :: d_in
+         type(c_ptr), value :: d_out
+         integer(c_int64_t), value :: n
+         integer(c_int64_t), intent(out) :: h_total
+         integer(c_int32_t) :: rc
+      end function thrust_exclusive_scan_i64
    end interface
 
 contains
@@ -41,16 +65,15 @@ contains
    subroutine SortBoxesDirect(Boxes, N)
       type(Box), intent(inout), target :: Boxes(:)
       integer(kind=int64), intent(in) :: N
+      integer(c_int32_t) :: rc
 
       if (N <= 1) return
 
-      ! Map the array to the device (or use it if already there)
-      ! 'use_device_ptr' extracts the raw device address to pass to C++
-      !$omp target data map(tofrom: Boxes(1:N)) use_device_addr(Boxes)
-
-      call thrust_sort_boxes_direct(c_loc(Boxes(1)), N)
-
-      !$omp end target data
+      rc = thrust_sort_boxes_direct_host(c_loc(Boxes(1)), N)
+      if (rc /= 0_c_int32_t) then
+         write(*,*) 'ERROR: thrust_sort_boxes_direct_host failed with rc = ', rc
+         error stop "SortBoxesDirect CUDA failure"
+      end if
 
    end subroutine SortBoxesDirect
 
@@ -60,17 +83,18 @@ contains
       type(Box), intent(in), target :: Boxes(:)
       integer(kind=int64), intent(in) :: N
       integer(kind=int64), intent(out), target :: SortedIndices(:)
+      integer(c_int32_t) :: rc
 
-      if (N <= 1) return
+      if (N <= 1) then
+         if (N == 1) SortedIndices(1) = 1_int64
+         return
+      end if
 
-      ! Boxes are read-only (map 'to').
-      ! SortedIndices is allocated/written on GPU and copied back (map 'from').
-      !$omp target data map(to: Boxes(1:N)) map(from: SortedIndices(1:N)) &
-      !$omp use_device_addr(Boxes, SortedIndices)
-
-      call thrust_sort_boxes_indirect(c_loc(Boxes(1)), c_loc(SortedIndices(1)), N)
-
-      !$omp end target data
+      rc = thrust_sort_boxes_indirect_host(c_loc(Boxes(1)), c_loc(SortedIndices(1)), N)
+      if (rc /= 0_c_int32_t) then
+         write(*,*) 'ERROR: thrust_sort_boxes_indirect_host failed with rc = ', rc
+         error stop "SortBoxesIndirect CUDA failure"
+      end if
 
    end subroutine SortBoxesIndirect
 

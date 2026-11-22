@@ -234,6 +234,8 @@ contains
             tempBox%x2 = x2
             tempBox%y2 = y2
             call addBoxToLayer( resolved_layer, tempBox )
+            ! Raw rect input: mark layer as needing sort/tree/pnum/heal processing.
+            resolved_layer%layerState = LAYER_STATE_NONE
           end associate
        end if
        !> INSPECT, ALLOCATE, RESOLVE, LOAD

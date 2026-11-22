@@ -52,6 +52,11 @@ contains
        return
     end if
     interaction_count_gpu = 0
+    if( gpu_offload_enabled(input_layer%n_used) ) then
+       retval = CertifyHealingGPU( input_layer%tree%tree_nodes, size(input_layer%tree%tree_nodes,kind=int64), &
+            input_layer%layer_boxes(1:input_layer%n_used), input_layer%n_used, input_layer%tree%root_index )
+       return
+    end if
     call ComputeInteractionsCPU( input_layer%tree%tree_nodes, size(input_layer%tree%tree_nodes,kind=int64),&
          input_layer%layer_boxes, input_layer%n_used, input_layer%tree%root_index, interaction_count_gpu)
     
@@ -603,22 +608,25 @@ contains
       input_layer%n_used = size( input_layer%layer_boxes )
    end subroutine RemoveIdentical
 
-   module subroutine CalculateGROWLayer( input_layer, output_layer, ivar )
-      type(Layer),      intent(in)    :: input_layer
-      type(Layer),      intent(inout) :: output_layer
-      integer(kind=K_COORDINATE_KIND), intent(in)   :: ivar(4)
-      call ClearLayer( output_layer )
-      output_layer%layerState = LAYER_STATE_NONE
-      output_layer%layer_boxes = input_layer%layer_boxes
-      output_layer%n_used = input_layer%n_used
-      !write(*,*) 'GROW : ', ivar
-      call box_grow_directional(output_layer%layer_boxes, ivar(1), ivar(2), ivar(3), ivar(4) )
-      !write(*,*) 'OUTPUT_STATE = ', output_layer%layerState
-      call output_layer%mark( LAYER_STATE_SORT ) !> optimization
-      call BuildTree( output_layer ) !> this can be built from the input_layer, see above
-      call MergeHealLayer( output_layer )
-      call PreprocessLayer( output_layer )
-   end subroutine CalculateGROWLayer
+    module subroutine CalculateGROWLayer( input_layer, output_layer, ivar )
+       type(Layer),      intent(in)    :: input_layer
+       type(Layer),      intent(inout) :: output_layer
+       integer(kind=K_COORDINATE_KIND), intent(in)   :: ivar(4)
+       ! Check if input layer is empty - if so, clear output and return
+       if( input_layer%n_used == 0 ) then
+          call ClearLayer( output_layer )
+          return
+       end if
+       call ClearLayer( output_layer )
+       output_layer%layerState = LAYER_STATE_NONE
+       output_layer%layer_boxes = input_layer%layer_boxes
+       output_layer%n_used = input_layer%n_used
+       call box_grow_directional(output_layer%layer_boxes(1:output_layer%n_used), ivar(1), ivar(2), ivar(3), ivar(4) )
+       output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_SORT )
+       call BuildTree( output_layer )
+       call MergeHealLayer( output_layer )
+       call PreprocessLayer( output_layer )
+    end subroutine CalculateGROWLayer
 
    module subroutine CalculateSHRINKLayer( input_layer_A, shrink_value, output_layer )
       type(Layer), intent(inout) :: input_layer_A
@@ -629,6 +637,14 @@ contains
       type(Layer) :: temp_layer
       integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
       call PreprocessLayer( input_layer_A )
+      if( input_layer_A%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
+      end if
+      if( shrink_value <= 0 ) then
+         call CopyLayer( output_layer, input_layer_A )
+         return
+      end if
       !> Step 1
       bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
       call box_grow( bboxA, shrink_value, shrink_value )
@@ -640,6 +656,41 @@ contains
       call PreprocessLayer( temp_layer )
       call CalculateNOT( input_layer_A, temp_layer, output_layer )
    end subroutine CalculateSHRINKLayer
+
+   module subroutine CalculateSHRINKDirectional( input_layer, output_layer, ivar )
+      type(Layer), intent(in) :: input_layer
+      type(Layer), intent(inout) :: output_layer
+      integer(kind=K_COORDINATE_KIND), intent(in) :: ivar(4) ! E,N,W,S
+      integer(kind=int64) :: i, n, j
+      type(Box) :: b
+      call ClearLayer( output_layer )
+      n = input_layer%n_used
+      if( n <= 0 ) return
+      allocate( output_layer%layer_boxes(n) )
+      j = 0
+      do i = 1, n
+         b = input_layer%layer_boxes(i)
+         b%x1 = b%x1 + ivar(3)
+         b%x2 = b%x2 - ivar(1)
+         b%y1 = b%y1 + ivar(4)
+         b%y2 = b%y2 - ivar(2)
+         if( b%x2 > b%x1 .and. b%y2 > b%y1 ) then
+            j = j + 1
+            output_layer%layer_boxes(j) = b
+         end if
+      end do
+      output_layer%n_used = j
+      if( j == 0 ) then
+         if( allocated(output_layer%layer_boxes) ) deallocate(output_layer%layer_boxes)
+         allocate(output_layer%layer_boxes(0))
+         output_layer%n_used = 0
+         return
+      end if
+      output_layer%layerState = ior(output_layer%layerState, LAYER_STATE_SORT)
+      call BuildTree( output_layer )
+      call MergeHealLayer( output_layer )
+      call PreprocessLayer( output_layer )
+   end subroutine CalculateSHRINKDirectional
 
    !> ConvertLayerToBox
    !>
@@ -969,42 +1020,35 @@ contains
    end subroutine CalculateFrameNOTTask
 
    module subroutine CalculateBoostOperation( input_layer_A, input_layer_B, output_layer, control_parameter, control_value )
-      type(Layer), intent(inout) :: input_layer_A, input_layer_B
-      type(Layer), intent(inout)   :: output_layer
-      integer(kind=int64), intent(in) :: control_parameter, control_value
-      type(Box), allocatable :: empty_boxes(:), sized_boxes(:), result_boxes(:)
-      integer(kind=int64) :: i, nA, nB
-      logical :: gpu_size
-#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
-      character(len=32) :: offload_env
-      integer :: offload_len, offload_stat
+     type(Layer), intent(inout) :: input_layer_A, input_layer_B
+     type(Layer), intent(inout)   :: output_layer
+     integer(kind=int64), intent(in) :: control_parameter, control_value
+     type(Box), allocatable :: empty_boxes(:), sized_boxes(:), result_boxes(:)
+     integer(kind=int64) :: i, nA, nB
+#if !(defined(__APPLE__) && defined(__INTEL_COMPILER))
+     !> Fast path: NOT uses direct parallel R-Tree subtraction (same geometric semantics as @).
+     !> Not taken with ifort on macOS, where CalculateNOT falls back to the
+     !> scanline formulation (see design_boolean_impl.f90) and Boost fractures less.
+     if( control_parameter == K_BOOST_CONTROL_NOT ) then
+        call CalculateNOT( input_layer_A, input_layer_B, output_layer )
+        return
+     end if
 #endif
-      allocate( empty_boxes(0) )
-      nA = input_layer_A%n_used
-      nB = input_layer_B%n_used
-      !> this function does the allocation; always slice to 1:n_used so uninitialized tail slots are never read
+     allocate( empty_boxes(0) )
+     nA = input_layer_A%n_used
+     nB = input_layer_B%n_used
+     !> this function does the allocation; always slice to 1:n_used so uninitialized tail slots are never read
       if( control_parameter == K_BOOST_CONTROL_SIZE ) then
-         gpu_size = .false.
-#if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
-         if (nA > 0 .and. control_value > 0 .and. omp_get_num_devices() > 0) then
-            gpu_size = .true.
-            call get_environment_variable('OMP_TARGET_OFFLOAD', offload_env, length=offload_len, status=offload_stat)
-            if (offload_stat == 0 .and. offload_len > 0) then
-               if (trim(offload_env) == 'DISABLED' .or. trim(offload_env) == 'disabled') gpu_size = .false.
-            end if
-         end if
-#endif
          if (nA == 0) then
             allocate(result_boxes(0))
-         else if (gpu_size) then
+         else if (control_value > 0) then
             allocate(sized_boxes(nA))
-            sized_boxes(1:nA) = input_layer_A%layer_boxes(1:nA)
-            !$omp target teams distribute parallel do map(tofrom: sized_boxes(1:nA))
+            !$omp parallel do if(nA >= 4096) private(i)
             do i = 1, nA
-               sized_boxes(i)%x1 = sized_boxes(i)%x1 - int(control_value, kind=K_COORDINATE_KIND)
-               sized_boxes(i)%y1 = sized_boxes(i)%y1 - int(control_value, kind=K_COORDINATE_KIND)
-               sized_boxes(i)%x2 = sized_boxes(i)%x2 + int(control_value, kind=K_COORDINATE_KIND)
-               sized_boxes(i)%y2 = sized_boxes(i)%y2 + int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%x1 = input_layer_A%layer_boxes(i)%x1 - int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%y1 = input_layer_A%layer_boxes(i)%y1 - int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%x2 = input_layer_A%layer_boxes(i)%x2 + int(control_value, kind=K_COORDINATE_KIND)
+               sized_boxes(i)%y2 = input_layer_A%layer_boxes(i)%y2 + int(control_value, kind=K_COORDINATE_KIND)
             end do
             call MergeBoxesUsingBoostPolygon(sized_boxes, result_boxes)
             if (allocated(sized_boxes)) deallocate(sized_boxes)
@@ -1138,11 +1182,9 @@ contains
               '|', ' Comp B', '|', ' A AND COMP B', '|', ' REAL TIME', '|'
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
       end if
-      !$omp parallel default(shared)
-      !$omp single
+      ! Process grid cells sequentially to limit peak memory on large designs.
       do rows = 1, K_GRID
          do cols = 1, K_GRID
-            !$omp task default(shared) firstprivate(rows, cols) private(local_arg)
             call system_clock(count=start_tick(rows,cols))
             call cpu_time(start_time(rows,cols))
             grids(rows,cols) = gridA%layer_boxes( (rows-1)*K_GRID+cols ) !> this does Layer = Box
@@ -1169,21 +1211,16 @@ contains
             call system_clock(count=end_tick(rows,cols))
             elapsed_time(rows,cols) = real(end_tick(rows,cols) - start_tick(rows,cols), kind=real64) / real(clock_rate, kind=real64)
             if( debug_verbosity > 1 ) then
-               !$omp critical(print_lock)
                write(*,'(A,I3,A,I3,A,I12,A,I12,A,I12,A,F10.3,A)') '|',rows,'|',cols,'|',&
                   grid_layer_counts(rows,cols,A_IN_GRID),'|',&
                   grid_layer_counts(rows,cols,B_IN_GRID),'|',&
                   grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID),&
                   '|',elapsed_time(rows,cols), '|'
-               !$omp end critical(print_lock)
             end if
             if( allocated( AinGrid(rows,cols)%layer_boxes )) call ClearLayer( AinGrid( rows, cols ) )
             if( allocated( BinGrid(rows,cols)%layer_boxes )) call ClearLayer( BinGrid( rows, cols ) )
-            !$omp end task
          end do
       end do
-      !$omp end single
-      !$omp end parallel
       if( debug_verbosity > 1 ) then
          write(*,'(A85)') '+-----------------------------------------------------------------------------------+'
       end if
@@ -1213,6 +1250,7 @@ contains
                output_layer%layer_boxes( total_count + i ) =  outputGrid(rows,cols)%layer_boxes(i)
             end do
             total_count = total_count + outputGrid(rows,cols)%n_used
+            call ClearLayer( outputGrid(rows,cols) )
          end do
       end do
       deallocate( outputGrid )
@@ -1239,13 +1277,19 @@ contains
    end subroutine BoostKernelBinary
 
    module subroutine CalculateFrameNOT( input_layer_A, input_layer_B, output_layer )
-      type(Layer), intent(inout) :: input_layer_A, input_layer_B
-      type(Layer), intent(inout) :: output_layer
-
-      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_NOT, 0_int64 )
-      if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
-      output_layer%layerState = LAYER_STATE_HEAL
-      call PreprocessLayer( output_layer )
+     type(Layer), intent(inout) :: input_layer_A, input_layer_B
+     type(Layer), intent(inout) :: output_layer
+#if defined(__APPLE__) && defined(__INTEL_COMPILER)
+     !> CalculateNOT falls back to the scanline formulation on this platform
+     !> (see design_boolean_impl.f90), which fractures far more; keep Boost here.
+     call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_NOT, 0_int64 )
+     if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
+     output_layer%layerState = LAYER_STATE_HEAL
+     call PreprocessLayer( output_layer )
+#else
+     !> Fast path: direct parallel R-Tree subtraction (same geometric semantics as @/!).
+     call CalculateNOT( input_layer_A, input_layer_B, output_layer )
+#endif
    end subroutine CalculateFrameNOT
 
    module subroutine CalculateXOR( input_layer_A, input_layer_B, output_layer )

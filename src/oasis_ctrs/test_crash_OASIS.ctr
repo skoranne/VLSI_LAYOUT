@@ -1,0 +1,20 @@
+# Repurposed from test_crash.ctr: KLBIN/MAG design references replaced with OASIS files from /scratch1/skoranne/DESIGNS/
+# Minimal reproducing control file for crash bug
+program test_crash
+systeminfo
+var debug_verbosity 1
+decl design d1_input = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW_FLAT.oas
+decl output o1 = test_crash_output.mag
+decl memory d1 = nothing
+decl memory t1 = nothing
+info
+exec init t1:nothing
+exec run d1:poly = d1_input:poly COPY nothing
+# Create rings which will cause the healing issue
+exec run t1:poly_1 = d1:poly GROW t1:nothing 0.001 0.001 0.001 0.001
+exec run t1:poly_2 = d1:poly SIZE t1:nothing -0.001
+exec run t1:poly_outer_ring = t1:poly_1 ~ d1:poly
+exec run t1:poly_inner_ring = d1:poly ~ t1:poly_2
+# This is where the crash happens - the AND operation on unhealed layers
+exec run t1:poly_ring_intersection  = t1:poly_outer_ring * t1:poly_inner_ring
+end
