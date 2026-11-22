@@ -22,3 +22,14 @@ Example:
 cd src && ./MAGPARSER.exe db/regressions/SDT_oasis.ctr 16
 ```
 Notes: external `/scratch1/...` paths and some in-repo layouts may need to be present (non-LFS) on the test machine; adjust `temp_folder`/paths as needed for x86-64+IFX runs.
+
+## MPW_MERGE (shuttle assembly)
+- `mpw_merge_check.rb`: KLayout batch script that compares one slot of an `MPW_MERGE`
+  output with its original file. It walks the hierarchy cell by cell and compares
+  shape counts, a per-layer local XOR, the texts, and instances with their transforms,
+  arrays and properties. Exit status 0 means the two are equivalent.
+```sh
+src/db/MPW_MERGE --verify -o two.oas slot-001/.../caravel_00070f74.oas slot-002/.../caravel_0007bc4e.oas
+klayout -b -r src/db/regressions/mpw_merge_check.rb -rd a=slot-001/.../caravel_00070f74.oas \
+        -rd b=two.oas -rd ta=caravel_00070f74 -rd tb=S001_caravel_00070f74
+```

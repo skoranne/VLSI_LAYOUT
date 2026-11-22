@@ -1315,6 +1315,9 @@ contains
       type(Layer), intent(inout) :: input_layer_A
       type(Layer), intent(inout)   :: output_layer
       procedure(LayerKernel)     :: kernel
+      !> ifx does not carry a dummy procedure into an OpenMP task correctly (the task saw a
+      !> garbage address and GROW/MERGE crashed); hand the task a firstprivate procedure pointer.
+      procedure(LayerKernel), pointer :: kernel_ptr
       integer(kind=int64), intent(in) :: control_opcode, control_parameter
       integer(kind=int64) :: total_count, i, number_tree_nodes
       integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
@@ -1357,11 +1360,12 @@ contains
          write(*,'(A,A3,A,A3,A,A12,A,A12,A,A,A)') '|','RO','|','CO','|','A in Grid','|', ' A AND COMP B', '|', ' REAL TIME', '|'
          write(*,'(A85)') '+----------------------------------------------------------------------------------+'
       end if
+      kernel_ptr => kernel
       !$omp parallel default(shared)
       !$omp single
       do rows = 1, K_GRID
          do cols = 1, K_GRID
-            !$omp task default(shared) firstprivate(rows, cols) private(local_arg)
+            !$omp task default(shared) firstprivate(rows, cols, kernel_ptr) private(local_arg)
             call system_clock(count=start_tick(rows,cols))
             call cpu_time(start_time(rows,cols))
             grids(rows,cols) = gridA%layer_boxes( (rows-1)*K_GRID+cols ) !> this does Layer = Box
@@ -1379,7 +1383,7 @@ contains
                local_arg%C => outputGrid(rows,cols)
                local_arg%control_opcode = control_opcode
                local_arg%control_parameter = control_parameter
-               call kernel( local_arg )
+               call kernel_ptr( local_arg )
                grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID) = outputGrid(rows,cols)%n_used
                call cpu_time(end_time(rows,cols))
                call system_clock(count=end_tick(rows,cols))

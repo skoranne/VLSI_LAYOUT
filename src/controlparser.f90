@@ -417,7 +417,21 @@ contains
              !allocate( design_dbs(db_count)%layers( MAX_LAYERS ) )
              !> we also want output association of layer data with disk
              design_dbs(db_count)%fileName = trim(keyword(1:pos))
-             call LoadDesignFileByExt(design_dbs(db_count), MAX_LAYERS)
+             !> An output file is normally written by this run: read it only if it
+             !> already exists, otherwise start with an empty design (like a memory db).
+             block
+               logical :: out_exists
+               inquire( file=trim(keyword(1:pos)), exist=out_exists )
+               if( out_exists ) then
+                  call LoadDesignFileByExt(design_dbs(db_count), MAX_LAYERS)
+               else
+                  write(*,*) 'INFO: output file does not exist yet, starting empty: ', trim(keyword(1:pos))
+                  allocate( design_dbs(db_count)%layerNames( MAX_LAYERS ) )
+                  design_dbs(db_count)%layerNames = ''
+                  call hash_create(design_dbs(db_count)%ht, MAX_LAYERS )
+                  allocate( design_dbs(db_count)%layers( MAX_LAYERS ) )
+               end if
+             end block
              db_count = db_count+1
           else if( trim(rest(1:pos-1)) == 'design' ) then
              rest = adjustl(rest(pos+1:))             

@@ -9,3 +9,6 @@ db_roundtrip
 db_oasis_debug
 *.rt
 *.oas.out
+db_oasis2lefdef
+db_hier_extent
+MPW_MERGE

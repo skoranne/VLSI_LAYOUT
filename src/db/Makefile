@@ -17,11 +17,11 @@ endif
 CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp gdsii.cpp oasis.cpp oasis_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
 
-TESTS = db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent
+TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent
 
 all: $(TESTS) liblayoutdb.a
 
-$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h fracture.hpp
+$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h fracture.hpp oasis_codec.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 liblayoutdb.a: $(CORE_OBJS)
@@ -45,10 +45,17 @@ db_roundtrip: db_roundtrip.cpp $(CORE_OBJS)
 db_oasis2lefdef: db_oasis2lefdef.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
+oasis_rec.o: oasis_rec.cpp oasis_rec.hpp oasis_codec.hpp fracture.hpp nvcomp_support.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# MPW shuttle assembly: per-slot OASIS files -> one OASIS with scribe lanes
+MPW_MERGE: mpw_merge.cpp oasis_rec.o nvcomp_support.o oasis_rec.hpp oasis_codec.hpp
+	$(CXX) $(CXXFLAGS) mpw_merge.cpp oasis_rec.o nvcomp_support.o -o $@ $(LDFLAGS) -pthread
+
 db_hier_extent: db_hier_extent.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:
-	rm -f $(CORE_OBJS) $(TESTS) *.rt *.oas.out
+	rm -f $(CORE_OBJS) oasis_rec.o $(TESTS) *.rt *.oas.out
 
 .PHONY: all clean

@@ -1,4 +1,8 @@
 # Repurposed from MW_4x4_SELFTEST.ctr: KLBIN/MAG design references replaced with OASIS files from /scratch1/skoranne/DESIGNS/
+# OASIS input: flattened with `decl hierdesign` (plain `decl design` loads only each cell's own boxes
+# at the origin). OASIS layers are named by GDS number, so sky130 names are mapped: nwell L64_D20,
+# diff L65_D20, poly L66_D20, li1 L67_D20, met1..met5 L68_D20..L72_D20. Run with MAX_LAYERS >= 34
+# (MICROWATT.oas has 34 layer/datatype pairs), e.g. MAGPARSER.exe <ctr> 64.
 # MW_4x4 comprehensive self-test CTR for MAGPARSER
 # Boolean, topological, DE-9IM/Egenhofer, edge-topological ops, self-test identities.
 program mw4x4_selftest
@@ -7,120 +11,120 @@ var temporary_layers 2
 var abort_on_assert_zero 2
 var debug 1
 systeminfo
-decl design d = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW_FLAT.oas
+decl hierdesign d = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW_FLAT.oas
 decl memory m = nothing
 decl output o = MW_4x4_SELFTEST_output.mag
 info
 
 # --- Boolean basics ---
-exec run o:diff_or_poly = d:diff + d:poly
-exec run o:diff_and_poly = d:diff * d:poly
-exec run o:diff_not_poly = d:diff @ d:poly
-exec run o:diff_xor_poly = d:diff ^ d:poly
-exec run o:diff_or2_poly = d:diff OR2 d:poly
-exec run o:diff_and2_poly = d:diff AND2 d:poly
-exec run o:diff_fnot_poly = d:diff ~ d:poly
-exec run o:diff_bnot_poly = d:diff ! d:poly
+exec run o:diff_or_poly = d:L65_D20 + d:L66_D20
+exec run o:diff_and_poly = d:L65_D20 * d:L66_D20
+exec run o:diff_not_poly = d:L65_D20 @ d:L66_D20
+exec run o:diff_xor_poly = d:L65_D20 ^ d:L66_D20
+exec run o:diff_or2_poly = d:L65_D20 OR2 d:L66_D20
+exec run o:diff_and2_poly = d:L65_D20 AND2 d:L66_D20
+exec run o:diff_fnot_poly = d:L65_D20 ~ d:L66_D20
+exec run o:diff_bnot_poly = d:L65_D20 ! d:L66_D20
 
 # --- Self-test identity: A AND (B NOT A) == 0 ---
-exec run m:bnot_a_dp = d:poly @ d:diff
-exec run m:self_dp = d:diff * m:bnot_a_dp
+exec run m:bnot_a_dp = d:L66_D20 @ d:L65_D20
+exec run m:self_dp = d:L65_D20 * m:bnot_a_dp
 exec run m:az_self_dp = m:self_dp ASSERT_ZERO nothing
-exec run m:bnot_a_pl = d:li1 @ d:poly
-exec run m:self_pl = d:poly * m:bnot_a_pl
+exec run m:bnot_a_pl = d:L67_D20 @ d:L66_D20
+exec run m:self_pl = d:L66_D20 * m:bnot_a_pl
 exec run m:az_self_pl = m:self_pl ASSERT_ZERO nothing
-exec run m:bnot_a_lm1 = d:met1 @ d:li1
-exec run m:self_lm1 = d:li1 * m:bnot_a_lm1
+exec run m:bnot_a_lm1 = d:L68_D20 @ d:L67_D20
+exec run m:self_lm1 = d:L67_D20 * m:bnot_a_lm1
 exec run m:az_self_lm1 = m:self_lm1 ASSERT_ZERO nothing
-exec run m:bnot_a_m12 = d:met2 @ d:met1
-exec run m:self_m12 = d:met1 * m:bnot_a_m12
+exec run m:bnot_a_m12 = d:L69_D20 @ d:L68_D20
+exec run m:self_m12 = d:L68_D20 * m:bnot_a_m12
 exec run m:az_self_m12 = m:self_m12 ASSERT_ZERO nothing
 
 # --- Boolean identities ---
-exec run m:xor_self = d:diff ^ d:diff
+exec run m:xor_self = d:L65_D20 ^ d:L65_D20
 exec run m:az_xor_self = m:xor_self ASSERT_ZERO nothing
-exec run m:not_self = d:diff @ d:diff
+exec run m:not_self = d:L65_D20 @ d:L65_D20
 exec run m:az_not_self = m:not_self ASSERT_ZERO nothing
-exec run m:and_self = d:diff * d:diff
-exec run m:id_and = m:and_self ^ d:diff
+exec run m:and_self = d:L65_D20 * d:L65_D20
+exec run m:id_and = m:and_self ^ d:L65_D20
 exec run m:az_id_and = m:id_and ASSERT_ZERO nothing
-exec run m:or_self = d:diff + d:diff
-exec run m:id_or = m:or_self ^ d:diff
+exec run m:or_self = d:L65_D20 + d:L65_D20
+exec run m:id_or = m:or_self ^ d:L65_D20
 exec run m:az_id_or = m:id_or ASSERT_ZERO nothing
-exec run m:not_sub = o:diff_not_poly @ d:diff
+exec run m:not_sub = o:diff_not_poly @ d:L65_D20
 exec run m:az_not_sub = m:not_sub ASSERT_ZERO nothing
 
 # --- Morphological / derivations ---
-exec run m:g_poly = d:poly GROW nothing 0.1 0.1 0.1 0.1
-exec run m:s_poly = d:poly SHRINK nothing 0.1 0.1 0.1 0.1
-exec run m:sz_poly = d:poly SIZE nothing 0.1
-exec run o:poly_ring = m:g_poly ~ d:poly
-exec run o:poly_inner = d:poly ~ m:s_poly
-exec run m:g_diff = d:diff GROW nothing 0.05 0.05 0.05 0.05
+exec run m:g_poly = d:L66_D20 GROW nothing 0.1 0.1 0.1 0.1
+exec run m:s_poly = d:L66_D20 SHRINK nothing 0.1 0.1 0.1 0.1
+exec run m:sz_poly = d:L66_D20 SIZE nothing 0.1
+exec run o:poly_ring = m:g_poly ~ d:L66_D20
+exec run o:poly_inner = d:L66_D20 ~ m:s_poly
+exec run m:g_diff = d:L65_D20 GROW nothing 0.05 0.05 0.05 0.05
 
 # --- Topological/DE-9IM box ops (diff vs poly) ---
-exec run m:ti = d:diff INTERACT d:poly
-exec run m:tni = d:diff NOT_INTERACT d:poly
+exec run m:ti = d:L65_D20 INTERACT d:L66_D20
+exec run m:tni = d:L65_D20 NOT_INTERACT d:L66_D20
 exec run m:ti_c = m:ti * m:tni
 exec run m:ti_az = m:ti_c ASSERT_ZERO nothing
 exec run m:ti_u = m:ti + m:tni
-exec run m:ti_eq = m:ti_u ^ d:diff
+exec run m:ti_eq = m:ti_u ^ d:L65_D20
 exec run m:ti_eqaz = m:ti_eq ASSERT_ZERO nothing
-exec run m:tc = d:diff CUT d:poly
-exec run m:tnc = d:diff NOT_CUT d:poly
+exec run m:tc = d:L65_D20 CUT d:L66_D20
+exec run m:tnc = d:L65_D20 NOT_CUT d:L66_D20
 exec run m:tc_c = m:tc * m:tnc
 exec run m:tc_az = m:tc_c ASSERT_ZERO nothing
-exec run m:tt = d:diff TOUCH d:poly
-exec run m:tnt = d:diff NOT_TOUCH d:poly
+exec run m:tt = d:L65_D20 TOUCH d:L66_D20
+exec run m:tnt = d:L65_D20 NOT_TOUCH d:L66_D20
 exec run m:tt_c = m:tt * m:tnt
 exec run m:tt_az = m:tt_c ASSERT_ZERO nothing
-exec run m:tin = d:diff INSIDE d:poly
-exec run m:tnin = d:diff NOT_INSIDE d:poly
+exec run m:tin = d:L65_D20 INSIDE d:L66_D20
+exec run m:tnin = d:L65_D20 NOT_INSIDE d:L66_D20
 exec run m:tin_c = m:tin * m:tnin
 exec run m:tin_az = m:tin_c ASSERT_ZERO nothing
-exec run m:to = d:diff OUTSIDE d:poly
-exec run m:tno = d:diff NOT_OUTSIDE d:poly
+exec run m:to = d:L65_D20 OUTSIDE d:L66_D20
+exec run m:tno = d:L65_D20 NOT_OUTSIDE d:L66_D20
 exec run m:to_c = m:to * m:tno
 exec run m:to_az = m:to_c ASSERT_ZERO nothing
 exec run m:to_u = m:to + m:tno
-exec run m:to_eq = m:to_u ^ d:diff
+exec run m:to_eq = m:to_u ^ d:L65_D20
 exec run m:to_eqaz = m:to_eq ASSERT_ZERO nothing
 
 # --- Egenhofer/DE-9IM relations ---
-exec run m:disj = d:diff DISJOINT d:poly
-exec run m:ndisj = d:diff NOT_DISJOINT d:poly
+exec run m:disj = d:L65_D20 DISJOINT d:L66_D20
+exec run m:ndisj = d:L65_D20 NOT_DISJOINT d:L66_D20
 exec run m:disj_c = m:disj * m:ndisj
 exec run m:disj_az = m:disj_c ASSERT_ZERO nothing
-exec run m:meet = d:diff MEET d:poly
-exec run m:nmeet = d:diff NOT_MEET d:poly
+exec run m:meet = d:L65_D20 MEET d:L66_D20
+exec run m:nmeet = d:L65_D20 NOT_MEET d:L66_D20
 exec run m:meet_c = m:meet * m:nmeet
 exec run m:meet_az = m:meet_c ASSERT_ZERO nothing
-exec run m:ov = d:diff OVERLAPS d:poly
-exec run m:nov = d:diff NOT_OVERLAPS d:poly
+exec run m:ov = d:L65_D20 OVERLAPS d:L66_D20
+exec run m:nov = d:L65_D20 NOT_OVERLAPS d:L66_D20
 exec run m:ov_c = m:ov * m:nov
 exec run m:ov_az = m:ov_c ASSERT_ZERO nothing
-exec run m:eqr = d:diff EQUAL d:diff
-exec run m:neqr = d:diff NOT_EQUAL d:diff
+exec run m:eqr = d:L65_D20 EQUAL d:L65_D20
+exec run m:neqr = d:L65_D20 NOT_EQUAL d:L65_D20
 exec run m:eqr_c = m:eqr * m:neqr
 exec run m:eqr_az = m:eqr_c ASSERT_ZERO nothing
-exec run m:cont = m:g_poly CONTAINS d:poly
-exec run m:ncont = m:g_poly NOT_CONTAINS d:poly
+exec run m:cont = m:g_poly CONTAINS d:L66_D20
+exec run m:ncont = m:g_poly NOT_CONTAINS d:L66_D20
 exec run m:cont_c = m:cont * m:ncont
 exec run m:cont_az = m:cont_c ASSERT_ZERO nothing
-exec run m:covby = d:poly COVEREDBY m:g_poly
-exec run m:ncovby = d:poly NOT_COVEREDBY m:g_poly
+exec run m:covby = d:L66_D20 COVEREDBY m:g_poly
+exec run m:ncovby = d:L66_D20 NOT_COVEREDBY m:g_poly
 exec run m:covby_c = m:covby * m:ncovby
 exec run m:covby_az = m:covby_c ASSERT_ZERO nothing
 
 # --- Edge topological / DE-9IM edge ops ---
-exec run m:ie = d:poly INSIDE_EDGE m:g_poly
-exec run m:nie = d:poly NOT_INSIDE_EDGE m:g_poly
-exec run m:oe = d:poly OUTSIDE_EDGE m:g_poly
-exec run m:noe = d:poly NOT_OUTSIDE_EDGE m:g_poly
-exec run m:cie = d:poly COINCIDENT_INSIDE_EDGE m:g_poly
-exec run m:ncie = d:poly NOT_COINCIDENT_INSIDE_EDGE m:g_poly
-exec run m:coe = d:poly COINCIDENT_OUTSIDE_EDGE m:g_poly
-exec run m:ncoe = d:poly NOT_COINCIDENT_OUTSIDE_EDGE m:g_poly
+exec run m:ie = d:L66_D20 INSIDE_EDGE m:g_poly
+exec run m:nie = d:L66_D20 NOT_INSIDE_EDGE m:g_poly
+exec run m:oe = d:L66_D20 OUTSIDE_EDGE m:g_poly
+exec run m:noe = d:L66_D20 NOT_OUTSIDE_EDGE m:g_poly
+exec run m:cie = d:L66_D20 COINCIDENT_INSIDE_EDGE m:g_poly
+exec run m:ncie = d:L66_D20 NOT_COINCIDENT_INSIDE_EDGE m:g_poly
+exec run m:coe = d:L66_D20 COINCIDENT_OUTSIDE_EDGE m:g_poly
+exec run m:ncoe = d:L66_D20 NOT_COINCIDENT_OUTSIDE_EDGE m:g_poly
 exec run m:oe_az2 = m:oe ASSERT_ZERO nothing
 exec run m:cie_az2 = m:cie ASSERT_ZERO nothing
 exec run m:coe_az2 = m:coe ASSERT_ZERO nothing
@@ -134,11 +138,11 @@ exec run m:ie_exc3 = m:ie * m:coe
 exec run m:ie_exc3z = m:ie_exc3 ASSERT_ZERO nothing
 
 # --- More layer-pair coverage for perf/GPU study ---
-exec run o:li1_not_met1 = d:li1 @ d:met1
-exec run m:self_lm = d:met1 * (d:li1 @ d:met1)
+exec run o:li1_not_met1 = d:L67_D20 @ d:L68_D20
+exec run m:self_lm = d:L68_D20 * (d:L67_D20 @ d:L68_D20)
 exec run m:az_self_lm = m:self_lm ASSERT_ZERO nothing
-exec run m:met1_ti = d:met1 INTERACT d:met2
-exec run m:met1_tni = d:met1 NOT_INTERACT d:met2
+exec run m:met1_ti = d:L68_D20 INTERACT d:L69_D20
+exec run m:met1_tni = d:L68_D20 NOT_INTERACT d:L69_D20
 exec run m:met1_tic = m:met1_ti * m:met1_tni
 exec run m:met1_tiaz = m:met1_tic ASSERT_ZERO nothing
 

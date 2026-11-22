@@ -1,0 +1,65 @@
+# Regression: GDSII -> OASIS conversion must be geometry-exact.
+# Loads mkALU.gds and mkALU.oas flattened through the hierarchy (`decl
+# hierdesign`; plain `decl design` loads every cell's own boxes at the origin
+# without placing instances, which would leave PLACEMENT/repetition decoding
+# untested) and XORs every (layer,datatype) pair. With `var abort_on_xor 1` the run aborts (non-zero exit) on the first
+# non-empty XOR, so the regression passes only if GDS and OASIS agree on
+# every layer.
+#
+# Run:
+#   cd src && MAGPARSER.exe db/regressions/mkALU_gds_oasis_xor.ctr 40
+#
+# Expected PASS: all 34 per-layer XORs empty, exit 0.
+program mkALU_gds_oasis_xor
+systeminfo
+var temp_folder MKALU_XOR_REG/
+var temporary_layers 40
+var abort_on_xor 1
+var abort_on_assert_zero 1
+var debug_verbosity 0
+decl hierdesign dgds = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/DESIGNS/64bit_ALU/gds/mkALU.gds
+decl hierdesign doas = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/DESIGNS/64bit_ALU/gds/mkALU.oas
+decl memory t1 = nothing
+info
+exec init t1:nothing
+# sky130 layer:datatype pairs present in both files
+exec run t1:xor_64_16 = dgds:L64_D16 ^ doas:L64_D16
+exec run t1:xor_64_20 = dgds:L64_D20 ^ doas:L64_D20
+exec run t1:xor_65_20 = dgds:L65_D20 ^ doas:L65_D20
+exec run t1:xor_65_44 = dgds:L65_D44 ^ doas:L65_D44
+exec run t1:xor_66_15 = dgds:L66_D15 ^ doas:L66_D15
+exec run t1:xor_66_20 = dgds:L66_D20 ^ doas:L66_D20
+exec run t1:xor_66_44 = dgds:L66_D44 ^ doas:L66_D44
+exec run t1:xor_67_16 = dgds:L67_D16 ^ doas:L67_D16
+exec run t1:xor_67_20 = dgds:L67_D20 ^ doas:L67_D20
+exec run t1:xor_67_44 = dgds:L67_D44 ^ doas:L67_D44
+exec run t1:xor_68_16 = dgds:L68_D16 ^ doas:L68_D16
+exec run t1:xor_68_20 = dgds:L68_D20 ^ doas:L68_D20
+exec run t1:xor_68_44 = dgds:L68_D44 ^ doas:L68_D44
+exec run t1:xor_69_16 = dgds:L69_D16 ^ doas:L69_D16
+exec run t1:xor_69_20 = dgds:L69_D20 ^ doas:L69_D20
+exec run t1:xor_69_44 = dgds:L69_D44 ^ doas:L69_D44
+exec run t1:xor_70_16 = dgds:L70_D16 ^ doas:L70_D16
+exec run t1:xor_70_20 = dgds:L70_D20 ^ doas:L70_D20
+exec run t1:xor_70_44 = dgds:L70_D44 ^ doas:L70_D44
+exec run t1:xor_71_16 = dgds:L71_D16 ^ doas:L71_D16
+exec run t1:xor_71_20 = dgds:L71_D20 ^ doas:L71_D20
+exec run t1:xor_71_44 = dgds:L71_D44 ^ doas:L71_D44
+exec run t1:xor_72_16 = dgds:L72_D16 ^ doas:L72_D16
+exec run t1:xor_72_20 = dgds:L72_D20 ^ doas:L72_D20
+exec run t1:xor_78_44 = dgds:L78_D44 ^ doas:L78_D44
+exec run t1:xor_81_4  = dgds:L81_D4  ^ doas:L81_D4
+exec run t1:xor_81_14 = dgds:L81_D14 ^ doas:L81_D14
+exec run t1:xor_81_23 = dgds:L81_D23 ^ doas:L81_D23
+exec run t1:xor_93_44 = dgds:L93_D44 ^ doas:L93_D44
+exec run t1:xor_94_20 = dgds:L94_D20 ^ doas:L94_D20
+exec run t1:xor_95_20 = dgds:L95_D20 ^ doas:L95_D20
+exec run t1:xor_122_16 = dgds:L122_D16 ^ doas:L122_D16
+exec run t1:xor_235_4  = dgds:L235_D4 ^ doas:L235_D4
+exec run t1:xor_236_0  = dgds:L236_D0 ^ doas:L236_D0
+delete dgds
+delete doas
+delete t1
+flush
+info "PASS: GDS and OASIS geometry identical on all layers"
+end

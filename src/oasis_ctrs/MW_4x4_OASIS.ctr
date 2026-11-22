@@ -1,28 +1,32 @@
 # Repurposed from MW_4x4.ctr: KLBIN/MAG design references replaced with OASIS files from /scratch1/skoranne/DESIGNS/
+# OASIS input: flattened with `decl hierdesign` (plain `decl design` loads only each cell's own boxes
+# at the origin). OASIS layers are named by GDS number, so sky130 names are mapped: nwell L64_D20,
+# diff L65_D20, poly L66_D20, li1 L67_D20, met1..met5 L68_D20..L72_D20. Run with MAX_LAYERS >= 34
+# (MICROWATT.oas has 34 layer/datatype pairs), e.g. MAGPARSER.exe <ctr> 64.
 # Control file for MAGPARSER
 program square
 systeminfo
 # decl design d1 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW4x4.oas
-decl design d1 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW_FLAT.oas
+decl hierdesign d1 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW_FLAT.oas
 # decl design d1 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
 # decl design d1 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
 decl output o1 = MW_4x4_output.mag
 decl memory t1 = nothing
 info
-exec run o1:sd3  = d1:diff ! d1:poly
-exec run o1:sd2  = d1:diff ~ d1:poly
-exec run o1:sd1  = d1:diff @ d1:poly
+exec run o1:sd3  = d1:L65_D20 ! d1:L66_D20
+exec run o1:sd2  = d1:L65_D20 ~ d1:L66_D20
+exec run o1:sd1  = d1:L65_D20 @ d1:L66_D20
 flush
 end
-exec run o1:gate = d1:poly * d1:diff
-exec run o1:ng_poly2 = d1:poly ~ o1:gate
-exec run o1:ng_poly1 = d1:poly - o1:gate
-exec run t1:grow_poly = d1:poly GROW nothing 0.1 0.1 0.1 0.1
-exec run t1:shrink_poly = d1:poly SHRINK nothing 0.1
-exec run o1:met1_grow = d1:met1 GROW nothing 0.1 0.1 0.1 0.1
-exec run o1:poly_retarget = d1:poly GROW nothing 0.2 0.1 0.2 0.2
-exec run o1:li1 = d1:li1 COPY nothing
-exec run o1:poly_outer_ring = t1:grow_poly ~ d1:poly
-exec run o1:poly_inner_ring = d1:poly ~ t1:shrink_poly
+exec run o1:gate = d1:L66_D20 * d1:L65_D20
+exec run o1:ng_poly2 = d1:L66_D20 ~ o1:gate
+exec run o1:ng_poly1 = d1:L66_D20 - o1:gate
+exec run t1:grow_poly = d1:L66_D20 GROW nothing 0.1 0.1 0.1 0.1
+exec run t1:shrink_poly = d1:L66_D20 SHRINK nothing 0.1
+exec run o1:met1_grow = d1:L68_D20 GROW nothing 0.1 0.1 0.1 0.1
+exec run o1:poly_retarget = d1:L66_D20 GROW nothing 0.2 0.1 0.2 0.2
+exec run o1:li1 = d1:L67_D20 COPY nothing
+exec run o1:poly_outer_ring = t1:grow_poly ~ d1:L66_D20
+exec run o1:poly_inner_ring = d1:L66_D20 ~ t1:shrink_poly
 flush
 end 

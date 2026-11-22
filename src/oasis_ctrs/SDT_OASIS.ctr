@@ -1,4 +1,8 @@
 # Repurposed from SDT.ctr: KLBIN/MAG design references replaced with OASIS files from /scratch1/skoranne/DESIGNS/
+# OASIS input: flattened with `decl hierdesign` (plain `decl design` loads only each cell's own boxes
+# at the origin). OASIS layers are named by GDS number, so sky130 names are mapped: nwell L64_D20,
+# diff L65_D20, poly L66_D20, li1 L67_D20, met1..met5 L68_D20..L72_D20. Run with MAX_LAYERS >= 34
+# (MICROWATT.oas has 34 layer/datatype pairs), e.g. MAGPARSER.exe <ctr> 64.
 # Control file for MAGPARSER for SKYWATER 130A process
 # Designed by Sandeep Koranne (C) 1997-
 # VLSI Magic Layout Editor
@@ -11,7 +15,7 @@ var abort_on_assert_zero 2
 var debug_verbosity 0
 # decl design d1_input = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW4x4.oas
 # decl design d1_input = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MW_FLAT.oas
-decl design d1_input = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
+decl hierdesign d1_input = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
 # decl design d1_input = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
 # decl design d1_input = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
 # decl design d1 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
@@ -21,10 +25,10 @@ decl memory t1 = nothing
 decl memory t2 = nothing
 info
 exec init t1:nothing
-exec run d1:poly = d1_input:poly COPY nothing
-exec run d1:diff = d1_input:diff COPY nothing
-exec run d1:met1 = d1_input:met1 COPY nothing
-exec run d1:li1 =  d1_input:li1 COPY nothing
+exec run d1:poly = d1_input:L66_D20 COPY nothing
+exec run d1:diff = d1_input:L65_D20 COPY nothing
+exec run d1:met1 = d1_input:L68_D20 COPY nothing
+exec run d1:li1 =  d1_input:L67_D20 COPY nothing
 delete d1_input
 # exec run o1:met1_grow = d1:met1 GROW nothing 0.1 0.1 0.1 0.1
 # exec run o1:poly_retarget = d1:poly GROW nothing 0.2 0.1 0.2 0.2

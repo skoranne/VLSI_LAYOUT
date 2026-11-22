@@ -1,7 +1,11 @@
 # Repurposed from FPU.ctr: KLBIN/MAG design references replaced with OASIS files from /scratch1/skoranne/DESIGNS/
+# OASIS input: flattened with `decl hierdesign` (plain `decl design` loads only each cell's own boxes
+# at the origin). OASIS layers are named by GDS number, so sky130 names are mapped: nwell L64_D20,
+# diff L65_D20, poly L66_D20, li1 L67_D20, met1..met5 L68_D20..L72_D20. Run with MAX_LAYERS >= 34
+# (MICROWATT.oas has 34 layer/datatype pairs), e.g. MAGPARSER.exe <ctr> 64.
 # Control file for MAGPARSER
 program square
-decl design d1 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
+decl hierdesign d1 = /scratch1/skoranne/DESIGNS/microwatt-mpw7/gds/MICROWATT.oas
 decl output o1 = oFPU.mag
 info
 

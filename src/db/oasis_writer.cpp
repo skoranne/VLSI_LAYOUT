@@ -6,6 +6,7 @@
 // PROPERTY and a 256-byte END record.  The byte encodings mirror oasis.cpp.
 
 #include "layoutdb_internal.hpp"
+#include "oasis_codec.hpp"
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -25,21 +26,7 @@ enum Record : uint8_t {
     REC_POLYGON = 21, REC_PROPERTY = 28
 };
 
-struct Writer {
-    std::vector<uint8_t> b;
-    void u8(uint8_t v) { b.push_back(v); }
-    void bytes(const void* p, size_t n) { auto* c = (const uint8_t*)p; b.insert(b.end(), c, c + n); }
-    void uint_(uint64_t v) { while (v >= 0x80) { u8(uint8_t(v | 0x80)); v >>= 7; } u8(uint8_t(v)); }
-    static uint64_t mag(int64_t v) { return v < 0 ? (uint64_t)0 - (uint64_t)v : (uint64_t)v; }
-    void sint(int64_t v) { uint_((mag(v) << 1) | (v < 0 ? 1u : 0u)); }      // sign in the low bit
-    void str(const std::string& s) { uint_(s.size()); bytes(s.data(), s.size()); }
-    void real_whole(uint64_t v) { uint_(0); uint_(v); }
-    void real_double(double v) { uint_(7); bytes(&v, 8); }
-    void gdelta(int64_t dx, int64_t dy) {                                   // general form
-        uint_((mag(dx) << 2) | (dx < 0 ? 2u : 0u) | 1u);
-        uint_((mag(dy) << 1) | (dy < 0 ? 1u : 0u));
-    }
-
+struct Writer : oasis_codec::Encoder {
     void begin(uint64_t grid_per_micron) {
         bytes("%SEMI-OASIS\r\n", 13);
         u8(REC_START); str("1.0"); real_whole(grid_per_micron);

@@ -56,7 +56,9 @@ endif
 # --- Library Definition ---
 LIBRARY = libmagparser.a
 
-db/liblayoutdb.a:
+# FORCE: always let db/Makefile decide; without it a stale library (e.g. an old
+# OASIS reader) is linked into MAGPARSER.exe after src/db/*.cpp change.
+db/liblayoutdb.a: FORCE
 	$(MAKE) -C db all
 
 include DEPENDENCIES.txt
@@ -73,7 +75,8 @@ DEP_FILES = $(ALL_OBJS:.o=.d)
 
 # --- Phony Targets ---
 # Tells Make these aren't actual files to generate
-.PHONY: all clean unit_test
+.PHONY: all clean unit_test FORCE
+FORCE:
 
 all: MAGPARSER.exe
 # This target writes a small .f90 module containing the hash
