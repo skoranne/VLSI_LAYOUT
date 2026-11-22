@@ -29,6 +29,7 @@ module ControlModule
   use SystemInformationModule
   use MagicVLSILayoutParser
   use LayoutDBLoaderModule
+  use TRSOptimizerModule
   use iso_fortran_env, only: int32, int64, real64
   implicit none
   public :: ParseControlFile, GetLayerFromDBName
@@ -214,6 +215,8 @@ contains
     integer(kind=K_COORDINATE_KIND) :: used_precision
     character(len=1024) :: m4_cmd, expanded_file, echo_line, helper_name
     integer :: m4_stat, echo_unit, echo_ios, pid_self, pid_unit, helper_unit, helper_ios
+    character(len=1024) :: trs_rules_file, trs_file
+    integer :: trs_status
     db_count = 1
     TEMPORARY_FOLDER = ''
     TEMPORARY_LAYER_PREFIX = "MTL_"
@@ -275,6 +278,31 @@ contains
     end do
     close(echo_unit)
     write(*,'(A)') '--- END M4-EXPANDED CONTROL FILE ---'
+
+    ! Compile-time DAG analysis + term rewriting (trs_optimizer.f90), enabled by
+    ! `var trs_rules <file>` in the CTR or MAGPARSER_TRS_RULES in the environment.
+    call TRSFindRulesFile(trim(expanded_file), trs_rules_file)
+    if (len_trim(trs_rules_file) > 0) then
+       trs_file = trim(expanded_file) // '.trs.ctr'
+       write(*,'(A)') '--- BEGIN TRS OPTIMIZATION, rules: ' // trim(trs_rules_file) // ' ---'
+       call TRSOptimizeFile(trim(trs_rules_file), trim(expanded_file), trim(trs_file), .true., trs_status)
+       if (trs_status == 0) then
+          write(*,'(A)') 'INFO: TRS optimized control file: ' // trim(trs_file)
+          open(newunit=echo_unit, file=trim(trs_file), status='old', action='read', iostat=echo_ios)
+          if (echo_ios == 0) then
+             do
+                read(echo_unit, '(A)', iostat=echo_ios) echo_line
+                if (echo_ios /= 0) exit
+                write(*,'(A)') trim(echo_line)
+             end do
+             close(echo_unit)
+          end if
+          expanded_file = trs_file
+       else
+          write(*,'(A)') 'WARNING: TRS optimization failed; running the control file unoptimized.'
+       end if
+       write(*,'(A)') '--- END TRS OPTIMIZATION ---'
+    end if
 
     ! Open the expanded file for parsing
     open(newunit=unit, file=trim(expanded_file), status='old', action='read', iostat=ios)
@@ -355,6 +383,9 @@ contains
              else
                 write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
              end if             
+          else if( trim(rest(1:pos-1)) == 'trs_rules' .or. trim(rest(1:pos-1)) == 'trs_enable' ) then
+             !> consumed at compile time by TRSFindRulesFile / TRSOptimizeFile
+             write(*,*) 'INFO: TRS directive (handled before execution): ', trim(rest)
           else if( trim(rest(1:pos-1)) == 'temporary_layers' ) then             
              rest = adjustl(rest)
              pos = index( rest, ' ' )

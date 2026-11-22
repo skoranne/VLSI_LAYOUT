@@ -1,20 +1,29 @@
-# Example CTR with redundant operations for TRS
+# Example CTR with redundant operations for trs_dag.jl
+# (two-layer intersection is `*`; the keyword AND is single-layer self-overlap)
 program trs_example
 decl design d = MW4x4_FLAT.mag
 decl memory m = nothing
-# redundant: A NOT A
+# A NOT A == 0
 exec run m:r1 = d:diff NOT d:diff
-# A AND (B NOT A) pattern
+# A * (B NOT A) == 0
 exec run m:bna = d:poly NOT d:diff
-exec run m:r2 = d:diff AND m:bna
-# INSIDE/OUTSIDE same args
+exec run m:r2 = d:diff * m:bna
+# (A INSIDE B) * (A OUTSIDE B) == 0   (box model, Trs.Box.mzeroTerms 1)
 exec run m:in1 = d:diff INSIDE d:poly
 exec run m:out1 = d:diff OUTSIDE d:poly
-exec run m:r3 = m:in1 AND m:out1
-# INSIDE XOR AND same args
-exec run m:in2 = d:diff INSIDE d:poly
-exec run m:and2 = d:diff AND d:poly
-exec run m:r4 = m:in2 XOR m:and2
-# useful op
-exec run m:keep = d:diff AND d:poly
+exec run m:r3 = m:in1 * m:out1
+# (A INSIDE B) NOT B == 0   (C1: an INSIDE box lies in B)
+exec run m:r4 = m:in1 NOT d:poly
+# (A INSIDE B) ^ (A * B) is NOT a valid identity in the box model: must be kept
+exec run m:and2 = d:diff * d:poly
+exec run m:r5 = m:in1 ^ m:and2
+# (A INSIDE B) INSIDE B == A INSIDE B   (Trs.Box.sel_idem)
+exec run m:in3 = m:in1 INSIDE d:poly
+# (A * B) + A == A
+exec run m:r6 = m:and2 + d:diff
+# empty propagation: X + 0 == X
+exec run m:r7 = d:poly + m:r1
+# results that are used later
+exec run m:keep = m:r5 + m:in3
+exec run m:keep2 = m:r7 * m:r6
 end

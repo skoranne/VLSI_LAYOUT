@@ -119,6 +119,9 @@ test_contour.exe: test_contour.o $(LIBRARY)
 	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_morton.exe: test_morton.o $(LIBRARY)
 	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+TRS_OPT.exe: trs_main.o trs_optimizer.o
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@
+trs_main.o: trs_optimizer.o
 CONVERT.exe: test_polygonfracture.o $(LIBRARY)
 	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_boxmerge.exe: test_boxmerge.o $(LIBRARY)

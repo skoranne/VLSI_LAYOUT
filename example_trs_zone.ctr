@@ -1,11 +1,11 @@
-# CTR with CONNECT ZONE markers (TODO: full propagation)
+# CTR with CONNECT ZONE markers: no rewrites inside a zone
 program trs_zone
 START CONNECT ZONE 1
 decl design d = MW4x4_FLAT.mag
 decl memory m = nothing
 exec run m:r1 = d:diff NOT d:diff
 exec run m:bna = d:poly NOT d:diff
-exec run m:r2 = d:diff AND m:bna
+exec run m:r2 = d:diff * m:bna
 END CONNECT ZONE 1
-exec run m:keep = d:diff AND d:poly
+exec run m:keep = d:diff * d:poly
 end

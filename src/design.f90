@@ -1183,10 +1183,14 @@ contains
   end subroutine ClearLayer
 
   subroutine CopyLayer( output_layer, input_layer_A )
-    type(Layer), intent(inout) :: output_layer
-    type(Layer), intent(in) :: input_layer_A
+    type(Layer), intent(inout), target :: output_layer
+    type(Layer), intent(in), target :: input_layer_A
     character(len=*), parameter :: K_COPY_PREFIX = "MTL_COPY_"
     integer(kind=int64) :: n
+    !> Self-copy (e.g. `X = X COPY nothing`, or `X = X NOT Y` with empty Y via CalculateNOT):
+    !> output and input are the same object, and the deallocations below would free the
+    !> input before it is read.  Copying a layer onto itself is a no-op.
+    if( c_associated( c_loc(output_layer), c_loc(input_layer_A) ) ) return
     if( input_layer_A%n_used == 0 ) then
        call ClearLayer( output_layer )
        return

@@ -1,0 +1,10 @@
+# Redefinition: m:r uses the FIRST m:t (poly * diff, not empty); must not be rewritten
+program trs_redef
+decl design d = MW4x4_FLAT.mag
+decl memory m = nothing
+exec run m:t = d:poly * d:diff
+exec run m:r = d:diff * m:t
+exec run m:t = d:poly NOT d:diff
+exec run m:s = d:diff * m:t
+exec run m:out = m:r + m:s
+end
