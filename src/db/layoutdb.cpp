@@ -57,7 +57,7 @@ static bool spill_compact_to_disk(LdbCell& c, size_t idx){
     return true;
 }
 
-static std::vector<LdbBoxElem> load_boxes_on_demand(LdbCell& c){
+std::vector<LdbBoxElem> ldb_load_boxes_on_demand(LdbCell& c){
     if(!c.boxes.empty()) return c.boxes;
     if(!c.boxes_compact.empty()) return compact::decode_boxes(c.boxes_compact);
     if(c.boxes_on_disk && !c.boxes_spill_path.empty()){
@@ -329,7 +329,7 @@ extern "C" int ldb_iterate_boxes(ldb_file_t* fh, ldb_box_cb cb, void* ud){
             for(auto& b: c.boxes){ cb(ud, c.name.c_str(), b.layer, b.datatype, b.kind, b.x1,b.y1,b.x2,b.y2); }
         } else if(!c.boxes_compact.empty() || c.boxes_on_disk){
             // low-memory/compressed view: disk-access/on-demand decode
-            auto decoded = load_boxes_on_demand(c);
+            auto decoded = ldb_load_boxes_on_demand(c);
             for(auto& b: decoded){ cb(ud, c.name.c_str(), b.layer, b.datatype, b.kind, b.x1,b.y1,b.x2,b.y2); }
         }
     }
@@ -377,7 +377,7 @@ extern "C" int ldb_iterate_boxes_flat(ldb_file_t* fh, ldb_box_cb cb, void* ud){
             }
         };
         if(!c.boxes.empty()) emit_boxes(c.boxes);
-        else if(!c.boxes_compact.empty() || c.boxes_on_disk) emit_boxes(load_boxes_on_demand(c));
+        else if(!c.boxes_compact.empty() || c.boxes_on_disk) emit_boxes(ldb_load_boxes_on_demand(c));
         // recurse into instances
         for(const auto& inst: c.instances){
             auto it = f->cell_index.find(inst.ref_name);
@@ -464,7 +464,7 @@ extern "C" int ldb_iterate_polygons(ldb_file_t* fh, ldb_poly_cb cb, void* ud){
         } else if(!c.boxes.empty()){
             for(auto& b: c.boxes){ ldb_emit_poly_as_rect(cb,ud,c.name.c_str(),b.layer,b.datatype,b.kind,b.x1,b.y1,b.x2,b.y2); }
         } else if(!c.boxes_compact.empty() || c.boxes_on_disk){
-            auto decoded = load_boxes_on_demand(c);
+            auto decoded = ldb_load_boxes_on_demand(c);
             for(auto& b: decoded){ ldb_emit_poly_as_rect(cb,ud,c.name.c_str(),b.layer,b.datatype,b.kind,b.x1,b.y1,b.x2,b.y2); }
         }
     }
@@ -494,7 +494,7 @@ extern "C" int ldb_iterate_polygons_flat(ldb_file_t* fh, ldb_poly_cb cb, void* u
         } else if(!c.boxes.empty()){
             for(auto& b: c.boxes) emit_box(b);
         } else if(!c.boxes_compact.empty() || c.boxes_on_disk){
-            auto decoded = load_boxes_on_demand(c);
+            auto decoded = ldb_load_boxes_on_demand(c);
             for(auto& b: decoded) emit_box(b);
         }
         for(const auto& inst: c.instances){

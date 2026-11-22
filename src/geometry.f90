@@ -885,6 +885,11 @@ contains
        call omt_pack_recursive(arr, split_idx + 1_int64, end_idx, node_capacity, workspace)
     end if
 
+    ! The child tasks share this frame's arr/workspace dummy arguments, so
+    ! this frame must outlive them: returning early leaves the tasks with
+    ! dangling array descriptors (random SIGSEGV on large layers).
+    !$omp taskwait
+
   end subroutine omt_pack_recursive
 #endif
   ! Helper Subroutine: Computes the cost (Overlap and Area) of a proposed split

@@ -86,7 +86,7 @@ contains
     num_boxesB = input_layer_B%n_used
     if (num_boxesA == 0 .or. num_boxesB == 0) then
        call ClearLayer(output_layer)
-       output_layer%layerState = ior(output_layer%layerState, LAYER_STATE_HEAL)
+       call output_layer%mark( LAYER_STATE_HEAL )
        if (profiling_enabled) call RecordTime("CalculateAND", get_cpu_time() - t_start)
        return
     end if
@@ -253,7 +253,7 @@ contains
     bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
     call generate_trackers( input_layer_B%layer_boxes(1:input_layer_B%n_used), bboxA, trackers )
     call scanline_fracture(trackers, temp_layer%layer_boxes)
-    temp_layer%layerState = ior( temp_layer%layerState, LAYER_STATE_HEAL )
+    call temp_layer%mark( LAYER_STATE_HEAL )
     temp_layer%n_used = size( temp_layer%layer_boxes, kind=int64 )
     temp_layer%n_alloc = temp_layer%n_used
     call CalculateAND( input_layer_A, temp_layer, output_layer )

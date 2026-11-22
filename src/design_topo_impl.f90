@@ -52,7 +52,7 @@ contains
     output_layer%tree%root_index = 0
     if( numA == 0 ) then
        call ClearLayer( output_layer )
-       output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
+       call output_layer%mark( LAYER_STATE_HEAL )
        return
     end if
 
@@ -173,7 +173,7 @@ contains
           call ClearLayer( buffers(tid) )
        end do
        call ClearLayer( output_layer )
-       output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
+       call output_layer%mark( LAYER_STATE_HEAL )
     else
        allocate( output_layer%layer_boxes( output_layer%n_used ), stat=alloc_status )
        if( alloc_status /= 0 ) error stop "ALLOCATION FAILED in CalculateTopologicalSelect"

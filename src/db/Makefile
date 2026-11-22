@@ -2,6 +2,12 @@ CXX ?= g++
 AR ?= ar
 CXXFLAGS ?= -O2 -std=c++17 -Wall -Wextra -I. -DLAYOUTDB_USE_ZLIB
 LDFLAGS ?= -lz
+# The Fortran link on macOS (ifort) targets an older libc++ than the default
+# SDK; without a matching deployment target std::function leaves undefined
+# symbols (bad_function_call) in MAGPARSER.exe.
+ifeq ($(shell uname -s),Darwin)
+CXXFLAGS += -mmacosx-version-min=11.0
+endif
 NVCC ?= nvcc
 # Optional: make NVCOMP=1 NVCOMP_INC=... NVCOMP_LIB=... to enable GPU CBLOCK decompression
 ifdef NVCOMP
@@ -15,7 +21,7 @@ TESTS = db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip
 
 all: $(TESTS) liblayoutdb.a
 
-$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h
+$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h fracture.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 liblayoutdb.a: $(CORE_OBJS)

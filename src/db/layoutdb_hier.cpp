@@ -6,6 +6,17 @@
 #include <algorithm>
 #include <unordered_map>
 
+std::vector<LdbBoxElem> ldb_load_boxes_on_demand(LdbCell& c);   // layoutdb.cpp
+
+// Local boxes of a cell, decoded from the compact/on-disk form when the
+// low-memory mode has dropped the expanded copy.
+static const std::vector<LdbBoxElem>& cell_boxes(LdbCell& c, std::vector<LdbBoxElem>& scratch){
+    if(!c.boxes.empty() || (c.boxes_compact.empty() && !c.boxes_on_disk)) return c.boxes;
+    scratch = ldb_load_boxes_on_demand(c);
+    return scratch;
+}
+
+// p -> R(angle) * Mirror_x * mag * p + origin
 static void transform_point(const LdbTransform& t, int64_t ix, int64_t iy, int64_t& ox, int64_t& oy){
     double x = (double)ix * t.mag;
     double y = (double)iy * t.mag;
@@ -19,6 +30,18 @@ static void transform_point(const LdbTransform& t, int64_t ix, int64_t iy, int64
     oy = t.oy + (int64_t)llround(ry);
 }
 
+// Unit magnification and a multiple of 90 degrees: exact integer arithmetic.
+static bool orthogonal_matrix(const LdbTransform& t, int64_t m[4]){
+    if(t.mag != 1.0) return false;
+    double q = t.angle_deg / 90.0;
+    if(q != std::floor(q)) return false;
+    int k = (int)(((long long)q % 4 + 4) % 4);
+    static const int64_t c4[4] = {1,0,-1,0}, s4[4] = {0,1,0,-1};
+    int64_t my = t.mirror_x ? -1 : 1;
+    m[0] = c4[k]; m[1] = -s4[k]*my; m[2] = s4[k]; m[3] = c4[k]*my;
+    return true;
+}
+
 static void transform_bbox(const LdbTransform& t, int64_t x1,int64_t y1,int64_t x2,int64_t y2,
                            int64_t& ox1,int64_t& oy1,int64_t& ox2,int64_t& oy2){
     int64_t px[4], py[4];
@@ -30,18 +53,15 @@ static void transform_bbox(const LdbTransform& t, int64_t x1,int64_t y1,int64_t 
     for(int i=1;i<4;i++){ if(px[i]<ox1)ox1=px[i]; if(px[i]>ox2)ox2=px[i]; if(py[i]<oy1)oy1=py[i]; if(py[i]>oy2)oy2=py[i]; }
 }
 
+// Placement `inst` seen through its parent's transform:
+//   P(I(p)) = Rp Mp sp (Ri Mi si p + oi) + op,  and  Mp Ri = R(-ai) Mp.
+// Array expansion is handled by the caller.
 static void compose_transform(const LdbTransform& parent, const LdbTransform& inst, LdbTransform& out){
-    // apply inst in parent context: for non-orthogonal/complex cases approximate by transforming origin and accumulating
-    // For general case, we handle translation+mag+mirror+angle by transforming the instance origin and adding angles/mags.
-    // Array expansion is handled separately.
     out = inst;
-    // transform inst origin by parent
-    int64_t tox, toy;
-    transform_point(parent, inst.ox, inst.oy, tox, toy);
-    out.ox = tox; out.oy = toy;
+    transform_point(parent, inst.ox, inst.oy, out.ox, out.oy);
     out.mag = parent.mag * inst.mag;
-    out.angle_deg = parent.angle_deg + inst.angle_deg;
-    out.mirror_x = parent.mirror_x ^ inst.mirror_x; // simplified composition
+    out.angle_deg = parent.angle_deg + (parent.mirror_x ? -inst.angle_deg : inst.angle_deg);
+    out.mirror_x = parent.mirror_x ^ inst.mirror_x;
     out.cols = 1; out.rows = 1; out.dx=out.dy=out.row_dx=out.row_dy=0;
 }
 
@@ -88,8 +108,11 @@ static bool cell_extent_flat(LdbFile* f, const std::string& cname,
     auto& cell = f->cells[it->second];
     ldb_extent_t ext{0,0,0,0,0};
     // local geometry bbox
-    for(auto& b : cell.boxes){
-        ldb_extent_add_point(ext, b.x1,b.y1); ldb_extent_add_point(ext, b.x2,b.y2);
+    {
+        std::vector<LdbBoxElem> scratch;
+        for(auto& b : cell_boxes(cell, scratch)){
+            ldb_extent_add_point(ext, b.x1,b.y1); ldb_extent_add_point(ext, b.x2,b.y2);
+        }
     }
     // instances
     for(auto& inst : cell.instances){
@@ -120,10 +143,25 @@ static void hier_iter_cell(LdbFile* f, const std::string& cname, const LdbTransf
     visiting.insert(cname);
     auto& cell = f->cells[it->second];
     // emit local geometry transformed
-    for(auto& b : cell.boxes){
-        int64_t x1,y1,x2,y2;
-        transform_bbox(cur_tr, b.x1,b.y1,b.x2,b.y2, x1,y1,x2,y2);
-        cb(ud, cname.c_str(), b.layer, b.datatype, b.kind, x1,y1,x2,y2);
+    {
+        std::vector<LdbBoxElem> scratch;
+        const std::vector<LdbBoxElem>& boxes = cell_boxes(cell, scratch);
+        int64_t m[4];
+        if(orthogonal_matrix(cur_tr, m)){
+            for(auto& b : boxes){
+                int64_t ax = m[0]*b.x1 + m[1]*b.y1, ay = m[2]*b.x1 + m[3]*b.y1;
+                int64_t bx = m[0]*b.x2 + m[1]*b.y2, by = m[2]*b.x2 + m[3]*b.y2;
+                cb(ud, cname.c_str(), b.layer, b.datatype, b.kind,
+                   cur_tr.ox + std::min(ax,bx), cur_tr.oy + std::min(ay,by),
+                   cur_tr.ox + std::max(ax,bx), cur_tr.oy + std::max(ay,by));
+            }
+        } else {
+            for(auto& b : boxes){
+                int64_t x1,y1,x2,y2;
+                transform_bbox(cur_tr, b.x1,b.y1,b.x2,b.y2, x1,y1,x2,y2);
+                cb(ud, cname.c_str(), b.layer, b.datatype, b.kind, x1,y1,x2,y2);
+            }
+        }
     }
     // recurse into instances if depth allows
     if(max_depth < 0 || depth < max_depth){

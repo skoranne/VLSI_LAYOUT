@@ -32,7 +32,7 @@ contains
     if( NeedsRTree( input_layer ) ) call BuildTree( input_layer )
     call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY, &
                       input_layer%tree%tree_nodes, input_layer%tree%root_index, overlap_area, overlap_perimeter)
-    input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_PNUM )    
+    call input_layer%mark( LAYER_STATE_PNUM )    
   end subroutine PerformMergeLayer
   
   module function CertifyHealing( input_layer ) result(retval)
@@ -73,7 +73,7 @@ contains
       end do
       call move_alloc( from=tempBoxes, to=output_layer%layer_boxes)
       output_layer%n_alloc = N
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_FINAL )
+      call output_layer%mark( LAYER_STATE_FINAL )
    end subroutine FinalizeLayer
 
 
@@ -170,7 +170,7 @@ contains
       end if
       !> we can choose not to perform some operations later
       call FinalizeLayer( output_layer )
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL ) !> otherwise this might merge
+      call output_layer%mark( LAYER_STATE_HEAL ) !> otherwise this might merge
       call PreprocessLayer( output_layer )
    end subroutine FilterLayer
 
@@ -304,7 +304,7 @@ contains
             end do
          end block
       end do
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL ) !> otherwise this might merge
+      call output_layer%mark( LAYER_STATE_HEAL ) !> otherwise this might merge
       call PreprocessLayer( output_layer )
        if (profiling_enabled) call RecordTime("CreateGrid", get_cpu_time() - t_start)
    end subroutine CreateGrid
@@ -323,7 +323,7 @@ contains
       if( .not. output_layer%layer_boxes(1)%is_valid() ) error stop
       output_layer%n_used = 1
       output_layer%layerState = LAYER_STATE_HEAL
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_SORT )
+      call output_layer%mark( LAYER_STATE_SORT )
       call PreprocessLayer( output_layer )
    end subroutine CreateEXTENT
 
@@ -363,9 +363,9 @@ contains
             !call SortBoxesDirect( input_layer_A%layer_boxes, N )
             call omt_pack( input_layer_A%layer_boxes , K_LEAF_CAPACITY )
          end if
-         input_layer_A%layerState = ior( input_layer_A%layerState, LAYER_STATE_SORT )
+         call input_layer_A%mark( LAYER_STATE_SORT )
          call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, input_layer_A%tree%tree_nodes, input_layer_A%tree%root_index)
-         input_layer_A%layerState = ior( input_layer_A%layerState, LAYER_STATE_RTREE )
+         call input_layer_A%mark( LAYER_STATE_RTREE )
       end if
       call ComputeInteractionsCPU( input_layer_A%tree%tree_nodes, int(size(input_layer_A%tree%tree_nodes),kind=int64),&
          input_layer_A%layer_boxes, N,&
@@ -407,9 +407,9 @@ contains
             !call SortBoxesDirect( input_layer%layer_boxes, N )
             call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
          end if
-         input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
+         call input_layer%mark( LAYER_STATE_SORT )
          call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
-         input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
+         call input_layer%mark( LAYER_STATE_RTREE )
       end if
 
       call FindSingletonsCPU( input_layer%layer_boxes, input_layer%tree%tree_nodes, input_layer%tree%root_index,&
@@ -432,7 +432,7 @@ contains
       integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
       !> we cannot call Preprocess and neither should it be called prior
       if( input_layer_A%n_used == 0 ) then
-         input_layer_A%layerState = 31 !> we set everything
+         input_layer_A%layerState = LAYER_STATE_PREPROCESSED !> we set everything
          return
       end if
 
@@ -461,7 +461,7 @@ contains
          if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
          allocate( input_layer_A%tree%tree_nodes( CalculateTotalNodes( input_layer_A%n_used, K_LEAF_CAPACITY ) ) )
          call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, input_layer_A%tree%tree_nodes, input_layer_A%tree%root_index)
-         input_layer_A%layerState = ior( input_layer_A%layerState, LAYER_STATE_RTREE )
+         call input_layer_A%mark( LAYER_STATE_RTREE )
       end if
 
       nthreads = omp_get_max_threads()
@@ -540,7 +540,7 @@ contains
       end do
       output_layer%n_used = num_boxesC
       !> we can use the optimization that by construction the output is HEALED
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )
+      call output_layer%mark( LAYER_STATE_HEAL )
    end subroutine CalculateSingleLayerAND
 
 
@@ -614,7 +614,7 @@ contains
       !write(*,*) 'GROW : ', ivar
       call box_grow_directional(output_layer%layer_boxes, ivar(1), ivar(2), ivar(3), ivar(4) )
       !write(*,*) 'OUTPUT_STATE = ', output_layer%layerState
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_SORT ) !> optimization
+      call output_layer%mark( LAYER_STATE_SORT ) !> optimization
       call BuildTree( output_layer ) !> this can be built from the input_layer, see above
       call MergeHealLayer( output_layer )
       call PreprocessLayer( output_layer )
@@ -746,7 +746,7 @@ contains
                templayerGrid(rows,cols)%n_used = size( templayerGrid(rows,cols)%layer_boxes)
                if( allocated( trackersGrid(rows,cols)%trackers)) deallocate( trackersGrid(rows,cols)%trackers )
                grid_layer_counts(rows,cols,TEMP_LAYER_GRID) = templayerGrid(rows,cols)%n_used
-               templayerGrid(rows,cols)%layerState = ior( templayerGrid(rows,cols)%layerState, LAYER_STATE_HEAL)
+               call templayerGrid(rows,cols)%mark( LAYER_STATE_HEAL )
                if( templayerGrid(rows,cols)%n_used == 0 ) error stop "GENERATED TASK 2 FRAME tempLayer EMPTY"
             end if
 
@@ -805,7 +805,7 @@ contains
       end do
       deallocate( outputGrid )
       output_layer%n_used = total_count
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )    !> correct by construction in each GRID
+      call output_layer%mark( LAYER_STATE_HEAL )    !> correct by construction in each GRID
       call PreprocessLayer( output_layer )
       if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
    end subroutine CalculateFrameNOTExplicit
@@ -903,7 +903,7 @@ contains
                   call generate_trackers( BinGrid(rows,cols)%layer_boxes, grids(rows,cols)%layer_boxes(1), &
                      trackersGrid(rows,cols)%trackers ) !> this does CW ordering of inner contours
                   call scanline_fracture(trackersGrid(rows,cols)%trackers, templayerGrid(rows,cols)%layer_boxes)
-                  templayerGrid(rows,cols)%layerState = ior( templayerGrid(rows,cols)%layerState, LAYER_STATE_HEAL)
+                  call templayerGrid(rows,cols)%mark( LAYER_STATE_HEAL )
                   templayerGrid(rows,cols)%n_used = size( templayerGrid(rows,cols)%layer_boxes)
                   if( templayerGrid(rows,cols)%n_used == 0 ) error stop "GENERATED TASK 2 FRAME tempLayer EMPTY"
                end if
@@ -963,7 +963,7 @@ contains
          end do
       end do
       output_layer%n_used = total_count
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )    !> correct by construction in each GRID
+      call output_layer%mark( LAYER_STATE_HEAL )    !> correct by construction in each GRID
       call PreprocessLayer( output_layer )
       if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
    end subroutine CalculateFrameNOTTask
@@ -1082,10 +1082,10 @@ contains
    end subroutine CalculateExplicitXOR
 
    module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, &
-        functype, control_opcode, control_parameter )
+        kernel, control_opcode, control_parameter )
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout)   :: output_layer
-      type(CGFunction) :: functype
+      procedure(LayerKernel)     :: kernel
       integer(kind=int64), intent(in) :: control_opcode, control_parameter
       real(kind=real64)           :: t_start
       integer(kind=int64) :: total_count, i, number_tree_nodes
@@ -1103,7 +1103,7 @@ contains
       real(kind=real64), allocatable :: start_time(:,:), end_time(:,:), elapsed_time(:,:)
       integer(kind=int64), allocatable :: grid_layer_counts(:,:,:)
       integer,parameter :: A_IN_GRID=1, B_IN_GRID=2, TRACKER_GRID=3, TEMP_LAYER_GRID=4, OUTPUT_LAYER_GRID=5
-      type(CGArgument2) :: local_arg
+      type(CGArgument) :: local_arg
       if (profiling_enabled) t_start = get_cpu_time()
       number_tree_nodes = CalculateTotalNodes( max( input_layer_A%n_used, input_layer_B%n_used ), K_LEAF_CAPACITY )
       K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
@@ -1163,7 +1163,7 @@ contains
             local_arg%C => outputGrid(rows,cols)
             local_arg%control_opcode = control_opcode
             local_arg%control_parameter = control_parameter
-            call functype%main_compute( local_arg )
+            call kernel( local_arg )
             grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID) = outputGrid(rows,cols)%n_used
             call cpu_time(end_time(rows,cols))
             call system_clock(count=end_tick(rows,cols))
@@ -1226,36 +1226,23 @@ contains
       if (profiling_enabled) call RecordTime("CalculateFrameFunction2", get_cpu_time() - t_start)
    end subroutine CalculateFrameFunction2
 
-   subroutine BoostMainCompute1(ad)
-      class(*), intent(inout) :: ad
-      type(Layer)             :: tempLayer
-      select type (arg_data => ad)
-       type is (CGArgument1)
-         call CalculateBoostOperation( arg_data%A, tempLayer, arg_data%C, arg_data%control_opcode, arg_data%control_parameter )
-       class default
-         error stop "ERROR: Not supported yet."
-      end select
-   end subroutine BoostMainCompute1
+   !> Frame kernels: C = boost_op(A [, B]) on one tile
+   subroutine BoostKernelUnary(arg)
+      type(CGArgument), intent(inout) :: arg
+      type(Layer)                     :: empty_layer
+      call CalculateBoostOperation( arg%A, empty_layer, arg%C, arg%control_opcode, arg%control_parameter )
+   end subroutine BoostKernelUnary
 
-   subroutine BoostMainCompute2(ad)
-      class(*), intent(inout) :: ad
-      select type (arg_data => ad)
-       type is (CGArgument2)
-         call CalculateBoostOperation( arg_data%A, arg_data%B, arg_data%C, arg_data%control_opcode, arg_data%control_parameter )
-       class default
-         error stop "ERROR: Not supported yet."
-      end select
-   end subroutine BoostMainCompute2
+   subroutine BoostKernelBinary(arg)
+      type(CGArgument), intent(inout) :: arg
+      call CalculateBoostOperation( arg%A, arg%B, arg%C, arg%control_opcode, arg%control_parameter )
+   end subroutine BoostKernelBinary
 
    module subroutine CalculateFrameNOT( input_layer_A, input_layer_B, output_layer )
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout) :: output_layer
-      type(CGFunction)           :: local_functiontype
-      local_functiontype%preamble => null()
-      local_functiontype%main_compute => BoostMainCompute2
-      local_functiontype%postamble => null()
 
-      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, local_functiontype, K_BOOST_CONTROL_NOT, 0_int64 )
+      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_NOT, 0_int64 )
       if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
       output_layer%layerState = LAYER_STATE_HEAL
       call PreprocessLayer( output_layer )
@@ -1264,12 +1251,8 @@ contains
    module subroutine CalculateXOR( input_layer_A, input_layer_B, output_layer )
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout) :: output_layer
-      type(CGFunction)           :: local_functiontype
-      local_functiontype%preamble => null()
-      local_functiontype%main_compute => BoostMainCompute2
-      local_functiontype%postamble => null()
 
-      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, local_functiontype, K_BOOST_CONTROL_XOR, 0_int64 )
+      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_XOR, 0_int64 )
       output_layer%layerState = LAYER_STATE_HEAL
       call PreprocessLayer( output_layer )
    end subroutine CalculateXOR
@@ -1277,21 +1260,17 @@ contains
    module subroutine CalculateFrameAND( input_layer_A, input_layer_B, output_layer )
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout) :: output_layer
-      type(CGFunction)           :: local_functiontype
-      local_functiontype%preamble => null()
-      local_functiontype%main_compute => BoostMainCompute2
-      local_functiontype%postamble => null()
 
-      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, local_functiontype, K_BOOST_CONTROL_AND, 0_int64 )
+      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_AND, 0_int64 )
       output_layer%layerState = LAYER_STATE_HEAL
       call PreprocessLayer( output_layer )
     end subroutine CalculateFrameAND
    
    !> Single layer FRAME function wrapper
-   module subroutine CalculateFrameFunction1( input_layer_A, output_layer, functype, control_opcode, control_parameter )
+   module subroutine CalculateFrameFunction1( input_layer_A, output_layer, kernel, control_opcode, control_parameter )
       type(Layer), intent(inout) :: input_layer_A
       type(Layer), intent(inout)   :: output_layer
-      type(CGFunction) :: functype
+      procedure(LayerKernel)     :: kernel
       integer(kind=int64), intent(in) :: control_opcode, control_parameter
       integer(kind=int64) :: total_count, i, number_tree_nodes
       integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
@@ -1308,7 +1287,7 @@ contains
       real(kind=real64), allocatable :: start_time(:,:), end_time(:,:), elapsed_time(:,:)
       integer(kind=int64), allocatable :: grid_layer_counts(:,:,:)
       integer,parameter :: A_IN_GRID=1, B_IN_GRID=2, TRACKER_GRID=3, TEMP_LAYER_GRID=4, OUTPUT_LAYER_GRID=5
-      type(CGArgument1) :: local_arg
+      type(CGArgument) :: local_arg
       number_tree_nodes = CalculateTotalNodes( input_layer_A%n_used, K_LEAF_CAPACITY )
       K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
       !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
@@ -1356,7 +1335,7 @@ contains
                local_arg%C => outputGrid(rows,cols)
                local_arg%control_opcode = control_opcode
                local_arg%control_parameter = control_parameter
-               call functype%main_compute( local_arg )
+               call kernel( local_arg )
                grid_layer_counts(rows,cols,OUTPUT_LAYER_GRID) = outputGrid(rows,cols)%n_used
                call cpu_time(end_time(rows,cols))
                call system_clock(count=end_tick(rows,cols))
@@ -1409,7 +1388,7 @@ contains
       end do
       deallocate( outputGrid )
       output_layer%n_used = total_count
-      output_layer%layerState = ior( output_layer%layerState, LAYER_STATE_HEAL )    !> correct by construction in each GRID
+      call output_layer%mark( LAYER_STATE_HEAL )    !> correct by construction in each GRID
       call PreprocessLayer( output_layer )
       if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
    end subroutine CalculateFrameFunction1
@@ -1417,7 +1396,6 @@ contains
    module subroutine MergeHealLayer( input_layer )
       type(Layer), intent( inout ) :: input_layer
       type(Layer)                  :: tempLayer
-      type(CGFunction)             :: local_functiontype
       integer(kind=int64)          :: output_box_count
       !if( CertifyHealing( input_layer ) ) return
       !write(*,*) 'INFO: Even GPU says, merge is needed.'
@@ -1429,10 +1407,7 @@ contains
          input_layer%layerState = LAYER_STATE_HEAL
          return
       end if
-      local_functiontype%preamble => null()
-      local_functiontype%main_compute => BoostMainCompute1
-      local_functiontype%postamble => null()
-      call CalculateFrameFunction1( input_layer, tempLayer, local_functiontype, K_BOOST_CONTROL_MERGE, 0_int64 )
+      call CalculateFrameFunction1( input_layer, tempLayer, BoostKernelUnary, K_BOOST_CONTROL_MERGE, 0_int64 )
       call swap_layer( input_layer, tempLayer, .false. ) !> do NOT swap filenames
       !> any time you move down from RTree state you have to delete the tree
       if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )

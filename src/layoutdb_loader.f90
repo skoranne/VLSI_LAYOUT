@@ -13,6 +13,10 @@ module LayoutDBLoaderModule
   type :: ldb_load_ctx
      type(Design), pointer :: design => null()
      integer :: max_layers = 0
+     ! Consecutive boxes nearly always share a layer: remember the last one
+     ! so that the name formatting and hash lookup run once per run of boxes.
+     integer(c_int) :: last_layer_num = -1, last_datatype = -1
+     integer :: last_layer_idx = 0
   end type ldb_load_ctx
 
 contains
@@ -29,6 +33,12 @@ contains
     call c_f_pointer(ud, ctx)
     if(.not. associated(ctx)) return
     if(.not. associated(ctx%design)) return
+    ! Zero-area shapes contribute nothing and are rejected downstream as INVALID BOX.
+    if(x1 == x2 .or. y1 == y2) return
+    if(ctx%last_layer_idx > 0 .and. layer_num == ctx%last_layer_num .and. datatype == ctx%last_datatype) then
+       call store_box(ctx, ctx%last_layer_idx, x1, y1, x2, y2)
+       return
+    end if
     write(buf,'("L",I0,"_D",I0)') layer_num, datatype
     call hash_get(ctx%design%ht, trim(buf), layer_idx, ins)
     if(.not. ins) then
@@ -83,13 +93,25 @@ contains
          call hash_put(ctx%design%ht, trim(a4), layer_idx, ins2)
        end block
     end if
-    call push_box_local(ctx%design, layer_idx, int(x1,kind=K_COORDINATE_KIND), int(y1,kind=K_COORDINATE_KIND), &
-                        int(x2,kind=K_COORDINATE_KIND), int(y2,kind=K_COORDINATE_KIND))
-    if(int(x1,kind=K_COORDINATE_KIND) < ctx%design%DESIGN_EXTENT%x1) ctx%design%DESIGN_EXTENT%x1 = int(x1,kind=K_COORDINATE_KIND)
-    if(int(y1,kind=K_COORDINATE_KIND) < ctx%design%DESIGN_EXTENT%y1) ctx%design%DESIGN_EXTENT%y1 = int(y1,kind=K_COORDINATE_KIND)
-    if(int(x2,kind=K_COORDINATE_KIND) > ctx%design%DESIGN_EXTENT%x2) ctx%design%DESIGN_EXTENT%x2 = int(x2,kind=K_COORDINATE_KIND)
-    if(int(y2,kind=K_COORDINATE_KIND) > ctx%design%DESIGN_EXTENT%y2) ctx%design%DESIGN_EXTENT%y2 = int(y2,kind=K_COORDINATE_KIND)
+    ctx%last_layer_num = layer_num
+    ctx%last_datatype  = datatype
+    ctx%last_layer_idx = layer_idx
+    call store_box(ctx, layer_idx, x1, y1, x2, y2)
   end subroutine box_callback
+
+  subroutine store_box(ctx, layer_idx, x1, y1, x2, y2)
+    type(ldb_load_ctx), intent(inout) :: ctx
+    integer, intent(in) :: layer_idx
+    integer(c_int64_t), intent(in) :: x1, y1, x2, y2
+    integer(kind=K_COORDINATE_KIND) :: bx1, by1, bx2, by2
+    bx1 = int(min(x1,x2), kind=K_COORDINATE_KIND); bx2 = int(max(x1,x2), kind=K_COORDINATE_KIND)
+    by1 = int(min(y1,y2), kind=K_COORDINATE_KIND); by2 = int(max(y1,y2), kind=K_COORDINATE_KIND)
+    call push_box_local(ctx%design, layer_idx, bx1, by1, bx2, by2)
+    associate(e => ctx%design%DESIGN_EXTENT)
+      e%x1 = min(e%x1, bx1); e%y1 = min(e%y1, by1)
+      e%x2 = max(e%x2, bx2); e%y2 = max(e%y2, by2)
+    end associate
+  end subroutine store_box
 
   subroutine push_box_local(d, layer_idx, x1,y1,x2,y2)
     type(Design), intent(inout) :: d
@@ -173,7 +195,8 @@ contains
     allocate(load_design%layers(MAX_LAYERS))
     allocate(load_design%layerNames(MAX_LAYERS))
     load_design%layerNames = ''
-    call hash_create(load_design%ht, MAX_LAYERS)
+    ! Each layer is registered under four aliases (L1_D2, L1_2, 1:2, 1_2).
+    call hash_create(load_design%ht, 4*MAX_LAYERS)
     call load_design%DESIGN_EXTENT%reset_to_infinity()
     do i=1,MAX_LAYERS
        load_design%layers(i)%n_used=0; load_design%layers(i)%n_alloc=0
@@ -204,6 +227,20 @@ contains
     end do
   end subroutine trim_design_layers
 
+  ! One line per layer that received geometry.  (The hash table holds four
+  ! aliases per layer, so its item count is not the number of layers.)
+  subroutine report_layers(d, verb)
+    type(Design), intent(in) :: d
+    character(len=*), intent(in) :: verb
+    integer :: i, n
+    n = count(len_trim(d%layerNames) > 0)
+    write(*,'(5A,I0,A)') 'INFO: ', verb, ' ', trim(d%fileName), ': ', n, ' layers'
+    do i = 1, size(d%layerNames)
+       if(len_trim(d%layerNames(i)) == 0) cycle
+       write(*,'(A,I0,3A,I0,A)') '  Layer ', i, ': ', trim(d%layerNames(i)), ' (', d%layers(i)%n_used, ' boxes)'
+    end do
+  end subroutine report_layers
+
   subroutine LoadLayoutDBFile(load_design, MAX_LAYERS)
     type(Design), intent(inout), target :: load_design
     integer, intent(in) :: MAX_LAYERS
@@ -211,17 +248,13 @@ contains
     type(ldb_load_ctx), target :: ctx
     type(c_funptr) :: cb
     integer(c_int) :: rc
-    integer :: i
     call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
     if(.not. c_associated(fh)) return
     cb = c_funloc(box_callback)
     rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
     call ldb_close_c(fh)
     call trim_design_layers(load_design)
-    write(*,*) 'INFO: Loaded ', hash_nitems(load_design%ht), ' layers from ', trim(load_design%fileName)
-    do i = 1, hash_nitems(load_design%ht)
-       write(*,*) '  Layer ', i, ': ', trim(load_design%layerNames(i))
-    end do
+    call report_layers(load_design, 'Loaded')
   end subroutine LoadLayoutDBFile
 
   subroutine LoadLayoutDBFileHier(load_design, MAX_LAYERS)
@@ -239,7 +272,7 @@ contains
     rc = ldb_iterate_boxes_hier_c(fh, topc, -1, cb, c_loc(ctx))
     call ldb_close_c(fh)
     call trim_design_layers(load_design)
-    write(*,*) 'INFO: Hierarchically loaded ', hash_nitems(load_design%ht), ' layers from ', trim(load_design%fileName)
+    call report_layers(load_design, 'Hierarchically loaded')
   end subroutine LoadLayoutDBFileHier
 
 end module LayoutDBLoaderModule

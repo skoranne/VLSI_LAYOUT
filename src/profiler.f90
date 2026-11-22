@@ -37,11 +37,14 @@ module ProfilerModule
        character(len=*), intent(in) :: name
        real(kind=real64), intent(in) :: duration
        integer :: i
-       logical :: found = .false.
+       logical :: found
 
+       ! Initialisation must happen under the lock too: RecordTime is called
+       ! from concurrent tasks, and two threads racing through InitProfiler
+       ! abort with "allocatable array is already allocated".
+       !$omp critical (profiler_table)
        if (.not. profiler_initialized) call InitProfiler()
-
-       !$omp critical
+       found = .false.
        do i = 1, num_profiles
           if (profiles(i)%name == name) then
              profiles(i)%total_time = profiles(i)%total_time + duration
@@ -67,7 +70,7 @@ module ProfilerModule
           profiles(num_profiles)%total_time = duration
           profiles(num_profiles)%call_count = 1
        end if
-       !$omp end critical
+       !$omp end critical (profiler_table)
     end subroutine RecordTime
 
     subroutine PrintProfileSummary()

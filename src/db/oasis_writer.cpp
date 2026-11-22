@@ -1,3 +1,10 @@
+// OASIS (SEMI P39) writer.
+//
+// Emits standard-conforming files: START with an in-record (empty) table
+// offset block, CELLNAME / PROPNAME / PROPSTRING tables with explicit
+// reference numbers, CELL, PLACEMENT (with repetitions), RECTANGLE, POLYGON,
+// PROPERTY and a 256-byte END record.  The byte encodings mirror oasis.cpp.
+
 #include "layoutdb_internal.hpp"
 #include <cmath>
 #include <cstdio>
@@ -8,195 +15,182 @@
 #include <map>
 #include <utility>
 
-// OASIS writer with PROPERTY support and valid record encoding (KLayout-compatible).
-// Supports: START, CELLNAME, PROPNAME, PROPSTRING, CELL, RECTANGLE, POLYGON, PATH, CIRCLE, TRAPEZOID, CTRAPEZOID, PROPERTY, END.
-// Also generates GEAR-like curvilinear (sampled polygon) layout with cutouts for 3DIC.
+std::vector<LdbBoxElem> ldb_load_boxes_on_demand(LdbCell& c);   // layoutdb.cpp
 
 namespace {
 
-struct W {
+enum Record : uint8_t {
+    REC_START = 1, REC_END = 2, REC_CELLNAME_REF = 4, REC_PROPNAME_REF = 8, REC_PROPSTRING_REF = 10,
+    REC_CELL_REF = 13, REC_PLACEMENT = 17, REC_PLACEMENT_GENERAL = 18, REC_RECTANGLE = 20,
+    REC_POLYGON = 21, REC_PROPERTY = 28
+};
+
+struct Writer {
     std::vector<uint8_t> b;
-    void u8(uint8_t v){ b.push_back(v); }
-    void bytes(const void* p,size_t n){ auto*c=(const uint8_t*)p; b.insert(b.end(),c,c+n); }
-    void uvar(uint64_t v){ while(v>=0x80){ u8(uint8_t(v|0x80)); v>>=7; } u8(uint8_t(v)); }
-    void svar(int64_t v){ uint64_t u=(v>=0)?(uint64_t(v)<<1):((uint64_t(-(v+1))<<1)|1); uvar(u); }
-    void astr(const std::string& s){ uvar(s.size()); bytes(s.data(),s.size()); }
-    void bstr(const std::string& s){ uvar(s.size()); bytes(s.data(),s.size()); }
-    void nstr(const std::string& s){ astr(s); }
-    // reals
-    void real_uint(uint64_t v){ u8(0); uvar(v); } // type 0: positive integer
-    void real_neg_uint(uint64_t v){ u8(1); uvar(v); }
-    void real_pos_int_exp(uint64_t mant, int64_t exp){ u8(2); uvar(mant); svar(exp); }
-    void real_neg_int_exp(uint64_t mant, int64_t exp){ u8(3); uvar(mant); svar(exp); }
-    void real_pos_recip(uint64_t d){ u8(4); uvar(d); }
-    void real_pos_ratio(uint64_t n,uint64_t d){ u8(6); uvar(n); uvar(d); }
-    void real_double(double v){ u8(8); bytes(&v,8); } // IEEE 64
+    void u8(uint8_t v) { b.push_back(v); }
+    void bytes(const void* p, size_t n) { auto* c = (const uint8_t*)p; b.insert(b.end(), c, c + n); }
+    void uint_(uint64_t v) { while (v >= 0x80) { u8(uint8_t(v | 0x80)); v >>= 7; } u8(uint8_t(v)); }
+    static uint64_t mag(int64_t v) { return v < 0 ? (uint64_t)0 - (uint64_t)v : (uint64_t)v; }
+    void sint(int64_t v) { uint_((mag(v) << 1) | (v < 0 ? 1u : 0u)); }      // sign in the low bit
+    void str(const std::string& s) { uint_(s.size()); bytes(s.data(), s.size()); }
+    void real_whole(uint64_t v) { uint_(0); uint_(v); }
+    void real_double(double v) { uint_(7); bytes(&v, 8); }
+    void gdelta(int64_t dx, int64_t dy) {                                   // general form
+        uint_((mag(dx) << 2) | (dx < 0 ? 2u : 0u) | 1u);
+        uint_((mag(dy) << 1) | (dy < 0 ? 1u : 0u));
+    }
+
+    void begin(uint64_t grid_per_micron) {
+        bytes("%SEMI-OASIS\r\n", 13);
+        u8(REC_START); str("1.0"); real_whole(grid_per_micron);
+        uint_(0);                                       // table offsets follow, here
+        for (int i = 0; i < 12; ++i) uint_(0);          // six (strict flag, offset) pairs: no tables
+    }
+    void end() {
+        u8(REC_END);
+        str(std::string(252, '\0'));                    // pads the record to 256 bytes
+        uint_(0);                                       // no validation signature
+    }
+    // One-value property whose name is a PROPNAME reference; the value is an
+    // n-string or, when value_ref >= 0, a PROPSTRING reference.
+    void property(uint64_t name_ref, const std::string& value, long value_ref = -1) {
+        u8(REC_PROPERTY); u8(0x16);                     // one value, name by reference number
+        uint_(name_ref);
+        if (value_ref >= 0) { uint_(15); uint_((uint64_t)value_ref); }
+        else { uint_(12); str(value); }
+    }
+    void rectangle(int layer, int datatype, int64_t x, int64_t y, int64_t w, int64_t h) {
+        u8(REC_RECTANGLE); u8(0x7B);                    // W H X Y D L
+        uint_((uint64_t)layer); uint_((uint64_t)datatype);
+        uint_((uint64_t)w); uint_((uint64_t)h); sint(x); sint(y);
+    }
+    void polygon(int layer, int datatype, const std::vector<std::pair<int64_t, int64_t>>& pts) {
+        if (pts.size() < 3) return;
+        u8(REC_POLYGON); u8(0x3B);                      // P X Y D L
+        uint_((uint64_t)layer); uint_((uint64_t)datatype);
+        uint_(4); uint_(pts.size() - 1);                // point list: general deltas
+        for (size_t i = 1; i < pts.size(); ++i) gdelta(pts[i].first - pts[i - 1].first, pts[i].second - pts[i - 1].second);
+        sint(pts[0].first); sint(pts[0].second);
+    }
+    void placement(uint64_t cell_ref, const LdbTransform& t) {
+        const bool array = t.cols > 1 || t.rows > 1;
+        const double quarter = t.angle_deg / 90.0;
+        const bool simple = t.mag == 1.0 && quarter == std::floor(quarter);
+        uint8_t info = 0xF0 | (array ? 0x08 : 0) | (t.mirror_x ? 0x01 : 0);   // C N X Y [R] [F]
+        if (simple) {
+            info |= (uint8_t)((((long long)quarter % 4 + 4) % 4) << 1);
+            u8(REC_PLACEMENT); u8(info); uint_(cell_ref);
+        } else {
+            info |= 0x06;                               // magnification and angle follow
+            u8(REC_PLACEMENT_GENERAL); u8(info); uint_(cell_ref);
+            real_double(t.mag); real_double(t.angle_deg);
+        }
+        sint(t.ox); sint(t.oy);
+        if (!array) return;
+        if (t.cols > 1 && t.rows > 1) {
+            uint_(8); uint_((uint64_t)t.cols - 2); uint_((uint64_t)t.rows - 2);
+            gdelta(t.dx, t.dy); gdelta(t.row_dx, t.row_dy);
+        } else if (t.cols > 1) { uint_(9); uint_((uint64_t)t.cols - 2); gdelta(t.dx, t.dy); }
+        else { uint_(9); uint_((uint64_t)t.rows - 2); gdelta(t.row_dx, t.row_dy); }
+    }
+    int save(const char* path, char* errbuf, size_t errbuf_sz) const {
+        FILE* fp = fopen(path, "wb");
+        if (!fp) { if (errbuf) snprintf(errbuf, errbuf_sz, "open for write failed"); return -1; }
+        const bool ok = fwrite(b.data(), 1, b.size(), fp) == b.size();
+        fclose(fp);
+        if (!ok) { if (errbuf) snprintf(errbuf, errbuf_sz, "write failed"); return -1; }
+        return 0;
+    }
 };
 
-struct PropValue {
-    enum Type { Real=0, Unsigned=1, Signed=2, AString=3, BString=4, NString=5 } type;
-    std::string str;
-    uint64_t u=0; int64_t s=0; double r=0;
-};
+} // namespace
 
-static void write_property(W& w, uint64_t propname_ref, const std::vector<PropValue>& vals, bool name_is_ref=true, const std::string& name_str=""){
-    // PROPERTY record 28
-    // info bits: 0-1: number of values (0-2, 3 means count follows), 2: value list flag, 3: propname is reference (0) or string (1)? spec: bit2 = N (if 1, propname-string follows; if 0, propname-reference follows)
-    uint8_t info = 0;
-    if(vals.size()>=3) info |= 0x03; else info |= (uint8_t)vals.size();
-    if(!name_is_ref) info |= 0x04; // N bit: propname-string present
-    // if values by reference? we use inline values -> U bit 0x02 not set
-    w.u8(28); w.u8(info);
-    if(name_is_ref) w.uvar(propname_ref); else w.nstr(name_str);
-    if(vals.size()>=3) w.uvar(vals.size());
-    for(auto& v: vals){
-        // value: type byte + payload. Types: 0=real,1=unsigned,2=signed,3=a-string,4=b-string,5=n-string, 6=a-string ref? per spec: 0x00 real,0x01 unsigned,0x02 signed,0x03 a-string,0x04 b-string,0x05 n-string, 0x06 a-string-ref,0x07 b-string-ref,0x08 n-string-ref
-        // we emit direct values
-        if(v.type==PropValue::Real){ w.u8(0); w.real_double(v.r); }
-        else if(v.type==PropValue::Unsigned){ w.u8(1); w.uvar(v.u); }
-        else if(v.type==PropValue::Signed){ w.u8(2); w.svar(v.s); }
-        else if(v.type==PropValue::AString){ w.u8(3); w.astr(v.str); }
-        else if(v.type==PropValue::BString){ w.u8(4); w.bstr(v.str); }
-        else if(v.type==PropValue::NString){ w.u8(5); w.nstr(v.str); }
+// Synthetic gear with circular cut-outs (sampled curves written as POLYGON
+// records) carrying cell properties: the 3DIC test layout.
+extern "C" int ldb_write_oasis_gear_multigon(const char* out_path, char* errbuf, size_t errbuf_sz) {
+    if (errbuf && errbuf_sz) errbuf[0] = '\0';
+    Writer w;
+    w.begin(1000);                                      // 1 nm grid
+    w.u8(REC_PROPNAME_REF); w.str("GEAR_TYPE"); w.uint_(0);
+    w.u8(REC_PROPNAME_REF); w.str("MATERIAL"); w.uint_(1);
+    w.u8(REC_PROPSTRING_REF); w.str("3DIC_CUTOUT"); w.uint_(0);
+    w.u8(REC_CELLNAME_REF); w.str("GEAR3DIC"); w.uint_(0);
+    w.u8(REC_CELL_REF); w.uint_(0);
+    w.property(0, "3DIC_cutout");
+    w.property(1, "", 0);
+
+    auto ring = [](double cx, double cy, double radius, int n) {
+        std::vector<std::pair<int64_t, int64_t>> pts;
+        for (int i = 0; i < n; ++i) {
+            const double a = 2 * M_PI * i / n;
+            pts.push_back({ (int64_t)llround(cx + radius * cos(a)), (int64_t)llround(cy + radius * sin(a)) });
+        }
+        return pts;
+    };
+    const int teeth = 8; const double R = 2000, r = 1500, tooth = 400;
+    std::vector<std::pair<int64_t, int64_t>> gear;
+    for (int i = 0; i < teeth * 4; ++i) {
+        const double a = (2 * M_PI * i) / (teeth * 4), rad = (i % 4 < 2) ? (R + tooth) : r;
+        gear.push_back({ (int64_t)llround(rad * cos(a)), (int64_t)llround(rad * sin(a)) });
     }
+    w.polygon(10, 0, gear);
+    w.polygon(11, 0, ring(0, 0, 600, 64));
+    for (int k = 0; k < 4; ++k) {
+        const double a0 = 2 * M_PI * k / 4;
+        w.polygon(11, 0, ring(1100 * cos(a0), 1100 * sin(a0), 180, 32));
+    }
+    w.end();
+    return w.save(out_path, errbuf, errbuf_sz);
 }
 
-} // anon
-
-extern "C" int ldb_write_oasis_gear_multigon(const char* out_path, char* errbuf, size_t errbuf_sz){
-    if(errbuf&&errbuf_sz) errbuf[0]='\0';
-    W w;
-    const char magic[] = "%SEMI-OASIS\r\n"; w.bytes(magic,13);
-    // START: version "1.0", unit 1e-9 m, validation 0, no offset table values (all zeros)
-    w.u8(1);
-    w.astr("1.0");
-    w.real_pos_int_exp(1,-9); // 1e-9
-    w.u8(0); // validation scheme: 0 = none
-    // Offset table: OASIS has flags + table; simplest compatible form: write 0x00 byte for "no strict" style? actually after validation comes the offset-control byte in some implementations.
-    // Better: include 12 offset values as zeros (common minimal)
-    // But to be safe and simple, do not emit offset table - many readers (incl klayout for basic files) can handle.
-    // PROPNAME (6): ref 0 "GEAR_TYPE"
-    // PROPNAME (6): ref 0 "GEAR_TYPE"
-    w.u8(6); w.nstr("GEAR_TYPE"); w.uvar(0);
-    // PROPNAME (6): ref 1 "S_GDS_PROPERTY" style not needed; add another for demo
-    w.u8(6); w.nstr("MATERIAL"); w.uvar(1);
-    // PROPSTRING (7): ref 0 "3DIC_CUTOUT"
-    w.u8(7); w.astr("3DIC_CUTOUT"); w.uvar(0);
-    // CELLNAME (3)
-    w.u8(3); w.nstr("GEAR3DIC"); w.uvar(0);
-    // CELL (13)
-    w.u8(13); w.uvar(0);
-    // Property on cell: GEAR_TYPE = "3DIC_cutout" (inline string) and MATERIAL via propstring ref
-    { std::vector<PropValue> vals(1); vals[0].type=PropValue::NString; vals[0].str="3DIC_cutout"; write_property(w,0,vals,true); }
-    { std::vector<PropValue> vals(1); vals[0].type=PropValue::NString; vals[0].str="metal_via"; write_property(w,1,vals,true); }
-    // geometry - use RECTANGLE and POLYGON and PATH/CIRCLE approximations
-    // We'll emit as POLYGONs with explicit point lists (general 2D) for maximum compatibility.
-    auto emit_polygon = [&](int layer,int datatype,const std::vector<std::pair<int64_t,int64_t>>& pts){
-        if(pts.size()<3) return;
-        // POLYGON (21): info-byte bits (LSB..MSB): X(0), Y(1), P(2), R(3), D(4), L(5)
-        // Field order after info: layer(if L), datatype(if D), point-list(if P), geometry-x(if X), geometry-y(if Y), repetition(if R)
-        uint8_t info = 0x04 /*P*/ | 0x10 /*D*/ | 0x20 /*L*/ | 0x01 /*X*/ | 0x02 /*Y*/;
-        w.u8(21); w.u8(info);
-        w.uvar((uint64_t)layer);
-        w.uvar((uint64_t)datatype);
-        // point-list: first byte = type (0..4). type 4 = 2-dimension deltas (dx,dy) for all vertices except first
-        w.u8(4);
-        w.uvar(pts.size()-1); // count of delta pairs
-        int64_t px=pts[0].first, py=pts[0].second;
-        for(size_t i=1;i<pts.size();i++){
-            w.svar(pts[i].first - px);
-            w.svar(pts[i].second - py);
-            px=pts[i].first; py=pts[i].second;
-        }
-        w.svar(pts[0].first); // X
-        w.svar(pts[0].second); // Y
+// Write the in-memory model.  A file that was read from OASIS is written back
+// byte for byte; anything else is synthesised: names, placements (arrays kept
+// as repetitions), boxes as RECTANGLE records and cell/file properties.
+extern "C" int ldb_write_oasis(const ldb_file_t* fh, const char* out_path, char* errbuf, size_t errbuf_sz) {
+    auto* f = (const LdbFile*)fh; if (errbuf && errbuf_sz) errbuf[0] = '\0';
+    if (!f) { if (errbuf) snprintf(errbuf, errbuf_sz, "null"); return -1; }
+    if (f->format == 2 && !f->oasis_raw.empty()) {
+        FILE* fp = fopen(out_path, "wb");
+        if (!fp) { if (errbuf) snprintf(errbuf, errbuf_sz, "open for write failed"); return -1; }
+        const bool ok = fwrite(f->oasis_raw.data(), 1, f->oasis_raw.size(), fp) == f->oasis_raw.size();
+        fclose(fp);
+        if (!ok) { if (errbuf) snprintf(errbuf, errbuf_sz, "write failed"); return -1; }
+        return 0;
+    }
+    Writer w;
+    w.begin(1000);
+    std::map<std::string, uint64_t> prop_ref;
+    auto prop_name = [&](const std::string& name) {
+        auto it = prop_ref.find(name);
+        if (it != prop_ref.end()) return it->second;
+        const uint64_t ref = prop_ref.size();
+        prop_ref[name] = ref;
+        w.u8(REC_PROPNAME_REF); w.str(name); w.uint_(ref);
+        return ref;
     };
-    auto emit_rect = [&](int layer,int datatype,int64_t x,int64_t y,int64_t ww,int64_t hh){
-        // RECTANGLE 20: info bits S,H,W,X,Y,R,D,L = 0..7
-        uint8_t info = 0;
-        if(ww==hh) info |= 0x01; // S
-        info |= 0x02; // H
-        if(ww!=hh) info |= 0x04; // W
-        info |= 0x08; // X
-        info |= 0x10; // Y
-        info |= 0x40; // D
-        info |= 0x80; // L
-        w.u8(20); w.u8(info);
-        w.uvar((uint64_t)layer); w.uvar((uint64_t)datatype);
-        if(ww!=hh) w.uvar((uint64_t)ww);
-        w.uvar((uint64_t)hh);
-        w.svar(x); w.svar(y);
-    };
-
-    // Gear-like outer shape (curvilinear approximation) on layer 10
-    const int teeth=8; double R=2000, r=1500, tooth=400; int64_t cx=0, cy=0;
-    std::vector<std::pair<int64_t,int64_t>> gear;
-    for(int i=0;i<teeth*4;i++){
-        double ang = (2*M_PI*i)/(teeth*4);
-        double rad = (i%4<2)? (R+tooth): r;
-        gear.push_back({cx + (int64_t)llround(rad*cos(ang)), cy + (int64_t)llround(rad*sin(ang))});
+    for (auto& p : f->file_properties) if (!p.name.empty()) prop_name(p.name);
+    for (auto& c : f->cells) for (auto& p : c.properties) if (!p.name.empty()) prop_name(p.name);
+    std::map<std::string, uint64_t> cell_ref;
+    for (auto& c : f->cells) {
+        const uint64_t ref = cell_ref.size();
+        cell_ref[c.name] = ref;
+        w.u8(REC_CELLNAME_REF); w.str(c.name); w.uint_(ref);
     }
-    emit_polygon(10,0,gear);
-    // Inner cutout (approximated circle as polygon) on layer 11
-    std::vector<std::pair<int64_t,int64_t>> inner;
-    for(int i=0;i<64;i++){ double ang=2*M_PI*i/64; inner.push_back({(int64_t)llround(600*cos(ang)), (int64_t)llround(600*sin(ang))}); }
-    emit_polygon(11,0,inner);
-    // Bolt cutouts
-    for(int k=0;k<4;k++){
-        double ang0=2*M_PI*k/4; std::vector<std::pair<int64_t,int64_t>> hole;
-        for(int i=0;i<32;i++){ double ang=2*M_PI*i/32; hole.push_back({(int64_t)llround(1100*cos(ang0)+180*cos(ang)), (int64_t)llround(1100*sin(ang0)+180*sin(ang))}); }
-        emit_polygon(11,0,hole);
-    }
-
-    w.u8(2); // END
-    FILE* fp=fopen(out_path,"wb"); if(!fp){ if(errbuf) snprintf(errbuf,errbuf_sz,"open for write failed"); return -1; }
-    if(fwrite(w.b.data(),1,w.b.size(),fp)!=w.b.size()){ fclose(fp); if(errbuf) snprintf(errbuf,errbuf_sz,"write failed"); return -1; }
-    fclose(fp); return 0;
-}
-
-// Generic OASIS writer from current in-memory model.
-// Emits cell names, cells, and geometry boxes as POLYGON records (encoding aligned with our parser).
-extern "C" int ldb_write_oasis(const ldb_file_t* fh, const char* out_path, char* errbuf, size_t errbuf_sz){
-    auto* f=(const LdbFile*)fh; if(errbuf&&errbuf_sz) errbuf[0]='\0';
-    if(!f){ if(errbuf) snprintf(errbuf,errbuf_sz,"null"); return -1; }
-    // If we have original raw stream (from read), prefer lossless round-trip
-    if(f->format==2 && !f->oasis_raw.empty()){
-        FILE* fp=fopen(out_path,"wb"); if(!fp){ if(errbuf) snprintf(errbuf,errbuf_sz,"open for write failed"); return -1; }
-        if(fwrite(f->oasis_raw.data(),1,f->oasis_raw.size(),fp)!=f->oasis_raw.size()){ fclose(fp); if(errbuf) snprintf(errbuf,errbuf_sz,"write failed"); return -1; }
-        fclose(fp); return 0;
-    }
-    // Otherwise synthesize a minimal valid OASIS from parsed model
-    W w; const char magic[]="%SEMI-OASIS\r\n"; w.bytes(magic,13);
-    w.u8(1); w.astr("1.0"); w.real_pos_int_exp(1,-9); w.u8(0);
-    // property names
-    for(auto& kv: f->propnames){ w.u8(6); w.nstr(kv.second.empty()?("P"+std::to_string(kv.first)):kv.second); w.uvar((uint64_t)kv.first); }
-    // cell names
-    uint64_t cref=0; std::map<std::string,uint64_t> cmap;
-    for(auto& c: f->cells){ cmap[c.name]=cref; w.u8(3); w.nstr(c.name); w.uvar(cref); cref++; }
-    // cells and geometry
-    for(auto& c: f->cells){
-        w.u8(13); w.uvar(cmap[c.name]);
-        for(const auto& b : c.boxes){
-            // POLYGON (21) encoding aligned with our parser:
-            // info bit 0x01 => XY present (svar dx,dy) - with abs mode sets position
-            // info bit 0x20 => layer present, 0x40 => datatype present
-            uint8_t info = 0x01 | 0x20 | 0x40;
-            w.u8(21); w.u8(info);
-            w.svar(b.x1); w.svar(b.y1); // position = (x1,y1)
-            w.uvar((uint64_t)b.layer);
-            w.uvar((uint64_t)b.datatype);
-            // point-list: type 3 (all-delta) with 3 more vertices forming rectangle
-            w.u8(3);
-            w.uvar(3);
-            int64_t wdt = b.x2 - b.x1;
-            int64_t hgt = b.y2 - b.y1;
-            w.svar(wdt); w.svar(0);      // (x2,y1)
-            w.svar(0);   w.svar(hgt);    // (x2,y2)
-            w.svar(-wdt); w.svar(0);     // (x1,y2)
+    for (auto& p : f->file_properties) if (!p.name.empty()) w.property(prop_ref[p.name], p.value);
+    for (auto& c : f->cells) {
+        w.u8(REC_CELL_REF); w.uint_(cell_ref[c.name]);
+        for (auto& p : c.properties) if (!p.name.empty()) w.property(prop_ref[p.name], p.value);
+        for (auto& inst : c.instances) {
+            auto it = cell_ref.find(inst.ref_name);
+            if (it != cell_ref.end()) w.placement(it->second, inst.tr);
         }
+        std::vector<LdbBoxElem> decoded;
+        const std::vector<LdbBoxElem>* boxes = &c.boxes;
+        if (boxes->empty() && (!c.boxes_compact.empty() || c.boxes_on_disk)) {
+            decoded = ldb_load_boxes_on_demand(const_cast<LdbCell&>(c)); boxes = &decoded;
+        }
+        for (const auto& bx : *boxes) w.rectangle(bx.layer, bx.datatype, bx.x1, bx.y1, bx.x2 - bx.x1, bx.y2 - bx.y1);
     }
-    w.u8(2);
-    FILE* fp=fopen(out_path,"wb"); if(!fp){ if(errbuf) snprintf(errbuf,errbuf_sz,"open for write failed"); return -1; }
-    if(fwrite(w.b.data(),1,w.b.size(),fp)!=w.b.size()){ fclose(fp); if(errbuf) snprintf(errbuf,errbuf_sz,"write failed"); return -1; }
-    fclose(fp); return 0;
+    w.end();
+    return w.save(out_path, errbuf, errbuf_sz);
 }

@@ -76,13 +76,13 @@ contains
           call omt_pack( input_layer%layer_boxes(1:n_used), K_LEAF_CAPACITY )
        end if
 #endif
-       input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_SORT )
+       call input_layer%mark( LAYER_STATE_SORT )
     end if
     total_nodes = CalculateTotalNodes( n_used, K_LEAF_CAPACITY )
     if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
     call BuildRTree( input_layer%layer_boxes(1:n_used), K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
-    input_layer%layerState = ior( input_layer%layerState, LAYER_STATE_RTREE )
+    call input_layer%mark( LAYER_STATE_RTREE )
 
     if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
   end subroutine BuildTree
