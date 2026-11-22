@@ -25,6 +25,7 @@ exec run d1:poly = d1_input:poly COPY nothing
 exec run d1:diff = d1_input:diff COPY nothing
 exec run d1:met1 = d1_input:met1 COPY nothing
 exec run d1:li1 =  d1_input:li1 COPY nothing
+exec run d1:met2 = d1_input:met2 COPY t1:nothing
 delete d1_input
 flush
 RUN_LOOP(`OP1',`t1',`d1',`poly',`0.001',`li1',`0.001',`met1',`0.001',`met2',`0.001')dnl
