@@ -1,0 +1,26 @@
+# Banded-execution check, run B: banded results XOR the unbanded reference must be empty.
+program study_check_band_cmp
+var temp_folder /tmp/magparser_band_check/
+var temporary_layers 2
+var abort_on_assert_zero 1
+var debug_verbosity 0
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT_C.oas
+decl design r1 = /tmp/magparser_band_check/band_ref.mag
+decl memory m = nothing
+exec init m:nothing
+exec run m:g = d1:L67_D20 GROW nothing 0.05 0.02 0.03 0.01
+exec run m:x1 = m:g ^ r1:g
+exec run m:z = m:x1 ASSERT_ZERO nothing
+exec run m:s = d1:L66_D20 SIZE nothing 0.02
+exec run m:x2 = m:s ^ r1:s
+exec run m:z = m:x2 ASSERT_ZERO nothing
+exec run m:sn = d1:L68_D20 SIZE nothing -0.01
+exec run m:x3 = m:sn ^ r1:sn
+exec run m:z = m:x3 ASSERT_ZERO nothing
+exec run m:fn = d1:L67_D20 ~ d1:L66_D20
+exec run m:x4 = m:fn ^ r1:fn
+exec run m:z = m:x4 ASSERT_ZERO nothing
+exec run m:an = d1:L67_D20 * d1:L66_D20
+exec run m:x5 = m:an ^ r1:an
+exec run m:z = m:x5 ASSERT_ZERO nothing
+end

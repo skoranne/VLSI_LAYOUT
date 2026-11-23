@@ -1,0 +1,29 @@
+# mp_chaos.dag -- larger layers so ops take seconds (failure-injection tests)
+L1 = gen seed=21 n=1500000 extent=8000000 maxsize=900
+L2 = gen seed=22 n=1500000 extent=8000000 maxsize=900
+L3 = gen seed=23 n=1500000 extent=8000000 maxsize=900
+L4 = gen seed=24 n=1500000 extent=8000000 maxsize=900
+O12 = OR L1 L2
+O34 = OR L3 L4
+A13 = AND L1 L3
+A24 = AND L2 L4
+N12 = NOT L1 L2
+N34 = NOT L3 L4
+X13 = XOR L1 L3
+X24 = XOR L2 L4
+G1  = GROW L1 d=15
+G2  = GROW L2 d=15
+G3  = GROW L3 d=15
+G4  = GROW L4 d=15
+S1  = SHRINK G1 d=5
+S2  = SHRINK G2 d=5
+S3  = SHRINK G3 d=5
+S4  = SHRINK G4 d=5
+OO  = OR O12 O34
+AA  = OR A13 A24
+NN  = OR N12 N34
+XX  = XOR X13 X24
+SS  = OR S1 S2
+TT  = OR S3 S4
+ALL = OR SS TT
+F   = XOR ALL OO

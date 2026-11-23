@@ -23,6 +23,34 @@ SMALL_SDT went from 176 MB to 12.6 MB, and SDT16 (456M boxes) from 30 GB to 110 
 `d1:L66_D20` (or `66:20`). `src/regress/gpu_study/to_oas.sh` rewrites a KLBIN-based
 CTR to use them.
 
+## Compact layers, banded operations and MAGVIEWER
+
+Streamed flat OASIS feeds the compact layer store (`src/compact_layer.f90`). Each box is
+stored as a Morton code of its centre plus a shape id. Keys are packed in blocks of 128,
+with one MBR per block. When `2*cbits + sbits > 62`, the layer switches to a wide layout
+that keeps the shape ids in a separate stream.
+
+**Operations** (`MAGPARSER_COMPACT_LAYERS=1`):
+- Layers are compacted when they finish loading, expanded when an op needs them, and kept
+  within `MAGPARSER_COMPACT_BUDGET_GB` by an LRU.
+- An expanded layer keeps its packed copy. If the layer is unchanged, re-compacting it
+  costs nothing.
+- `src/band_exec.f90` runs these ops in y-bands over compact inputs, so whole layers are
+  never expanded: `+ * @ ~ ! ^`, GROW and SIZE (with a halo), and INTERACT when A is
+  healed.
+- Band size is set by `MAGPARSER_BAND_BOXES` (default 48M; 0 turns banding off) or by
+  `var band_boxes N` in the CTR. Banded outputs above `MAGPARSER_BAND_MERGE_MAX` boxes
+  (default 400M) stay multi-part.
+- To check banded results against unbanded ones: `src/regress/gpu_study/run_band_checks.sh`.
+- `MAGPARSER_COMPACT_FORCE_WIDE=1` forces the wide layout, for testing.
+
+**MAGVIEWER** builds its quantized R-tree index directly from the compact blocks
+(`CompressedSpatialIndex%build_from_compact`). SDT16 (422M unique boxes) loads into a
+1.56 GB index with a 4.5 GB peak. `MAGVIEWER_COMPACT=0` selects the legacy BoxCodec/zstd
+chunks, whose multi-threaded encoder has a known race. To test load and pan/zoom queries
+without a display: `test_viewer_index.exe file.oas [max_layers] [windows] [frac]`
+(`TVI_VERIFY=1` adds a brute-force oracle).
+
 ## MPW_MERGE: multi-project-wafer shuttle assembly
 
 `MPW_MERGE` combines the per-slot OASIS files of an MPW shuttle into one OASIS

@@ -11,6 +11,8 @@ module CompressedSpatialIndexModule
   use GeometryModule,          only: Box, mbr_of_array, omt_pack
   use BoxCodecModule,          only: BoxCodec, CompressBoxesUsingCodec, DecompressBoxesUsingCodec
   use SnappyCompressionModule, only: zstd_compress_bound, zstd_compress, zstd_decompress, zstd_is_error
+  use CompactLayerModule,      only: CompactLayer, CompactDecodeBlocks, CompactMove, CompactPack, &
+                                     CompactRelease, CompactBytes, CompactEncode, K_CL_BLOCK
   implicit none
   private
 
@@ -20,6 +22,7 @@ module CompressedSpatialIndexModule
   integer,        parameter, public :: K_CSI_DEFAULT_CACHE  = 16
   integer,        parameter         :: K_CSI_DFS_STACK_MAX  = 1024
   integer(c_int), parameter         :: K_CSI_ZSTD_LEVEL     = 1_c_int
+  integer(int64), parameter         :: K_CSI_CL_BLOCKS      = K_CSI_BOXES_PER_BLK / K_CL_BLOCK
 
   type :: CompressedBoxChunk
      integer(int32) :: num_boxes = 0_int32
@@ -72,8 +75,16 @@ module CompressedSpatialIndexModule
 
      ! Compressed geometry chunks (each holds up to K_CSI_BOXES_PER_BLK sorted boxes)
      type(CompressedBoxChunk), allocatable :: chunks(:)
+
+     ! Alternative geometry store: a CompactLayer (Morton centre key + shape id, bit-packed
+     ! 128-key blocks). Chunk i is compact blocks (i-1)*K_CSI_CL_BLOCKS+1 .. i*K_CSI_CL_BLOCKS,
+     ! decoded with plain integer ops (no BoxCodec/zstd). Leaves follow Morton key order.
+     logical            :: compact_backed = .false.
+     type(CompactLayer) :: cl
    contains
      procedure :: build_from_boxes    => csi_build_from_boxes
+     procedure :: build_from_compact  => csi_build_from_compact
+     procedure :: build_auto          => csi_build_auto
      procedure :: destroy             => csi_destroy
      procedure :: is_empty            => csi_is_empty
      procedure :: memory_bytes        => csi_memory_bytes
@@ -305,12 +316,22 @@ contains
        end if
     end do
 
-    call decompress_chunk(csi%chunks(chunk_id), cache%slots(victim)%boxes, &
-                          cache%scratch_codec, cache%codec)
+    if (csi%compact_backed) then
+       block
+         integer(int64) :: nout
+         if (.not. allocated(cache%slots(victim)%boxes)) allocate(cache%slots(victim)%boxes(K_CSI_BOXES_PER_BLK))
+         call CompactDecodeBlocks(csi%cl, (chunk_id - 1_int64) * K_CSI_CL_BLOCKS + 1_int64, &
+              min(chunk_id * K_CSI_CL_BLOCKS, csi%cl%nblk), cache%slots(victim)%boxes, nout)
+         cache%slots(victim)%num_boxes = int(nout, int32)
+       end block
+    else
+       call decompress_chunk(csi%chunks(chunk_id), cache%slots(victim)%boxes, &
+                             cache%scratch_codec, cache%codec)
+       cache%slots(victim)%num_boxes = csi%chunks(chunk_id)%num_boxes
+    end if
     cache%clock = cache%clock + 1_int64
     cache%slots(victim)%chunk_id  = chunk_id
     cache%slots(victim)%stamp     = cache%clock
-    cache%slots(victim)%num_boxes = csi%chunks(chunk_id)%num_boxes
     slot_idx = victim
   end subroutine cache_fetch_slot
 
@@ -332,6 +353,8 @@ contains
        end do
        deallocate(this%chunks)
     end if
+    if (this%compact_backed) call CompactRelease(this%cl)
+    this%compact_backed = .false.
     this%n_boxes    = 0_int64
     this%n_leaves   = 0_int64
     this%n_nodes    = 0_int64
@@ -359,6 +382,10 @@ contains
     class(CompressedSpatialIndex), intent(in) :: this
     integer(int64) :: i
     csi_chunk_bytes = 0_int64
+    if (this%compact_backed) then
+       csi_chunk_bytes = CompactBytes(this%cl)
+       return
+    end if
     if (.not. allocated(this%chunks)) return
     do i = 1_int64, this%n_chunks
        if (allocated(this%chunks(i)%payload)) then
@@ -396,6 +423,198 @@ contains
   ! Build compressed spatial index from a Box array (sorts in-place,
   ! builds quantized SoA R-Tree, compresses chunks in parallel).
   ! ------------------------------------------------------------------
+  !> Internal R-tree levels over the quantized leaf MBRs qx1..qy2(1:n_leaves).
+  subroutine build_internal_levels(this)
+    class(CompressedSpatialIndex), intent(inout) :: this
+    integer(int64) :: i, j, c_start, c_end, node_idx, prev_start, prev_count, cur_start, cur_count, int_idx
+    integer(int16) :: aq_x1, aq_y1, aq_x2, aq_y2
+    prev_start = 1_int64
+    prev_count = this%n_leaves
+    node_idx   = this%n_leaves + 1_int64
+    do while (prev_count > 1_int64)
+       cur_start = node_idx
+       cur_count = (prev_count + K_CSI_LEAF_CAPACITY - 1_int64) / K_CSI_LEAF_CAPACITY
+       do i = 1_int64, cur_count
+          c_start = prev_start + (i - 1_int64) * K_CSI_LEAF_CAPACITY
+          c_end   = min(prev_start + i * K_CSI_LEAF_CAPACITY - 1_int64, &
+                        prev_start + prev_count - 1_int64)
+          aq_x1 = this%qx1(c_start); aq_y1 = this%qy1(c_start)
+          aq_x2 = this%qx2(c_start); aq_y2 = this%qy2(c_start)
+          do j = c_start + 1_int64, c_end
+             if (this%qx1(j) < aq_x1) aq_x1 = this%qx1(j)
+             if (this%qy1(j) < aq_y1) aq_y1 = this%qy1(j)
+             if (this%qx2(j) > aq_x2) aq_x2 = this%qx2(j)
+             if (this%qy2(j) > aq_y2) aq_y2 = this%qy2(j)
+          end do
+          this%qx1(node_idx) = aq_x1; this%qy1(node_idx) = aq_y1
+          this%qx2(node_idx) = aq_x2; this%qy2(node_idx) = aq_y2
+          int_idx = node_idx - this%n_leaves
+          this%int_child_start(int_idx) = int(c_start, int32)
+          this%int_child_count(int_idx) = int(c_end - c_start + 1_int64, int16)
+          node_idx = node_idx + 1_int64
+       end do
+       prev_start = cur_start
+       prev_count = cur_count
+    end do
+    this%root_index = node_idx - 1_int64
+  end subroutine build_internal_levels
+
+  !> Build the index over a CompactLayer, taking ownership of it (cl is left empty).
+  !> Never materialises the layer as a Box array: leaf MBRs come from decoding one
+  !> 16K-box chunk at a time per thread; the geometry stays bit-packed (cold form).
+  subroutine csi_build_from_compact(this, cl)
+    class(CompressedSpatialIndex), intent(inout) :: this
+    type(CompactLayer), intent(inout)            :: cl
+    integer(int64) :: ic, i, j, l0, nout, leaf, c_start, c_end, n_internal
+    integer(K_COORDINATE_KIND) :: lx1, ly1
+    type(Box) :: agg
+    type(Box), allocatable :: buf(:)
+
+    call this%destroy()
+    if (cl%n <= 0_int64) return
+    if (allocated(cl%keys)) call CompactPack(cl)          !> keep only the cold form
+    call CompactMove(cl, this%cl)
+    this%compact_backed = .true.
+    this%n_boxes = this%cl%n
+
+    ! exact layer MBR from the per-block MBRs
+    agg = this%cl%blk_mbr(1)
+    do i = 2_int64, this%cl%nblk
+       agg%x1 = min(agg%x1, this%cl%blk_mbr(i)%x1); agg%y1 = min(agg%y1, this%cl%blk_mbr(i)%y1)
+       agg%x2 = max(agg%x2, this%cl%blk_mbr(i)%x2); agg%y2 = max(agg%y2, this%cl%blk_mbr(i)%y2)
+    end do
+    this%layer_mbr = agg
+    lx1 = agg%x1; ly1 = agg%y1
+    this%span_x = max(1_int64, int(agg%x2, int64) - int(lx1, int64))
+    this%span_y = max(1_int64, int(agg%y2, int64) - int(ly1, int64))
+
+    this%n_leaves = (this%n_boxes + K_CSI_LEAF_CAPACITY - 1_int64) / K_CSI_LEAF_CAPACITY
+    this%n_nodes  = compute_total_nodes(this%n_boxes, K_CSI_LEAF_CAPACITY)
+    n_internal    = max(0_int64, this%n_nodes - this%n_leaves)
+    allocate(this%qx1(this%n_nodes), this%qy1(this%n_nodes), this%qx2(this%n_nodes), this%qy2(this%n_nodes))
+    if (n_internal > 0_int64) allocate(this%int_child_start(n_internal), this%int_child_count(n_internal))
+    this%n_chunks = (this%n_boxes + K_CSI_BOXES_PER_BLK - 1_int64) / K_CSI_BOXES_PER_BLK
+
+    !$omp parallel default(shared) private(ic, i, j, l0, nout, leaf, c_start, c_end, agg, buf)
+    allocate(buf(K_CSI_BOXES_PER_BLK))
+    !$omp do schedule(dynamic, 4)
+    do ic = 1_int64, this%n_chunks
+       call CompactDecodeBlocks(this%cl, (ic - 1_int64) * K_CSI_CL_BLOCKS + 1_int64, &
+            min(ic * K_CSI_CL_BLOCKS, this%cl%nblk), buf, nout)
+       l0 = (ic - 1_int64) * K_CSI_LEAVES_PER_BLK
+       do i = 1_int64, (nout + K_CSI_LEAF_CAPACITY - 1_int64) / K_CSI_LEAF_CAPACITY
+          c_start = (i - 1_int64) * K_CSI_LEAF_CAPACITY + 1_int64
+          c_end   = min(i * K_CSI_LEAF_CAPACITY, nout)
+          agg = buf(c_start)
+          do j = c_start + 1_int64, c_end
+             if (buf(j)%x1 < agg%x1) agg%x1 = buf(j)%x1
+             if (buf(j)%y1 < agg%y1) agg%y1 = buf(j)%y1
+             if (buf(j)%x2 > agg%x2) agg%x2 = buf(j)%x2
+             if (buf(j)%y2 > agg%y2) agg%y2 = buf(j)%y2
+          end do
+          leaf = l0 + i
+          this%qx1(leaf) = quantize_lo(agg%x1, lx1, this%span_x)
+          this%qy1(leaf) = quantize_lo(agg%y1, ly1, this%span_y)
+          this%qx2(leaf) = quantize_hi(agg%x2, lx1, this%span_x)
+          this%qy2(leaf) = quantize_hi(agg%y2, ly1, this%span_y)
+       end do
+    end do
+    !$omp end do
+    deallocate(buf)
+    !$omp end parallel
+
+    call build_internal_levels(this)
+  end subroutine csi_build_from_compact
+
+  !> MAGVIEWER_COMPACT (default on): use the compact Morton/shape-id store for large layers.
+  logical function csi_compact_enabled()
+    character(len=8) :: ev
+    integer :: evlen, evstat
+    call get_environment_variable('MAGVIEWER_COMPACT', ev, evlen, evstat)
+    csi_compact_enabled = .not. (evstat == 0 .and. evlen > 0 .and. ev(1:1) == '0')
+  end function csi_compact_enabled
+
+  !> Build from boxes, through the compact store when the layer is large and encodes
+  !> exactly, else through BoxCodec/zstd chunks. Exact duplicate boxes are dropped
+  !> in the compact form (they draw identically).
+  subroutine csi_build_auto(this, boxes, n_used)
+    class(CompressedSpatialIndex), intent(inout) :: this
+    type(Box), intent(inout)                     :: boxes(:)
+    integer(int64), intent(in)                   :: n_used
+    type(CompactLayer) :: cl
+    integer :: status
+    if (n_used >= 1_int64 .and. csi_compact_enabled()) then
+       call CompactEncode(boxes(1:n_used), n_used, cl, status)
+       if (status == 0) then
+          call this%build_from_compact(cl)
+          return
+       end if
+       call CompactRelease(cl)
+    end if
+    call this%build_from_boxes(boxes, n_used, already_sorted=.false.)
+  end subroutine csi_build_auto
+
+  recursive subroutine compress_chunks_worker(this, boxes, n_used)
+    class(CompressedSpatialIndex), intent(inout) :: this
+    type(Box), intent(in)                        :: boxes(:)
+    integer(int64), intent(in)                   :: n_used
+    type(BoxCodec) :: local_codec
+    integer(int8), allocatable, target :: codec_buf(:)
+    integer(int8), allocatable, target :: zstd_buf(:)
+    integer(int64) :: i, c_start, c_end, codec_bytes, nb
+    integer(c_size_t) :: bound, zsz
+    call local_codec%init()
+    allocate(codec_buf(K_CSI_BOXES_PER_BLK * 24_int64))
+    allocate(zstd_buf(K_CSI_BOXES_PER_BLK * 24_int64))
+
+    !$omp do schedule(dynamic, 1)
+    do i = 1_int64, this%n_chunks
+       c_start = (i - 1_int64) * K_CSI_BOXES_PER_BLK + 1_int64
+       c_end   = min(i * K_CSI_BOXES_PER_BLK, n_used)
+       nb      = c_end - c_start + 1_int64
+
+       ! Reset codec state per chunk (no reallocation)
+       local_codec%num_w = 0_int64
+       local_codec%num_h = 0_int64
+       local_codec%current_w_index = 0_int64
+       local_codec%current_h_index = 0_int64
+       local_codec%current_x = 0_K_COORDINATE_KIND
+       local_codec%current_y = 0_K_COORDINATE_KIND
+       local_codec%w_hash_valid = .true.
+       local_codec%h_hash_valid = .true.
+       if (allocated(local_codec%w_hash)) local_codec%w_hash = 0_int32
+       if (allocated(local_codec%h_hash)) local_codec%h_hash = 0_int32
+
+       call CompressBoxesUsingCodec(boxes(c_start:c_end), local_codec, codec_buf, codec_bytes)
+
+       this%chunks(i)%num_boxes = int(nb, int32)
+       this%chunks(i)%codec_len = int(codec_bytes, int32)
+
+       bound = zstd_compress_bound(int(codec_bytes, c_size_t))
+       if (int(bound, int64) > size(zstd_buf, kind=int64)) then
+          deallocate(zstd_buf)
+          allocate(zstd_buf(int(bound, int64)))
+       end if
+
+       zsz = zstd_compress(c_loc(zstd_buf(1)), bound, c_loc(codec_buf(1)), &
+                           int(codec_bytes, c_size_t), K_CSI_ZSTD_LEVEL)
+
+       if (zstd_is_error(zsz) == 0_c_int .and. int(zsz, int64) < codec_bytes) then
+          this%chunks(i)%is_zstd = .true.
+          allocate(this%chunks(i)%payload(int(zsz, int64)))
+          this%chunks(i)%payload(1:int(zsz, int64)) = zstd_buf(1:int(zsz, int64))
+       else
+          this%chunks(i)%is_zstd = .false.
+          allocate(this%chunks(i)%payload(codec_bytes))
+          this%chunks(i)%payload(1:codec_bytes) = codec_buf(1:codec_bytes)
+       end if
+    end do
+    !$omp end do
+
+    if (allocated(codec_buf)) deallocate(codec_buf)
+    if (allocated(zstd_buf))  deallocate(zstd_buf)
+  end subroutine compress_chunks_worker
+
   subroutine csi_build_from_boxes(this, boxes, n_used, already_sorted)
     class(CompressedSpatialIndex), intent(inout) :: this
     type(Box), intent(inout)                     :: boxes(:)
@@ -408,11 +627,6 @@ contains
     integer(K_COORDINATE_KIND) :: lx1, ly1
     type(Box)      :: agg
     integer(int16) :: aq_x1, aq_y1, aq_x2, aq_y2
-    type(BoxCodec) :: local_codec
-    integer(int8), allocatable, target :: codec_buf(:)
-    integer(int8), allocatable, target :: zstd_buf(:)
-    integer(int64) :: codec_bytes, nb
-    integer(c_size_t) :: bound, zsz
 
     call this%destroy()
     if (n_used <= 0_int64) return
@@ -466,101 +680,16 @@ contains
     !$omp end parallel do
 
     ! 5. Build internal levels (bottom-up using already-quantized child MBRs)
-    prev_start = 1_int64
-    prev_count = this%n_leaves
-    node_idx   = this%n_leaves + 1_int64
-
-    do while (prev_count > 1_int64)
-       cur_start = node_idx
-       cur_count = (prev_count + K_CSI_LEAF_CAPACITY - 1_int64) / K_CSI_LEAF_CAPACITY
-
-       do i = 1_int64, cur_count
-          c_start = prev_start + (i - 1_int64) * K_CSI_LEAF_CAPACITY
-          c_end   = min(prev_start + i * K_CSI_LEAF_CAPACITY - 1_int64, &
-                        prev_start + prev_count - 1_int64)
-          aq_x1 = this%qx1(c_start)
-          aq_y1 = this%qy1(c_start)
-          aq_x2 = this%qx2(c_start)
-          aq_y2 = this%qy2(c_start)
-          do j = c_start + 1_int64, c_end
-             if (this%qx1(j) < aq_x1) aq_x1 = this%qx1(j)
-             if (this%qy1(j) < aq_y1) aq_y1 = this%qy1(j)
-             if (this%qx2(j) > aq_x2) aq_x2 = this%qx2(j)
-             if (this%qy2(j) > aq_y2) aq_y2 = this%qy2(j)
-          end do
-          this%qx1(node_idx) = aq_x1
-          this%qy1(node_idx) = aq_y1
-          this%qx2(node_idx) = aq_x2
-          this%qy2(node_idx) = aq_y2
-
-          int_idx = node_idx - this%n_leaves
-          this%int_child_start(int_idx) = int(c_start, int32)
-          this%int_child_count(int_idx) = int(c_end - c_start + 1_int64, int16)
-          node_idx = node_idx + 1_int64
-       end do
-
-       prev_start = cur_start
-       prev_count = cur_count
-    end do
-    this%root_index = node_idx - 1_int64
+    call build_internal_levels(this)
 
     ! 6. Compress leaf geometry into independent BoxCodec + Zstd chunks in parallel
     this%n_chunks = (n_used + K_CSI_BOXES_PER_BLK - 1_int64) / K_CSI_BOXES_PER_BLK
     allocate(this%chunks(this%n_chunks))
 
-    !$omp parallel default(none) &
-    !$omp shared(this, boxes, n_used) &
-    !$omp private(i, c_start, c_end, local_codec, codec_buf, zstd_buf, codec_bytes, nb, bound, zsz)
-    call local_codec%init()
-    allocate(codec_buf(K_CSI_BOXES_PER_BLK * 24_int64))
-    allocate(zstd_buf(K_CSI_BOXES_PER_BLK * 24_int64))
-
-    !$omp do schedule(dynamic, 1)
-    do i = 1_int64, this%n_chunks
-       c_start = (i - 1_int64) * K_CSI_BOXES_PER_BLK + 1_int64
-       c_end   = min(i * K_CSI_BOXES_PER_BLK, n_used)
-       nb      = c_end - c_start + 1_int64
-
-       ! Reset codec state per chunk (no reallocation)
-       local_codec%num_w = 0_int64
-       local_codec%num_h = 0_int64
-       local_codec%current_w_index = 0_int64
-       local_codec%current_h_index = 0_int64
-       local_codec%current_x = 0_K_COORDINATE_KIND
-       local_codec%current_y = 0_K_COORDINATE_KIND
-       local_codec%w_hash_valid = .true.
-       local_codec%h_hash_valid = .true.
-       if (allocated(local_codec%w_hash)) local_codec%w_hash = 0_int32
-       if (allocated(local_codec%h_hash)) local_codec%h_hash = 0_int32
-
-       call CompressBoxesUsingCodec(boxes(c_start:c_end), local_codec, codec_buf, codec_bytes)
-
-       this%chunks(i)%num_boxes = int(nb, int32)
-       this%chunks(i)%codec_len = int(codec_bytes, int32)
-
-       bound = zstd_compress_bound(int(codec_bytes, c_size_t))
-       if (int(bound, int64) > size(zstd_buf, kind=int64)) then
-          deallocate(zstd_buf)
-          allocate(zstd_buf(int(bound, int64)))
-       end if
-
-       zsz = zstd_compress(c_loc(zstd_buf(1)), bound, c_loc(codec_buf(1)), &
-                           int(codec_bytes, c_size_t), K_CSI_ZSTD_LEVEL)
-
-       if (zstd_is_error(zsz) == 0_c_int .and. int(zsz, int64) < codec_bytes) then
-          this%chunks(i)%is_zstd = .true.
-          allocate(this%chunks(i)%payload(int(zsz, int64)))
-          this%chunks(i)%payload(1:int(zsz, int64)) = zstd_buf(1:int(zsz, int64))
-       else
-          this%chunks(i)%is_zstd = .false.
-          allocate(this%chunks(i)%payload(codec_bytes))
-          this%chunks(i)%payload(1:codec_bytes) = codec_buf(1:codec_bytes)
-       end if
-    end do
-    !$omp end do
-
-    if (allocated(codec_buf)) deallocate(codec_buf)
-    if (allocated(zstd_buf))  deallocate(zstd_buf)
+    ! Each thread's codec and scratch buffers are locals of the worker (an orphaned
+    ! omp do), not PRIVATE copies of routine-scope allocatable derived types.
+    !$omp parallel default(shared)
+    call compress_chunks_worker(this, boxes, n_used)
     !$omp end parallel
   end subroutine csi_build_from_boxes
 

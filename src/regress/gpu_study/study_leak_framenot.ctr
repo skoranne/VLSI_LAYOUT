@@ -1,0 +1,19 @@
+program study_leak_framenot
+var temp_folder /tmp/magparser_band_check/
+var temporary_layers 2
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT_C.oas
+decl memory m = nothing
+exec init m:nothing
+exec run m:f1 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f0 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f1 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f0 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f1 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f0 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f1 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f0 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f1 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f0 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f1 = d1:L67_D20 ~ d1:L66_D20
+exec run m:f0 = d1:L67_D20 ~ d1:L66_D20
+end

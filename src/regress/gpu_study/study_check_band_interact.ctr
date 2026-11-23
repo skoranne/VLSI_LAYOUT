@@ -1,0 +1,26 @@
+# Banded INTERACT vs unbanded on the same healed inputs, in one run (var band_boxes switches).
+program study_check_band_interact
+var temp_folder /tmp/magparser_band_check/
+var temporary_layers 2
+var abort_on_assert_zero 1
+var debug_verbosity 0
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT_C.oas
+decl memory m = nothing
+exec init m:nothing
+var band_boxes 0
+exec run m:ab = d1:L67_D20 * d1:L66_D20
+exec run m:it0 = d1:L67_D20 INTERACT d1:L66_D20
+exec run m:it2 = d1:L66_D20 INTERACT d1:L67_D20
+exec run m:g0 = d1:L67_D20 GROW nothing 0.05 0.02 0.03 0.01
+var band_boxes 100000
+exec run m:it1 = d1:L67_D20 INTERACT d1:L66_D20
+exec run m:x1 = m:it0 ^ m:it1
+exec run m:z = m:x1 ASSERT_ZERO nothing
+exec run m:it3 = d1:L66_D20 INTERACT d1:L67_D20
+exec run m:x3 = m:it2 ^ m:it3
+exec run m:z = m:x3 ASSERT_ZERO nothing
+exec run m:g1 = d1:L67_D20 GROW nothing 0.05 0.02 0.03 0.01
+exec run m:x4 = m:g0 ^ m:g1
+exec run m:z = m:x4 ASSERT_ZERO nothing
+exec run m:neg = m:it0 ^ m:g1
+end

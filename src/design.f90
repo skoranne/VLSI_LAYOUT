@@ -108,6 +108,14 @@ module DesignModule
      logical                :: is_compact = .false.
      integer(kind=c_int)    :: compact_state = 0  !> layerState bits valid after expand (HEAL)
      integer(kind=int64)    :: last_use = 0       !> op counter of the last use (LRU for the budget)
+     !> Shadow: after LayerExpand the cold form is kept (3-5 B/box) with the count and content
+     !> hash of the expanded boxes. LayerCompact reuses it when the boxes are unchanged
+     !> (same count and hash), so re-compacting an input layer costs nothing.
+     logical                :: compact_shadow = .false.
+     !> Very large banded outputs stay as several parts (compact = part 1, cextra = the rest)
+     !> instead of paying the merge's 12 B/box transient; banded ops and LayerExpand read all parts.
+     type(CompactLayer), allocatable :: cextra(:)
+     integer(kind=int64)    :: shadow_n = 0, shadow_hash = 0
    contains
      procedure :: has     => layer_has_state
      procedure :: mark    => layer_mark_state
@@ -447,7 +455,7 @@ contains
   subroutine ClearLayer( input_layer_A )
     type(Layer), intent(inout), target :: input_layer_A
     call LayerDeviceRelease( input_layer_A )
-    if( input_layer_A%is_compact ) call LayerDropCompact( input_layer_A )
+    call LayerDropCompact( input_layer_A )
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
     if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
     call drop_rtree( input_layer_A )
@@ -501,6 +509,8 @@ contains
     character(len=:), allocatable    :: temp_fileName
 
     if( a%is_compact .or. b%is_compact ) error stop "swap_layer: expand compact layers first"
+    call LayerDropCompact( a )      !> shadows belong to the old contents
+    call LayerDropCompact( b )
     call swap_int64( a%n_used,  b%n_used )
     call swap_int64( a%n_alloc, b%n_alloc )
     call swap_int64( a%tree%root_index, b%tree%root_index )
@@ -1024,8 +1034,25 @@ contains
     nmin = 65536_int64
     if( present(min_boxes) ) nmin = min_boxes
     if( L%is_compact .or. L%n_used < nmin ) return
-    tp = PhaseBegin('compact.encode')
     keep_state = iand( L%layerState, LAYER_STATE_HEAL )
+    if( L%compact_shadow ) then
+       tp = PhaseBegin('compact.reuse')
+       if( L%n_used == L%shadow_n ) then
+          if( BoxSetHash( L%layer_boxes, L%n_used ) == L%shadow_hash ) then
+             call release_expanded( L )
+             L%compact_shadow = .false.
+             L%is_compact = .true.
+             L%compact_state = keep_state
+             L%layerState = LAYER_STATE_NONE
+             call PhaseEnd('compact.reuse', tp, L%compact%n)
+             return
+          end if
+       end if
+       call PhaseEnd('compact.reuse', tp, 0_int64)
+       call CompactRelease( L%compact )            !> contents changed: shadow is stale
+       L%compact_shadow = .false.
+    end if
+    tp = PhaseBegin('compact.encode')
     call CompactEncode( L%layer_boxes(1:L%n_used), L%n_used, L%compact, status )
     if( status /= 0 ) then
        call CompactRelease( L%compact )
@@ -1034,13 +1061,7 @@ contains
     end if
     call CompactPack( L%compact )
     if( debug_verbosity > 0 .or. PhaseTimersEnabled() ) call CompactPrintStats( L%compact, 'layer' )
-    call LayerDeviceRelease( L )         !> device copies of the boxes/tree are now stale
-    if( allocated( L%layer_boxes ) ) deallocate( L%layer_boxes )
-    if( allocated( L%pnumtable%arr ) ) deallocate( L%pnumtable%arr )
-    call drop_rtree( L )
-    L%n_used = 0
-    L%n_alloc = 0
-    L%device_resident = .false.
+    call release_expanded( L )
     L%is_compact = .true.
     L%compact_state = keep_state
     L%layerState = LAYER_STATE_NONE
@@ -1054,11 +1075,45 @@ contains
     real(kind=real64) :: tp
     if( .not. L%is_compact ) return
     tp = PhaseBegin('compact.decode')
-    call CompactUnpack( L%compact, drop_cold=.true. )
-    call CompactDecode( L%compact, L%layer_boxes )
+    if( allocated( L%cextra ) ) then                    !> multi-part: concatenate, no shadow
+       block
+         integer(kind=int64) :: ntot, off
+         integer :: ip
+         ntot = L%compact%n
+         do ip = 1, size( L%cextra )
+            ntot = ntot + L%cextra(ip)%n
+         end do
+         if( allocated( L%layer_boxes ) ) deallocate( L%layer_boxes )
+         allocate( L%layer_boxes( max( 1_int64, ntot ) ) )
+         call CompactDecodeColdInto( L%compact, L%layer_boxes )
+         off = L%compact%n
+         do ip = 1, size( L%cextra )
+            call CompactDecodeColdInto( L%cextra(ip), L%layer_boxes( off+1: ) )
+            off = off + L%cextra(ip)%n
+            call CompactRelease( L%cextra(ip) )
+         end do
+         deallocate( L%cextra )
+         call CompactRelease( L%compact )
+         L%n_used = ntot
+         L%n_alloc = size( L%layer_boxes, kind=int64 )
+         L%is_compact = .false.
+         L%compact_shadow = .false.
+         L%layerState = L%compact_state                 !> parts are not jointly Morton-sorted
+         L%tree%root_index = 0
+       end block
+       call PhaseEnd('compact.decode', tp, L%n_used)
+       if( present(build_tree) ) then
+          if( .not. build_tree ) return
+       end if
+       call BuildTree( L )
+       return
+    end if
+    call CompactDecodeCold( L%compact, L%layer_boxes )   !> cold form kept as the shadow
     L%n_used = L%compact%n
-    L%n_alloc = L%compact%n
-    call CompactRelease( L%compact )
+    L%n_alloc = size( L%layer_boxes, kind=int64 )
+    L%shadow_n = L%n_used
+    L%shadow_hash = BoxSetHash( L%layer_boxes, L%n_used )
+    L%compact_shadow = .true.
     L%is_compact = .false.
     L%layerState = ior( L%compact_state, LAYER_STATE_SORT )
     L%tree%root_index = 0
@@ -1069,12 +1124,34 @@ contains
     call BuildTree( L )
   end subroutine LayerExpand
 
-  !> The layer is about to be overwritten: a compact copy would be stale.
+  !> The layer is about to be overwritten: a compact copy or shadow would be stale.
   subroutine LayerDropCompact( L )
     type(Layer), intent(inout) :: L
-    if( .not. L%is_compact ) return
+    if( allocated( L%cextra ) ) then
+       block
+         integer :: ip
+         do ip = 1, size( L%cextra )
+            call CompactRelease( L%cextra(ip) )
+         end do
+       end block
+       deallocate( L%cextra )
+    end if
+    if( .not. (L%is_compact .or. L%compact_shadow) ) return
     call CompactRelease( L%compact )
     L%is_compact = .false.
+    L%compact_shadow = .false.
   end subroutine LayerDropCompact
+
+  !> Free the Box form (boxes, tree, pnum table, device copies) of a layer being compacted.
+  subroutine release_expanded( L )
+    type(Layer), intent(inout), target :: L
+    call LayerDeviceRelease( L )         !> device copies of the boxes/tree are now stale
+    if( allocated( L%layer_boxes ) ) deallocate( L%layer_boxes )
+    if( allocated( L%pnumtable%arr ) ) deallocate( L%pnumtable%arr )
+    call drop_rtree( L )
+    L%n_used = 0
+    L%n_alloc = 0
+    L%device_resident = .false.
+  end subroutine release_expanded
 
 end module DesignModule

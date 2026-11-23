@@ -1,5 +1,9 @@
 # cluster/ — heterogeneous compute-cluster prototype (Julia control plane)
 
+> **MAGPARSER RPC cluster:** to run real MAGPARSER ops on remote nodes, see [`mp/README.md`](mp/README.md).
+> It uses Distributed.jl, sends CompactLayer data over the network and launches `MAGPARSER.exe --rpc-serve`,
+> with no CTR/BIN files and no scp. The rest of this file describes the dummy-worker prototype.
+
 A dummy application for prototyping distributed MAGPARSER DAG execution across
 machines that **share no filesystem** and run **different architectures and MPI
 implementations** (aarch64 GB10, aarch64 8 GB board, x86_64 RHEL8, macOS).

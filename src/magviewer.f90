@@ -3,6 +3,11 @@
 ! Purpose : Idiomatic Fortran 2018 OpenGL/GLFW viewer for Magic, GDSII, OASIS,
 !           KLBIN, and SNAP layouts backed by CompressedSpatialIndex
 !           (16-bit quantized SoA R-Tree + BoxCodec/Zstd chunks + LRU cache).
+!           Every layer uses the compact store instead of BoxCodec/Zstd
+!           (compact_layer.f90: Morton centre key + shape id, 128-key bit-packed blocks;
+!           contacts are centre-only). Flat OASIS streams and compacts layer by layer, so
+!           the peak is one layer as Boxes. MAGVIEWER_COMPACT=0 restores BoxCodec chunks.
+!           Headless load/query check: test_viewer_index.exe.
 
 module DrawUsingOpenGL
   use, intrinsic :: iso_fortran_env, only: int32, int64, real64
@@ -803,7 +808,7 @@ program magviewer
      allocate(indices(1), layer_names(1))
      layer_names(1) = trim(filename)
      if (single_layer%n_used > 0_int64 .and. allocated(single_layer%layer_boxes)) then
-        call indices(1)%build_from_boxes(single_layer%layer_boxes, single_layer%n_used, already_sorted=.false.)
+        call indices(1)%build_auto(single_layer%layer_boxes, single_layer%n_used)
         global_mbr = indices(1)%layer_mbr
      end if
      call ClearLayer(single_layer)
@@ -828,8 +833,7 @@ program magviewer
         layer_names(i) = trim(load_design%layerNames(i))
         if (load_design%layers(i)%n_used > 0_int64 .and. &
             allocated(load_design%layers(i)%layer_boxes)) then
-           call indices(i)%build_from_boxes(load_design%layers(i)%layer_boxes, &
-                load_design%layers(i)%n_used, already_sorted=.false.)
+           call indices(i)%build_auto(load_design%layers(i)%layer_boxes, load_design%layers(i)%n_used)
            global_mbr = global_mbr + indices(i)%layer_mbr
         end if
         call ClearLayer(load_design%layers(i))

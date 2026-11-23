@@ -1,0 +1,31 @@
+# mp_local_sim.toml -- two simulated nodes on this machine (exercises the full RPC path).
+[coordinator]
+http = 8080
+
+[[host]]
+name = "sim-a"
+ssh = "local"
+julia = "/home/skoranne/.juliaup/bin/julia"
+magparser = "/home/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe"
+workers = 2
+tmp = "/tmp"
+env = { OMP_NUM_THREADS = "4", MAGPARSER_GPU_MEM_BUDGET = "1" }
+
+[[host]]
+name = "sim-b"
+ssh = "local"
+julia = "/home/skoranne/.juliaup/bin/julia"
+magparser = "/home/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe"
+workers = 1
+tmp = "/tmp"
+env = { OMP_NUM_THREADS = "4", MAGPARSER_GPU_MEM_BUDGET = "1" }
+
+[[host]]
+name = "sim-c"
+ssh = "local"
+julia = "/home/skoranne/.juliaup/bin/julia"
+magparser = "/home/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe"
+workers = 1
+tmp = "/tmp"
+autostart = false
+env = { OMP_NUM_THREADS = "4", MAGPARSER_GPU_MEM_BUDGET = "1" }

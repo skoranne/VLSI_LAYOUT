@@ -26,6 +26,7 @@ module ControlModule
   use CommonModule
   use hash_mod
   use DesignModule
+  use BandExecModule
   use SystemInformationModule
   use MagicVLSILayoutParser
   use LayoutDBLoaderModule
@@ -254,6 +255,7 @@ contains
     real(kind=real64)  :: rvar(16)
     integer(kind=K_COORDINATE_KIND):: ivar(16)
     integer(kind=K_COORDINATE_KIND) :: used_precision
+    logical :: banded_done
     character(len=1024) :: m4_cmd, expanded_file, echo_line, helper_name
     integer :: m4_stat, echo_unit, echo_ios, pid_self, pid_unit, helper_unit, helper_ios
     character(len=1024) :: trs_rules_file, trs_file
@@ -395,6 +397,20 @@ contains
              rest = trim( adjustl( rest(pos+1:)))             
              write(*,*) 'USING TEMP_FOLDER = ', trim(rest)
              TEMPORARY_FOLDER = trim(rest)
+          else if( trim(rest(1:pos-1)) == 'band_boxes' ) then
+             rest = adjustl(rest)
+             pos = index( rest, ' ' )
+             rest = trim( adjustl( rest(pos+1:)))
+             block
+               integer(kind=int64) :: nb_band
+               read(rest, *, iostat=ios) nb_band
+               if( ios == 0 ) then
+                  call BandSetTarget( nb_band )
+                  write(*,*) 'INFO: VAR changing band_boxes = ', nb_band
+               else
+                  write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
+               end if
+             end block
           else if( trim(rest(1:pos-1)) == 'abort_on_xor' ) then
              rest = adjustl(rest)
              pos = index( rest, ' ' )
@@ -724,6 +740,45 @@ contains
                      design_dbs(rhs1_db_index)%designName,':',trim(design_dbs(rhs1_db_index)%layerNames(rhs1_layer_index)),&
                      operator_char, &
                      design_dbs(rhs2_db_index)%designName,':',trim(design_dbs(rhs2_db_index)%layerNames(rhs2_layer_index))
+                banded_done = .false.
+                if( index('+*@~!^', operator_char) > 0 ) then
+                   if( BandedEligible( rhs1_layer, rhs2_layer ) ) then
+                      !> large compact inputs: run band by band, never expanding whole layers
+                      call touch_layers( lhs_layer, rhs1_layer, rhs2_layer )
+                      select case (operator_char)
+                      case('+')
+                         call StartMarkTime("OR")
+                         call BandedRun( rhs1_layer, rhs2_layer, lhs_layer, K_BAND_OR, 0_int64 )
+                         call StopMarkTime("OR")
+                      case('*')
+                         call StartMarkTime("AND")
+                         call BandedRun( rhs1_layer, rhs2_layer, lhs_layer, K_BAND_AND, 0_int64 )
+                         call StopMarkTime("AND")
+                      case('@')
+                         call StartMarkTime("NOT")
+                         call BandedRun( rhs1_layer, rhs2_layer, lhs_layer, K_BAND_NOT, 0_int64 )
+                         call StopMarkTime("NOT")
+                      case('~')
+                         call StartMarkTime("FRAMENOT")
+                         call BandedRun( rhs1_layer, rhs2_layer, lhs_layer, K_BAND_FRAMENOT, 0_int64 )
+                         call StopMarkTime("FRAMENOT")
+                      case('!')
+                         call StartMarkTime("BOOSTNOT")
+                         call BandedRun( rhs1_layer, rhs2_layer, lhs_layer, K_BAND_BOOSTNOT, 0_int64 )
+                         call StopMarkTime("BOOSTNOT")
+                      case('^')
+                         call StartMarkTime("BOOSTXOR")
+                         call BandedRun( rhs1_layer, rhs2_layer, lhs_layer, K_BAND_XOR, 0_int64 )
+                         call StopMarkTime("BOOSTXOR")
+                         if( abort_on_xor > 0 .and. LayerBoxCount( lhs_layer ) > 0 ) then
+                            write(*,*) 'ERROR: Aborting RUN since abort_on_xor set > 0, and ^ layer has non-zero shapes.'
+                            error stop
+                         end if
+                      end select
+                      banded_done = .true.
+                   end if
+                end if
+                if( .not. banded_done ) then
                 call LayerExpand( rhs1_layer )
                 call LayerExpand( rhs2_layer )
                 if( rhs1_layer%n_used == 0 ) call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
@@ -766,6 +821,7 @@ contains
                    end if
                 case('%')
                 end select
+                end if   !> .not. banded_done
              else
                 !> more verbose style eg f1:bbox_poly = d1:poly EXTENT nothing                
                 !> try "list directed read"
@@ -859,6 +915,39 @@ contains
                         nullify( rhs2_layer )
                      end if
                      call StartMarkTime(primary_operator)
+                     banded_done = .false.
+                     if( associated( rhs1_layer ) .and. associated( rhs2_layer ) .and. &
+                         associated( lhs_layer ) .and. primary_operator == 'INTERACT' ) then
+                        if( BandedEligible( rhs1_layer, rhs2_layer ) ) then
+                           if( LayerIsHealed( rhs1_layer ) ) then
+                              call touch_layers( lhs_layer, rhs1_layer, rhs2_layer )
+                              call BandedRun( rhs1_layer, rhs2_layer, lhs_layer, K_BAND_INTERACT, 0_int64 )
+                              banded_done = .true.
+                           end if
+                        end if
+                     end if
+                     if( associated( rhs1_layer ) .and. associated( lhs_layer ) .and. &
+                         ( primary_operator == 'GROW' .or. primary_operator == 'SIZE' ) ) then
+                        if( BandedEligible( rhs1_layer ) ) then
+                           call touch_layers( lhs_layer, rhs1_layer, rhs1_layer )
+                           if( primary_operator == 'GROW' ) then
+                              read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
+                              do i=1,4
+                                 ivar(i) = int( used_precision*rvar(i), kind = K_COORDINATE_KIND )
+                              end do
+                              call BandedRun( rhs1_layer, C=lhs_layer, op=K_BAND_GROW, &
+                                   halo=int( maxval( abs( ivar(1:4) ) ), int64 ), ivar=ivar(1:4) )
+                              banded_done = .true.
+                           else if( .not. associated( rhs2_layer ) ) then
+                              read(rest, *, iostat=ios) buf1, buf2, rvar(1)
+                              ivar(1) = int( rvar(1)*used_precision, kind=K_COORDINATE_KIND )
+                              call BandedRun( rhs1_layer, C=lhs_layer, op=K_BAND_SIZE, &
+                                   halo=abs( int( ivar(1), int64 ) ), cval=int( ivar(1), int64 ) )
+                              banded_done = .true.
+                           end if
+                        end if
+                     end if
+                     if( .not. banded_done ) then
                      if( associated( rhs1_layer ) ) then
                         call LayerExpand( rhs1_layer )
                         if( rhs1_layer%n_used == 0 ) call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
@@ -1033,6 +1122,7 @@ contains
                         write(*,*) 'UNKNOWN primary_operator: ', primary_operator, ' on line: ', line_number-1
                         error stop "SYNTAX ERROR on TEXT based operator"
                      end select
+                     end if   !> .not. banded_done
                      call StopMarkTime(primary_operator)
                   else
                      write(*,*) 'SYNTAX ERROR on line: ', line_number-1

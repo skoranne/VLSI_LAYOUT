@@ -134,6 +134,23 @@ extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
         std::sort(h_keys, h_keys + n);
     return 0;
 }
+// Sort (key, value) pairs lexicographically (CompactLayerModule wide layers: Morton key +
+// shape id). CPU build: sort an index permutation, then apply it.
+extern "C" int32_t thrust_sort_u64_i32_host(uint64_t *h_keys, int32_t *h_vals, int64_t n)
+{
+    if (n <= 1)
+        return 0;
+    std::vector<std::pair<uint64_t, int32_t>> v((size_t)n);
+    for (int64_t i = 0; i < n; ++i)
+        v[(size_t)i] = std::make_pair(h_keys[i], h_vals[i]);
+    std::sort(v.begin(), v.end());
+    for (int64_t i = 0; i < n; ++i)
+    {
+        h_keys[i] = v[(size_t)i].first;
+        h_vals[i] = v[(size_t)i].second;
+    }
+    return 0;
+}
 // NVTX range shims for the Fortran phase timers (ProfilerModule); no-ops without CUDA.
 extern "C" void magparser_nvtx_push(const char *) {}
 extern "C" void magparser_nvtx_pop(void) {}
@@ -560,6 +577,45 @@ extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
     cudaError_t serr = cudaStreamSynchronize(s);
     end_call();
     if (err != cudaSuccess)
+        return 4;
+    return (serr == cudaSuccess) ? 0 : 5;
+}
+
+// Lexicographic (key, value) sort on the device: stable sort by value, then stable sort by
+// key (two-pass LSD), so equal keys stay ordered by value. Wide compact layers only.
+extern "C" int32_t thrust_sort_u64_i32_host(uint64_t *h_keys, int32_t *h_vals, int64_t n)
+{
+    if (n <= 1)
+        return 0;
+    std::lock_guard<std::mutex> lk(g_mutex);
+    const size_t kb = (size_t)n * sizeof(uint64_t), vb = (size_t)n * sizeof(int32_t);
+    uint64_t *d_keys = (uint64_t *)g_keys.get(kb);
+    int32_t *d_vals = (int32_t *)g_idx.get(vb);
+    if (!d_keys || !d_vals)
+        return 1;
+    cudaStream_t s = stream();
+    if (cudaMemcpyAsync(d_keys, h_keys, kb, cudaMemcpyHostToDevice, s) != cudaSuccess ||
+        cudaMemcpyAsync(d_vals, h_vals, vb, cudaMemcpyHostToDevice, s) != cudaSuccess)
+    {
+        end_call();
+        return 2;
+    }
+    try
+    {
+        thrust::stable_sort_by_key(policy(), d_vals, d_vals + n, d_keys);
+        thrust::stable_sort_by_key(policy(), d_keys, d_keys + n, d_vals);
+    }
+    catch (...)
+    {
+        cudaStreamSynchronize(s);
+        end_call();
+        return 3;
+    }
+    cudaError_t e1 = cudaMemcpyAsync(h_keys, d_keys, kb, cudaMemcpyDeviceToHost, s);
+    cudaError_t e2 = cudaMemcpyAsync(h_vals, d_vals, vb, cudaMemcpyDeviceToHost, s);
+    cudaError_t serr = cudaStreamSynchronize(s);
+    end_call();
+    if (e1 != cudaSuccess || e2 != cudaSuccess)
         return 4;
     return (serr == cudaSuccess) ? 0 : 5;
 }

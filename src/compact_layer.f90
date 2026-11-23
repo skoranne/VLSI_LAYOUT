@@ -28,12 +28,14 @@ module CompactLayerModule
   use iso_c_binding, only: c_loc, c_int32_t, c_int64_t, c_ptr
   use CommonModule, only: K_COORDINATE_KIND
   use GeometryModule, only: Box
+  use ProfilerModule, only: PhaseBegin, PhaseEnd
   use omp_lib
   implicit none
   private
 
   public :: CompactLayer, CompactEncode, CompactDecode, CompactPack, CompactUnpack, &
-       CompactRelease, CompactBytes, CompactPrintStats, CompactKeyOf, K_CL_BLOCK
+       CompactRelease, CompactBytes, CompactPrintStats, CompactKeyOf, K_CL_BLOCK, &
+       CompactDecodeBlocks, CompactMove, CompactDecodeCold, BoxSetHash, CompactMergeParts, CompactSortU64, CompactDecodeColdInto
 
   integer(kind=int64), parameter :: K_CL_BLOCK = 128_int64
 
@@ -54,6 +56,11 @@ module CompactLayerModule
      !> coarse spatial index (one MBR per block), valid in both forms
      type(Box), allocatable :: blk_mbr(:)
      integer(kind=int64) :: nblk = 0
+     !> wide layers (2*cbits + sbits > 62): keys hold the Morton code only and the shape
+     !> ids live in a parallel stream, sid (hot, int32) / sidpack (cold, sbits per box).
+     logical :: wide = .false.
+     integer(kind=int32), allocatable :: sid(:)
+     integer(kind=int64), allocatable :: sidpack(:)
   end type CompactLayer
 
   interface
@@ -63,6 +70,12 @@ module CompactLayerModule
        integer(c_int64_t), value :: n
        integer(c_int32_t) :: rc
      end function thrust_sort_u64_host
+     function thrust_sort_u64_i32_host(h_keys, h_vals, n) result(rc) bind(c, name="thrust_sort_u64_i32_host")
+       import :: c_ptr, c_int64_t, c_int32_t
+       type(c_ptr), value :: h_keys, h_vals
+       integer(c_int64_t), value :: n
+       integer(c_int32_t) :: rc
+     end function thrust_sort_u64_i32_host
   end interface
 
 contains
@@ -115,6 +128,64 @@ contains
     if (rc /= 0) error stop "CompactLayer: key sort failed"
   end subroutine sort_u64
 
+  subroutine sort_pairs(a, v, n)
+    integer(kind=int64), intent(inout), target :: a(:)
+    integer(kind=int32), intent(inout), target :: v(:)
+    integer(kind=int64), intent(in) :: n
+    integer(c_int32_t) :: rc
+    if (n <= 1) return
+    rc = thrust_sort_u64_i32_host(c_loc(a(1)), c_loc(v(1)), int(n, c_int64_t))
+    if (rc /= 0) error stop "CompactLayer: pair sort failed"
+  end subroutine sort_pairs
+
+  !> MAGPARSER_COMPACT_FORCE_WIDE=1 (testing): use the wide layout for every layer.
+  logical function force_wide()
+    character(len=4) :: ev
+    integer :: evlen, evstat
+    call get_environment_variable('MAGPARSER_COMPACT_FORCE_WIDE', ev, evlen, evstat)
+    force_wide = (evstat == 0 .and. evlen > 0 .and. ev(1:1) == '1')
+  end function force_wide
+
+  !> w-bit field number i (1-based) of a fixed-width bit stream.
+  pure integer(kind=int64) function get_field(buf, i, w) result(v)
+    integer(kind=int64), intent(in) :: buf(:)
+    integer(kind=int64), intent(in) :: i
+    integer(kind=int32), intent(in) :: w
+    integer(kind=int64) :: pos, word, off
+    v = 0
+    if (w == 0) return
+    pos = (i - 1) * w
+    word = pos / 64 + 1
+    off = mod(pos, 64_int64)
+    v = shiftr(buf(word), int(off))
+    if (off + w > 64) v = ior(v, shiftl(buf(word + 1), int(64 - off)))
+    v = iand(v, shiftl(1_int64, w) - 1_int64)
+  end function get_field
+
+  !> Shape-id stream (wide layers) of box i: hot array or cold bit stream.
+  pure integer(kind=int64) function sid_of(cl, i) result(sid)
+    type(CompactLayer), intent(in) :: cl
+    integer(kind=int64), intent(in) :: i
+    if (allocated(cl%sid)) then
+       sid = cl%sid(i)
+    else
+       sid = get_field(cl%sidpack, i, cl%sbits)
+    end if
+  end function sid_of
+
+  !> Box i (1-based, key = its key) of cl, narrow or wide.
+  pure subroutine decode_at(cl, key, i, b)
+    type(CompactLayer), intent(in) :: cl
+    integer(kind=int64), intent(in) :: key, i
+    type(Box), intent(out) :: b
+    if (cl%wide) then
+       call decode_ms(key, sid_of(cl, i), cl%ox, cl%oy, cl%grid, cl%shape_w, cl%shape_h, b)
+    else
+       call decode_key(key, cl%sbits, shiftl(1_int64, cl%sbits) - 1_int64, cl%ox, cl%oy, cl%grid, &
+            cl%shape_w, cl%shape_h, b)
+    end if
+  end subroutine decode_at
+
   !> Key of one box under cl's parameters (shape must exist in cl's table).
   integer(kind=int64) function CompactKeyOf(cl, b) result(key)
     type(CompactLayer), intent(in) :: cl
@@ -149,6 +220,7 @@ contains
     integer(kind=int64), allocatable :: whk(:)
     integer :: lo, hi, mid
     logical :: bad
+    real(kind=real64) :: tp
 
     call CompactRelease(cl)
     status = 0
@@ -157,6 +229,7 @@ contains
        return
     end if
 
+    tp = PhaseBegin('cl.scan')
     ! origin of centre sums, validity
     ox = huge(ox); oy = huge(oy); bad = .false.
     !$omp parallel do reduction(min:ox,oy) reduction(.or.:bad) schedule(static)
@@ -167,18 +240,30 @@ contains
     end do
     if (bad) then
        status = 3
+       call PhaseEnd('cl.scan', tp, n)
        return
     end if
 
     ! grid = gcd of all centre-sum offsets (per-thread gcd, then combine)
     g = 0
-    !$omp parallel private(i, j)
+    !$omp parallel private(i, j, wh)
     j = 0
     !$omp do schedule(static)
     do i = 1, n
        if (j /= 1_int64) then
-          j = gcd64(j, int(boxes(i)%x1, int64) + int(boxes(i)%x2, int64) - ox)
-          j = gcd64(j, int(boxes(i)%y1, int64) + int(boxes(i)%y2, int64) - oy)
+          ! fast path: once j is the layer grid almost every offset is a multiple of it
+          wh = int(boxes(i)%x1, int64) + int(boxes(i)%x2, int64) - ox
+          if (j == 0_int64) then
+             j = wh
+          else if (mod(wh, j) /= 0_int64) then
+             j = gcd64(j, wh)
+          end if
+          wh = int(boxes(i)%y1, int64) + int(boxes(i)%y2, int64) - oy
+          if (j == 0_int64) then
+             j = wh
+          else if (mod(wh, j) /= 0_int64) then
+             j = gcd64(j, wh)
+          end if
        end if
     end do
     !$omp end do
@@ -195,6 +280,8 @@ contains
                         (int(boxes(i)%y1, int64) + int(boxes(i)%y2, int64) - oy) / g)
     end do
 
+    call PhaseEnd('cl.scan', tp, n)
+    tp = PhaseBegin('cl.shapes')
     ! shape dictionary: sort the (w,h) keys, keep the unique ones
     allocate(whk(n))
     !$omp parallel do schedule(static)
@@ -212,11 +299,13 @@ contains
 
     cl%cbits = max(1, bit_length(qmax))
     cl%sbits = bit_length(nshape - 1)
-    if (2 * cl%cbits + cl%sbits > 62 .or. cl%cbits > 31) then
+    if (cl%cbits > 31) then
        deallocate(whk)
        status = 2
+       call PhaseEnd('cl.shapes', tp, n)
        return
     end if
+    cl%wide = (2 * cl%cbits + cl%sbits > 62) .or. force_wide()   !> shape ids go to a separate stream
     cl%ox = ox; cl%oy = oy; cl%grid = g; cl%n_input = n
     allocate(cl%shape_w(nshape), cl%shape_h(nshape))
     do i = 1, nshape
@@ -224,8 +313,11 @@ contains
        cl%shape_h(i) = int(iand(whk(i), int(z'00000000FFFFFFFF', int64)), int32)
     end do
 
+    call PhaseEnd('cl.shapes', tp, n)
+    tp = PhaseBegin('cl.keys')
     ! keys
     allocate(cl%keys(n))
+    if (cl%wide) allocate(cl%sid(n))
     !$omp parallel do private(wh, lo, hi, mid) schedule(static)
     do i = 1, n
        wh = ior(shiftl(int(boxes(i)%x2 - boxes(i)%x1, int64), 32), int(boxes(i)%y2 - boxes(i)%y1, int64))
@@ -238,32 +330,63 @@ contains
              hi = mid
           end if
        end do
-       cl%keys(i) = ior(shiftl(ior(spread_bits((int(boxes(i)%x1, int64) + int(boxes(i)%x2, int64) - ox) / g), &
-            shiftl(spread_bits((int(boxes(i)%y1, int64) + int(boxes(i)%y2, int64) - oy) / g), 1)), cl%sbits), &
-            int(lo - 1, int64))
+       wh = ior(spread_bits((int(boxes(i)%x1, int64) + int(boxes(i)%x2, int64) - ox) / g), &
+            shiftl(spread_bits((int(boxes(i)%y1, int64) + int(boxes(i)%y2, int64) - oy) / g), 1))
+       if (cl%wide) then
+          cl%keys(i) = wh
+          cl%sid(i) = lo - 1
+       else
+          cl%keys(i) = ior(shiftl(wh, cl%sbits), int(lo - 1, int64))
+       end if
     end do
     deallocate(whk)
-    call sort_u64(cl%keys, n)
-
+    call PhaseEnd('cl.keys', tp, n)
+    tp = PhaseBegin('cl.sort')
+    if (cl%wide) then
+       call sort_pairs(cl%keys, cl%sid, n)
+    else
+       call sort_u64(cl%keys, n)
+    end if
+    call PhaseEnd('cl.sort', tp, n)
+    tp = PhaseBegin('cl.dedup_mbr')
     ! exact duplicates (identical boxes) carry no information for region operations
-    nu = 1
+    call dedup_sorted(cl, n)
+    call build_block_mbrs(cl)
+    call PhaseEnd('cl.dedup_mbr', tp, cl%n)
+  end subroutine CompactEncode
+
+  !> Drop repeated (key[, sid]) entries of the sorted hot form; sets cl%n.
+  subroutine dedup_sorted(cl, n)
+    type(CompactLayer), intent(inout) :: cl
+    integer(kind=int64), intent(in) :: n
+    integer(kind=int64) :: i, nu
+    nu = min(n, 1_int64)
     do i = 2, n
-       if (cl%keys(i) /= cl%keys(nu)) then
-          nu = nu + 1
-          cl%keys(nu) = cl%keys(i)
+       if (cl%wide) then
+          if (cl%keys(i) == cl%keys(nu) .and. cl%sid(i) == cl%sid(nu)) cycle
+       else
+          if (cl%keys(i) == cl%keys(nu)) cycle
        end if
+       nu = nu + 1
+       cl%keys(nu) = cl%keys(i)
+       if (cl%wide) cl%sid(nu) = cl%sid(i)
     end do
     if (nu < n) then
        block
          integer(kind=int64), allocatable :: tmp(:)
+         integer(kind=int32), allocatable :: tsid(:)
          allocate(tmp(nu))
          tmp(1:nu) = cl%keys(1:nu)
          call move_alloc(tmp, cl%keys)
+         if (cl%wide) then
+            allocate(tsid(nu))
+            tsid(1:nu) = cl%sid(1:nu)
+            call move_alloc(tsid, cl%sid)
+         end if
        end block
     end if
     cl%n = nu
-    call build_block_mbrs(cl)
-  end subroutine CompactEncode
+  end subroutine dedup_sorted
 
   !> Decode key -> box (exact).
   pure subroutine decode_key(key, sbits, smask, ox, oy, g, sw, sh, b)
@@ -271,16 +394,23 @@ contains
     integer(kind=int32), intent(in) :: sbits
     integer(kind=int32), intent(in) :: sw(:), sh(:)
     type(Box), intent(out) :: b
-    integer(kind=int64) :: m, sx, sy, w, h
+    call decode_ms(shiftr(key, sbits), iand(key, smask), ox, oy, g, sw, sh, b)
+  end subroutine decode_key
+
+  !> Morton code m + 0-based shape id -> box (exact).
+  pure subroutine decode_ms(m, sid0, ox, oy, g, sw, sh, b)
+    integer(kind=int64), intent(in) :: m, sid0, ox, oy, g
+    integer(kind=int32), intent(in) :: sw(:), sh(:)
+    type(Box), intent(out) :: b
+    integer(kind=int64) :: sx, sy, w, h
     integer :: sid
-    sid = int(iand(key, smask)) + 1
-    m = shiftr(key, sbits)
+    sid = int(sid0) + 1
     sx = compact_bits(m) * g + ox
     sy = compact_bits(shiftr(m, 1)) * g + oy
     w = sw(sid); h = sh(sid)
     b%x1 = int((sx - w) / 2, K_COORDINATE_KIND); b%x2 = int((sx - w) / 2 + w, K_COORDINATE_KIND)
     b%y1 = int((sy - h) / 2, K_COORDINATE_KIND); b%y2 = int((sy - h) / 2 + h, K_COORDINATE_KIND)
-  end subroutine decode_key
+  end subroutine decode_ms
 
   subroutine build_block_mbrs(cl)
     type(CompactLayer), intent(inout) :: cl
@@ -294,9 +424,9 @@ contains
     do k = 1, cl%nblk
        i0 = (k - 1) * K_CL_BLOCK + 1
        i1 = min(cl%n, k * K_CL_BLOCK)
-       call decode_key(cl%keys(i0), cl%sbits, smask, cl%ox, cl%oy, cl%grid, cl%shape_w, cl%shape_h, m)
+       call decode_at(cl, cl%keys(i0), i0, m)
        do i = i0 + 1, i1
-          call decode_key(cl%keys(i), cl%sbits, smask, cl%ox, cl%oy, cl%grid, cl%shape_w, cl%shape_h, b)
+          call decode_at(cl, cl%keys(i), i, b)
           m%x1 = min(m%x1, b%x1); m%y1 = min(m%y1, b%y1)
           m%x2 = max(m%x2, b%x2); m%y2 = max(m%y2, b%y2)
        end do
@@ -316,7 +446,7 @@ contains
     smask = shiftl(1_int64, cl%sbits) - 1_int64
     !$omp parallel do schedule(static)
     do i = 1, cl%n
-       call decode_key(cl%keys(i), cl%sbits, smask, cl%ox, cl%oy, cl%grid, cl%shape_w, cl%shape_h, boxes(i))
+       call decode_at(cl, cl%keys(i), i, boxes(i))
     end do
   end subroutine CompactDecode
 
@@ -370,6 +500,19 @@ contains
        end do
     end do
     deallocate(cl%keys)
+    if (cl%wide) then
+       if (allocated(cl%sidpack)) deallocate(cl%sidpack)
+       allocate(cl%sidpack(max(1_int64, (cl%n * cl%sbits + 63) / 64 + 1)))
+       cl%sidpack = 0
+       if (cl%sbits > 0) then
+          !$omp parallel do private(pos) schedule(static)
+          do i = 1, cl%n
+             pos = (i - 1) * cl%sbits
+             call put_bits(cl%sidpack, pos / 64 + 1, mod(pos, 64_int64), int(cl%sid(i), int64), cl%sbits)
+          end do
+       end if
+       deallocate(cl%sid)
+    end if
   end subroutine CompactPack
 
   subroutine put_bits(buf, word, off, v, w)
@@ -418,12 +561,295 @@ contains
           pos = pos + w
        end do
     end do
+    if (cl%wide) then
+       allocate(cl%sid(cl%n))
+       !$omp parallel do schedule(static)
+       do i = 1, cl%n
+          cl%sid(i) = int(get_field(cl%sidpack, i, cl%sbits), int32)
+       end do
+    end if
     if (present(drop_cold)) then
        if (drop_cold) then
           deallocate(cl%blk_base, cl%blk_bitoff, cl%blk_width, cl%packed)
+          if (allocated(cl%sidpack)) deallocate(cl%sidpack)
        end if
     end if
   end subroutine CompactUnpack
+
+  !> Decode blocks kb0..kb1 (1-based, 128 keys each) into boxes(1:nout), from the hot form
+  !> when present, else straight from the cold bit-packed form. Read-only on cl: safe to
+  !> call concurrently (MAGVIEWER chunk cache, per-chunk parallel builds).
+  subroutine CompactDecodeBlocks(cl, kb0, kb1, boxes, nout)
+    type(CompactLayer), intent(in) :: cl
+    integer(kind=int64), intent(in) :: kb0, kb1
+    type(Box), intent(inout) :: boxes(:)
+    integer(kind=int64), intent(out) :: nout
+    integer(kind=int64) :: k, i, i0, i1, pos, word, off, v, mask, key, smask
+    integer(kind=int32) :: w
+    nout = 0
+    if (kb0 > kb1 .or. kb0 < 1 .or. kb1 > cl%nblk) return
+    smask = shiftl(1_int64, cl%sbits) - 1_int64
+    if (allocated(cl%keys)) then
+       i0 = (kb0 - 1) * K_CL_BLOCK + 1
+       i1 = min(cl%n, kb1 * K_CL_BLOCK)
+       do i = i0, i1
+          nout = nout + 1
+          call decode_at(cl, cl%keys(i), i, boxes(nout))
+       end do
+       return
+    end if
+    do k = kb0, kb1
+       i0 = (k - 1) * K_CL_BLOCK + 1
+       i1 = min(cl%n, k * K_CL_BLOCK)
+       w = int(cl%blk_width(k), int32)
+       mask = shiftl(1_int64, w) - 1_int64
+       pos = cl%blk_bitoff(k)
+       key = cl%blk_base(k)
+       nout = nout + 1
+       call decode_at(cl, key, i0, boxes(nout))
+       do i = i0 + 1, i1
+          if (w == 0) then
+             v = 0
+          else
+             word = pos / 64 + 1
+             off = mod(pos, 64_int64)
+             v = shiftr(cl%packed(word), int(off))
+             if (off + w > 64) v = ior(v, shiftl(cl%packed(word + 1), int(64 - off)))
+             v = iand(v, mask)
+          end if
+          key = key + v
+          pos = pos + w
+          nout = nout + 1
+          call decode_at(cl, key, i, boxes(nout))
+       end do
+    end do
+  end subroutine CompactDecodeBlocks
+
+  !> Cold form -> Box array, in parallel over 64-block groups, without building the
+  !> 8 B/box hot key array. The cold form is left intact.
+  subroutine CompactDecodeCold(cl, boxes)
+    type(CompactLayer), intent(in) :: cl
+    type(Box), allocatable, intent(inout) :: boxes(:)
+    integer(kind=int64), parameter :: G = 64
+    integer(kind=int64) :: ig, ng, kb0, kb1, nout
+    if (allocated(boxes)) deallocate(boxes)
+    allocate(boxes(max(cl%n, 1_int64)))
+    if (cl%n <= 0) return
+    if (allocated(cl%keys)) then
+       call CompactDecodeBlocks(cl, 1_int64, cl%nblk, boxes, nout)   ! hot form present: one pass
+       return
+    end if
+    ng = (cl%nblk + G - 1) / G
+    !$omp parallel do private(kb0, kb1, nout) schedule(dynamic, 4)
+    do ig = 1, ng
+       kb0 = (ig - 1) * G + 1
+       kb1 = min(ig * G, cl%nblk)
+       call CompactDecodeBlocks(cl, kb0, kb1, boxes((kb0 - 1) * K_CL_BLOCK + 1:), nout)
+    end do
+  end subroutine CompactDecodeCold
+
+  !> Cold (or hot) form -> boxes(1:cl%n) of a caller-provided array (multi-part expand).
+  subroutine CompactDecodeColdInto(cl, boxes)
+    type(CompactLayer), intent(in) :: cl
+    type(Box), intent(inout) :: boxes(:)
+    integer(kind=int64), parameter :: KG = 64
+    integer(kind=int64) :: ig, ng, kb0, kb1, nout
+    if (cl%n <= 0) return
+    ng = (cl%nblk + KG - 1) / KG
+    !$omp parallel do private(kb0, kb1, nout) schedule(dynamic, 4)
+    do ig = 1, ng
+       kb0 = (ig - 1) * KG + 1
+       kb1 = min(ig * KG, cl%nblk)
+       call CompactDecodeBlocks(cl, kb0, kb1, boxes((kb0 - 1) * K_CL_BLOCK + 1:), nout)
+    end do
+  end subroutine CompactDecodeColdInto
+
+  !> Order-independent 64-bit content hash of a box set (sum of mixed per-box hashes).
+  integer(kind=int64) function BoxSetHash(boxes, n) result(h)
+    type(Box), intent(in) :: boxes(:)
+    integer(kind=int64), intent(in) :: n
+    integer(kind=int64) :: i, z
+    h = 0
+    !$omp parallel do private(z) reduction(+:h) schedule(static)
+    do i = 1, n
+       z = ieor(shiftl(int(boxes(i)%x1, int64), 32), iand(int(boxes(i)%y1, int64), 4294967295_int64))
+       z = ieor(z * (-7046029254386353131_int64), &
+            ieor(shiftl(int(boxes(i)%x2, int64), 32), iand(int(boxes(i)%y2, int64), 4294967295_int64)))
+       z = ieor(z, shiftr(z, 31)) * (-4658895280553007687_int64)
+       z = ieor(z, shiftr(z, 29)) * (-7723592293110705685_int64)
+       h = h + ieor(z, shiftr(z, 32))
+    end do
+  end function BoxSetHash
+
+  !> Public sort of int64 keys (Thrust on the GPU build, std::sort otherwise).
+  subroutine CompactSortU64(a, n)
+    integer(kind=int64), intent(inout), target :: a(:)
+    integer(kind=int64), intent(in) :: n
+    call sort_u64(a, n)
+  end subroutine CompactSortU64
+
+  !> Merge independently encoded compact layers (e.g. per-band outputs) into one, without
+  !> materialising the boxes: global origin = min origin, grid = gcd of the part grids and
+  !> origin offsets, shape table = union of the part tables; every part's blocks are decoded
+  !> in parallel straight into the global key array, which is then sorted and de-duplicated.
+  !> Peak memory is the 8 B/box key array plus the parts. Parts are released.
+  !> status: 0 ok, 1 empty, 2 keys exceed 62 bits (parts left intact for the caller).
+  subroutine CompactMergeParts(parts, np, out, status)
+    type(CompactLayer), intent(inout) :: parts(:)
+    integer, intent(in) :: np
+    type(CompactLayer), intent(inout) :: out
+    integer, intent(out) :: status
+    integer(kind=int64), parameter :: KG = 64
+    integer(kind=int64) :: ntot, ox, oy, g, nsh, nshape, qmax, it, nit, kb0, kb1, nout, j, wh, qx, qy
+    integer(kind=int64), allocatable :: whk(:), off(:), item_p(:), item_kb(:)
+    type(Box), allocatable :: buf(:)
+    integer :: p, lo, hi, mid
+    real(kind=real64) :: tp
+
+    call CompactRelease(out)
+    status = 0
+    ntot = 0
+    do p = 1, np
+       ntot = ntot + parts(p)%n
+    end do
+    if (ntot <= 0) then
+       status = 1
+       return
+    end if
+    tp = PhaseBegin('cl.merge')
+    ox = huge(ox); oy = huge(oy)
+    do p = 1, np
+       if (parts(p)%n <= 0) cycle
+       ox = min(ox, parts(p)%ox); oy = min(oy, parts(p)%oy)
+    end do
+    g = 0; nsh = 0
+    do p = 1, np
+       if (parts(p)%n <= 0) cycle
+       g = gcd64(g, parts(p)%grid)
+       g = gcd64(g, parts(p)%ox - ox)
+       g = gcd64(g, parts(p)%oy - oy)
+       nsh = nsh + size(parts(p)%shape_w)
+    end do
+    if (g == 0) g = 1
+    allocate(whk(nsh))
+    nsh = 0
+    do p = 1, np
+       if (parts(p)%n <= 0) cycle
+       do j = 1, size(parts(p)%shape_w)
+          nsh = nsh + 1
+          whk(nsh) = ior(shiftl(int(parts(p)%shape_w(j), int64), 32), int(parts(p)%shape_h(j), int64))
+       end do
+    end do
+    call sort_u64(whk, nsh)
+    nshape = 1
+    do j = 2, nsh
+       if (whk(j) /= whk(nshape)) then
+          nshape = nshape + 1
+          whk(nshape) = whk(j)
+       end if
+    end do
+    out%sbits = bit_length(nshape - 1)
+    allocate(out%shape_w(nshape), out%shape_h(nshape))
+    do j = 1, nshape
+       out%shape_w(j) = int(shiftr(whk(j), 32), int32)
+       out%shape_h(j) = int(iand(whk(j), int(z'00000000FFFFFFFF', int64)), int32)
+    end do
+
+    ! work items: (part, 64-block group) with the key offset of the group's first box
+    nit = 0
+    do p = 1, np
+       if (parts(p)%n > 0) nit = nit + (parts(p)%nblk + KG - 1) / KG
+    end do
+    allocate(item_p(nit), item_kb(nit), off(nit))
+    nit = 0; j = 0
+    do p = 1, np
+       if (parts(p)%n <= 0) cycle
+       do kb0 = 1, parts(p)%nblk, KG
+          nit = nit + 1
+          item_p(nit) = p; item_kb(nit) = kb0; off(nit) = j + (kb0 - 1) * K_CL_BLOCK
+       end do
+       j = j + parts(p)%n
+    end do
+
+    allocate(out%keys(ntot), out%sid(ntot))    !> Morton codes + shape ids; narrowed below if they fit
+    qmax = 0
+    !$omp parallel private(it, p, kb0, kb1, nout, j, wh, qx, qy, lo, hi, mid, buf) reduction(max:qmax)
+    allocate(buf(KG * K_CL_BLOCK))
+    !$omp do schedule(dynamic, 4)
+    do it = 1, nit
+       p = int(item_p(it)); kb0 = item_kb(it); kb1 = min(kb0 + KG - 1, parts(p)%nblk)
+       call CompactDecodeBlocks(parts(p), kb0, kb1, buf, nout)
+       do j = 1, nout
+          wh = ior(shiftl(int(buf(j)%x2 - buf(j)%x1, int64), 32), int(buf(j)%y2 - buf(j)%y1, int64))
+          lo = 1; hi = int(nshape)
+          do while (lo < hi)
+             mid = (lo + hi) / 2
+             if (whk(mid) < wh) then
+                lo = mid + 1
+             else
+                hi = mid
+             end if
+          end do
+          qx = (int(buf(j)%x1, int64) + int(buf(j)%x2, int64) - ox) / g
+          qy = (int(buf(j)%y1, int64) + int(buf(j)%y2, int64) - oy) / g
+          qmax = max(qmax, qx, qy)
+          out%keys(off(it) + j) = ior(spread_bits(qx), shiftl(spread_bits(qy), 1))
+          out%sid(off(it) + j) = lo - 1
+       end do
+    end do
+    !$omp end do
+    deallocate(buf)
+    !$omp end parallel
+    deallocate(whk, item_p, item_kb, off)
+
+    out%cbits = max(1, bit_length(qmax))
+    if (out%cbits > 31) then
+       call CompactRelease(out)
+       status = 2
+       call PhaseEnd('cl.merge', tp, 0_int64)
+       return
+    end if
+    out%ox = ox; out%oy = oy; out%grid = g
+    out%n_input = 0
+    do p = 1, np
+       out%n_input = out%n_input + parts(p)%n_input
+       call CompactRelease(parts(p))
+    end do
+    out%wide = (2 * out%cbits + out%sbits > 62) .or. force_wide()
+    if (out%wide) then
+       call sort_pairs(out%keys, out%sid, ntot)
+    else
+       !$omp parallel do schedule(static)
+       do j = 1, ntot
+          out%keys(j) = ior(shiftl(out%keys(j), out%sbits), int(out%sid(j), int64))
+       end do
+       deallocate(out%sid)
+       call sort_u64(out%keys, ntot)
+    end if
+    call dedup_sorted(out, ntot)
+    call build_block_mbrs(out)
+    call PhaseEnd('cl.merge', tp, out%n)
+  end subroutine CompactMergeParts
+
+  !> Move src into dst without copying the arrays; src is left empty.
+  subroutine CompactMove(src, dst)
+    type(CompactLayer), intent(inout) :: src, dst
+    call CompactRelease(dst)
+    dst%n = src%n; dst%n_input = src%n_input; dst%ox = src%ox; dst%oy = src%oy
+    dst%grid = src%grid; dst%cbits = src%cbits; dst%sbits = src%sbits; dst%nblk = src%nblk
+    if (allocated(src%shape_w)) call move_alloc(src%shape_w, dst%shape_w)
+    if (allocated(src%shape_h)) call move_alloc(src%shape_h, dst%shape_h)
+    if (allocated(src%keys)) call move_alloc(src%keys, dst%keys)
+    if (allocated(src%blk_base)) call move_alloc(src%blk_base, dst%blk_base)
+    if (allocated(src%blk_bitoff)) call move_alloc(src%blk_bitoff, dst%blk_bitoff)
+    if (allocated(src%blk_width)) call move_alloc(src%blk_width, dst%blk_width)
+    if (allocated(src%packed)) call move_alloc(src%packed, dst%packed)
+    if (allocated(src%blk_mbr)) call move_alloc(src%blk_mbr, dst%blk_mbr)
+    dst%wide = src%wide
+    if (allocated(src%sid)) call move_alloc(src%sid, dst%sid)
+    if (allocated(src%sidpack)) call move_alloc(src%sidpack, dst%sidpack)
+    call CompactRelease(src)
+  end subroutine CompactMove
 
   subroutine CompactRelease(cl)
     type(CompactLayer), intent(inout) :: cl
@@ -435,11 +861,13 @@ contains
     if (allocated(cl%blk_width)) deallocate(cl%blk_width)
     if (allocated(cl%packed)) deallocate(cl%packed)
     if (allocated(cl%blk_mbr)) deallocate(cl%blk_mbr)
-    cl%n = 0; cl%n_input = 0; cl%nblk = 0; cl%grid = 1; cl%cbits = 0; cl%sbits = 0
+    if (allocated(cl%sid)) deallocate(cl%sid)
+    if (allocated(cl%sidpack)) deallocate(cl%sidpack)
+    cl%n = 0; cl%n_input = 0; cl%nblk = 0; cl%grid = 1; cl%cbits = 0; cl%sbits = 0; cl%wide = .false.
   end subroutine CompactRelease
 
   !> Bytes held (hot + cold + index + shape table).
-  integer(kind=int64) function CompactBytes(cl) result(nb)
+  pure integer(kind=int64) function CompactBytes(cl) result(nb)
     type(CompactLayer), intent(in) :: cl
     nb = 64
     if (allocated(cl%keys)) nb = nb + 8 * size(cl%keys, kind=int64)
@@ -447,6 +875,8 @@ contains
     if (allocated(cl%blk_base)) nb = nb + 17 * size(cl%blk_base, kind=int64)
     if (allocated(cl%blk_mbr)) nb = nb + 16 * size(cl%blk_mbr, kind=int64)
     if (allocated(cl%shape_w)) nb = nb + 8 * size(cl%shape_w, kind=int64)
+    if (allocated(cl%sid)) nb = nb + 4 * size(cl%sid, kind=int64)
+    if (allocated(cl%sidpack)) nb = nb + 8 * size(cl%sidpack, kind=int64)
   end function CompactBytes
 
   subroutine CompactPrintStats(cl, label)
@@ -454,9 +884,9 @@ contains
     character(len=*), intent(in) :: label
     real(kind=real64) :: bpb
     bpb = real(CompactBytes(cl), real64) / real(max(cl%n, 1_int64), real64)
-    write(*,'(A,A,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,F6.2,A,F6.1,A)') 'COMPACT ', trim(label), ' n=', cl%n, &
+    write(*,'(A,A,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,A,F6.2,A,F6.1,A)') 'COMPACT ', trim(label), ' n=', cl%n, &
          ' (in ', cl%n_input, ') grid=', cl%grid, ' shapes=', size(cl%shape_w), ' cbits=', cl%cbits, &
-         ' sbits=', cl%sbits, ' bytes/box=', bpb, ' (', 16.0_real64 * real(cl%n_input, real64) / &
+         ' sbits=', cl%sbits, merge(' (wide)', '       ', cl%wide), ' bytes/box=', bpb, ' (', 16.0_real64 * real(cl%n_input, real64) / &
          real(max(CompactBytes(cl), 1_int64), real64), 'x vs Box)'
   end subroutine CompactPrintStats
 

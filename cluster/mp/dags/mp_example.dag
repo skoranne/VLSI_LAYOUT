@@ -1,0 +1,22 @@
+# mp_example.dag -- MAGPARSER ops executed over the RPC cluster (sizes in DBU).
+#   NAME = gen seed= n= extent= maxsize=     layer generated on the coordinator (Julia)
+#   NAME = OP in1 [in2] [k=v...]              MAGPARSER op on a remote node
+# OPs: OR OR2 AND NOT XOR BOOSTNOT GROW(d= | e= n= w= s=) SHRINK(d= | e= n= w= s=)
+#      EXTENT COPY MERGE and the topological selects (INTERACT, NOT_INTERACT, INSIDE, ...)
+M1   = gen seed=11 n=200000 extent=2000000 maxsize=800
+M2   = gen seed=12 n=200000 extent=2000000 maxsize=800
+VIA  = gen seed=13 n=100000 extent=2000000 maxsize=60
+
+U12  = OR   M1 M2
+A12  = AND  M1 M2
+N12  = NOT  M1 M2
+X12  = XOR  M1 M2
+G1   = GROW M1 d=20
+S2   = SHRINK M2 d=10
+GV   = AND  G1 VIA
+IV   = INTERACT M1 VIA
+NIV  = NOT_INTERACT M2 VIA
+U2   = OR   GV S2
+E    = EXTENT U2
+D    = XOR  U12 X12        # = M1 AND M2 region, computed a second way
+CHK  = XOR  D A12          # must be empty

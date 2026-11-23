@@ -1,0 +1,16 @@
+# Banded-execution check, run A: unbanded reference outputs (run with MAGPARSER_BAND_BOXES=0).
+program study_check_band_ref
+var temp_folder /tmp/magparser_band_check/
+var temporary_layers 2
+var debug_verbosity 0
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT_C.oas
+decl output o1 = /tmp/magparser_band_check/band_ref.mag
+decl memory m1 = nothing
+exec init m1:nothing
+exec run o1:g = d1:L67_D20 GROW nothing 0.05 0.02 0.03 0.01
+exec run o1:s = d1:L66_D20 SIZE nothing 0.02
+exec run o1:sn = d1:L68_D20 SIZE nothing -0.01
+exec run o1:fn = d1:L67_D20 ~ d1:L66_D20
+exec run o1:an = d1:L67_D20 * d1:L66_D20
+flush
+end

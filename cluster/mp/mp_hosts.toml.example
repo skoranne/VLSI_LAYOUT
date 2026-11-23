@@ -1,0 +1,36 @@
+# mp_hosts.toml -- MAGPARSER RPC cluster (copy to mp_hosts.toml and edit).
+# Every host needs FULL paths of julia and MAGPARSER.exe on that machine. The node's Julia
+# must have the same major.minor version as the coordinator's (Distributed.jl requirement).
+# MAGPARSER.exe must be built from a commit that has `--rpc-serve` (rpc_server.f90).
+# Fields: name, ssh ("local" or ssh target), julia, magparser, workers (= concurrent ops,
+# one MAGPARSER server each), tmp (scratch base; per-run dirs are deleted), reserve_mb,
+# autostart (false = spare, "Add" on the dashboard), env (passed to MAGPARSER).
+[coordinator]
+http = 8080
+
+[[host]]
+name = "spark-local"        # aarch64 GB10, nvfortran build
+ssh = "local"
+julia = "/home/skoranne/.juliaup/bin/julia"
+magparser = "/home/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe"
+workers = 2
+tmp = "/tmp"
+env = { OMP_NUM_THREADS = "8", MAGPARSER_GPU_MEM_BUDGET = "1" }
+
+[[host]]
+name = "rhel8-A"            # x86_64 RHEL8, ifx build (rebuild with RPC support first)
+ssh = "rhel8-A"
+julia = "/home/skoranne/.juliaup/bin/julia"
+magparser = "/home/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe"
+workers = 2
+tmp = "/tmp"
+env = { OMP_NUM_THREADS = "16" }
+
+[[host]]
+name = "JN6-TX2"            # aarch64 8 GB; needs Julia 1.13 and a MAGPARSER build
+ssh = "JN6-TX2.local"
+julia = "/home/skoranne/julia-1.11.3/bin/julia"
+magparser = "/home/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe"
+workers = 1
+tmp = "/tmp"
+reserve_mb = 1536

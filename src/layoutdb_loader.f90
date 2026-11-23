@@ -300,9 +300,10 @@ contains
     end do
   end subroutine trim_design_layers
 
-  subroutine LoadLayoutDBFile(load_design, MAX_LAYERS)
+  subroutine LoadLayoutDBFile(load_design, MAX_LAYERS, compact)
     type(Design), intent(inout), target :: load_design
     integer, intent(in)                 :: MAX_LAYERS
+    logical, intent(in), optional       :: compact   !> override MAGPARSER_COMPACT_LAYERS
     type(c_ptr)               :: fh
     type(ldb_load_ctx), target :: ctx
     type(c_funptr)            :: cb
@@ -324,6 +325,7 @@ contains
          cpath(n + 1) = c_null_char
          errbuf = c_null_char
          call init_design_ctx(load_design, MAX_LAYERS, ctx)
+         if (present(compact)) ctx%compact = compact
          rc = ldb_stream_boxes_c(cpath, cb, c_loc(ctx), errbuf, 512_c_size_t)
          if (rc == 0_c_int) then
             write(*,'(A,A)') 'INFO: Streamed OASIS: ', trim(load_design%fileName)
@@ -341,6 +343,7 @@ contains
     if (rc /= 0_c_int) then
        call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
        if (.not. c_associated(fh)) return
+       if (present(compact)) ctx%compact = compact
        rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
        call ldb_close_c(fh)
     end if
@@ -353,9 +356,10 @@ contains
     end do
   end subroutine LoadLayoutDBFile
 
-  subroutine LoadLayoutDBFileHier(load_design, MAX_LAYERS)
+  subroutine LoadLayoutDBFileHier(load_design, MAX_LAYERS, compact)
     type(Design), intent(inout), target :: load_design
     integer, intent(in)                 :: MAX_LAYERS
+    logical, intent(in), optional       :: compact
     type(c_ptr)               :: fh
     type(ldb_load_ctx), target :: ctx
     type(c_funptr)            :: cb
@@ -365,6 +369,7 @@ contains
 
     call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
     if (.not. c_associated(fh)) return
+    if (present(compact)) ctx%compact = compact
     cb = c_funloc(box_callback)
     topc(1) = c_null_char
     rc = ldb_iterate_boxes_hier_c(fh, topc, -1_c_int, cb, c_loc(ctx))
@@ -394,13 +399,10 @@ contains
     integer, intent(out)                                    :: num_layers
     type(Box), intent(out)                                  :: global_mbr
 
-    type(Design), target      :: tmp_design
-    type(c_ptr)               :: fh
-    type(ldb_load_ctx), target :: ctx
-    type(c_funptr)            :: cb
-    integer(c_int)            :: rc
-    character(kind=c_char)    :: topc(1)
-    integer                   :: i
+    type(Design), target :: tmp_design
+    integer              :: i
+    logical              :: use_compact
+    integer(int64)       :: t0, t1, t2, rate
 
     num_layers = 0
     call global_mbr%reset_to_infinity()
@@ -409,42 +411,49 @@ contains
     tmp_design%fileName = trim(filename)
     tmp_design%design_direction = DESIGN_DIRECTION_INPUT
 
-    call load_ldb_common(tmp_design, max_layers, fh, ctx)
-    if (.not. c_associated(fh)) return
-
-    cb = c_funloc(box_callback)
+    ! Flat OASIS streams box by box; with the compact store each layer is encoded as the
+    ! stream moves past it, so the peak is one layer as Boxes plus the compact layers.
+    use_compact = viewer_compact_enabled()
+    call system_clock(t0, rate)
     if (use_hier) then
-       topc(1) = c_null_char
-       rc = ldb_iterate_boxes_hier_c(fh, topc, -1_c_int, cb, c_loc(ctx))
+       call LoadLayoutDBFileHier(tmp_design, max_layers, compact=use_compact)
     else
-       rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
+       call LoadLayoutDBFile(tmp_design, max_layers, compact=use_compact)
     end if
-    call ldb_close_c(fh)
-
-    num_layers = ctx%num_unique_layers
-    global_mbr = tmp_design%DESIGN_EXTENT
-
+    num_layers = CountLoadedLayers(tmp_design)
     if (num_layers <= 0) then
        call DeleteDesign(tmp_design)
        return
     end if
 
+    call system_clock(t1)
     allocate(indices(num_layers))
     allocate(layer_names(num_layers))
-
-    ! Build compressed spatial index per layer and immediately free raw boxes
     do i = 1, num_layers
        layer_names(i) = trim(tmp_design%layerNames(i))
-       if (tmp_design%layers(i)%n_used > 0_int64 .and. &
-           allocated(tmp_design%layers(i)%layer_boxes)) then
-          call indices(i)%build_from_boxes(tmp_design%layers(i)%layer_boxes, &
-                                           tmp_design%layers(i)%n_used, already_sorted=.false.)
+       if (tmp_design%layers(i)%is_compact) then
+          ! The index takes ownership of the packed keys: geometry never re-expands.
+          call indices(i)%build_from_compact(tmp_design%layers(i)%compact)
+          tmp_design%layers(i)%is_compact = .false.
+       else if (tmp_design%layers(i)%n_used > 0_int64 .and. &
+                allocated(tmp_design%layers(i)%layer_boxes)) then
+          call indices(i)%build_auto(tmp_design%layers(i)%layer_boxes, tmp_design%layers(i)%n_used)
        end if
-       ! Free uncompressed boxes immediately before compressing the next layer
+       if (.not. indices(i)%is_empty()) global_mbr = global_mbr + indices(i)%layer_mbr
        call ClearLayer(tmp_design%layers(i))
     end do
+    call system_clock(t2)
+    write(*,'(A,F8.2,A,F8.2,A,L1,A)') 'INFO: MAGVIEWER read ', real(t1 - t0) / real(rate), &
+         ' s, index build ', real(t2 - t1) / real(rate), ' s (compact=', use_compact, ')'
 
     call DeleteDesign(tmp_design)
   end subroutine LoadLayoutDBToCompressedIndex
+
+  logical function viewer_compact_enabled()
+    character(len=8) :: ev
+    integer :: evlen, evstat
+    call get_environment_variable('MAGVIEWER_COMPACT', ev, evlen, evstat)
+    viewer_compact_enabled = .not. (evstat == 0 .and. evlen > 0 .and. ev(1:1) == '0')
+  end function viewer_compact_enabled
 
 end module LayoutDBLoaderModule

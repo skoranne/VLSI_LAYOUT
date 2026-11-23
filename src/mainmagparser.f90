@@ -55,6 +55,7 @@ program mag_parser
   use ProfilerModule
   use DeviceRegistryModule, only: DevicePrintStats
   use version_mod, only: commit_hash
+  use RPCServerModule, only: RPCServe
   implicit none
 
   !-----------------------------------------------------------------
@@ -75,6 +76,16 @@ program mag_parser
   !  Get the number of arguments supplied on the command line
   !-----------------------------------------------------------------
   narg = command_argument_count()
+
+  !> cluster RPC server mode (cluster/mp): MAGPARSER.exe --rpc-serve HOST:PORT
+  if (narg == 2) then
+     call get_command_argument(1, arg_string)
+     if (trim(arg_string) == '--rpc-serve') then
+        call get_command_argument(2, arg_string)
+        call RPCServe(trim(arg_string))
+        stop
+     end if
+  end if
 
   select case (narg)
   case (0)                     ! No arguments → use defaults
