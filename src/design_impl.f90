@@ -36,7 +36,7 @@ contains
   end subroutine PerformMergeLayer
   
   module function CertifyHealing( input_layer ) result(retval)
-    type(Layer), intent( in ) :: input_layer
+    type(Layer), intent( inout ), target :: input_layer
     logical                   :: retval
     integer(kind=int64)       :: interaction_count_gpu
     if( input_layer%n_used < 2 ) then
@@ -53,8 +53,10 @@ contains
     end if
     interaction_count_gpu = 0
     if( gpu_offload_enabled(input_layer%n_used) ) then
+       call LayerDeviceEnsure( input_layer )
        retval = CertifyHealingGPU( input_layer%tree%tree_nodes, size(input_layer%tree%tree_nodes,kind=int64), &
             input_layer%layer_boxes(1:input_layer%n_used), input_layer%n_used, input_layer%tree%root_index )
+       call LayerDeviceDone( input_layer )
        return
     end if
     call ComputeInteractionsCPU( input_layer%tree%tree_nodes, size(input_layer%tree%tree_nodes,kind=int64),&
@@ -338,6 +340,7 @@ contains
       integer(kind=int64) :: interaction_count, N, total_nodes
       type(RTreeNode), allocatable:: TreeNodes(:)
       integer(kind=int64) :: RootIndex
+      integer(kind=int32) :: gpu_overflow
       interaction_count = 0
       if( input_layer_A%n_used == 0 ) then
          return
@@ -350,9 +353,20 @@ contains
       total_nodes = CalculateTotalNodes( N, K_LEAF_CAPACITY ) !> for GPU we might change
       call omt_pack( input_layer_A%layer_boxes , K_LEAF_CAPACITY )
       !call SortBoxesDirect( input_layer_A%layer_boxes, N )
+      !> boxes reordered in place: derived structures are stale
+      call LayerDeviceRelease( input_layer_A )
+      call input_layer_A%unmark( ior( LAYER_STATE_RTREE, LAYER_STATE_PNUM ) )
+      call input_layer_A%mark( LAYER_STATE_SORT )
       allocate( TreeNodes( total_nodes ) )
-      call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
-      call ComputeInteractionsGPU( TreeNodes, total_nodes, input_layer_A%layer_boxes, N, RootIndex, interaction_count)
+      call BuildRTree( input_layer_A%layer_boxes(1:N), K_LEAF_CAPACITY, TreeNodes, RootIndex)
+      gpu_overflow = 1_int32
+      if( gpu_offload_enabled( N ) ) then
+         call ComputeInteractionsGPU( TreeNodes, total_nodes, input_layer_A%layer_boxes(1:N), N, RootIndex, &
+              interaction_count, gpu_overflow )
+      end if
+      if( gpu_overflow /= 0_int32 ) then
+         call ComputeInteractionsCPU( TreeNodes, total_nodes, input_layer_A%layer_boxes(1:N), N, RootIndex, interaction_count )
+      end if
    end function CalculateOverlapCount
 #else
    module function CalculateOverlapCount( input_layer_A ) result( interaction_count )
@@ -385,6 +399,7 @@ contains
       type(RTreeNode), allocatable:: TreeNodes(:)
       integer(kind=int64) :: RootIndex
       logical, allocatable, intent(out) :: is_singleton(:)
+      integer(kind=int32) :: gpu_overflow
       interaction_count = 0
       if( input_layer%n_used == 0 ) then
          return
@@ -393,9 +408,20 @@ contains
       total_nodes = CalculateTotalNodes( N, K_LEAF_CAPACITY ) !> for GPU we might change
       !call SortBoxesDirect( input_layer%layer_boxes, N )
       call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
+      !> boxes reordered in place: derived structures are stale
+      call LayerDeviceRelease( input_layer )
+      call input_layer%unmark( ior( LAYER_STATE_RTREE, LAYER_STATE_PNUM ) )
+      call input_layer%mark( LAYER_STATE_SORT )
       allocate( TreeNodes( total_nodes ) )
-      call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
-      call FindSingletonsGPU( N, input_layer%layer_boxes, total_nodes, TreeNodes, RootIndex, is_singleton, interaction_count)
+      call BuildRTree( input_layer%layer_boxes(1:N), K_LEAF_CAPACITY, TreeNodes, RootIndex)
+      gpu_overflow = 1_int32
+      if( gpu_offload_enabled( N ) ) then
+         call FindSingletonsGPU( N, input_layer%layer_boxes(1:N), total_nodes, TreeNodes, RootIndex, is_singleton, &
+              interaction_count, gpu_overflow )
+      end if
+      if( gpu_overflow /= 0_int32 ) then
+         call FindSingletonsCPU( input_layer%layer_boxes(1:N), TreeNodes, RootIndex, is_singleton, interaction_count )
+      end if
    end function CalculateSingletonCount
 #else
    module function CalculateSingletonCount( input_layer, is_singleton ) result( interaction_count )
@@ -425,6 +451,7 @@ contains
    module subroutine CalculateSingleLayerAND( input_layer_A, output_layer )
       type(Layer), intent(inout) :: input_layer_A
       type(Layer), intent(inout) :: output_layer
+      integer(kind=int32) :: gpu_overflow
       integer(kind=int64) :: num_boxesA, num_boxesC
       integer(kind=int64) :: leafboxes(K_MAX_SEARCH_LEAVES) ! better choose a large number
       integer(kind=int64) :: number_leaves
@@ -452,10 +479,30 @@ contains
       write(*,*) 'Loaded : ', N, ' BBOX = ', bbox, ' |T| = ', total_nodes
       call omt_pack( input_layer_A%layer_boxes , K_LEAF_CAPACITY )
       !call SortBoxesDirect( input_layer_A%layer_boxes, N )
-      allocate( TreeNodes( total_nodes ) )
-      call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, TreeNodes, RootIndex)
-      write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(TreeNodes)
-      call ComputeInteractionsGPU( TreeNodes, total_nodes, input_layer_A%layer_boxes, N, RootIndex, interaction_count)
+      !> omt_pack reorders the boxes in place, so any existing tree, pnum table or device copy
+      !> is stale. Rebuild the layer's own tree once (it is reused by the search below).
+      call LayerDeviceRelease( input_layer_A )
+      call input_layer_A%unmark( ior( LAYER_STATE_RTREE, LAYER_STATE_PNUM ) )
+      call input_layer_A%mark( LAYER_STATE_SORT )
+      if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
+      allocate( input_layer_A%tree%tree_nodes( total_nodes ) )
+      call BuildRTree( input_layer_A%layer_boxes(1:N), K_LEAF_CAPACITY, input_layer_A%tree%tree_nodes, &
+           input_layer_A%tree%root_index )
+      call input_layer_A%mark( LAYER_STATE_RTREE )
+      call LayerTreeBuilt( input_layer_A )
+      RootIndex = input_layer_A%tree%root_index
+      write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(input_layer_A%tree%tree_nodes)
+      gpu_overflow = 1_int32
+      if( gpu_offload_enabled( N ) ) then
+         call LayerDeviceEnsure( input_layer_A )
+         call ComputeInteractionsGPU( input_layer_A%tree%tree_nodes, total_nodes, input_layer_A%layer_boxes(1:N), N, &
+              RootIndex, interaction_count, gpu_overflow )
+         call LayerDeviceDone( input_layer_A )
+      end if
+      if( gpu_overflow /= 0_int32 ) then
+         call ComputeInteractionsCPU( input_layer_A%tree%tree_nodes, total_nodes, input_layer_A%layer_boxes(1:N), N, &
+              RootIndex, interaction_count )
+      end if
       if( interaction_count == 0 ) then
          output_layer%n_used = 0
          output_layer%layerState = LAYER_STATE_EVERYTHING
@@ -1442,9 +1489,10 @@ contains
    end subroutine CalculateFrameFunction1
 
    module subroutine MergeHealLayer( input_layer )
-      type(Layer), intent( inout ) :: input_layer
+      type(Layer), intent( inout ), target :: input_layer
       type(Layer)                  :: tempLayer
       integer(kind=int64)          :: output_box_count
+      call LayerDeviceRelease( input_layer )   !> boxes are healed in place / replaced below
       !if( CertifyHealing( input_layer ) ) return
       !write(*,*) 'INFO: Even GPU says, merge is needed.'
       if( input_layer%n_used < K_FRAME_THRESHOLD ) then

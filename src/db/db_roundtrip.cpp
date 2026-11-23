@@ -52,7 +52,13 @@ int main(int argc,char**argv){
         printf("Extent1: %s\n", e1.valid?"valid":"invalid");
         printf("Extent2: %s\n", e2.valid?"valid":"invalid");
         printf("CPU(s)=%.6f MaxRSS(kB)=%ld Mem(bytes)=%zu GPU=%s util=%u%% gpu_mem=%zu\n", st.cpu_seconds, st.max_rss_kb, st.in_memory_bytes, st.gpu_name, st.gpu_util_percent, st.gpu_mem_total_bytes);
-        printf("nvComp: %s\n", "not linked/detected in this build; CBLOCK GPU decompression path TODO when nvcomp available");
+#if defined(LAYOUTDB_USE_NVCOMP)
+        printf("nvComp: linked; CBLOCK backend LDB_CBLOCK_DECOMP=%s (auto|gpu|cpu|serial)\n",
+               getenv("LDB_CBLOCK_DECOMP") ? getenv("LDB_CBLOCK_DECOMP") : "auto");
+#else
+        printf("nvComp: not linked in this build; CBLOCKs decoded on the CPU (LDB_CBLOCK_DECOMP=%s)\n",
+               getenv("LDB_CBLOCK_DECOMP") ? getenv("LDB_CBLOCK_DECOMP") : "auto");
+#endif
         ldb_close(f2); ldb_close(f);
         return same?0:3;
     }

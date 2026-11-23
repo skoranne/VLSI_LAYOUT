@@ -53,6 +53,7 @@ program mag_parser
   use DesignModule
   use ControlModule
   use ProfilerModule
+  use DeviceRegistryModule, only: DevicePrintStats
   use version_mod, only: commit_hash
   implicit none
 
@@ -119,6 +120,7 @@ program mag_parser
   if (profiling_enabled) then
      call PrintProfileSummary()
   end if
+  call DevicePrintStats()   !> GPU residency summary (MAGPARSER_GPU_RESIDENCY_STATS=1)
   
   !-----------------------------------------------------------------
   !  Normal program termination

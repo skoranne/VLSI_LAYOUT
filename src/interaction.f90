@@ -4,7 +4,7 @@
 !        : as there are several challenges, such as non-allocate, no procs.
 module RTreeBuilderGPU
   use iso_fortran_env, only: int8, int32, int64, real64
-  use iso_c_binding, only: c_loc, c_int32_t
+  use iso_c_binding, only: c_loc, c_int32_t, c_size_t
   use omp_lib
   use CommonModule
   use Utilities
@@ -13,18 +13,87 @@ module RTreeBuilderGPU
   use DataStructuresModule
   use RTreeBuilder
   use MortonSortOMT, only: thrust_exclusive_scan_i64
+  use DeviceRegistryModule, only: DevicePrepare
   implicit none
   private
 
+  public :: prep_boxes, prep_nodes, prep_i64, prep_i8, prep_logical
   public :: gpu_offload_enabled, ComputeInteractionsGPU, CertifyHealingGPU, &
        ComputeANDPairsCountGPU, ComputeANDPairsFillGPU, ComputeANDPairsGPU, &
        ComputeTopoSelectGPU, ComputeMergeEdgesGPU
 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024
   integer(kind=int64), parameter, public :: K_GPU_MIN_BOXES = 4096_int64
+  !> Per-thread DFS stack depth for R-tree traversal kernels. BuildRTree produces a balanced
+  !> tree with fanout <= K_LEAF_CAPACITY (16); a DFS that pops one node and pushes at most 16
+  !> children needs at most 1 + 15*L slots for L internal levels. 160 covers L <= 10, i.e.
+  !> 16^10 leaves (> 10^13 boxes). Kernels still guard every push and raise an overflow flag.
+  integer(kind=int32), parameter, public :: K_GPU_DFS_STACK = 160_int32
 
 
 contains
+
+  !> DevicePrepare helpers: call for every host array a wrapper maps, right before mapping it.
+  !> Drops any persistent-residency mapping overlapping the array unless it is the exact,
+  !> validated-in-this-scope copy (see device_registry.f90). Cheap: O(#registered ranges).
+  subroutine prep_boxes(a, n)
+    integer(kind=int64), intent(in) :: n
+    type(Box), intent(in), target :: a(*)
+    if (n > 0_int64) call DevicePrepare(c_loc(a(1)), int(n, c_size_t) * int(storage_size(a(1))/8, c_size_t))
+  end subroutine prep_boxes
+  subroutine prep_nodes(a, n)
+    integer(kind=int64), intent(in) :: n
+    type(RTreeNode), intent(in), target :: a(*)
+    if (n > 0_int64) call DevicePrepare(c_loc(a(1)), int(n, c_size_t) * int(storage_size(a(1))/8, c_size_t))
+  end subroutine prep_nodes
+  subroutine prep_i64(a, n)
+    integer(kind=int64), intent(in) :: n
+    integer(kind=int64), intent(in), target :: a(*)
+    if (n > 0_int64) call DevicePrepare(c_loc(a(1)), int(n, c_size_t) * 8_c_size_t)
+  end subroutine prep_i64
+  subroutine prep_i8(a, n)
+    integer(kind=int64), intent(in) :: n
+    integer(kind=int8), intent(in), target :: a(*)
+    if (n > 0_int64) call DevicePrepare(c_loc(a(1)), int(n, c_size_t))
+  end subroutine prep_i8
+  subroutine prep_logical(a, n)
+    integer(kind=int64), intent(in) :: n
+    logical, intent(in), target :: a(*)
+    if (n > 0_int64) call DevicePrepare(c_loc(a(1)), int(n, c_size_t) * int(storage_size(a(1))/8, c_size_t))
+  end subroutine prep_logical
+
+  !> First-touch helpers. nsys on GB10 showed device-to-host copies into freshly allocated
+  !> (never touched) host arrays running at ~0.1 GB/s: the driver faults the destination in
+  !> page by page during the DMA. Touching the pages first, in parallel on the CPU, makes the
+  !> same copy run at full speed (44 MB: ~250 ms -> ~7 ms). Use before every map(from:) into a
+  !> newly allocated array.
+  subroutine first_touch_boxes(a, n)
+    integer(kind=int64), intent(in) :: n
+    type(Box), intent(inout) :: a(*)
+    integer(kind=int64) :: i
+    !$omp parallel do if(n > 65536_int64) schedule(static)
+    do i = 1, n
+       a(i)%X1 = 0; a(i)%Y1 = 0; a(i)%X2 = 0; a(i)%Y2 = 0
+    end do
+  end subroutine first_touch_boxes
+  subroutine first_touch_i64(a, n)
+    integer(kind=int64), intent(in) :: n
+    integer(kind=int64), intent(inout) :: a(*)
+    integer(kind=int64) :: i
+    !$omp parallel do if(n > 131072_int64) schedule(static)
+    do i = 1, n
+       a(i) = 0_int64
+    end do
+  end subroutine first_touch_i64
+  subroutine first_touch_i8(a, n)
+    integer(kind=int64), intent(in) :: n
+    integer(kind=int8), intent(inout) :: a(*)
+    integer(kind=int64) :: i
+    !$omp parallel do if(n > 1048576_int64) schedule(static)
+    do i = 1, n
+       a(i) = 0_int8
+    end do
+  end subroutine first_touch_i8
 
   !> Runtime GPU offload policy:
   !> - Returns .false. on non-GPU builds, if no OpenMP target device exists, or if OMP_TARGET_OFFLOAD=DISABLED.
@@ -243,7 +312,7 @@ contains
   end subroutine DO_INTERACTION
 
   !> GPU Offloaded All-Query Interaction Generator
-  subroutine ComputeInteractionsGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex, KernelCount)
+  subroutine ComputeInteractionsGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex, KernelCount, OverflowFlag)
     ! 1. The exact sizes MUST come first
     integer(kind=int64), intent(in) :: NumNodes, NumBoxes
 
@@ -253,11 +322,15 @@ contains
 
     integer(kind=int64), intent(in) :: RootIndex
     integer(kind=int64), intent(out) :: KernelCount
+    !> Set to 1 if any traversal overflowed its stack (KernelCount then incomplete).
+    !> If absent and an overflow occurs, the routine stops rather than return a wrong count.
+    integer(kind=int32), intent(out), optional :: OverflowFlag
+    integer(kind=int32) :: StackOverflow
 
     integer(kind=int64) :: I, J, K, ChildIdx, CurrNode
 
     ! 3. Stack size of 512 is now massive overkill, which is a good thing.
-    integer(kind=int64), parameter :: K_STACK_SIZE = 64
+    integer(kind=int64), parameter :: K_STACK_SIZE = int(K_GPU_DFS_STACK, kind=int64)
     integer(kind=int64) :: Stack(K_STACK_SIZE) 
     integer(kind=int64) :: StackPtr
 
@@ -265,12 +338,16 @@ contains
     logical :: OverlapX, OverlapY
 
     KernelCount = 0
+    StackOverflow = 0_int32
+    if (present(OverflowFlag)) OverflowFlag = 0_int32
+    if (NumBoxes <= 0_int64 .or. NumNodes <= 0_int64 .or. RootIndex <= 0_int64) return
 
-    ! Map the explicit bounds
+    ! Map the explicit bounds (no transfer if the layer is already device-resident)
+    call prep_nodes(TreeNodes, NumNodes); call prep_boxes(SortedBoxes, NumBoxes)
     !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
 
-    ! Launch kernel
-    !$omp target teams distribute parallel do &
+    ! Launch kernel (explicit tofrom so the flag is not firstprivate)
+    !$omp target teams distribute parallel do map(tofrom: StackOverflow) &
     !$omp private(I, J, K, ChildIdx, CurrNode, Stack, StackPtr, &
     !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY) &
     !$omp reduction(+:KernelCount)
@@ -336,13 +413,14 @@ contains
                    OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
 
                    if (OverlapY) then
-                      StackPtr = StackPtr + 1
-
-                      ! GPU Guard: Prevent silent death if tree is inexplicably deep
-                      if (StackPtr <= K_STACK_SIZE) then
+                      ! Bounded push: never index past the private stack. On overflow the
+                      ! count is incomplete, so flag it (wrapper reports / stops).
+                      if (StackPtr < K_STACK_SIZE) then
+                         StackPtr = StackPtr + 1
                          Stack(StackPtr) = ChildIdx
                       else
-
+                         !$omp atomic write
+                         StackOverflow = 1_int32
                       end if
                    end if
                 end if
@@ -351,6 +429,13 @@ contains
        end do
     end do
     !$omp target exit data map(release:  TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
+    if (StackOverflow /= 0_int32) then
+       if (present(OverflowFlag)) then
+          OverflowFlag = 1_int32
+       else
+          error stop "GPU R-tree traversal stack overflow (K_GPU_DFS_STACK): result would be incomplete"
+       end if
+    end if
 
   end subroutine ComputeInteractionsGPU
 
@@ -366,7 +451,7 @@ contains
   !  retval = self_check_count == input_layer%n_used
   !end function ComputeSelfCheckGPULayer
   
-  subroutine ComputeSelfCheckGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex, KernelCount)
+  subroutine ComputeSelfCheckGPU(TreeNodes, NumNodes, SortedBoxes, NumBoxes, RootIndex, KernelCount, OverflowFlag)
     ! 1. The exact sizes MUST come first
     integer(kind=int64), intent(in) :: NumNodes, NumBoxes
 
@@ -376,11 +461,15 @@ contains
 
     integer(kind=int64), intent(in) :: RootIndex
     integer(kind=int64), intent(out) :: KernelCount
+    !> Set to 1 if any traversal overflowed its stack (KernelCount then incomplete).
+    !> If absent and an overflow occurs, the routine stops rather than return a wrong count.
+    integer(kind=int32), intent(out), optional :: OverflowFlag
+    integer(kind=int32) :: StackOverflow
 
     integer(kind=int64) :: I, J, K, ChildIdx, CurrNode
 
     ! 3. Stack size of 512 is now massive overkill, which is a good thing.
-    integer(kind=int64), parameter :: K_STACK_SIZE = 64
+    integer(kind=int64), parameter :: K_STACK_SIZE = int(K_GPU_DFS_STACK, kind=int64)
     integer(kind=int64) :: Stack(K_STACK_SIZE) 
     integer(kind=int64) :: StackPtr
 
@@ -388,12 +477,16 @@ contains
     logical :: OverlapX, OverlapY
 
     KernelCount = 0
+    StackOverflow = 0_int32
+    if (present(OverflowFlag)) OverflowFlag = 0_int32
+    if (NumBoxes <= 0_int64 .or. NumNodes <= 0_int64 .or. RootIndex <= 0_int64) return
 
-    ! Map the explicit bounds
+    ! Map the explicit bounds (no transfer if the layer is already device-resident)
+    call prep_nodes(TreeNodes, NumNodes); call prep_boxes(SortedBoxes, NumBoxes)
     !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
 
-    ! Launch kernel
-    !$omp target teams distribute parallel do &
+    ! Launch kernel (explicit tofrom so the flag is not firstprivate)
+    !$omp target teams distribute parallel do map(tofrom: StackOverflow) &
     !$omp private(I, J, K, ChildIdx, CurrNode, Stack, StackPtr, &
     !$omp         QBox, NodeMbr, TargetBox, OverlapX, OverlapY) &
     !$omp reduction(+:KernelCount)
@@ -449,13 +542,14 @@ contains
                    OverlapY = max(NodeMbr%Y1, QBox%Y1) <= min(NodeMbr%Y2, QBox%Y2)
 
                    if (OverlapY) then
-                      StackPtr = StackPtr + 1
-
-                      ! GPU Guard: Prevent silent death if tree is inexplicably deep
-                      if (StackPtr <= K_STACK_SIZE) then
+                      ! Bounded push: never index past the private stack. On overflow the
+                      ! count is incomplete, so flag it (wrapper reports / stops).
+                      if (StackPtr < K_STACK_SIZE) then
+                         StackPtr = StackPtr + 1
                          Stack(StackPtr) = ChildIdx
                       else
-
+                         !$omp atomic write
+                         StackOverflow = 1_int32
                       end if
                    end if
                 end if
@@ -464,6 +558,13 @@ contains
        end do
     end do
     !$omp target exit data map(release:  TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes))
+    if (StackOverflow /= 0_int32) then
+       if (present(OverflowFlag)) then
+          OverflowFlag = 1_int32
+       else
+          error stop "GPU R-tree traversal stack overflow (K_GPU_DFS_STACK): result would be incomplete"
+       end if
+    end if
 
   end subroutine ComputeSelfCheckGPU
 
@@ -495,6 +596,7 @@ contains
     if (NumBoxes < 2_int64 .or. NumNodes <= 0_int64) return
 
     ! Map the explicit bounds and the abort flag
+    call prep_nodes(TreeNodes, NumNodes); call prep_boxes(SortedBoxes, NumBoxes)
     !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes)) &
     !$omp map(tofrom: GlobalAbortFlag)
 
@@ -525,14 +627,14 @@ contains
        Stack(1) = int(RootIndex, kind=int32)
 
        do while (StackPtr > 0_int32)
-          !$omp atomic read
-          LocalAbort = GlobalAbortFlag
-          if (LocalAbort /= 0) exit
-
           CurrNode = int(Stack(StackPtr), kind=int64)
           StackPtr = StackPtr - 1_int32
 
           if (TreeNodes(CurrNode)%IsLeaf) then
+             ! Poll the global abort flag only when doing leaf work (cheaper than every pop).
+             !$omp atomic read
+             LocalAbort = GlobalAbortFlag
+             if (LocalAbort /= 0) exit
              do K = 0_int64, int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
                 J = TreeNodes(CurrNode)%ChildStart + K
                 if (J <= I) cycle
@@ -593,21 +695,25 @@ contains
     integer(kind=int64), intent(out):: TotalCount
 
     integer(kind=int64) :: I, J, K, ChildIdx, CurrNode, LocalCount
-    integer(kind=int64), parameter :: K_STACK_SIZE = 64
+    integer(kind=int64), parameter :: K_STACK_SIZE = int(K_GPU_DFS_STACK, kind=int64)
     integer(kind=int64) :: Stack(K_STACK_SIZE)
     integer(kind=int64) :: StackPtr
     type(Box) :: QBox, NodeMbr, TargetBox
     logical :: OverlapX, OverlapY
     integer(kind=K_COORDINATE_KIND) :: ix1, iy1, ix2, iy2
+    integer(kind=int32) :: StackOverflow
 
+    StackOverflow = 0_int32
     Counts = 0_int64
     TotalCount = 0_int64
     if (NumBoxesA <= 0 .or. NumBoxesB <= 0 .or. NumNodes <= 0) return
 
+    call prep_nodes(TreeNodes, NumNodes); call prep_boxes(SortedBoxesB, NumBoxesB)
+    call prep_boxes(BoxesA, NumBoxesA); call prep_i64(Counts, NumBoxesA)
     !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA))
     !$omp target enter data map(alloc: Counts(1:NumBoxesA))
 
-    !$omp target teams distribute parallel do &
+    !$omp target teams distribute parallel do map(tofrom: StackOverflow) &
     !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,LocalCount,QBox,NodeMbr,TargetBox,OverlapX,OverlapY,ix1,iy1,ix2,iy2)
     do I = 1, NumBoxesA
        QBox = BoxesA(I)
@@ -652,6 +758,9 @@ contains
                          if (StackPtr < K_STACK_SIZE) then
                             StackPtr = StackPtr + 1
                             Stack(StackPtr) = ChildIdx
+                         else
+                            !$omp atomic write
+                            StackOverflow = 1_int32
                          end if
                       end if
                    end if
@@ -669,6 +778,8 @@ contains
     do I = 1, NumBoxesA
        TotalCount = TotalCount + Counts(I)
     end do
+    ! Stack overflow => counts incomplete; signal with a negative total (caller must use CPU path).
+    if (StackOverflow /= 0_int32) TotalCount = -1_int64
   end subroutine ComputeANDPairsCountGPU
 
   !> GPU-accelerated AND fill: generate intersection boxes using per-A offsets.
@@ -684,7 +795,7 @@ contains
     type(Box), intent(out)          :: OutBoxes(OutCount)
 
     integer(kind=int64) :: I, J, K, ChildIdx, CurrNode, WriteIdx, Base
-    integer(kind=int64), parameter :: K_STACK_SIZE = 64
+    integer(kind=int64), parameter :: K_STACK_SIZE = int(K_GPU_DFS_STACK, kind=int64)
     integer(kind=int64) :: Stack(K_STACK_SIZE)
     integer(kind=int64) :: StackPtr
     type(Box) :: QBox, NodeMbr, TargetBox
@@ -693,6 +804,8 @@ contains
 
     if (OutCount <= 0 .or. NumBoxesA <= 0 .or. NumBoxesB <= 0 .or. NumNodes <= 0) return
 
+    call prep_nodes(TreeNodes, NumNodes); call prep_boxes(SortedBoxesB, NumBoxesB)
+    call prep_boxes(BoxesA, NumBoxesA); call prep_i64(Offsets, NumBoxesA); call prep_boxes(OutBoxes, OutCount)
     !$omp target enter data map(to: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA), Offsets(1:NumBoxesA))
     !$omp target enter data map(alloc: OutBoxes(1:OutCount))
 
@@ -798,6 +911,8 @@ contains
     end if
 
     ! Single persistent device data region: Counts & Offsets stay resident on GPU (zero D2H/H2D roundtrip)
+    call prep_nodes(TreeNodes, NumNodes); call prep_boxes(SortedBoxesB, NumBoxesB); call prep_boxes(BoxesA, NumBoxesA)
+    call prep_i64(Counts, NumBoxesA); call prep_i64(Offsets, NumBoxesA)
     !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA)) &
     !$omp map(alloc: Counts(1:NumBoxesA), Offsets(1:NumBoxesA)) &
     !$omp map(tofrom: OverflowFlag)
@@ -864,6 +979,8 @@ contains
              allocate(OutBoxes(0))
           else
              ! --- Pass 2: fill output boxes (Counts & Offsets already resident on GPU!) ---
+             call first_touch_boxes(OutBoxes, OutCount)
+             call prep_boxes(OutBoxes, OutCount)
              !$omp target data map(from: OutBoxes(1:OutCount))
              !$omp target teams distribute parallel do &
              !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,WriteIdx,QBox,NodeMbr,TargetBox)
@@ -940,6 +1057,8 @@ contains
     OverflowFlag = 0_int32
     if (NumBoxesA <= 0_int64 .or. NumBoxesB <= 0_int64 .or. NumNodesB <= 0_int64) return
 
+    call prep_nodes(TreeNodesB, NumNodesB); call prep_boxes(SortedBoxesB, NumBoxesB)
+    call prep_boxes(BoxesA, NumBoxesA); call first_touch_i8(KeepMask, NumBoxesA); call prep_i8(KeepMask, NumBoxesA)
     !$omp target data map(to: TreeNodesB(1:NumNodesB), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA)) &
     !$omp map(from: KeepMask(1:NumBoxesA)) map(tofrom: OverflowFlag)
 
@@ -984,6 +1103,10 @@ contains
                       outside_all = .false.
                    else if (ix1 <= ix2 .and. iy1 <= iy2 .and. .not. (ix1 == ix2 .and. iy1 == iy2)) then
                       touch_any = .true.
+                      outside_all = .false.
+                   else if (ix1 == ix2 .and. iy1 == iy2) then
+                      ! Corner (point) contact: not an edge TOUCH, but it is contact, so the box
+                      ! is not OUTSIDE ("no contact at all", RELATIONS.md; == DISJOINT on CPU).
                       outside_all = .false.
                    end if
 
@@ -1095,6 +1218,8 @@ contains
        return
     end if
 
+    call prep_nodes(TreeNodes, NumNodes); call prep_boxes(SortedBoxes, NumBoxes)
+    call prep_i64(Counts, NumBoxes); call prep_i64(Offsets, NumBoxes)
     !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxes(1:NumBoxes)) &
     !$omp map(alloc: Counts(1:NumBoxes), Offsets(1:NumBoxes)) &
     !$omp map(tofrom: OverflowFlag)
@@ -1173,6 +1298,8 @@ contains
              allocate(OutEdges(2, 0))
           else
              ! --- Pass 2: fill exact edge list (skips zero-count boxes, zero atomics) ---
+             call first_touch_i64(OutEdges, 2_int64 * OutCount)
+             call prep_i64(OutEdges, 2_int64 * OutCount)
              !$omp target data map(from: OutEdges(1:2, 1:OutCount))
              !$omp target teams distribute parallel do &
              !$omp private(I,J,K,ChildIdx,CurrNode,Stack,StackPtr,WriteIdx,QBox,NodeMbr,TargetBox)

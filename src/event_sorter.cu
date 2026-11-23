@@ -37,6 +37,8 @@ extern "C" {
 #include <thrust/sort.h>
 #include <thrust/execution_policy.h>
 #include <thrust/transform.h>
+#include <cuda_runtime.h>
+#include <cstdio>
 #include <stdint.h>
 
 // Use extern "C" to prevent C++ name mangling so Fortran can link to it
@@ -59,25 +61,42 @@ extern "C" {
   };
 #endif
 
-  // The wrapper function called from Fortran
-  // d_arr is a raw device pointer passed from OpenMP's use_device_ptr
-  void device_event_sort(XYTracker* d_arr, int64_t n) {
-    // 1. Allocate a temporary device array for the 64-bit primitive keys
+  int magparser_is_device_pointer(const void *p); // gpu_morton.cu
+
+  // Called from Fortran (event_sorter_apif.f90). d_arr is normally the device address from
+  // OpenMP use_device_addr; if the caller had no device mapping (offload disabled / no
+  // device) it is a host pointer, which is staged through a device buffer here instead of
+  // relying on the GPU being able to dereference host memory (true only with ATS/HMM).
+  void device_event_sort(XYTracker* arr, int64_t n) {
+    if (n <= 1) return;
+    const size_t bytes = (size_t)n * sizeof(XYTracker);
+    XYTracker* d_arr = arr;
+    XYTracker* staged = nullptr;
+    if (!magparser_is_device_pointer(arr)) {
+      if (cudaMalloc((void**)&staged, bytes) != cudaSuccess ||
+          cudaMemcpy(staged, arr, bytes, cudaMemcpyHostToDevice) != cudaSuccess) {
+        if (staged) cudaFree(staged);
+        std::fprintf(stderr, "device_event_sort: staging failed, sorting on host\n");
+        thrust::sort(thrust::host, arr, arr + n, TrackerLess());
+        return;
+      }
+      d_arr = staged;
+    }
     uint64_t* d_keys = nullptr;
-    cudaMalloc((void**)&d_keys, n * sizeof(uint64_t));
-
-    // 2. Map the X and Y coordinates into the 64-bit keys in parallel
+    if (cudaMalloc((void**)&d_keys, n * sizeof(uint64_t)) != cudaSuccess) {
+      std::fprintf(stderr, "device_event_sort: cudaMalloc(keys) failed\n");
+      if (staged) cudaFree(staged);
+      return;
+    }
+    // Pack (X,Y) into one 64-bit key and radix sort the structs by it.
     thrust::transform(thrust::device, d_arr, d_arr + n, d_keys, PackKeys());
-    // 3. BLAST PROCESSING: Radix Sort!
-    // This sorts the primitive d_keys, and physically moves the structs in 
-    // d_arr to perfectly match the new sorted order.
     thrust::sort_by_key(thrust::device, d_keys, d_keys + n, d_arr);
-
-    // 4. Clean up
     cudaFree(d_keys);
-	
-    // thrust::device execution policy tells Thrust the pointer is already on the GPU
-    //thrust::sort(thrust::device, d_arr, d_arr + n, TrackerLess());
+    if (staged) {
+      if (cudaMemcpy(arr, staged, bytes, cudaMemcpyDeviceToHost) != cudaSuccess)
+        std::fprintf(stderr, "device_event_sort: copy-back failed\n");
+      cudaFree(staged);
+    }
   }
 }
 #else

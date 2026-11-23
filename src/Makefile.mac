@@ -41,7 +41,7 @@ GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 # --- Linker ---
 LDFLAGS ?= -L$(SNAPPY_PREFIX)/lib -L$(ZSTD_PREFIX)/lib
-LDLIBS ?= db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd $(LDLIBS_HDF5)
+LDLIBS ?= db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd -lpthread $(LDLIBS_HDF5)
 
 LIBRARY = libmagparser.a
 

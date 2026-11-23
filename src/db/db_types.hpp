@@ -68,7 +68,7 @@ struct CBlock {
     uint64_t src_offset; // compressed data offset in file
     uint64_t comp_size;
     uint64_t uncomp_size;
-    uint8_t comp_type; // 0=none, 1=zlib/deflate (OASIS), 2 etc
+    uint8_t comp_type; // OASIS: 0 = DEFLATE (RFC 1951, raw); other values undefined by the spec
     std::vector<uint8_t> host_out; // decompressed bytes (pinned/GPU-friendly alloc ideal)
     void* dev_in=nullptr; void* dev_out=nullptr; // device buffers if nvcomp used
 };

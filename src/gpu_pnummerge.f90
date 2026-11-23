@@ -10,6 +10,7 @@ module GPUMergeModule
   use GeometryModule
   use RTreeBuilder
   use DataStructuresModule
+  use RTreeBuilderGPU, only: prep_boxes, prep_nodes, prep_i64, prep_logical
   use omp_lib
   implicit none
 
@@ -37,7 +38,10 @@ contains
 
     integer(kind=int64) :: i, j, k, childidx, currnode
     integer(kind=int64) :: stackptr, idx
-    integer(kind=int64) :: stack(64) 
+    ! Children are pushed unpruned (MBR tested at pop): need <= 1 + 15*levels; see K_GPU_DFS_STACK.
+    integer(kind=int64), parameter :: K_STACK_SIZE = 160_int64
+    integer(kind=int64) :: stack(K_STACK_SIZE)
+    integer(kind=int32) :: stack_overflow
 
     type(Box) :: qbox, nodembr, targetbox, tempBox
     logical :: overlapx, overlapy
@@ -51,12 +55,15 @@ contains
 
     overlap_area = 0.0_real64
     overlap_perimeter = 0.0_real64
+    stack_overflow = 0_int32
     call uf%init(num_boxes)
 
+    call prep_nodes(tree_nodes, num_nodes); call prep_boxes(sorted_boxes, num_boxes)
+    call prep_i64(d_edges, 2_int64 * limit_edges)
     ! CRITICAL FIX 1: global_edge_count MUST be in this map to prevent Error 719 Segfaults
     !$omp target data map(to: tree_nodes(1:num_nodes), sorted_boxes(1:num_boxes)) &
     !$omp map(alloc: d_edges(1:2, 1:limit_edges)) &
-    !$omp map(tofrom: global_edge_count)
+    !$omp map(tofrom: global_edge_count, stack_overflow)
 
     do chunk_start = 1, num_boxes, CHUNK_SIZE
        chunk_end = min(chunk_start + CHUNK_SIZE - 1, num_boxes)
@@ -69,7 +76,10 @@ contains
 
        ! CRITICAL FIX: Removed default(none) and the shared() clauses for scalars. 
        ! OpenMP will now correctly register-map the scalars and memory-map the arrays.
-       !$omp target teams distribute parallel do &
+       ! The counter and flag are mapped on the enclosing target data region; the explicit
+       ! tofrom here keeps them shared (otherwise scalars on a target construct are firstprivate
+       ! and the atomic capture would increment a private copy).
+       !$omp target teams distribute parallel do map(tofrom: global_edge_count, stack_overflow) &
        !$omp private(i, j, k, childidx, currnode, stack, stackptr, qbox, nodembr, targetbox, tempBox, overlapx, overlapy, idx, w, h) &
        !$omp reduction(+:chunk_area, chunk_perimeter)
        do i = chunk_start, chunk_end
@@ -124,9 +134,12 @@ contains
              else
                 do k = 0, tree_nodes(currnode)%NumChildren - 1
                    childidx = tree_nodes(currnode)%ChildStart + k
-                   if (stackptr < 64) then
+                   if (stackptr < K_STACK_SIZE) then
                       stackptr = stackptr + 1
                       stack(stackptr) = childidx
+                   else
+                      !$omp atomic write
+                      stack_overflow = 1_int32
                    end if
                 end do
              end if
@@ -134,7 +147,8 @@ contains
        end do
 
        ! Fetch counts safely back to the host
-       !$omp target update from(global_edge_count)
+       !$omp target update from(global_edge_count, stack_overflow)
+       if (stack_overflow /= 0_int32) error stop "PerformMergeGPU: R-tree stack overflow (connectivity would be lost)"
 
        ! Accumulate the strictly local reductions into the global trackers
        overlap_area = overlap_area + chunk_area
@@ -142,7 +156,10 @@ contains
 
        valid_edges = min(global_edge_count, limit_edges)
        if (global_edge_count > limit_edges) then
-          print *, "WARNING: Chunk ", chunk_start, " to ", chunk_end, " exceeded buffer! Found ", global_edge_count, " edges."
+          ! Dropping edges silently breaks Union-Find connectivity; fail loudly instead.
+          ! (Production code uses ComputeMergeEdgesGPU, which sizes its output exactly.)
+          print *, "ERROR: Chunk ", chunk_start, " to ", chunk_end, " exceeded buffer! Found ", global_edge_count, " edges."
+          error stop "PerformMergeGPU: edge buffer overflow"
        end if
 
        if (valid_edges > 0) then
@@ -167,13 +184,17 @@ contains
   ! Proven more difficult than estimated
   ! Author  : Sandeep Koranne (C) 2026. (Adapted for GPU Offload)
   ! Purpose : Identifies boxes that share no area or edges with any other box
-  subroutine FindSingletonsGPU(num_boxes, sorted_boxes, num_nodes, tree_nodes, root_index, is_singleton, num_singletons)
+  subroutine FindSingletonsGPU(num_boxes, sorted_boxes, num_nodes, tree_nodes, root_index, is_singleton, num_singletons, &
+       overflow_flag)
     integer(kind=int64), intent(in) :: num_boxes, num_nodes  
     type(Box), intent(in)             :: sorted_boxes(num_boxes)
     type(RTreeNode), intent(in)    :: tree_nodes(num_nodes)
     integer(kind=int64), intent(in)   :: root_index
     logical, allocatable, intent(out) :: is_singleton(:)
     integer(kind=int64), intent(out)  :: num_singletons
+    !> 1 if a traversal overflowed its stack (result unreliable); stops if absent and overflow occurs.
+    integer(kind=int32), intent(out), optional :: overflow_flag
+    integer(kind=int32) :: stack_overflow
     integer(kind=int64) :: i, j, currnode, childidx
     ! Moderate stack perfectly safe for L1/Shared Memory limits
     integer(kind=int64), parameter :: K_STACK_SIZE = 256
@@ -184,11 +205,19 @@ contains
     allocate(is_singleton(num_boxes))
     is_singleton = .true.
     num_singletons = 0
+    stack_overflow = 0_int32
+    if (present(overflow_flag)) overflow_flag = 0_int32
+    if (num_boxes <= 0_int64 .or. num_nodes <= 0_int64 .or. root_index <= 0_int64) then
+       num_singletons = count(is_singleton)
+       return
+    end if
 
+    call prep_nodes(tree_nodes, num_nodes); call prep_boxes(sorted_boxes, num_boxes)
+    call prep_logical(is_singleton, num_boxes)
     !$omp target data map(to: tree_nodes(1:num_nodes), sorted_boxes(1:num_boxes)) &
-    !$omp map(tofrom: is_singleton(1:num_boxes))
+    !$omp map(tofrom: is_singleton(1:num_boxes), stack_overflow)
 
-    !$omp target teams distribute parallel do &
+    !$omp target teams distribute parallel do map(tofrom: stack_overflow) &
     !$omp private(i, j, currnode, childidx, stack, stackptr, qbox, nodembr, targetbox)
     do i = 1, num_boxes
        qbox = sorted_boxes(i)
@@ -233,6 +262,9 @@ contains
                       if (stackptr < K_STACK_SIZE) then
                          stackptr = stackptr + 1
                          stack(stackptr) = j
+                      else
+                         !$omp atomic write
+                         stack_overflow = 1_int32
                       end if
                    end do
                 end if
@@ -246,6 +278,13 @@ contains
 
     ! CPU Tally
     num_singletons = count(is_singleton)
+    if (stack_overflow /= 0_int32) then
+       if (present(overflow_flag)) then
+          overflow_flag = 1_int32
+       else
+          error stop "FindSingletonsGPU: R-tree stack overflow (singleton flags unreliable)"
+       end if
+    end if
   end subroutine FindSingletonsGPU
 
 end module GPUMergeModule

@@ -242,6 +242,11 @@ contains
        if (line(1:5) == 'KLBIN' .and. found_section) then
           !write (*,*) line
           call hash_get( ht, trim(section_name), layer_id, ok )            
+          !> Layer beyond max_layers (not registered): skip instead of indexing with garbage.
+          if( .not. ok .or. layer_id < 1 .or. layer_id > size(layers) ) then
+             write(*,*) 'WARNING: KLBIN section ', trim(section_name), ' skipped (layer not loaded; raise max_layers)'
+             cycle
+          end if
           !if( allocated( layers(layer_id)%item ) ) deallocate( layers(layer_id)%item )
           !allocate( Layer :: layers(layer_id) )
           associate( resolved_layer => layers(layer_id) )

@@ -30,6 +30,10 @@
 #include <array>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
+#include <cstdlib>
+#include <future>
+#include <memory>
 
 namespace {
 
@@ -70,8 +74,125 @@ struct Modal {
     void reset_for_cell() { relative = false; place_x = place_y = geom_x = geom_y = text_x = text_y = 0; }
 };
 
+// ---------------------------------------------------------------------------
+// Batched CBLOCK decompression
+//
+// A scan pass (Parser with scan_only=true) records every top-level CBLOCK; CblockSource then
+// inflates them in windows of LDB_CBLOCK_BATCH_MB (default 256 MB uncompressed) on the GPU
+// (nvCOMP) or a CPU thread pool, prefetching window k+1 asynchronously while the parser is
+// consuming window k. The real parse fetches block i by index (verifying its file position),
+// so parsing order, modal state and results are identical to the serial path.
+// ---------------------------------------------------------------------------
+struct CblockRef { const uint8_t* src; uint64_t comp_type, uncomp_len, comp_len; };
+
+class CblockSource {
+public:
+    CblockSource(std::vector<CblockRef> refs, db::CblockBackend be, db::NvcompStatus& st)
+        : refs_(std::move(refs)), be_(be), st_(st) {
+        const char* e = std::getenv("LDB_CBLOCK_BATCH_MB");
+        size_t mb = e && *e ? (size_t)std::strtoull(e, nullptr, 10) : 256;
+        window_bytes_ = std::max<size_t>(mb, 1) * 1024 * 1024;
+        // GPU windows need nvCOMP's output alignment; it is fetched lazily (first GPU window)
+        // so CPU-only decoding never creates a CUDA context.
+    }
+    ~CblockSource() { if (next_.valid()) next_.wait(); }
+
+    // Pointer/length of decompressed block i, or nullptr if i does not match the scan
+    // (caller then decodes inline). Throws nothing.
+    bool get(size_t i, const uint8_t* src, uint64_t comp_len, uint64_t uncomp_len, const uint8_t*& p, size_t& n) {
+        if (failed_ || i >= refs_.size()) return false;
+        const CblockRef& r = refs_[i];
+        if (r.src != src || r.comp_len != comp_len || r.uncomp_len != uncomp_len) { failed_ = true; return false; }
+        if (!cur_ || i < cur_->first || i >= cur_->last) {
+            const auto t0 = std::chrono::steady_clock::now();
+            if (next_.valid()) {
+                std::unique_ptr<Window> w = next_.get();
+                if (w && i >= w->first && i < w->last) cur_ = std::move(w);
+                else cur_ = decode(i);
+            } else {
+                cur_ = decode(i);
+            }
+            db::cblock_stats().wait_ms +=
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            if (cur_->last < refs_.size()) {
+                const size_t start = cur_->last;
+                next_ = std::async(std::launch::async, [this, start]() { return decode(start); });
+            }
+        }
+        const size_t k = i - cur_->first;
+        if (!cur_->jobs[k].ok) return false;
+        p = cur_->buf.p + cur_->jobs[k].out_off;
+        n = (size_t)r.uncomp_len;
+        return true;
+    }
+    size_t count() const { return refs_.size(); }
+
+private:
+    struct Window {
+        size_t first = 0, last = 0;
+        std::vector<db::CblockJob> jobs;
+        db::HostBuffer buf;
+    };
+    std::unique_ptr<Window> decode(size_t first) {
+        std::unique_ptr<Window> w(new Window);
+        w->first = first;
+        const db::CblockBackend be = choose_backend(refs_.size() - first);
+        size_t align = 8;
+        if (be == db::CblockBackend::Gpu) {
+            if (gpu_align_ == 0) gpu_align_ = db::cblock_output_alignment(st_);
+            align = gpu_align_;
+        }
+        size_t off = 0, i = first;
+        for (; i < refs_.size(); ++i) {
+            const CblockRef& r = refs_[i];
+            if (i > first && off + r.uncomp_len > window_bytes_) break;
+            db::CblockJob j;
+            j.src = r.src; j.comp_len = (size_t)r.comp_len; j.uncomp_len = (size_t)r.uncomp_len;
+            j.comp_type = (uint8_t)r.comp_type;
+            j.out_off = off;
+            off += (size_t)r.uncomp_len;
+            off = (off + align - 1) / align * align;
+            w->jobs.push_back(j);
+        }
+        w->last = i;
+        w->buf.reserve(off, be == db::CblockBackend::Gpu);
+        const auto t0 = std::chrono::steady_clock::now();
+        db::decompress_cblock_batch(w->jobs, w->buf.p, be, st_);
+        const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        if (be_ == db::CblockBackend::Auto && st_.available) {
+            double& rate = (be == db::CblockBackend::Gpu) ? gpu_rate_ : cpu_rate_;
+            rate = (double)off / std::max(s, 1e-9);           // bytes/s of decompressed output
+        }
+        ++windows_done_;
+        return w;
+    }
+    // auto: calibrate on the first two windows (CPU, then GPU) and keep the faster backend.
+    // On GB10 the 20 Grace cores out-run nvCOMP for typical KLayout/OpenROAD CBLOCK sizes
+    // (~1-2 MB, a few hundred per file); on machines/files where the GPU wins it is chosen.
+    db::CblockBackend choose_backend(size_t nblocks) {
+        if (be_ != db::CblockBackend::Auto || !st_.available) return db::resolve_backend(be_, nblocks, st_);
+        if (windows_done_ == 0 || refs_.size() < 2) return db::CblockBackend::Cpu;
+        if (windows_done_ == 1) return db::CblockBackend::Gpu;
+        return gpu_rate_ > cpu_rate_ ? db::CblockBackend::Gpu : db::CblockBackend::Cpu;
+    }
+    std::vector<CblockRef> refs_;
+    db::CblockBackend be_;
+    db::NvcompStatus& st_;
+    size_t window_bytes_ = 0, gpu_align_ = 0;
+    size_t windows_done_ = 0;
+    double cpu_rate_ = 0.0, gpu_rate_ = 0.0;
+    bool failed_ = false;
+    std::unique_ptr<Window> cur_;
+    std::future<std::unique_ptr<Window>> next_;
+};
+
 struct Parser {
     LdbFile* f;
+    bool scan_only = false;                  // CBLOCK pre-scan: decode records, emit nothing
+    std::vector<CblockRef>* scan_refs = nullptr;
+    CblockSource* src = nullptr;             // pre-decoded CBLOCKs (real parse)
+    size_t top_cblock = 0;                   // index of the next top-level CBLOCK
+    int cblock_depth = 0;
     std::vector<PCell> cells; long cur = -1;
     NameTable cellnames, textstrings, propnames, propstrings;
     std::vector<PProp> props;
@@ -95,10 +216,12 @@ struct Parser {
         ldb_extent_add_point(c.cell_ext, be.x1, be.y1); ldb_extent_add_point(c.cell_ext, be.x2, be.y2);
     }
     void emit(Reader& s, const Repetition& rep, int kind, int64_t x1, int64_t y1, int64_t x2, int64_t y2) {
+        if (scan_only) return;
         if (cur < 0) s.fail("geometry outside a cell");
         rep.for_each([&](int64_t ox, int64_t oy) { add_box(m.layer, m.datatype, kind, x1 + ox, y1 + oy, x2 + ox, y2 + oy); });
     }
     void emit_rects(Reader& s, const Repetition& rep, int kind) {
+        if (scan_only) return;
         if (cur < 0) s.fail("geometry outside a cell");
         rep.for_each([&](int64_t ox, int64_t oy) {
             for (auto& r : rects) add_box(m.layer, m.datatype, kind, r[0] + ox, r[1] + oy, r[2] + ox, r[3] + oy);
@@ -114,6 +237,7 @@ struct Parser {
 
     // Fill `verts` (a closed polygon) as rectangles.
     void emit_polygon(Reader& s, const Repetition& rep) {
+        if (scan_only) return;
         rects.clear();
         if (is_manhattan(verts)) fracture_manhattan(verts, rects);
         else { fracture_general(verts, rects); ++approximated; }
@@ -141,7 +265,7 @@ struct Parser {
     }
 
     void placement(Reader& s, bool general) {
-        if (cur < 0) s.fail("PLACEMENT outside a cell");
+        if (cur < 0 && !scan_only) s.fail("PLACEMENT outside a cell");
         uint8_t info = s.u8();
         if (info & 0x80) {
             m.place_cell = CellRef();
@@ -155,6 +279,7 @@ struct Parser {
         if (info & 0x10) { int64_t v = s.sint(); m.place_y = m.relative ? m.place_y + v : v; }
         const Repetition* rep = &single();
         if (info & 0x08) { read_repetition(s, m.rep); rep = &m.rep; }
+        if (scan_only) return;
         PInst pi; pi.ref = m.place_cell;
         pi.tr.mag = mag; pi.tr.angle_deg = angle; pi.tr.mirror_x = (info & 0x01) ? 1 : 0;
         auto& insts = cells[(size_t)cur].insts;
@@ -308,7 +433,7 @@ struct Parser {
         if (info & 0x20) m.radius = (int64_t)s.uint_();
         read_xy(s, info, m.geom_x, m.geom_y);
         const Repetition& rep = read_rep(s, info);
-        if (m.radius <= 0) return;
+        if (scan_only || m.radius <= 0) return;
         verts.clear();
         for (int i = 0; i < 64; ++i) {
             const double a = 2.0 * M_PI * i / 64.0;
@@ -352,6 +477,26 @@ struct Parser {
     void cblock(Reader& s) {
         uint64_t comp_type = s.uint_(), uncomp_len = s.uint_(), comp_len = s.uint_();
         s.need(comp_len);
+        if (scan_only) {                     // record and skip: payload is self-contained
+            if (scan_refs) scan_refs->push_back(CblockRef{ s.p + s.off, comp_type, uncomp_len, comp_len });
+            s.off += (size_t)comp_len;
+            return;
+        }
+        if (src && cblock_depth == 0) {
+            const uint8_t* bp = nullptr; size_t bn = 0;
+            const size_t idx = top_cblock++;
+            if (src->get(idx, s.p + s.off, comp_len, uncomp_len, bp, bn)) {
+                s.off += (size_t)comp_len;
+                ++cblocks;
+                std::string where = "CBLOCK ending at file offset " + std::to_string(s.off) + ", uncompressed";
+                Reader inner(bp, bn, where.c_str());
+                ++cblock_depth;
+                parse(inner);
+                --cblock_depth;
+                return;
+            }
+            // mismatch with the scan or undecodable in batch: decode this block inline below
+        }
         std::vector<uint8_t> out;
         bool ok = db::decompress_cblock((uint8_t)comp_type, s.p + s.off, (size_t)comp_len, out, (size_t)uncomp_len, nvst);
         if (!ok || out.size() != uncomp_len) s.fail("CBLOCK decompression failed");
@@ -359,7 +504,9 @@ struct Parser {
         ++cblocks;
         std::string where = "CBLOCK ending at file offset " + std::to_string(s.off) + ", uncompressed";
         Reader inner(out.data(), out.size(), where.c_str());
+        ++cblock_depth;
         parse(inner);
+        --cblock_depth;
     }
 
     void parse(Reader& s) {
@@ -457,6 +604,25 @@ bool parse_oasis(LdbFile* f) {
     Parser ps; ps.f = f;
     ps.nvst = db::nvcomp_init();
     ps.want_props = (f->open_flags & LDB_OPEN_PROPERTY) != 0 || f->strict_mode;
+    const db::CblockBackend backend = db::cblock_backend_from_env();
+    std::unique_ptr<CblockSource> source;
+    double scan_ms = 0.0;
+    if (backend != db::CblockBackend::Serial) {
+        // Pre-scan for CBLOCKs (cheap: geometry sinks are skipped, CBLOCK payloads jumped over).
+        // Any problem here simply disables batching; the real parse reports real errors.
+        const auto t0 = std::chrono::steady_clock::now();
+        std::vector<CblockRef> refs;
+        try {
+            Parser scan; scan.f = f; scan.scan_only = true; scan.scan_refs = &refs;
+            Reader s(data + 13, f->size - 13, "file (CBLOCK scan)");
+            scan.parse(s);
+        } catch (...) { refs.clear(); }
+        scan_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        if (refs.size() >= 2) {
+            source.reset(new CblockSource(std::move(refs), backend, ps.nvst));
+            ps.src = source.get();
+        }
+    }
     try {
         Reader s(data + 13, f->size - 13, "file (after the 13-byte magic)");
         ps.parse(s);
@@ -472,9 +638,17 @@ bool parse_oasis(LdbFile* f) {
     f->mem_bytes_extra = f->oasis_raw.capacity();
     size_t nboxes = 0;
     for (auto& c : f->cells) nboxes += c.boxes.size();
-    char buf[200];
-    snprintf(buf, sizeof(buf), "CELLS=%zu BOXES=%zu CBLOCKS=%zu APPROXIMATED=%zu",
-             f->cells.size(), nboxes, ps.cblocks, ps.approximated);
+    char buf[400];
+    const db::CblockStats& cs = db::cblock_stats();
+    snprintf(buf, sizeof(buf),
+             "CELLS=%zu BOXES=%zu CBLOCKS=%zu APPROXIMATED=%zu CBLOCK_BACKEND=%s CBLOCK_GPU=%zu CBLOCK_CPU=%zu "
+             "CBLOCK_RETRY=%zu CBLOCK_INFLATE_MS=%.1f CBLOCK_WAIT_MS=%.1f CBLOCK_SCAN_MS=%.1f",
+             f->cells.size(), nboxes, ps.cblocks, ps.approximated,
+             source ? db::cblock_backend_name(backend) : "serial", cs.blocks_gpu, cs.blocks_cpu, cs.blocks_retry,
+             cs.inflate_ms, cs.wait_ms, scan_ms);
     f->error = buf;    // informational on success (read by db_hier_extent)
+    if (const char* v = std::getenv("LDB_CBLOCK_VERBOSE")) {
+        if (*v && *v != '0') std::fprintf(stderr, "LDB_OASIS %s\n", buf);
+    }
     return true;
 }

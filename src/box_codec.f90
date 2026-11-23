@@ -272,6 +272,13 @@ contains
     ! This makes calling init() on subsequent chunks extremely fast.
     if (.not. allocated(this%unique_w)) allocate(this%unique_w(cap))
     if (.not. allocated(this%unique_h)) allocate(this%unique_h(cap))
+    ! Tables may have grown for a previous chunk with many unique sizes; start each chunk small.
+    if (allocated(this%w_hash)) then
+       if (size(this%w_hash) /= K_CODEC_HASH_SIZE) deallocate(this%w_hash)
+    end if
+    if (allocated(this%h_hash)) then
+       if (size(this%h_hash) /= K_CODEC_HASH_SIZE) deallocate(this%h_hash)
+    end if
     if (.not. allocated(this%w_hash)) allocate(this%w_hash(0:K_CODEC_HASH_MASK))
     if (.not. allocated(this%h_hash)) allocate(this%h_hash(0:K_CODEC_HASH_MASK))
 
@@ -290,24 +297,50 @@ contains
     this%current_y = 0
   end subroutine codec_init
 
-  pure function codec_hash_slot(val) result(slot)
+  pure function codec_hash_slot(val, mask) result(slot)
     integer(K_COORDINATE_KIND), intent(in) :: val
+    integer(int32), intent(in) :: mask
     integer(int32) :: slot
     integer(int64) :: h
     h = int(val, int64) * 2654435761_int64
     h = ieor(h, shiftr(h, 16))
-    slot = int(iand(h, int(K_CODEC_HASH_MASK, int64)), int32)
+    slot = int(iand(h, int(mask, int64)), int32)
   end function codec_hash_slot
+
+  !> Rebuild an open-addressed table at twice its size from the dictionary (insertion order is
+  !> untouched, so dictionary indices -- and therefore the encoded bytes -- do not change).
+  !> nsys/timing showed chunks with > 2048 unique widths/heights falling back to a linear
+  !> dictionary scan per box when the old fixed 4096-slot table was simply disabled.
+  subroutine codec_rehash(table, keys, nkeys)
+    integer(int32), allocatable, intent(inout) :: table(:)
+    integer(K_COORDINATE_KIND), intent(in) :: keys(:)
+    integer(int64), intent(in) :: nkeys
+    integer(int32) :: newsize, mask, slot
+    integer(int64) :: i
+    newsize = 2_int32 * int(size(table), int32)
+    mask = newsize - 1_int32
+    deallocate(table)
+    allocate(table(0:mask))
+    table = 0_int32
+    do i = 1, nkeys
+       slot = codec_hash_slot(keys(i), mask)
+       do while (table(slot) /= 0_int32)
+          slot = iand(slot + 1_int32, mask)
+       end do
+       table(slot) = int(i, int32)
+    end do
+  end subroutine codec_rehash
 
   ! O(1) open-addressed L1 hash lookup (falls back to linear scan only if >2048 unique values)
   function codec_get_w_index(this, w) result(idx)
     class(BoxCodec), intent(in) :: this
     integer(K_COORDINATE_KIND), intent(in) :: w
     integer(int64) :: idx, i
-    integer(int32) :: slot, entry_idx
+    integer(int32) :: slot, entry_idx, mask
     idx = -1_int64
     if (this%w_hash_valid .and. allocated(this%w_hash)) then
-       slot = codec_hash_slot(w)
+       mask = int(size(this%w_hash), int32) - 1_int32
+       slot = codec_hash_slot(w, mask)
        do
           entry_idx = this%w_hash(slot)
           if (entry_idx == 0_int32) return
@@ -315,7 +348,7 @@ contains
              idx = int(entry_idx, int64)
              return
           end if
-          slot = iand(slot + 1_int32, K_CODEC_HASH_MASK)
+          slot = iand(slot + 1_int32, mask)
        end do
     else
        do i = 1, this%num_w
@@ -331,10 +364,11 @@ contains
     class(BoxCodec), intent(in) :: this
     integer(K_COORDINATE_KIND), intent(in) :: h
     integer(int64) :: idx, i
-    integer(int32) :: slot, entry_idx
+    integer(int32) :: slot, entry_idx, mask
     idx = -1_int64
     if (this%h_hash_valid .and. allocated(this%h_hash)) then
-       slot = codec_hash_slot(h)
+       mask = int(size(this%h_hash), int32) - 1_int32
+       slot = codec_hash_slot(h, mask)
        do
           entry_idx = this%h_hash(slot)
           if (entry_idx == 0_int32) return
@@ -342,7 +376,7 @@ contains
              idx = int(entry_idx, int64)
              return
           end if
-          slot = iand(slot + 1_int32, K_CODEC_HASH_MASK)
+          slot = iand(slot + 1_int32, mask)
        end do
     else
        do i = 1, this%num_h
@@ -359,7 +393,7 @@ contains
     integer(K_COORDINATE_KIND), intent(in) :: w
     integer(int64), intent(out) :: idx
     integer(K_COORDINATE_KIND), allocatable :: temp(:)
-    integer(int32) :: slot
+    integer(int32) :: slot, mask
 
     if (this%num_w >= size(this%unique_w, kind=int64)) then
        ! Reallocate double capacity
@@ -371,12 +405,14 @@ contains
     this%unique_w(this%num_w) = w
     idx = this%num_w
     if (this%w_hash_valid .and. allocated(this%w_hash)) then
-       if (this%num_w > int(K_CODEC_HASH_SIZE / 2, int64)) then
-          this%w_hash_valid = .false.
+       if (2_int64 * this%num_w > size(this%w_hash, kind=int64)) then
+          ! Load factor would exceed 1/2: grow (rehash includes the new key at index num_w).
+          call codec_rehash(this%w_hash, this%unique_w, this%num_w)
        else
-          slot = codec_hash_slot(w)
+          mask = int(size(this%w_hash), int32) - 1_int32
+          slot = codec_hash_slot(w, mask)
           do while (this%w_hash(slot) /= 0_int32)
-             slot = iand(slot + 1_int32, K_CODEC_HASH_MASK)
+             slot = iand(slot + 1_int32, mask)
           end do
           this%w_hash(slot) = int(idx, int32)
        end if
@@ -388,7 +424,7 @@ contains
     integer(K_COORDINATE_KIND), intent(in) :: h
     integer(int64), intent(out) :: idx
     integer(K_COORDINATE_KIND), allocatable :: temp(:)
-    integer(int32) :: slot
+    integer(int32) :: slot, mask
 
     if (this%num_h >= size(this%unique_h, kind=int64)) then
        allocate(temp(size(this%unique_h, kind=int64) * 2))
@@ -399,12 +435,14 @@ contains
     this%unique_h(this%num_h) = h
     idx = this%num_h
     if (this%h_hash_valid .and. allocated(this%h_hash)) then
-       if (this%num_h > int(K_CODEC_HASH_SIZE / 2, int64)) then
-          this%h_hash_valid = .false.
+       if (2_int64 * this%num_h > size(this%h_hash, kind=int64)) then
+          ! Load factor would exceed 1/2: grow (rehash includes the new key at index num_h).
+          call codec_rehash(this%h_hash, this%unique_h, this%num_h)
        else
-          slot = codec_hash_slot(h)
+          mask = int(size(this%h_hash), int32) - 1_int32
+          slot = codec_hash_slot(h, mask)
           do while (this%h_hash(slot) /= 0_int32)
-             slot = iand(slot + 1_int32, K_CODEC_HASH_MASK)
+             slot = iand(slot + 1_int32, mask)
           end do
           this%h_hash(slot) = int(idx, int32)
        end if

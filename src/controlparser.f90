@@ -194,6 +194,45 @@ contains
     end if
   end function EvaluateExpression
 
+  !> Regression aid: when MAGPARSER_LAYER_DIGEST is set (to anything but 0), print an
+  !> order-independent digest of an operation's output layer so that runs (CPU vs GPU,
+  !> baseline vs modified build) can be compared exactly. No effect when unset.
+  subroutine PrintLayerDigest( lyr, lname, line_no )
+    type(Layer), intent(in) :: lyr
+    character(len=*), intent(in) :: lname
+    integer, intent(in) :: line_no
+    logical, save :: initialized = .false., enabled = .false.
+    character(len=16) :: ev
+    integer :: evlen, evstat
+    integer(kind=int64) :: i, h, hsum, hxor, area, n
+    integer(kind=int64), parameter :: M32 = int(z'FFFFFFFF', int64)
+    if( .not. initialized ) then
+       call get_environment_variable( 'MAGPARSER_LAYER_DIGEST', ev, evlen, evstat )
+       enabled = ( evstat == 0 .and. evlen > 0 .and. ev(1:1) /= '0' )
+       initialized = .true.
+    end if
+    if( .not. enabled ) return
+    n = lyr%n_used
+    hsum = 0; hxor = 0; area = 0
+    if( n > 0 .and. allocated( lyr%layer_boxes ) ) then
+       do i = 1, n
+          associate( b => lyr%layer_boxes(i) )
+            area = area + int(b%x2 - b%x1, int64) * int(b%y2 - b%y1, int64)
+            h = iand( int(b%x1, int64) * 73856093_int64, M32 )
+            h = iand( ieor( h, int(b%y1, int64) * 19349663_int64 ) * 83492791_int64, M32 )
+            h = iand( ieor( h, int(b%x2, int64) * 2654435761_int64 ) * 40503_int64, M32 )
+            h = iand( ieor( h, int(b%y2, int64) * 2246822519_int64 ), M32 )
+            h = iand( ieor( h, ishft( h, -15 ) ) * 668265263_int64, M32 )
+            h = ieor( h, ishft( h, -13 ) )
+          end associate
+          hsum = iand( hsum + h, int(z'FFFFFFFFFFFF', int64) )
+          hxor = ieor( hxor, h )
+       end do
+    end if
+    write(*,'(A,I0,A,A,A,I0,A,I0,A,I0,A,I0)') 'LAYER_DIGEST line=', line_no, ' layer=', lname, &
+         ' n=', n, ' area=', area, ' hsum=', hsum, ' hxor=', hxor
+  end subroutine PrintLayerDigest
+
   subroutine ParseControlFile( fileName, MAX_LAYERS )
     character(len=*), intent(in) :: fileName
     integer, intent(in) :: MAX_LAYERS
@@ -972,6 +1011,9 @@ contains
                   end if
                 end block
              end if
+             if( associated( lhs_layer ) ) call PrintLayerDigest( lhs_layer, &
+                  trim(design_dbs(lhs_db_index)%designName)//':'// &
+                  trim(design_dbs(lhs_db_index)%layerNames(lhs_layer_index)), line_number-1 )
              cycle read_loop
           else if( trim(rest(1:pos-1)) == 'modedesign' ) then
              rest = adjustl(rest(pos+1:))             

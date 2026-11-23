@@ -38,6 +38,7 @@ module DesignModule
   public :: DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY
   public :: NeedsSorting, NeedsRTree, NeedsPNum, NeedsHealing
   public :: push_box, ClearLayer, CopyLayer, AssignFromBox, swap_layer, FinalizeLayer, DeleteDesign
+  public :: LayerDeviceEnsure, LayerDeviceRelease, LayerTreeBuilt, LayerDeviceTouch, LayerDeviceDone
   public :: assignment(=)
   public :: PerformUnion, PerformPolygonUnion, calculate_union_area_by_polygon, &
        PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
@@ -94,6 +95,10 @@ module DesignModule
      character(len=:), allocatable :: fileName
      integer                :: iunit = -1
      logical                :: device_resident = .false.
+     ! -- GPU residency bookkeeping (design_device_impl.f90 / device_registry.f90)
+     integer(kind=int64)    :: dev_gen = 0       !> generation tag; changes when boxes/tree change
+     integer                :: dev_boxes_id = 0  !> registry slot of layer_boxes(1:n_used), 0 = none
+     integer                :: dev_tree_id = 0   !> registry slot of tree%tree_nodes, 0 = none
    contains
      procedure :: has     => layer_has_state
      procedure :: mark    => layer_mark_state
@@ -143,17 +148,36 @@ module DesignModule
 
   interface
 
+     !> GPU residency (design_device_impl.f90)
+     module subroutine LayerDeviceEnsure( A, B )
+       type(Layer), intent(inout), target :: A
+       type(Layer), intent(inout), target, optional :: B
+     end subroutine LayerDeviceEnsure
+     module subroutine LayerDeviceRelease( L )
+       type(Layer), intent(inout), target :: L
+     end subroutine LayerDeviceRelease
+     module subroutine LayerTreeBuilt( L )
+       type(Layer), intent(inout), target :: L
+     end subroutine LayerTreeBuilt
+     module subroutine LayerDeviceTouch( L )
+       type(Layer), intent(inout) :: L
+     end subroutine LayerDeviceTouch
+     module subroutine LayerDeviceDone( A, B )
+       type(Layer), intent(inout), target :: A
+       type(Layer), intent(inout), target, optional :: B
+     end subroutine LayerDeviceDone
+
      module subroutine PerformMergeLayer( input_layer )
        type(Layer), intent( inout )    :: input_layer
      end subroutine PerformMergeLayer
      
      module function CertifyHealing( input_layer ) result(retval)
-       type(Layer), intent( in )    :: input_layer
+       type(Layer), intent( inout ), target :: input_layer   !> inout: GPU residency bookkeeping
        logical                      :: retval
      end function CertifyHealing
      
      module subroutine MergeHealLayer( input_layer )
-       type(Layer), intent( inout ) :: input_layer
+       type(Layer), intent( inout ), target :: input_layer
      end subroutine MergeHealLayer
      
      module subroutine CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, &
@@ -189,7 +213,7 @@ module DesignModule
      end subroutine PerformOperation
 
      module subroutine BuildTree( input_layer )
-       type(Layer), intent(inout) :: input_layer
+       type(Layer), intent(inout), target :: input_layer
      end subroutine BuildTree
 
      module subroutine SaveLayerToSnap( input_layer, snap_filename, method_to_use )
@@ -412,7 +436,8 @@ contains
   !> store (fileName, iunit) is left alone. An empty layer trivially has
   !> every property, so no preprocessing is triggered for it.
   subroutine ClearLayer( input_layer_A )
-    type(Layer), intent(inout) :: input_layer_A
+    type(Layer), intent(inout), target :: input_layer_A
+    call LayerDeviceRelease( input_layer_A )
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
     if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
     call drop_rtree( input_layer_A )
@@ -436,6 +461,7 @@ contains
        call ClearLayer( output_layer )
        return
     end if
+    call LayerDeviceRelease( output_layer )
     if( allocated( output_layer%layer_boxes ) ) deallocate( output_layer%layer_boxes )
     allocate( output_layer%layer_boxes, source=input_layer_A%layer_boxes(1:n) )
     output_layer%n_used = n
@@ -472,6 +498,9 @@ contains
     call swap_int( a%layerState, b%layerState )
     call swap_int( a%iunit, b%iunit )
     call swap_logical( a%device_resident, b%device_resident )
+    call swap_int64( a%dev_gen, b%dev_gen )
+    call swap_int( a%dev_boxes_id, b%dev_boxes_id )
+    call swap_int( a%dev_tree_id, b%dev_tree_id )
 
     call move_alloc(a%layer_boxes, temp_boxes)
     call move_alloc(b%layer_boxes, a%layer_boxes)
@@ -529,7 +558,8 @@ contains
   !  Sorting and R-tree maintenance
   !------------------------------------------------------------------
   subroutine drop_rtree( input_layer )
-    type(Layer), intent(inout) :: input_layer
+    type(Layer), intent(inout), target :: input_layer
+    call LayerDeviceRelease( input_layer )
     if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )
     input_layer%tree%root_index = 0
   end subroutine drop_rtree
@@ -545,6 +575,7 @@ contains
     call BuildRTree( input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY, &
          input_layer%tree%tree_nodes, input_layer%tree%root_index )
     call input_layer%mark( LAYER_STATE_RTREE )
+    call LayerTreeBuilt( input_layer )
   end subroutine rebuild_rtree
 
   !> Morton order suits layers that are mostly squares (vias, contacts).
@@ -557,8 +588,9 @@ contains
 
   !> Put the boxes in packing order. layer_boxes must hold exactly n_used boxes.
   subroutine sort_layer_boxes( input_layer, use_morton )
-    type(Layer), intent(inout) :: input_layer
+    type(Layer), intent(inout), target :: input_layer
     logical, intent(in)        :: use_morton
+    call LayerDeviceRelease( input_layer )   !> boxes are reordered in place
     if( use_morton ) then
 #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
        call SortBoxesDirect( input_layer%layer_boxes, input_layer%n_used )
@@ -820,8 +852,10 @@ contains
     if( NeedsSorting( input_layer ) ) call sort_layer_boxes( input_layer, use_morton=.false. )
     if( NeedsRTree( input_layer ) ) call rebuild_rtree( input_layer )
     if( NeedsPNum( input_layer ) ) then
+       call LayerDeviceEnsure( input_layer )   !> no-op unless PerformMerge will take the GPU path
        call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY, &
             input_layer%tree%tree_nodes, input_layer%tree%root_index, overlap_area, overlap_perimeter)
+       call LayerDeviceDone( input_layer )
        call input_layer%mark( LAYER_STATE_PNUM )
     end if
   end subroutine PreprocessLayerSL

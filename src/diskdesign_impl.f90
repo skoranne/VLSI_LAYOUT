@@ -24,7 +24,7 @@ submodule (DesignModule) DiskDesignImplModule
 
 contains
   module subroutine BuildTree( input_layer )
-    type(Layer), intent(inout)  :: input_layer
+    type(Layer), intent(inout), target :: input_layer
     real(kind=real64)           :: t_start
     integer(kind=int64)         :: total_nodes, num_squares, n_used, i
     logical                     :: dominated_by_squares
@@ -82,12 +82,15 @@ contains
 #endif
        call input_layer%mark( LAYER_STATE_SORT )
     end if
+    ! Boxes may have been sorted above and the tree is replaced: drop device copies first.
+    call LayerDeviceRelease( input_layer )
     if( allocated( input_layer%tree%tree_nodes ) ) deallocate( input_layer%tree%tree_nodes )
     input_layer%tree%root_index = 0
     total_nodes = CalculateTotalNodes( n_used, K_LEAF_CAPACITY )
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
     call BuildRTree( input_layer%layer_boxes(1:n_used), K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
     call input_layer%mark( LAYER_STATE_RTREE )
+    call LayerTreeBuilt( input_layer )
 
     if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
   end subroutine BuildTree

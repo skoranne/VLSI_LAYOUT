@@ -48,7 +48,7 @@ endif
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # --- Linker Variables (override LDFLAGS/LDLIBS for local machine) ---
 LDFLAGS ?=
-LDLIBS ?= db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd
+LDLIBS ?= db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd -lpthread
 ifeq ($(USE_HDF5),1)
   LDLIBS += -lhdf5_fortran -lhdf5
 endif

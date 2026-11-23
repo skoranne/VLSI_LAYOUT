@@ -25,6 +25,11 @@ NVCC ?= $(if $(wildcard $(NVHPC_CUDA_BIN)/nvcc),$(NVHPC_CUDA_BIN)/nvcc,nvcc)
 GIT_HASH := $(shell git rev-parse --short HEAD)
 # GPU/OpenMP target tuning (nvfortran). Override as needed, e.g. make -f Makefile.nvf GPU_CC=cc121
 GPU_CC ?= ccnative
+# nvcc target derived from GPU_CC so .cu code always matches the OpenMP offload target:
+#   ccnative -> -arch=native, ccXY -> -arch=sm_XY (e.g. cc121 -> sm_121 for GB10).
+NVCC_ARCH ?= $(if $(filter ccnative,$(GPU_CC)),native,$(patsubst cc%,sm_%,$(firstword $(subst $(comma), ,$(GPU_CC)))))
+comma := ,
+NVCCFLAGS ?= -arch=$(NVCC_ARCH) -DUSE_GPU -O3 -lineinfo -std=c++17
 NSYS ?= nsys
 NSYS_DELAY ?= 0
 NSYS_DUR ?= 0
@@ -43,15 +48,22 @@ endif
 # --- Linker Variables ---
 #LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
 LDFLAGS = -L/scratch1/skoranne/NVCOMPILERS/lib/
-LDLIBS = db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd
+LDLIBS = db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd -lpthread
+# nvCOMP for GPU OASIS CBLOCK decompression (auto-detected; NVCOMP=0 to disable).
+# nvfortran -cuda already links cudart, so only libnvcomp is added here.
+include db/nvcomp.mk
+LDLIBS += $(NVCOMP_LDLIBS)
 #LDLIBS = -lz -lhdf5_fortran -lhdf5
 # --- Library Definition ---
 LIBRARY = libmagparser.a
 
 include DEPENDENCIES.txt
 #skiplist_module.o
+# box_codec.f90 is miscompiled by nvfortran at -O3 (see NOTES.txt), so it defaults to -O1.
+# Measured on SDT.ctr: -O2 only gains ~9% in layer flush time, so -O1 stays the safe default.
+BOX_CODEC_OPT ?= -O1
 box_codec.o:	box_codec.f90
-	$(FORTRAN_COMPILER) -Mpreprocess -c -O1 -g -cuda box_codec.f90
+	$(FORTRAN_COMPILER) -Mpreprocess -c $(BOX_CODEC_OPT) -g -cuda box_codec.f90
 
 # Create a list of all object files that will be compiled
 ALL_OBJS = $(LIB_OBJS) mainmagparser.o test_contour.o
@@ -100,7 +112,13 @@ $(LIBRARY): $(LIB_OBJS)
 
 # --- Executable Builds ---
 # By linking against the library, we don't have to list out all objects again.
-MAGPARSER.exe: mainmagparser.o $(LIBRARY)
+# The layout DB (GDSII/OASIS reader, C++) is a sub-make; always re-run it so edits there relink.
+db/liblayoutdb.a: FORCE
+	$(MAKE) -C db liblayoutdb.a NVCOMP=$(NVCOMP)
+FORCE:
+.PHONY: FORCE
+
+MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)
@@ -131,9 +149,9 @@ snappy_api.o:	       snappy_api.cpp
 boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost boost_polygon_api.cpp -c
 event_sorter.o:	       event_sorter.cu
-		       $(NVCC) -arch=sm_121 -DUSE_GPU -O3 -c event_sorter.cu
+		       $(NVCC) $(NVCCFLAGS) -c event_sorter.cu
 gpu_morton.o:   gpu_morton.cu
-		       $(NVCC) -arch=sm_121 -DUSE_GPU -O3 -c gpu_morton.cu
+		       $(NVCC) $(NVCCFLAGS) -c gpu_morton.cu
 # Nsight Systems profiling for nvfortran+OpenMP target offload (GB10). Example:
 #   make -f Makefile.nvf profile CTR=check_interactions.ctr LAYERS=10
 #   make -f Makefile.nvf profile-delayed NSYS_DELAY=30 NSYS_DUR=60 CTR=check_interactions.ctr LAYERS=10

@@ -84,7 +84,7 @@ contains
     ierr = cudaGetDeviceCount(nDevices)
     if (nDevices == 0) then
        print "(/,'No CUDA devices found',/)"
-       stop
+       return   ! informational only: never terminate the run (CPU fallback paths exist)
     else if (nDevices == 1) then
        print "(/,'One CUDA device found',/)"
     else 

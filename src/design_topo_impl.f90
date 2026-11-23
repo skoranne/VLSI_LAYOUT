@@ -37,6 +37,9 @@ contains
     integer(kind=int64) :: sp, curr_idx, child_idx, c_end
     logical :: overlap_any, touch_any, inside_any, outside_all, select_it, early_done
     logical :: has_edge_touch
+    logical :: contains_any,covers_any,coveredby_any,equal_any,proper_overlap_any,point_touch_any
+    logical :: a_contains_b,b_contains_a,has_1d
+    integer(kind=K_COORDINATE_KIND) :: ix1,iy1,ix2,iy2
     type(Layer), allocatable :: buffers(:)
     integer :: alloc_status
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
@@ -50,6 +53,7 @@ contains
     call PreprocessLayer( input_layer_B )
     numA = input_layer_A%n_used
     numB = input_layer_B%n_used
+    call LayerDeviceRelease( output_layer )   !> output arrays are replaced below
     if( allocated( output_layer%layer_boxes ) ) deallocate( output_layer%layer_boxes )
     if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
     if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )
@@ -73,9 +77,11 @@ contains
           allocate(keep_mask(numA), stat=alloc_status)
           if( alloc_status == 0 ) then
              gpu_overflow = 0_int32
+             call LayerDeviceEnsure( input_layer_A, input_layer_B )
              call ComputeTopoSelectGPU(input_layer_B%tree%tree_nodes, numNodesB, &
                   input_layer_B%layer_boxes(1:numB), numB, input_layer_B%tree%root_index, &
                   input_layer_A%layer_boxes(1:numA), numA, topo_op, keep_mask, gpu_overflow)
+             call LayerDeviceDone( input_layer_A, input_layer_B )
              if( gpu_overflow == 0_int32 ) then
                 kept_count = 0_int64
                 do i = 1, numA
@@ -134,7 +140,9 @@ contains
     else
        root_idx = input_layer_B%tree%root_index
        !$omp parallel do private(i,k,tid,dfs_stack,sp,curr_idx,child_idx,c_end,overlap_any, &
-       !$omp   touch_any,inside_any,outside_all,select_it,early_done,abox,ibox,has_edge_touch,currNode,childNode)
+       !$omp   touch_any,inside_any,outside_all,select_it,early_done,abox,ibox,has_edge_touch, &
+       !$omp   currNode,childNode,contains_any,covers_any,coveredby_any,equal_any, &
+       !$omp   proper_overlap_any,point_touch_any,a_contains_b,b_contains_a,has_1d,ix1,iy1,ix2,iy2)
        do i=1,numA
           tid = omp_get_thread_num()+1
           abox = input_layer_A%layer_boxes(i)
@@ -143,12 +151,8 @@ contains
           inside_any = .false.
           outside_all = .true.
           early_done = .false.
-          block
-            logical :: contains_any,covers_any,coveredby_any,equal_any,proper_overlap_any,point_touch_any
-            logical :: a_contains_b,b_contains_a,has_1d
-            integer(kind=K_COORDINATE_KIND) :: ix1,iy1,ix2,iy2
-            contains_any=.false.; covers_any=.false.; coveredby_any=.false.; equal_any=.false.
-            proper_overlap_any=.false.; point_touch_any=.false.
+          contains_any=.false.; covers_any=.false.; coveredby_any=.false.; equal_any=.false.
+          proper_overlap_any=.false.; point_touch_any=.false.
 
           childNode = input_layer_B%tree%tree_nodes(root_idx)
           if (abox%x1 <= childNode%mbr%x2 .and. abox%x2 >= childNode%mbr%x1 .and. &
@@ -244,7 +248,6 @@ contains
           case default;               select_it = .false.
           end select
           if( select_it ) call push_box( abox, buffers(tid) )
-          end block
        end do
     end if
 
@@ -304,6 +307,7 @@ contains
     call PreprocessLayer( input_layer_B )
     numA = input_layer_A%n_used
     numB = input_layer_B%n_used
+    call LayerDeviceRelease( output_layer )   !> output arrays are replaced below
     if( allocated( output_layer%layer_boxes ) ) deallocate( output_layer%layer_boxes )
     if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
     if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )

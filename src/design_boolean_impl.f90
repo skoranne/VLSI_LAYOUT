@@ -109,6 +109,10 @@ contains
 
     if (use_gpu) then
        gpu_overflow = 0_int32
+       ! Output buffer is replaced (intent(out) allocatable): drop its device copy first, then
+       ! make both operands (boxes + tree) resident / revalidate them for this GPU scope.
+       call LayerDeviceRelease(output_layer)
+       call LayerDeviceEnsure(input_layer_A, input_layer_B)
        if (swap_ab) then
           call ComputeANDPairsGPU(input_layer_A%tree%tree_nodes, numNodesA, &
                input_layer_A%layer_boxes(1:num_boxesA), num_boxesA, input_layer_A%tree%root_index, &
@@ -118,6 +122,7 @@ contains
                input_layer_B%layer_boxes(1:num_boxesB), num_boxesB, input_layer_B%tree%root_index, &
                input_layer_A%layer_boxes(1:num_boxesA), num_boxesA, output_layer%layer_boxes, num_boxesC, gpu_overflow)
        end if
+       call LayerDeviceDone(input_layer_A, input_layer_B)
        if (gpu_overflow == 0_int32) then
           output_layer%n_used = num_boxesC
           output_layer%n_alloc = size(output_layer%layer_boxes, kind=int64)

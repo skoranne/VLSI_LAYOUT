@@ -35,7 +35,10 @@ contains
     
     integer(kind=int64) :: i, j, k, childidx, currnode
     integer(kind=int64) :: stackptr, idx
-    integer(kind=int64) :: stack(64) 
+    ! Children are pushed unpruned (MBR tested at pop): need <= 1 + 15*levels; see K_GPU_DFS_STACK.
+    integer(kind=int64), parameter :: K_STACK_SIZE = 160_int64
+    integer(kind=int64) :: stack(K_STACK_SIZE)
+    integer(kind=int32) :: stack_overflow
     
     ! RLE Thread-Local Trackers
     integer(kind=int64) :: j_start, j_end
@@ -56,20 +59,24 @@ contains
     overlap_perimeter = 0.0_real64
 
     ! Map immutable geometry and the RLE buffer
+    call prep_nodes(tree_nodes, num_nodes); call prep_boxes(sorted_boxes, num_boxes)
+    call prep_i64(d_rle, 3_int64 * limit_rle)
     !$omp target data map(to: tree_nodes(1:num_nodes), sorted_boxes(1:num_boxes)) &
     !$omp map(alloc: d_rle(1:3, 1:limit_rle)) &
-    !$omp map(tofrom: global_rle_count)
+    !$omp map(tofrom: global_rle_count, stack_overflow)
 
     do chunk_start = 1, num_boxes, CHUNK_SIZE
        chunk_end = min(chunk_start + CHUNK_SIZE - 1, num_boxes)
        
        global_rle_count = 0
-       !$omp target update to(global_rle_count)
+       stack_overflow = 0_int32
+       !$omp target update to(global_rle_count, stack_overflow)
 
        chunk_area = 0.0_real64
        chunk_perimeter = 0.0_real64
 
-       !$omp target teams distribute parallel do &
+       ! Explicit tofrom keeps the counter/flag shared (scalars default to firstprivate on target).
+       !$omp target teams distribute parallel do map(tofrom: global_rle_count, stack_overflow) &
        !$omp private(i, j, k, childidx, currnode, stack, stackptr, qbox, &
        !$omp   nodembr, targetbox, tempBox, overlapx, overlapy, idx, w, h, j_start, j_end) &
        !$omp reduction(+:chunk_area, chunk_perimeter)
@@ -162,9 +169,12 @@ contains
                 ! Internal Node Push
                 do k = 0, tree_nodes(currnode)%NumChildren - 1
                    childidx = tree_nodes(currnode)%ChildStart + k
-                   if (stackptr < 64) then
+                   if (stackptr < K_STACK_SIZE) then
                       stackptr = stackptr + 1
                       stack(stackptr) = childidx
+                   else
+                      !$omp atomic write
+                      stack_overflow = 1_int32
                    end if
                 end do
              end if
@@ -172,13 +182,16 @@ contains
        end do
        
        ! Fetch data
-       !$omp target update from(global_rle_count)
+       !$omp target update from(global_rle_count, stack_overflow)
+       if (stack_overflow /= 0_int32) error stop "PerformRLEMergeGPU: R-tree stack overflow (connectivity would be lost)"
        overlap_area = overlap_area + chunk_area
        overlap_perimeter = overlap_perimeter + chunk_perimeter
        
        valid_runs = min(global_rle_count, limit_rle)
        if (global_rle_count > limit_rle) then
-          print *, "WARNING: Chunk ", chunk_start, " to ", chunk_end, " exceeded RLE buffer!"
+          ! Dropped runs silently break Union-Find connectivity; fail loudly instead.
+          print *, "ERROR: Chunk ", chunk_start, " to ", chunk_end, " exceeded RLE buffer!"
+          error stop "PerformRLEMergeGPU: RLE buffer overflow"
        end if
 
        if (valid_runs > 0) then

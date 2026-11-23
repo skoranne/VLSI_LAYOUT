@@ -9,10 +9,10 @@ ifeq ($(shell uname -s),Darwin)
 CXXFLAGS += -mmacosx-version-min=11.0
 endif
 NVCC ?= nvcc
-# Optional: make NVCOMP=1 NVCOMP_INC=... NVCOMP_LIB=... to enable GPU CBLOCK decompression
-ifdef NVCOMP
-CXXFLAGS += -DLAYOUTDB_USE_NVCOMP
-endif
+# GPU CBLOCK decompression via nvCOMP: auto-detected (see nvcomp.mk; NVCOMP=0 disables).
+include $(dir $(lastword $(MAKEFILE_LIST)))nvcomp.mk
+CXXFLAGS += $(NVCOMP_CXXFLAGS)
+LDFLAGS += $(NVCOMP_LDLIBS) $(NVCOMP_CUDART) -pthread
 
 CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp gdsii.cpp oasis.cpp oasis_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
@@ -21,7 +21,7 @@ TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db
 
 all: $(TESTS) liblayoutdb.a
 
-$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h fracture.hpp oasis_codec.hpp
+$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h fracture.hpp oasis_codec.hpp nvcomp_support.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 liblayoutdb.a: $(CORE_OBJS)
