@@ -1,0 +1,29 @@
+# local_sim.toml -- simulate a 3-node cluster on one machine (plus a spare to "Add").
+[coordinator]
+advertise = "127.0.0.1"
+port = 7700
+http = 8080
+
+[[host]]
+name = "sim-a"
+ssh = "local"
+max_jobs = 2
+mpi_np = 2
+
+[[host]]
+name = "sim-b"
+ssh = "local"
+max_jobs = 2
+mpi_np = 1
+
+[[host]]
+name = "sim-c"
+ssh = "local"
+max_jobs = 2
+fortran = "none"     # exercises the Julia reference worker
+
+[[host]]
+name = "sim-d"
+ssh = "local"
+max_jobs = 1
+autostart = false

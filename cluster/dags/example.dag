@@ -1,0 +1,47 @@
+# example.dag -- toy MAGPARSER-like DAG for the cluster prototype.
+# Syntax: NAME = op [inputs...] [param=value...]   (inputs must be defined above)
+# ops: gen seed n extent maxsize | grow d | shrink d | and x1 y1 x2 y2 | or | area
+# cost_ms simulates op cost (CPU burn split across MPI ranks); scale with --cost-scale.
+# Four independent 'dies', each with two layers, merged at the end.
+
+# die 0
+M1_0  = gen seed=100 n=60000 extent=200000 maxsize=800 cost_ms=4000
+M2_0  = gen seed=200 n=60000 extent=200000 maxsize=800 cost_ms=4000
+G1_0  = grow M1_0 d=20 cost_ms=6000
+S2_0  = shrink M2_0 d=150 cost_ms=6000
+X_0   = or G1_0 S2_0 cost_ms=1000
+C_0   = and X_0 x1=20000 y1=20000 x2=180000 y2=180000 cost_ms=5000
+A_0   = area C_0 cost_ms=1500
+
+# die 1
+M1_1  = gen seed=101 n=60000 extent=200000 maxsize=800 cost_ms=4000
+M2_1  = gen seed=201 n=60000 extent=200000 maxsize=800 cost_ms=4000
+G1_1  = grow M1_1 d=20 cost_ms=6000
+S2_1  = shrink M2_1 d=150 cost_ms=6000
+X_1   = or G1_1 S2_1 cost_ms=1000
+C_1   = and X_1 x1=20000 y1=20000 x2=180000 y2=180000 cost_ms=5000
+A_1   = area C_1 cost_ms=1500
+
+# die 2
+M1_2  = gen seed=102 n=60000 extent=200000 maxsize=800 cost_ms=4000
+M2_2  = gen seed=202 n=60000 extent=200000 maxsize=800 cost_ms=4000
+G1_2  = grow M1_2 d=20 cost_ms=6000
+S2_2  = shrink M2_2 d=150 cost_ms=6000
+X_2   = or G1_2 S2_2 cost_ms=1000
+C_2   = and X_2 x1=20000 y1=20000 x2=180000 y2=180000 cost_ms=5000
+A_2   = area C_2 cost_ms=1500
+
+# die 3
+M1_3  = gen seed=103 n=60000 extent=200000 maxsize=800 cost_ms=4000
+M2_3  = gen seed=203 n=60000 extent=200000 maxsize=800 cost_ms=4000
+G1_3  = grow M1_3 d=20 cost_ms=6000
+S2_3  = shrink M2_3 d=150 cost_ms=6000
+X_3   = or G1_3 S2_3 cost_ms=1000
+C_3   = and X_3 x1=20000 y1=20000 x2=180000 y2=180000 cost_ms=5000
+A_3   = area C_3 cost_ms=1500
+
+# merge
+U01    = or C_0 C_1 cost_ms=2000
+U23    = or C_2 C_3 cost_ms=2000
+UALL   = or U01 U23 cost_ms=3000
+AREA   = area UALL cost_ms=3000

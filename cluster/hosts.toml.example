@@ -1,0 +1,51 @@
+# hosts.toml -- cluster membership for coordinator.jl (copy to hosts.toml and edit).
+#
+# [coordinator]  advertise = address the agents dial back to (this machine)
+# [[host]] fields:
+#   name        node name shown on the dashboard (unique)
+#   ssh         ssh target ("user@host" or alias); "local" = launch on this machine
+#   julia       julia executable on that host (non-interactive ssh PATH may differ)
+#   tmp         base dir for the per-run bootstrap dir (removed at the end)
+#   max_jobs    concurrent tasks on the node
+#   mpi_np      MPI ranks per task (used only if an MPI Fortran wrapper works there)
+#   mem_cap_mb  pretend the node has at most this much memory (0 = real value)
+#   reserve_mb  memory kept free on the node (default 512)
+#   fortran     "auto" | compiler name | "none" (use the Julia reference worker)
+#   autostart   false = not launched at start; use "Add" on the dashboard
+#   coord       override HOST:PORT the agent dials (e.g. through a tunnel)
+
+[coordinator]
+advertise = "10.0.0.100"     # spark-bc08 (aarch64 GB10)
+port = 7700
+http = 8080
+
+[[host]]
+name = "spark-local"         # an agent on the coordinator machine itself
+ssh = "local"
+max_jobs = 2
+mpi_np = 2
+
+[[host]]
+name = "rhel8-A"             # x86_64 RHEL8, 48 cpu, gfortran (no MPI wrapper -> serial worker)
+ssh = "rhel8-A"
+julia = "/home/skoranne/.juliaup/bin/julia"
+tmp = "/tmp"
+max_jobs = 3
+mpi_np = 4
+
+[[host]]
+name = "JN6-TX2"             # aarch64, 4 cpu, 8 GB RAM, Open MPI mpif90, julia 1.11.3
+ssh = "JN6-TX2.local"
+julia = "/home/skoranne/julia-1.11.3/bin/julia"
+tmp = "/tmp"
+max_jobs = 1
+mpi_np = 2
+reserve_mb = 1024
+
+# [[host]]
+# name = "macbook"
+# ssh = "user@macbook.local"
+# julia = "/Applications/Julia-1.11.app/Contents/Resources/julia/bin/julia"
+# tmp = "/tmp"
+# max_jobs = 2
+# autostart = false

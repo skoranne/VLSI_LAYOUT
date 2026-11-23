@@ -1,0 +1,8 @@
+# tiny.dag -- smoke test, finishes in a few seconds
+A  = gen seed=1 n=2000 extent=50000 maxsize=300 cost_ms=500
+B  = gen seed=2 n=2000 extent=50000 maxsize=300 cost_ms=500
+GA = grow A d=10 cost_ms=500
+SB = shrink B d=40 cost_ms=500
+U  = or GA SB cost_ms=200
+C  = and U x1=1000 y1=1000 x2=40000 y2=40000 cost_ms=500
+AR = area C cost_ms=200
