@@ -159,7 +159,12 @@ gpu_morton.o:	gpu_morton.cu
 	g++ -O3 -c -x c++ gpu_morton.cu
 glf90w.o: glf90w.F90
 	$(FC) -c -O3 -fpp -DGLF90W_USE_INTRINSIC_C_F_STRPOINTER glf90w.F90 -o $@
-MAGVIEWER.exe: magviewer.f90 $(LIBRARY) glf90w.o db/liblayoutdb.a
-	$(LINKER_FC) $(FCFLAGS) magviewer.f90 $(LIBRARY) glf90w.o -L$(GLFW_LIBDIR) -Wl,-rpath,$(GLFW_LIBDIR) -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
+GLFW_INC ?= $(GLFW_LIBDIR)/../include
+viewer_gl.o: viewer_gl.c
+	gcc -c -O2 -I$(GLFW_INC) viewer_gl.c -o $@
+viewer_font.o: viewer_font.f90
+	$(FC) -c -O2 viewer_font.f90 -o $@
+MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o db/liblayoutdb.a
+	$(LINKER_FC) $(FCFLAGS) magviewer.f90 viewer_font.o $(LIBRARY) viewer_gl.o -L$(GLFW_LIBDIR) -Wl,-rpath,$(GLFW_LIBDIR) -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
        
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe MAGVIEWER.exe

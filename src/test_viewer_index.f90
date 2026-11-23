@@ -72,8 +72,7 @@ program test_viewer_index
      allocate(oracle(max(1, nl)))
      do i = 1, nl
         if (.not. indices(i)%compact_backed) cycle
-        allocate(oracle(i)%b(indices(i)%cl%nblk * 128))
-        call CompactDecodeBlocks(indices(i)%cl, 1_int64, indices(i)%cl%nblk, oracle(i)%b, oracle(i)%n)
+        call indices(i)%decode_all(oracle(i)%b, oracle(i)%n)
      end do
   end if
 

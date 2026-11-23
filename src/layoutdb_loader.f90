@@ -1,6 +1,6 @@
 ! Load GDSII/OASIS into MAGPARSER Design or CompressedSpatialIndex structures via src/db C library
 module LayoutDBLoaderModule
-  use, intrinsic :: iso_fortran_env, only: int32, int64
+  use, intrinsic :: iso_fortran_env, only: int32, int64, real64
   use, intrinsic :: iso_c_binding
   use CommonModule
   use hash_mod
@@ -8,9 +8,12 @@ module LayoutDBLoaderModule
   use GeometryModule, only: Box
   use layoutdb_f_api
   use CompressedSpatialIndexModule, only: CompressedSpatialIndex
+  use CompactLayerModule, only: CompactLayer, CompactMove
   implicit none
   private
   public :: LoadLayoutDBFile, LoadLayoutDBFileHier, CountLoadedLayers, LoadLayoutDBToCompressedIndex
+  !> Phase times of the last LoadLayoutDBToCompressedIndex (seconds), for the viewer's report.
+  real(real64), public :: viewer_last_read_s = 0.0_real64, viewer_last_index_s = 0.0_real64
 
   integer(int32), parameter :: K_LD_CACHE_SIZE = 1024_int32
   integer(int32), parameter :: K_LD_CACHE_MASK = 1023_int32
@@ -24,6 +27,9 @@ module LayoutDBLoaderModule
      integer(c_int) :: last_datatype  = -2147483647_c_int
      integer        :: last_layer_idx = 0
      logical        :: compact = .false.   !> compact each layer when the stream moves on
+     !> > 0: streaming compaction; each layer is compacted in parts of this many boxes while it
+     !> streams, so it is never held whole as Boxes (viewer default 32M boxes = 512 MB buffer).
+     integer(int64) :: part_boxes = 0_int64
      ! Open-addressed integer hash table: (layer_num, datatype) -> layer_idx
      integer(c_int) :: tab_layer(0:K_LD_CACHE_SIZE-1) = 0_c_int
      integer(c_int) :: tab_dtype(0:K_LD_CACHE_SIZE-1) = 0_c_int
@@ -113,7 +119,10 @@ contains
           end block
        end if
 
-       if (ctx%compact) then
+       if (ctx%compact .and. ctx%part_boxes > 0_int64) then
+          if (ctx%last_layer_idx > 0 .and. ctx%last_layer_idx /= layer_idx) &
+               call LayerFinishParts(ctx%design%layers(ctx%last_layer_idx))
+       else if (ctx%compact) then
           if (ctx%last_layer_idx > 0 .and. ctx%last_layer_idx /= layer_idx) &
                call LayerCompact(ctx%design%layers(ctx%last_layer_idx))
           if (ctx%design%layers(layer_idx)%is_compact) &          !> interleaved file: append
@@ -136,6 +145,10 @@ contains
     by2 = max(cy1, cy2)
 
     call push_box_local(ctx%design, layer_idx, bx1, by1, bx2, by2)
+    if (ctx%part_boxes > 0_int64) then
+       if (ctx%design%layers(layer_idx)%n_used >= ctx%part_boxes) &
+            call LayerAppendPart(ctx%design%layers(layer_idx))
+    end if
 
     if (bx1 < ctx%design%DESIGN_EXTENT%x1) ctx%design%DESIGN_EXTENT%x1 = bx1
     if (by1 < ctx%design%DESIGN_EXTENT%y1) ctx%design%DESIGN_EXTENT%y1 = by1
@@ -265,6 +278,7 @@ contains
     ctx%last_layer_idx    = 0
     ctx%tab_idx           = 0
     ctx%compact           = CompactLayersEnabled()
+    ctx%part_boxes        = env_int64('MAGPARSER_STREAM_PART_BOXES', 0_int64)
   end subroutine init_design_ctx
 
   logical function stream_enabled()
@@ -300,10 +314,11 @@ contains
     end do
   end subroutine trim_design_layers
 
-  subroutine LoadLayoutDBFile(load_design, MAX_LAYERS, compact)
+  subroutine LoadLayoutDBFile(load_design, MAX_LAYERS, compact, part_boxes)
     type(Design), intent(inout), target :: load_design
     integer, intent(in)                 :: MAX_LAYERS
     logical, intent(in), optional       :: compact   !> override MAGPARSER_COMPACT_LAYERS
+    integer(int64), intent(in), optional :: part_boxes !> streaming compaction part size (0 = off)
     type(c_ptr)               :: fh
     type(ldb_load_ctx), target :: ctx
     type(c_funptr)            :: cb
@@ -326,6 +341,7 @@ contains
          errbuf = c_null_char
          call init_design_ctx(load_design, MAX_LAYERS, ctx)
          if (present(compact)) ctx%compact = compact
+         if (present(part_boxes)) ctx%part_boxes = part_boxes
          rc = ldb_stream_boxes_c(cpath, cb, c_loc(ctx), errbuf, 512_c_size_t)
          if (rc == 0_c_int) then
             write(*,'(A,A)') 'INFO: Streamed OASIS: ', trim(load_design%fileName)
@@ -346,6 +362,11 @@ contains
        if (present(compact)) ctx%compact = compact
        rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
        call ldb_close_c(fh)
+    end if
+    if (ctx%compact .and. ctx%part_boxes > 0_int64) then
+       do i = 1, ctx%num_unique_layers
+          call LayerFinishParts(load_design%layers(i))
+       end do
     end if
     call trim_design_layers(load_design, ctx%num_unique_layers)
     if (ctx%compact .and. ctx%last_layer_idx > 0) call LayerCompact(load_design%layers(ctx%last_layer_idx))
@@ -418,7 +439,8 @@ contains
     if (use_hier) then
        call LoadLayoutDBFileHier(tmp_design, max_layers, compact=use_compact)
     else
-       call LoadLayoutDBFile(tmp_design, max_layers, compact=use_compact)
+       call LoadLayoutDBFile(tmp_design, max_layers, compact=use_compact, &
+            part_boxes=merge(env_int64('MAGVIEWER_PART_BOXES', 33554432_int64), 0_int64, use_compact))
     end if
     num_layers = CountLoadedLayers(tmp_design)
     if (num_layers <= 0) then
@@ -431,7 +453,22 @@ contains
     allocate(layer_names(num_layers))
     do i = 1, num_layers
        layer_names(i) = trim(tmp_design%layerNames(i))
-       if (tmp_design%layers(i)%is_compact) then
+       if (tmp_design%layers(i)%is_compact .and. allocated(tmp_design%layers(i)%cextra)) then
+          ! Streamed in parts: the index takes ownership of all parts.
+          block
+            type(CompactLayer), allocatable :: parts(:)
+            integer :: ip, np
+            np = 1 + size(tmp_design%layers(i)%cextra)
+            allocate(parts(np))
+            call CompactMove(tmp_design%layers(i)%compact, parts(1))
+            do ip = 2, np
+               call CompactMove(tmp_design%layers(i)%cextra(ip - 1), parts(ip))
+            end do
+            deallocate(tmp_design%layers(i)%cextra)
+            call indices(i)%build_from_compact_parts(parts)
+            tmp_design%layers(i)%is_compact = .false.
+          end block
+       else if (tmp_design%layers(i)%is_compact) then
           ! The index takes ownership of the packed keys: geometry never re-expands.
           call indices(i)%build_from_compact(tmp_design%layers(i)%compact)
           tmp_design%layers(i)%is_compact = .false.
@@ -443,11 +480,26 @@ contains
        call ClearLayer(tmp_design%layers(i))
     end do
     call system_clock(t2)
+    viewer_last_read_s  = real(t1 - t0, real64) / real(rate, real64)
+    viewer_last_index_s = real(t2 - t1, real64) / real(rate, real64)
     write(*,'(A,F8.2,A,F8.2,A,L1,A)') 'INFO: MAGVIEWER read ', real(t1 - t0) / real(rate), &
          ' s, index build ', real(t2 - t1) / real(rate), ' s (compact=', use_compact, ')'
 
     call DeleteDesign(tmp_design)
   end subroutine LoadLayoutDBToCompressedIndex
+
+  integer(int64) function env_int64(name, dflt)
+    character(len=*), intent(in) :: name
+    integer(int64), intent(in) :: dflt
+    character(len=32) :: ev
+    integer :: evlen, evstat, ios
+    env_int64 = dflt
+    call get_environment_variable(name, ev, evlen, evstat)
+    if (evstat == 0 .and. evlen > 0) then
+       read(ev, *, iostat=ios) env_int64
+       if (ios /= 0) env_int64 = dflt
+    end if
+  end function env_int64
 
   logical function viewer_compact_enabled()
     character(len=8) :: ev

@@ -72,6 +72,27 @@ int ldb_write_oasis(const ldb_file_t* f, const char* out_path, char* errbuf, siz
 /* create synthetic GEAR-like curvilinear MULTIGON OASIS for 3DIC test */
 int ldb_write_oasis_gear_multigon(const char* out_path, char* errbuf, size_t errbuf_sz);
 
+
+/* Fast open of an OASIS file by its tables only (oasis_tables.cpp): unit, S_TOP_CELL,
+   CELLNAME table with S_CELL_OFFSET / S_BOUNDING_BOX, LAYERNAME table. No geometry decode. */
+typedef struct ldb_oas_info ldb_oas_info_t;
+ldb_oas_info_t* ldb_oas_info_open(const char* path, char* errbuf, size_t errbuf_sz);
+void   ldb_oas_info_close(ldb_oas_info_t* info);
+int    ldb_oas_info_strict(const ldb_oas_info_t* info);      /* 1: strict CELLNAME table present */
+int    ldb_oas_info_offsets_ok(const ldb_oas_info_t* info);  /* 1: every S_CELL_OFFSET hits its CELL */
+double ldb_oas_info_unit(const ldb_oas_info_t* info);        /* database steps per micron */
+double ldb_oas_info_open_ms(const ldb_oas_info_t* info);
+int    ldb_oas_info_top(const ldb_oas_info_t* info, char* name, int len);
+int    ldb_oas_info_n_layernames(const ldb_oas_info_t* info);
+/* hi = -1 means unbounded */
+int    ldb_oas_info_layername(const ldb_oas_info_t* info, int i, int64_t* l_lo, int64_t* l_hi,
+                              int64_t* d_lo, int64_t* d_hi, int* is_text, char* name, int len);
+int    ldb_oas_info_layer_name(const ldb_oas_info_t* info, int layer, int datatype, char* name, int len);
+int    ldb_oas_info_n_cells(const ldb_oas_info_t* info);
+/* bbox = x1,y1,x2,y2; bbox_flags = -1 when the cell has no S_BOUNDING_BOX; offset = -1 when no S_CELL_OFFSET */
+int    ldb_oas_info_cell(const ldb_oas_info_t* info, int i, char* name, int len, int64_t* offset,
+                         int* bbox_flags, int64_t* bbox);
+
 #ifdef __cplusplus
 }
 #endif

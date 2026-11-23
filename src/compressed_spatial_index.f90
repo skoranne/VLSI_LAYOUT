@@ -81,9 +81,18 @@ module CompressedSpatialIndexModule
      ! decoded with plain integer ops (no BoxCodec/zstd). Leaves follow Morton key order.
      logical            :: compact_backed = .false.
      type(CompactLayer) :: cl
+     ! Multi-part store (layers compacted while streaming): parts 2.. in clx(:). Chunk ic
+     ! decodes blocks chunk_kb0(ic)..chunk_kb1(ic) of part chunk_part(ic) (1 = cl). A partial
+     ! chunk at the end of a part keeps its K_CSI_LEAVES_PER_BLK leaf slots; unused slots are
+     ! empty (inverted MBR) and decode to nothing.
+     type(CompactLayer), allocatable :: clx(:)
+     integer(int32), allocatable :: chunk_part(:)
+     integer(int64), allocatable :: chunk_kb0(:), chunk_kb1(:)
    contains
      procedure :: build_from_boxes    => csi_build_from_boxes
      procedure :: build_from_compact  => csi_build_from_compact
+     procedure :: build_from_compact_parts => csi_build_from_compact_parts
+     procedure :: decode_all          => csi_decode_all
      procedure :: build_auto          => csi_build_auto
      procedure :: destroy             => csi_destroy
      procedure :: is_empty            => csi_is_empty
@@ -320,8 +329,7 @@ contains
        block
          integer(int64) :: nout
          if (.not. allocated(cache%slots(victim)%boxes)) allocate(cache%slots(victim)%boxes(K_CSI_BOXES_PER_BLK))
-         call CompactDecodeBlocks(csi%cl, (chunk_id - 1_int64) * K_CSI_CL_BLOCKS + 1_int64, &
-              min(chunk_id * K_CSI_CL_BLOCKS, csi%cl%nblk), cache%slots(victim)%boxes, nout)
+         call decode_chunk(csi, chunk_id, cache%slots(victim)%boxes, nout)
          cache%slots(victim)%num_boxes = int(nout, int32)
        end block
     else
@@ -354,6 +362,15 @@ contains
        deallocate(this%chunks)
     end if
     if (this%compact_backed) call CompactRelease(this%cl)
+    if (allocated(this%clx)) then
+       do i = 1_int64, size(this%clx, kind=int64)
+          call CompactRelease(this%clx(i))
+       end do
+       deallocate(this%clx)
+    end if
+    if (allocated(this%chunk_part)) deallocate(this%chunk_part)
+    if (allocated(this%chunk_kb0)) deallocate(this%chunk_kb0)
+    if (allocated(this%chunk_kb1)) deallocate(this%chunk_kb1)
     this%compact_backed = .false.
     this%n_boxes    = 0_int64
     this%n_leaves   = 0_int64
@@ -384,6 +401,12 @@ contains
     csi_chunk_bytes = 0_int64
     if (this%compact_backed) then
        csi_chunk_bytes = CompactBytes(this%cl)
+       if (allocated(this%clx)) then
+          do i = 1_int64, size(this%clx, kind=int64)
+             csi_chunk_bytes = csi_chunk_bytes + CompactBytes(this%clx(i))
+          end do
+       end if
+       if (allocated(this%chunk_part)) csi_chunk_bytes = csi_chunk_bytes + 20_int64 * size(this%chunk_part, kind=int64)
        return
     end if
     if (.not. allocated(this%chunks)) return
@@ -525,6 +548,164 @@ contains
 
     call build_internal_levels(this)
   end subroutine csi_build_from_compact
+
+  !> Decode chunk ic of a compact-backed index into buf(1:nout).
+  subroutine decode_chunk(csi, ic, buf, nout)
+    class(CompressedSpatialIndex), intent(in) :: csi
+    integer(int64), intent(in) :: ic
+    type(Box), intent(inout) :: buf(:)
+    integer(int64), intent(out) :: nout
+    if (allocated(csi%chunk_part)) then
+       if (csi%chunk_part(ic) == 1) then
+          call CompactDecodeBlocks(csi%cl, csi%chunk_kb0(ic), csi%chunk_kb1(ic), buf, nout)
+       else
+          call CompactDecodeBlocks(csi%clx(csi%chunk_part(ic) - 1), csi%chunk_kb0(ic), csi%chunk_kb1(ic), buf, nout)
+       end if
+    else
+       call CompactDecodeBlocks(csi%cl, (ic - 1_int64) * K_CSI_CL_BLOCKS + 1_int64, &
+            min(ic * K_CSI_CL_BLOCKS, csi%cl%nblk), buf, nout)
+    end if
+  end subroutine decode_chunk
+
+  !> Build the index over several compact parts of one layer (e.g. a layer compacted in pieces
+  !> while it streamed), taking ownership of them. Same tree as build_from_compact; chunks
+  !> never span parts, so a part's last chunk may be partial (its unused leaves are empty).
+  subroutine csi_build_from_compact_parts(this, parts)
+    class(CompressedSpatialIndex), intent(inout) :: this
+    type(CompactLayer), intent(inout)            :: parts(:)
+    integer(int64) :: ic, i, j, l0, nout, leaf, c_start, c_end, n_internal, nch, kb
+    integer :: p, np, q
+    integer(K_COORDINATE_KIND) :: lx1, ly1
+    type(Box) :: agg
+    logical :: first
+    type(Box), allocatable :: buf(:)
+
+    call this%destroy()
+    np = 0
+    do p = 1, size(parts)
+       if (parts(p)%n > 0_int64) np = np + 1
+    end do
+    if (np == 0) return
+    ! move non-empty parts in: first -> cl, others -> clx
+    if (np > 1) allocate(this%clx(np - 1))
+    q = 0
+    do p = 1, size(parts)
+       if (parts(p)%n <= 0_int64) then
+          call CompactRelease(parts(p)); cycle
+       end if
+       if (allocated(parts(p)%keys)) call CompactPack(parts(p))
+       q = q + 1
+       if (q == 1) then
+          call CompactMove(parts(p), this%cl)
+       else
+          call CompactMove(parts(p), this%clx(q - 1))
+       end if
+    end do
+    this%compact_backed = .true.
+
+    ! chunk table and totals
+    nch = 0_int64
+    this%n_boxes = 0_int64
+    first = .true.
+    do p = 1, np
+       associate (c => part_ref(this, p))
+         nch = nch + (c%nblk + K_CSI_CL_BLOCKS - 1_int64) / K_CSI_CL_BLOCKS
+         this%n_boxes = this%n_boxes + c%n
+         do i = 1_int64, c%nblk
+            if (first) then
+               agg = c%blk_mbr(i); first = .false.
+            else
+               agg%x1 = min(agg%x1, c%blk_mbr(i)%x1); agg%y1 = min(agg%y1, c%blk_mbr(i)%y1)
+               agg%x2 = max(agg%x2, c%blk_mbr(i)%x2); agg%y2 = max(agg%y2, c%blk_mbr(i)%y2)
+            end if
+         end do
+       end associate
+    end do
+    allocate(this%chunk_part(nch), this%chunk_kb0(nch), this%chunk_kb1(nch))
+    ic = 0_int64
+    do p = 1, np
+       associate (c => part_ref(this, p))
+         do kb = 1_int64, c%nblk, K_CSI_CL_BLOCKS
+            ic = ic + 1_int64
+            this%chunk_part(ic) = int(p, int32)
+            this%chunk_kb0(ic) = kb
+            this%chunk_kb1(ic) = min(kb + K_CSI_CL_BLOCKS - 1_int64, c%nblk)
+         end do
+       end associate
+    end do
+    this%n_chunks = nch
+    this%layer_mbr = agg
+    lx1 = agg%x1; ly1 = agg%y1
+    this%span_x = max(1_int64, int(agg%x2, int64) - int(lx1, int64))
+    this%span_y = max(1_int64, int(agg%y2, int64) - int(ly1, int64))
+
+    ! leaves: K_CSI_LEAVES_PER_BLK slots per chunk (the last chunk only as many as it needs)
+    this%n_leaves = (nch - 1_int64) * K_CSI_LEAVES_PER_BLK + K_CSI_LEAVES_PER_BLK
+    this%n_nodes  = compute_total_nodes(this%n_leaves * K_CSI_LEAF_CAPACITY, K_CSI_LEAF_CAPACITY)
+    n_internal    = max(0_int64, this%n_nodes - this%n_leaves)
+    allocate(this%qx1(this%n_nodes), this%qy1(this%n_nodes), this%qx2(this%n_nodes), this%qy2(this%n_nodes))
+    if (n_internal > 0_int64) allocate(this%int_child_start(n_internal), this%int_child_count(n_internal))
+    this%qx1(1:this%n_leaves) = huge(this%qx1(1)); this%qy1(1:this%n_leaves) = huge(this%qy1(1))
+    this%qx2(1:this%n_leaves) = -huge(this%qx2(1)) - 1_int16; this%qy2(1:this%n_leaves) = -huge(this%qy2(1)) - 1_int16
+
+    !$omp parallel default(shared) private(ic, i, j, l0, nout, leaf, c_start, c_end, agg, buf)
+    allocate(buf(K_CSI_BOXES_PER_BLK))
+    !$omp do schedule(dynamic, 4)
+    do ic = 1_int64, nch
+       call decode_chunk(this, ic, buf, nout)
+       l0 = (ic - 1_int64) * K_CSI_LEAVES_PER_BLK
+       do i = 1_int64, (nout + K_CSI_LEAF_CAPACITY - 1_int64) / K_CSI_LEAF_CAPACITY
+          c_start = (i - 1_int64) * K_CSI_LEAF_CAPACITY + 1_int64
+          c_end   = min(i * K_CSI_LEAF_CAPACITY, nout)
+          agg = buf(c_start)
+          do j = c_start + 1_int64, c_end
+             if (buf(j)%x1 < agg%x1) agg%x1 = buf(j)%x1
+             if (buf(j)%y1 < agg%y1) agg%y1 = buf(j)%y1
+             if (buf(j)%x2 > agg%x2) agg%x2 = buf(j)%x2
+             if (buf(j)%y2 > agg%y2) agg%y2 = buf(j)%y2
+          end do
+          leaf = l0 + i
+          this%qx1(leaf) = quantize_lo(agg%x1, lx1, this%span_x)
+          this%qy1(leaf) = quantize_lo(agg%y1, ly1, this%span_y)
+          this%qx2(leaf) = quantize_hi(agg%x2, lx1, this%span_x)
+          this%qy2(leaf) = quantize_hi(agg%y2, ly1, this%span_y)
+       end do
+    end do
+    !$omp end do
+    deallocate(buf)
+    !$omp end parallel
+
+    call build_internal_levels(this)
+  end subroutine csi_build_from_compact_parts
+
+  !> All boxes of a compact-backed index (every part), for tests / oracles.
+  subroutine csi_decode_all(this, boxes, n)
+    class(CompressedSpatialIndex), intent(in) :: this
+    type(Box), allocatable, intent(out) :: boxes(:)
+    integer(int64), intent(out) :: n
+    integer(int64) :: ic, nout
+    type(Box), allocatable :: buf(:)
+    n = 0_int64
+    allocate(boxes(max(1_int64, this%n_boxes)))
+    if (.not. this%compact_backed) return
+    allocate(buf(K_CSI_BOXES_PER_BLK))
+    do ic = 1_int64, this%n_chunks
+       call decode_chunk(this, ic, buf, nout)
+       boxes(n + 1:n + nout) = buf(1:nout)
+       n = n + nout
+    end do
+  end subroutine csi_decode_all
+
+  function part_ref(this, p) result(c)
+    class(CompressedSpatialIndex), intent(in), target :: this
+    integer, intent(in) :: p
+    type(CompactLayer), pointer :: c
+    if (p == 1) then
+       c => this%cl
+    else
+       c => this%clx(p - 1)
+    end if
+  end function part_ref
 
   !> MAGVIEWER_COMPACT (default on): use the compact Morton/shape-id store for large layers.
   logical function csi_compact_enabled()
@@ -751,6 +932,7 @@ contains
            (q_min_x > 0_int64 .and. &
             (int(this%qx2(curr_idx), int64) - int(this%qx1(curr_idx), int64)) <= q_min_x .and. &
             (int(this%qy2(curr_idx), int64) - int(this%qy1(curr_idx), int64)) <= q_min_y)) then
+          if (this%qx1(curr_idx) > this%qx2(curr_idx)) cycle      ! empty leaf slot
           x1 = dequantize_lo(this%qx1(curr_idx), this%layer_mbr%x1, this%span_x)
           y1 = dequantize_lo(this%qy1(curr_idx), this%layer_mbr%y1, this%span_y)
           x2 = dequantize_hi(this%qx2(curr_idx), this%layer_mbr%x1, this%span_x)

@@ -178,4 +178,14 @@ profile-delayed: MAGPARSER.exe
 
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe test_contour.exe
 
-
+# ---- MAGVIEWER (GLFW + system libGL; GLFW built from source as a static X11 library) ----
+GLFW_HOME ?= /home/skoranne/OSS_DOWNLOADS/glfw
+GLFW_INC  ?= $(GLFW_HOME)/include
+GLFW_LIB  ?= $(GLFW_HOME)/build/src/libglfw3.a
+LIBGL     ?= $(firstword $(wildcard /usr/lib/aarch64-linux-gnu/libGL.so.1 /usr/lib/x86_64-linux-gnu/libGL.so.1 /usr/lib64/libGL.so.1))
+viewer_gl.o: viewer_gl.c
+	gcc -c -O2 -I$(GLFW_INC) viewer_gl.c -o $@
+viewer_font.o: viewer_font.f90
+	$(FORTRAN_COMPILER) -c -O2 viewer_font.f90 -o $@
+MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) magviewer.f90 viewer_font.o $(LIBRARY) viewer_gl.o $(GLFW_LIB) $(LIBGL) -ldl -lm -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)

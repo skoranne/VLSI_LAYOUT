@@ -1,13 +1,23 @@
 ! File    : magviewer.f90
 ! Author  : Sandeep Koranne (C) 2026
-! Purpose : Idiomatic Fortran 2018 OpenGL/GLFW viewer for Magic, GDSII, OASIS,
-!           KLBIN, and SNAP layouts backed by CompressedSpatialIndex
-!           (16-bit quantized SoA R-Tree + BoxCodec/Zstd chunks + LRU cache).
-!           Every layer uses the compact store instead of BoxCodec/Zstd
-!           (compact_layer.f90: Morton centre key + shape id, 128-key bit-packed blocks;
-!           contacts are centre-only). Flat OASIS streams and compacts layer by layer, so
-!           the peak is one layer as Boxes. MAGVIEWER_COMPACT=0 restores BoxCodec chunks.
-!           Headless load/query check: test_viewer_index.exe.
+! Purpose : Fortran 2018 OpenGL/GLFW viewer for Magic, GDSII, OASIS, KLBIN and SNAP layouts
+!           backed by CompressedSpatialIndex (16-bit quantized R-tree over compact layers:
+!           Morton centre key + shape id, 128-key bit-packed blocks, LRU chunk cache).
+!           Flat OASIS streams and compacts layer by layer. MAGVIEWER_COMPACT=0 restores the
+!           legacy BoxCodec chunks. Plan and roadmap: MAGVIEWER_TODO.md.
+!
+!  UI:  layer list with names (OASIS LAYERNAME, else layer/datatype such as 67/20), minimap,
+!       status bar (cursor in um, um/pixel, boxes drawn, frame ms), performance HUD, key map
+!       on '?'. Small C helpers in viewer_gl.c (input queue, bitmap text, screenshots).
+!  Env: MAGVIEWER_SIZE=WxH            window size (default 1600x900)
+!       MAGVIEWER_SCREENSHOT=out.ppm  write the first complete frame and exit (or the last
+!                                     benchmark frame with MAGVIEWER_BENCH)
+!       MAGVIEWER_BENCH=1             scripted zoom/pan path; prints per-step query/draw ms
+!       MAGVIEWER_EGL=1               create the GL context through EGL (X servers without GLX)
+!       MAGVIEWER_HUD=1, MAGVIEWER_HELP=1  start with the HUD / key-map overlay shown
+!       MAGVIEWER_KEYS='g 3 ?'        key presses injected after the first frame (tests);
+!                                     tokens: a letter/digit/symbol, PgUp, PgDn, Esc, S-<x> (Shift)
+!  Headless load/query check without a display: test_viewer_index.exe.
 
 module DrawUsingOpenGL
   use, intrinsic :: iso_fortran_env, only: int32, int64, real64
@@ -15,7 +25,8 @@ module DrawUsingOpenGL
   use CommonModule,                 only: K_COORDINATE_KIND
   use GeometryModule,               only: Box, box_grow
   use CompressedSpatialIndexModule, only: CompressedSpatialIndex, ChunkLRUCache, K_CSI_DEFAULT_CACHE
-  use glf90w
+  use SystemInformationModule,      only: ReadProcessMemoryUsage
+  use ViewerFontModule,             only: FONT_BITS, FONT_W, FONT_H
   implicit none
   private
 
@@ -116,9 +127,111 @@ module DrawUsingOpenGL
      end subroutine glPolygonMode
   end interface
 
+
+  ! GLFW 3 (direct bindings; the window is an opaque C pointer)
+  interface
+     integer(c_int) function glfwInit() bind(C, name="glfwInit")
+       import :: c_int
+     end function glfwInit
+     subroutine glfwTerminate() bind(C, name="glfwTerminate")
+     end subroutine glfwTerminate
+     type(c_ptr) function glfwCreateWindow(w, h, title, mon, share) bind(C, name="glfwCreateWindow")
+       import :: c_ptr, c_int, c_char
+       integer(c_int), value :: w, h
+       character(kind=c_char), intent(in) :: title(*)
+       type(c_ptr), value :: mon, share
+     end function glfwCreateWindow
+     subroutine glfwDestroyWindow(win) bind(C, name="glfwDestroyWindow")
+       import :: c_ptr
+       type(c_ptr), value :: win
+     end subroutine glfwDestroyWindow
+     subroutine glfwMakeContextCurrent(win) bind(C, name="glfwMakeContextCurrent")
+       import :: c_ptr
+       type(c_ptr), value :: win
+     end subroutine glfwMakeContextCurrent
+     integer(c_int) function glfwWindowShouldClose(win) bind(C, name="glfwWindowShouldClose")
+       import :: c_ptr, c_int
+       type(c_ptr), value :: win
+     end function glfwWindowShouldClose
+     subroutine glfwGetWindowSize(win, w, h) bind(C, name="glfwGetWindowSize")
+       import :: c_ptr, c_int
+       type(c_ptr), value :: win
+       integer(c_int), intent(out) :: w, h
+     end subroutine glfwGetWindowSize
+     integer(c_int) function glfwGetKey(win, key) bind(C, name="glfwGetKey")
+       import :: c_ptr, c_int
+       type(c_ptr), value :: win
+       integer(c_int), value :: key
+     end function glfwGetKey
+     subroutine glfwGetCursorPos(win, x, y) bind(C, name="glfwGetCursorPos")
+       import :: c_ptr, c_double
+       type(c_ptr), value :: win
+       real(c_double), intent(out) :: x, y
+     end subroutine glfwGetCursorPos
+     subroutine glfwSwapBuffers(win) bind(C, name="glfwSwapBuffers")
+       import :: c_ptr
+       type(c_ptr), value :: win
+     end subroutine glfwSwapBuffers
+     subroutine glfwPollEvents() bind(C, name="glfwPollEvents")
+     end subroutine glfwPollEvents
+     subroutine glfwWaitEventsTimeout(t) bind(C, name="glfwWaitEventsTimeout")
+       import :: c_double
+       real(c_double), value :: t
+     end subroutine glfwWaitEventsTimeout
+     subroutine viewer_glfw_errors() bind(C, name="viewer_glfw_errors")
+     end subroutine viewer_glfw_errors
+     subroutine viewer_context_hints() bind(C, name="viewer_context_hints")
+     end subroutine viewer_context_hints
+     integer(c_int) function viewer_input_script(s, n) bind(C, name="viewer_input_script")
+       import :: c_char, c_int
+       character(kind=c_char), intent(in) :: s(*)
+       integer(c_int), value :: n
+     end function viewer_input_script
+  end interface
+
+  ! C helpers (viewer_gl.c): input queue, bitmap text, screenshot
+  interface
+     subroutine viewer_input_install(win) bind(C, name="viewer_input_install")
+       import :: c_ptr
+       type(c_ptr), value :: win
+     end subroutine viewer_input_install
+     integer(c_int) function viewer_input_next(etype, code, mods, action, x, y) bind(C, name="viewer_input_next")
+       import :: c_int, c_double
+       integer(c_int), intent(out) :: etype, code, mods, action
+       real(c_double), intent(out) :: x, y
+     end function viewer_input_next
+     subroutine viewer_text_set_font(bits) bind(C, name="viewer_text_set_font")
+       import :: c_int8_t
+       integer(c_int8_t), intent(in) :: bits(*)
+     end subroutine viewer_text_set_font
+     subroutine viewer_draw_text(x, y, s, n) bind(C, name="viewer_draw_text")
+       import :: c_float, c_char, c_int
+       real(c_float), value :: x, y
+       character(kind=c_char), intent(in) :: s(*)
+       integer(c_int), value :: n
+     end subroutine viewer_draw_text
+     integer(c_int) function viewer_screenshot_ppm(path, w, h) bind(C, name="viewer_screenshot_ppm")
+       import :: c_char, c_int
+       character(kind=c_char), intent(in) :: path(*)
+       integer(c_int), value :: w, h
+     end function viewer_screenshot_ppm
+     subroutine viewer_finish() bind(C, name="viewer_finish")
+     end subroutine viewer_finish
+     subroutine viewer_swap_interval(n) bind(C, name="viewer_swap_interval")
+       import :: c_int
+       integer(c_int), value :: n
+     end subroutine viewer_swap_interval
+     subroutine glLineWidth(w) bind(C, name="glLineWidth")
+       import :: c_float
+       real(c_float), value :: w
+     end subroutine glLineWidth
+  end interface
+
+
   ! OpenGL constants
   integer(c_int), parameter :: GL_COLOR_BUFFER_BIT    = int(z'00004000', c_int)
   integer(c_int), parameter :: GL_QUADS               = int(z'00000007', c_int)
+  integer(c_int), parameter :: GL_LINES               = int(z'00000001', c_int)
   integer(c_int), parameter :: GL_PROJECTION          = int(z'1701', c_int)
   integer(c_int), parameter :: GL_MODELVIEW           = int(z'1700', c_int)
   integer(c_int), parameter :: GL_VERTEX_ARRAY        = int(z'8074', c_int)
@@ -134,10 +247,19 @@ module DrawUsingOpenGL
   ! GLFW key and mouse constants
   integer(c_int), parameter :: GLFW_PRESS             = 1_c_int
   integer(c_int), parameter :: GLFW_MOUSE_BUTTON_LEFT = 0_c_int
+  integer(c_int), parameter :: GLFW_MOD_SHIFT         = 1_c_int
+  integer(c_int), parameter :: GLFW_MOD_CONTROL       = 2_c_int
+  integer(c_int), parameter :: GLFW_KEY_0             = 48_c_int
+  integer(c_int), parameter :: GLFW_KEY_9             = 57_c_int
   integer(c_int), parameter :: GLFW_KEY_MINUS         = 45_c_int
-  integer(c_int), parameter :: GLFW_KEY_SLASH         = 47_c_int
   integer(c_int), parameter :: GLFW_KEY_EQUAL         = 61_c_int
   integer(c_int), parameter :: GLFW_KEY_A             = 65_c_int
+  integer(c_int), parameter :: GLFW_KEY_F             = 70_c_int
+  integer(c_int), parameter :: GLFW_KEY_G             = 71_c_int
+  integer(c_int), parameter :: GLFW_KEY_H             = 72_c_int
+  integer(c_int), parameter :: GLFW_KEY_O             = 79_c_int
+  integer(c_int), parameter :: GLFW_KEY_P             = 80_c_int
+  integer(c_int), parameter :: GLFW_KEY_Q             = 81_c_int
   integer(c_int), parameter :: GLFW_KEY_R             = 82_c_int
   integer(c_int), parameter :: GLFW_KEY_S             = 83_c_int
   integer(c_int), parameter :: GLFW_KEY_T             = 84_c_int
@@ -148,8 +270,44 @@ module DrawUsingOpenGL
   integer(c_int), parameter :: GLFW_KEY_LEFT          = 263_c_int
   integer(c_int), parameter :: GLFW_KEY_DOWN          = 264_c_int
   integer(c_int), parameter :: GLFW_KEY_UP            = 265_c_int
-  integer(c_int), parameter :: GLFW_KEY_LEFT_CONTROL  = 341_c_int
-  integer(c_int), parameter :: GLFW_KEY_RIGHT_CONTROL = 345_c_int
+  integer(c_int), parameter :: GLFW_KEY_PAGE_UP       = 266_c_int
+  integer(c_int), parameter :: GLFW_KEY_PAGE_DOWN     = 267_c_int
+
+  ! Layout of the left column (pixels)
+  integer(c_int), parameter :: K_UI_WIDTH  = 280_c_int
+  integer(c_int), parameter :: K_ROW_H     = 17_c_int
+  integer(c_int), parameter :: K_HEADER_H  = 22_c_int
+  integer(c_int), parameter :: K_STATUS_H  = 18_c_int
+
+  integer, parameter :: K_NHELP = 27
+  character(len=80), parameter :: HELP_LINES(K_NHELP) = [character(len=80) :: &
+       'MAGVIEWER keys', &
+       '  arrows                 pan (hold)', &
+       '  = z / - x              zoom in / out (hold)', &
+       '  mouse wheel            zoom about the cursor (over the layer list: scroll)', &
+       '  f  or Ctrl-A           fit the whole layout', &
+       '  1 .. 9, 0              toggle layer 1 .. 10 (Shift: show only that layer)', &
+       '  a                      all layers on', &
+       '  click layer row        toggle layer (Shift-click: solo)', &
+       '  click ALL / NONE       all layers on / off', &
+       '  PageUp / PageDown      scroll the layer list', &
+       '  r                      tree mode (R-tree MBRs) / geometry', &
+       '  s / t                  tree depth - / +', &
+       '  o                      outlines on / off', &
+       '  g                      performance HUD on / off', &
+       '  p                      print performance report to the terminal', &
+       '  /                      print cursor position (um and database units)', &
+       '  h                      key map overlay on / off', &
+       '  ?                      print this key map to the terminal', &
+       '  q or Esc               quit', &
+       '', &
+       'Status bar: cursor x y (um) | um per pixel | boxes drawn | frame ms', &
+       'HUD: fps, frame / query / draw ms (last, avg, p95), boxes, chunk cache,', &
+       '     resident memory. Load phases are in the p report.', &
+       'Env: MAGVIEWER_SIZE=WxH  MAGVIEWER_SCREENSHOT=f.ppm  MAGVIEWER_BENCH=1', &
+       '     MAGVIEWER_COMPACT=0 (legacy chunks)', &
+       'Layer names: OASIS LAYERNAME table when present, else layer/datatype.', &
+       '']
 
   type :: Point2D
      real(c_double) :: x = 0.0_c_double
@@ -171,18 +329,12 @@ module DrawUsingOpenGL
      procedure :: fit_to_mbr      => cam_fit_to_mbr
      procedure :: to_view_box     => cam_to_view_box
      procedure :: screen_to_world => cam_screen_to_world
+     procedure :: zoom_about      => cam_zoom_about
   end type CameraState
 
-  type :: InputState
-     logical :: r_was_down     = .false.
-     logical :: s_was_down     = .false.
-     logical :: t_was_down     = .false.
-     logical :: slash_was_down = .false.
-     logical :: mouse_was_down = .false.
-  end type InputState
-
   type, public :: DrawnLayer
-     character(len=64)                      :: name        = ''
+     character(len=64)                      :: name        = ''   ! loader name, e.g. L67_D20
+     character(len=64)                      :: label       = ''   ! shown, e.g. "li1  67/20"
      type(CompressedSpatialIndex), pointer  :: index       => null()
      type(ChunkLRUCache)                    :: chunk_cache
      logical                                :: visible     = .true.
@@ -195,7 +347,27 @@ module DrawUsingOpenGL
      procedure :: destroy => drawn_layer_destroy
   end type DrawnLayer
 
-  public :: SimpleWindow, UpdateVisibleLayerCaches
+  !> Load-phase and frame statistics (filled by the program and the render loop).
+  integer, parameter :: K_RING = 512
+  type, public :: ViewerStats
+     character(len=512) :: file = ''
+     character(len=32)  :: format = ''
+     integer            :: strict = -1          ! OASIS strict tables: 1 yes, 0 no, -1 n/a
+     real(real64)       :: tables_ms = -1.0_real64
+     real(real64)       :: read_s = 0.0_real64, index_s = 0.0_real64, load_s = 0.0_real64
+     real(real64)       :: unit_per_um = 1000.0_real64   ! database steps per micron
+     integer(int64)     :: t0_ticks = 0         ! program start (system_clock)
+     integer(int64)     :: total_boxes = 0
+     real(real64)       :: index_mb = 0.0_real64
+     real(real64)       :: first_frame_s = -1.0_real64
+     integer(int64)     :: frames = 0
+     real(real64)       :: frame_ms(K_RING) = 0.0_real64, query_ms(K_RING) = 0.0_real64, &
+                           draw_ms(K_RING) = 0.0_real64
+     integer(int64)     :: boxes_drawn = 0
+  end type ViewerStats
+  type(ViewerStats), public :: vstats
+
+  public :: SimpleWindow, UpdateVisibleLayerCaches, PrintKeyMap, PrintPerfReport, wall_seconds
 
 contains
 
@@ -251,6 +423,144 @@ contains
     v%y2 = ceiling(max(lo, min(hi, this%top)),   kind=K_COORDINATE_KIND)
   end function cam_to_view_box
 
+
+  !> Zoom by factor (new zoom = zoom * factor) keeping the world point under screen (sx, sy) fixed.
+  pure subroutine cam_zoom_about(this, factor, sx, sy)
+    class(CameraState), intent(inout) :: this
+    real(c_double), intent(in) :: factor, sx, sy
+    real(c_double) :: wx, wy, z2, cx, cy
+    wx = this%left + sx * this%zoom
+    wy = this%top  - sy * this%zoom
+    z2 = max(1.0e-4_c_double, this%zoom * factor)
+    cx = wx + 0.5_c_double * this%win_w * z2 - sx * z2
+    cy = wy - 0.5_c_double * this%win_h * z2 + sy * z2
+    this%zoom  = z2
+    this%pan_x = cx - 0.5_c_double * this%win_w
+    this%pan_y = cy - 0.5_c_double * this%win_h
+    call this%update_bounds()
+  end subroutine cam_zoom_about
+
+  real(real64) function wall_seconds()
+    integer(int64) :: t, r
+    call system_clock(t, r)
+    wall_seconds = real(t, real64) / real(max(1_int64, r), real64)
+  end function wall_seconds
+
+  real(real64) function since_ms(t0)
+    real(real64), intent(in) :: t0
+    since_ms = 1000.0_real64 * (wall_seconds() - t0)
+  end function since_ms
+
+  !> Text at pixel (x, y) (lower-left of the first glyph) in the current pixel projection.
+  subroutine draw_text(x, y, s)
+    real, intent(in) :: x, y
+    character(len=*), intent(in) :: s
+    if (len_trim(s) == 0) return
+    call viewer_draw_text(real(x, c_float), real(y, c_float), s, int(len_trim(s), c_int))
+  end subroutine draw_text
+
+  subroutine fill_rect(x1, y1, x2, y2)
+    real, intent(in) :: x1, y1, x2, y2
+    call glBegin(GL_QUADS)
+    call glVertex2f(x1, y1); call glVertex2f(x2, y1)
+    call glVertex2f(x2, y2); call glVertex2f(x1, y2)
+    call glEnd()
+  end subroutine fill_rect
+
+  !> Pixel projection over the viewport (x0, y0, w, h); y grows upward.
+  subroutine pixel_projection(x0, y0, w, h)
+    integer(c_int), intent(in) :: x0, y0, w, h
+    call glViewport(x0, y0, w, h)
+    call glMatrixMode(GL_PROJECTION)
+    call glLoadIdentity()
+    call glOrtho(0.0_c_double, real(w, c_double), 0.0_c_double, real(h, c_double), &
+         -1.0_c_double, 1.0_c_double)
+    call glMatrixMode(GL_MODELVIEW)
+    call glLoadIdentity()
+  end subroutine pixel_projection
+
+  !> Mean and 95th percentile of the last min(n, K_RING) samples.
+  subroutine ring_stats(v, n, avg, p95)
+    real(real64), intent(in) :: v(K_RING)
+    integer(int64), intent(in) :: n
+    real(real64), intent(out) :: avg, p95
+    real(real64) :: tmp(K_RING), t
+    integer :: m, i, j
+    m = int(min(n, int(K_RING, int64)))
+    avg = 0.0_real64; p95 = 0.0_real64
+    if (m <= 0) return
+    tmp(1:m) = v(1:m)
+    avg = sum(tmp(1:m)) / real(m, real64)
+    do i = 2, m                                    ! insertion sort, m <= 512
+       t = tmp(i); j = i - 1
+       do while (j >= 1)
+          if (tmp(j) <= t) exit
+          tmp(j + 1) = tmp(j); j = j - 1
+       end do
+       tmp(j + 1) = t
+    end do
+    p95 = tmp(max(1, min(m, ceiling(0.95_real64 * real(m, real64)))))
+  end subroutine ring_stats
+
+  subroutine record_frame(frame_ms, query_ms, draw_ms)
+    real(real64), intent(in) :: frame_ms, query_ms, draw_ms
+    integer :: k
+    vstats%frames = vstats%frames + 1
+    k = int(mod(vstats%frames - 1, int(K_RING, int64))) + 1
+    vstats%frame_ms(k) = frame_ms
+    vstats%query_ms(k) = query_ms
+    vstats%draw_ms(k)  = draw_ms
+  end subroutine record_frame
+
+  subroutine PrintKeyMap()
+    integer :: i
+    do i = 1, K_NHELP
+       write(*,'(A)') trim(HELP_LINES(i))
+    end do
+  end subroutine PrintKeyMap
+
+  subroutine PrintPerfReport(n_layers, layers)
+    integer, intent(in) :: n_layers
+    type(DrawnLayer), intent(in) :: layers(:)
+    real(real64) :: fa, fp, qa, qp, da, dp
+    integer(int64) :: vm_kb, rss_kb, hits, misses
+    integer :: i
+    call ring_stats(vstats%frame_ms, vstats%frames, fa, fp)
+    call ring_stats(vstats%query_ms, vstats%frames, qa, qp)
+    call ring_stats(vstats%draw_ms,  vstats%frames, da, dp)
+    hits = 0; misses = 0
+    do i = 1, n_layers
+       hits = hits + layers(i)%chunk_cache%hits
+       misses = misses + layers(i)%chunk_cache%misses
+    end do
+    call ReadProcessMemoryUsage(vm_kb, rss_kb)
+    write(*,'(A)') '---------------- MAGVIEWER performance ----------------'
+    write(*,'(A,A)') '  file            ', trim(vstats%file)
+    if (vstats%strict >= 0) then
+       write(*,'(A,A,A,I0,A,F9.3,A)') '  format          ', trim(vstats%format), '  strict tables=', &
+            vstats%strict, '  (tables read in ', vstats%tables_ms, ' ms)'
+    else
+       write(*,'(A,A)') '  format          ', trim(vstats%format)
+    end if
+    write(*,'(A,F9.2,A,F9.2,A,F9.2,A)') '  load            read ', vstats%read_s, ' s  index ', &
+         vstats%index_s, ' s  total ', vstats%load_s, ' s'
+    write(*,'(A,I0,A,I0,A,F10.1,A)') '  data            layers ', n_layers, '  boxes ', vstats%total_boxes, &
+         '  index ', vstats%index_mb, ' MB'
+    write(*,'(A,F9.2,A)') '  first frame     ', vstats%first_frame_s, ' s after start'
+    write(*,'(A,I0)') '  frames          ', vstats%frames
+    write(*,'(A,3F10.2)') '  frame ms        last/avg/p95 ', &
+         vstats%frame_ms(int(mod(max(0_int64, vstats%frames - 1), int(K_RING, int64))) + 1), fa, fp
+    write(*,'(A,3F10.2)') '  query ms        last/avg/p95 ', &
+         vstats%query_ms(int(mod(max(0_int64, vstats%frames - 1), int(K_RING, int64))) + 1), qa, qp
+    write(*,'(A,3F10.2)') '  draw ms         last/avg/p95 ', &
+         vstats%draw_ms(int(mod(max(0_int64, vstats%frames - 1), int(K_RING, int64))) + 1), da, dp
+    write(*,'(A,I0)') '  boxes drawn     ', vstats%boxes_drawn
+    write(*,'(A,I0,A,I0)') '  chunk cache     hits ', hits, '  misses ', misses
+    write(*,'(A,F10.1,A,F10.1,A)') '  memory          VmRSS ', real(rss_kb, real64) / 1024.0_real64, &
+         ' MB  VmSize ', real(vm_kb, real64) / 1024.0_real64, ' MB'
+    write(*,'(A)') '--------------------------------------------------------'
+  end subroutine PrintPerfReport
+
   ! ------------------------------------------------------------------
   ! DrawnLayer cleanup & cache updates
   ! ------------------------------------------------------------------
@@ -263,11 +573,6 @@ contains
     nullify(this%index)
   end subroutine drawn_layer_destroy
 
-  subroutine handle_error(code, desc)
-    integer, intent(in)      :: code
-    character(*), intent(in) :: desc
-    write(*, '(A,I8,A,A)') 'GLFW Error ', code, ' : ', desc
-  end subroutine handle_error
 
   subroutine InvalidateLayerCaches(n_layers, layers)
     integer, intent(in)             :: n_layers
@@ -316,16 +621,18 @@ contains
     !$omp end parallel do
   end subroutine UpdateVisibleLayerCaches
 
+
   ! ------------------------------------------------------------------
   ! OpenGL Render Passes
   ! ------------------------------------------------------------------
-  subroutine RenderMainViewport(n_layers, layers, ui_width, main_width, win_h, cam, tree_mode)
+  subroutine RenderMainViewport(n_layers, layers, ui_width, main_width, win_h, cam, tree_mode, outlines)
     integer, intent(in)                  :: n_layers
     type(DrawnLayer), intent(in), target :: layers(:)
     integer(c_int), intent(in)           :: ui_width, main_width, win_h
     type(CameraState), intent(in)        :: cam
-    logical, intent(in)                  :: tree_mode
-    integer :: i
+    logical, intent(in)                  :: tree_mode, outlines
+    integer :: i, k, ns
+    real(c_double) :: wsum
 
     call glViewport(ui_width, 0_c_int, main_width, win_h)
     call glMatrixMode(GL_PROJECTION)
@@ -341,7 +648,6 @@ contains
 
        call glVertexPointer(2_c_int, GL_INT, 0_c_int, c_loc(layers(i)%vbo_verts(1)))
 
-       ! Filled pass
        call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
        if (tree_mode) then
           call glColor4f(layers(i)%color(1), layers(i)%color(2), layers(i)%color(3), 0.75_c_float)
@@ -350,10 +656,21 @@ contains
        end if
        call glDrawArrays(GL_QUADS, 0_c_int, int(layers(i)%vbo_count * 4, c_int))
 
-       ! Outline pass
-       call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-       call glColor4f(0.0_c_float, 0.0_c_float, 0.0_c_float, 1.0_c_float)
-       call glDrawArrays(GL_QUADS, 0_c_int, int(layers(i)%vbo_count * 4, c_int))
+       if (outlines) then
+          ! Outline only when boxes are at least ~4 pixels wide on average (sampled), otherwise
+          ! the edges of millions of tiny boxes hide the fill.
+          ns = min(64, layers(i)%vbo_count)
+          wsum = 0.0_c_double
+          do k = 0, ns - 1
+             wsum = wsum + abs(real(layers(i)%vbo_verts(8*k + 3) - layers(i)%vbo_verts(8*k + 1), c_double))
+          end do
+          if (ns > 0 .and. wsum / real(max(1, ns), c_double) >= 4.0_c_double * cam%zoom) then
+             call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+             call glColor4f(0.6_c_float * layers(i)%color(1), 0.6_c_float * layers(i)%color(2), &
+                  0.6_c_float * layers(i)%color(3), 1.0_c_float)
+             call glDrawArrays(GL_QUADS, 0_c_int, int(layers(i)%vbo_count * 4, c_int))
+          end if
+       end if
     end do
     call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
     call glDisableClientState(GL_VERTEX_ARRAY)
@@ -367,7 +684,7 @@ contains
     real(c_double) :: cur_w, cur_h, min_sz, cx, cy, draw_w, draw_h
     real(c_double) :: ix1, iy1, ix2, iy2
 
-    side = max(1_c_int, min(ui_width / 2_c_int, bot_h / 2_c_int))
+    side = max(1_c_int, min(ui_width, bot_h))
     call glViewport(0_c_int, 0_c_int, side, side)
     call glMatrixMode(GL_PROJECTION)
     call glLoadIdentity()
@@ -398,8 +715,8 @@ contains
     cy     = 0.5_c_double * (real(current_view%y1, c_double) + real(current_view%y2, c_double))
     draw_w = max(cur_w, min_sz)
     draw_h = max(cur_h, min_sz)
-    ix1 = cx - 0.5_c_double * draw_w; ix2 = cx + 0.5_c_double * draw_w
-    iy1 = cy - 0.5_c_double * draw_h; iy2 = cy + 0.5_c_double * draw_h
+    ix1 = max(real(mbr%x1, c_double), cx - 0.5_c_double * draw_w); ix2 = min(real(mbr%x2, c_double), cx + 0.5_c_double * draw_w)
+    iy1 = max(real(mbr%y1, c_double), cy - 0.5_c_double * draw_h); iy2 = min(real(mbr%y2, c_double), cy + 0.5_c_double * draw_h)
 
     call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
     call glColor3f(1.0_c_float, 1.0_c_float, 0.0_c_float)
@@ -412,78 +729,181 @@ contains
     call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
   end subroutine RenderMinimap
 
-  subroutine RenderLayerPanel(n_layers, layers, layer_colors, active_layer, ui_width, bot_h, top_h)
-    integer, intent(in)          :: n_layers, active_layer
+
+  !> Layer list: header with ALL / NONE buttons, then one row per layer (swatch + name).
+  !> list_top is the window height of the list area (pixels from the bottom of the window).
+  subroutine RenderLayerPanel(n_layers, layers, active_layer, scroll, ui_width, y0, list_h)
+    integer, intent(in)          :: n_layers, active_layer, scroll
     type(DrawnLayer), intent(in) :: layers(:)
-    real(c_float), intent(in)    :: layer_colors(:,:)
-    integer(c_int), intent(in)   :: ui_width, bot_h, top_h
-    integer :: r, col, idx, total_btns, num_rows
-    real(c_double) :: bw, bh, bx1, by1, bx2, by2
+    integer(c_int), intent(in)   :: ui_width, y0, list_h
+    integer :: i, row, nrows
+    real :: yt, w
+    character(len=40) :: hdr
 
-    call glViewport(0_c_int, bot_h, ui_width, top_h)
-    call glMatrixMode(GL_PROJECTION)
-    call glLoadIdentity()
-    call glOrtho(0.0_c_double, real(ui_width, c_double), 0.0_c_double, &
-         real(top_h, c_double), -1.0_c_double, 1.0_c_double)
-    call glMatrixMode(GL_MODELVIEW)
-    call glLoadIdentity()
+    call pixel_projection(0_c_int, y0, ui_width, list_h)
+    w = real(ui_width)
+    call glColor3f(0.12_c_float, 0.12_c_float, 0.14_c_float)
+    call fill_rect(0.0, 0.0, w, real(list_h))
 
-    total_btns = n_layers + 2
-    num_rows   = max(12, (total_btns + 4) / 5)
-    bw = real(ui_width, c_double) / 5.0_c_double
-    bh = real(top_h, c_double) / real(num_rows, c_double)
+    ! header
+    yt = real(list_h) - real(K_HEADER_H)
+    call glColor3f(0.30_c_float, 0.30_c_float, 0.34_c_float)
+    call fill_rect(2.0, yt + 2.0, w * 0.5 - 1.0, real(list_h) - 2.0)
+    call fill_rect(w * 0.5 + 1.0, yt + 2.0, w - 2.0, real(list_h) - 2.0)
+    call glColor3f(1.0_c_float, 1.0_c_float, 1.0_c_float)
+    write(hdr, '(A,I0,A)') 'ALL (', n_layers, ')'
+    call draw_text(8.0, yt + 6.0, trim(hdr))
+    call draw_text(w * 0.5 + 8.0, yt + 6.0, 'NONE')
 
-    idx = 1
-    do r = 0, num_rows - 1
-       do col = 0, 4
-          if (idx > total_btns) exit
-          bx1 = real(col, c_double) * bw + 2.0_c_double
-          bx2 = bx1 + bw - 4.0_c_double
-          by2 = real(top_h, c_double) - real(r, c_double) * bh - 2.0_c_double
-          by1 = by2 - bh + 4.0_c_double
-
-          if (idx <= n_layers) then
-             if (layers(idx)%visible) then
-                call glColor3f(layer_colors(1, idx), layer_colors(2, idx), layer_colors(3, idx))
-             else
-                call glColor3f(0.25_c_float * layer_colors(1, idx), &
-                     0.25_c_float * layer_colors(2, idx), 0.25_c_float * layer_colors(3, idx))
-             end if
-          else if (idx == n_layers + 1) then
-             call glColor3f(0.35_c_float, 0.35_c_float, 0.35_c_float) ! All OFF
-          else
-             call glColor3f(0.75_c_float, 0.75_c_float, 0.75_c_float) ! All ON
-          end if
-
-          call glBegin(GL_QUADS)
-          call glVertex2f(real(bx1, c_float), real(by1, c_float))
-          call glVertex2f(real(bx2, c_float), real(by1, c_float))
-          call glVertex2f(real(bx2, c_float), real(by2, c_float))
-          call glVertex2f(real(bx1, c_float), real(by2, c_float))
-          call glEnd()
-
-          if (idx == active_layer .or. idx == n_layers + 1 .or. idx == n_layers + 2) then
-             call glColor4f(1.0_c_float, 1.0_c_float, 1.0_c_float, 1.0_c_float)
-             call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-             call glBegin(GL_QUADS)
-             if (idx > n_layers) then
-                call glVertex2f(real(bx1 + 4.0_c_double, c_float), real(by1 + 4.0_c_double, c_float))
-                call glVertex2f(real(bx2 - 4.0_c_double, c_float), real(by1 + 4.0_c_double, c_float))
-                call glVertex2f(real(bx2 - 4.0_c_double, c_float), real(by2 - 4.0_c_double, c_float))
-                call glVertex2f(real(bx1 + 4.0_c_double, c_float), real(by2 - 4.0_c_double, c_float))
-             else
-                call glVertex2f(real(bx1, c_float), real(by1, c_float))
-                call glVertex2f(real(bx2, c_float), real(by1, c_float))
-                call glVertex2f(real(bx2, c_float), real(by2, c_float))
-                call glVertex2f(real(bx1, c_float), real(by2, c_float))
-             end if
-             call glEnd()
-             call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-          end if
-          idx = idx + 1
-       end do
+    nrows = int((list_h - K_HEADER_H) / K_ROW_H)
+    do row = 1, nrows
+       i = scroll + row
+       if (i > n_layers) exit
+       yt = real(list_h) - real(K_HEADER_H) - real(row * K_ROW_H)
+       if (i == active_layer) then
+          call glColor3f(0.22_c_float, 0.22_c_float, 0.28_c_float)
+          call fill_rect(0.0, yt, w, yt + real(K_ROW_H))
+       end if
+       if (layers(i)%visible) then
+          call glColor3f(layers(i)%color(1), layers(i)%color(2), layers(i)%color(3))
+       else
+          call glColor3f(0.25_c_float * layers(i)%color(1), 0.25_c_float * layers(i)%color(2), &
+               0.25_c_float * layers(i)%color(3))
+       end if
+       call fill_rect(6.0, yt + 3.0, 26.0, yt + real(K_ROW_H) - 3.0)
+       if (layers(i)%visible) then
+          call glColor3f(0.95_c_float, 0.95_c_float, 0.95_c_float)
+       else
+          call glColor3f(0.45_c_float, 0.45_c_float, 0.45_c_float)
+       end if
+       write(hdr, '(I3)') i
+       call draw_text(30.0, yt + 3.0, hdr(1:3))
+       call draw_text(62.0, yt + 3.0, layers(i)%label(1:min(len_trim(layers(i)%label), &
+            max(1, (ui_width - 66_c_int) / FONT_W))))
     end do
+    if (scroll > 0 .or. scroll + nrows < n_layers) then
+       call glColor3f(0.6_c_float, 0.6_c_float, 0.6_c_float)
+       write(hdr, '(I0,A,I0,A,I0)') scroll + 1, '-', min(n_layers, scroll + nrows), ' of ', n_layers
+       call draw_text(w - 8.0 * real(len_trim(hdr)) - 6.0, 2.0, trim(hdr))
+    end if
   end subroutine RenderLayerPanel
+
+  !> Status bar along the bottom of the main view and the optional HUD / key-map overlays.
+  subroutine RenderOverlays(n_layers, layers, ui_width, main_width, win_h, cam, mouse_world, in_view, &
+                            show_hud, show_help, tree_mode)
+    integer, intent(in)           :: n_layers
+    type(DrawnLayer), intent(in)  :: layers(:)
+    integer(c_int), intent(in)    :: ui_width, main_width, win_h
+    type(CameraState), intent(in) :: cam
+    type(Point2D), intent(in)     :: mouse_world
+    logical, intent(in)           :: in_view, show_hud, show_help, tree_mode
+    character(len=160) :: line
+    real(real64) :: u, fa, fp, qa, qp, da, dp, last
+    integer(int64) :: vm_kb, rss_kb, hits, misses
+    integer :: i, k
+
+    call pixel_projection(ui_width, 0_c_int, main_width, win_h)
+    u = vstats%unit_per_um
+    call glColor4f(0.0_c_float, 0.0_c_float, 0.0_c_float, 0.70_c_float)
+    call fill_rect(0.0, 0.0, real(main_width), real(K_STATUS_H))
+    k = int(mod(max(0_int64, vstats%frames - 1), int(K_RING, int64))) + 1
+    last = vstats%frame_ms(k)
+    if (in_view) then
+       write(line, '(A,F12.3,A,F12.3,A,ES9.2,A,I0,A,F7.1,A,A)') 'x ', mouse_world%x / u, '  y ', &
+            mouse_world%y / u, ' um | ', cam%zoom / u, ' um/px | boxes ', vstats%boxes_drawn, &
+            ' | ', last, ' ms', merge(' | TREE', '       ', tree_mode)
+    else
+       write(line, '(A,ES9.2,A,I0,A,F7.1,A)') 'um/px ', cam%zoom / u, ' | boxes ', vstats%boxes_drawn, &
+            ' | ', last, ' ms   (? keys)'
+    end if
+    call glColor3f(0.9_c_float, 0.9_c_float, 0.6_c_float)
+    call draw_text(6.0, 3.0, trim(adjustl(line)))
+
+    if (show_hud) then
+       call ring_stats(vstats%frame_ms, vstats%frames, fa, fp)
+       call ring_stats(vstats%query_ms, vstats%frames, qa, qp)
+       call ring_stats(vstats%draw_ms,  vstats%frames, da, dp)
+       hits = 0; misses = 0
+       do i = 1, n_layers
+          hits = hits + layers(i)%chunk_cache%hits
+          misses = misses + layers(i)%chunk_cache%misses
+       end do
+       call ReadProcessMemoryUsage(vm_kb, rss_kb)
+       call glColor4f(0.0_c_float, 0.0_c_float, 0.0_c_float, 0.70_c_float)
+       call fill_rect(real(main_width) - 330.0, real(win_h) - 140.0, real(main_width) - 4.0, real(win_h) - 4.0)
+       call glColor3f(0.6_c_float, 1.0_c_float, 0.6_c_float)
+       write(line, '(A,F6.1,A,F7.2,A,F7.2)') 'fps', 1000.0_real64 / max(0.01_real64, fa), &
+            '  load s', vstats%load_s, '  1st s', vstats%first_frame_s
+       call draw_text(real(main_width) - 324.0, real(win_h) - 20.0, trim(line))
+       write(line, '(A,3F8.1)') 'frame ms l/a/95', last, fa, fp
+       call draw_text(real(main_width) - 324.0, real(win_h) - 36.0, trim(line))
+       write(line, '(A,3F8.1)') 'query ms l/a/95', vstats%query_ms(k), qa, qp
+       call draw_text(real(main_width) - 324.0, real(win_h) - 52.0, trim(line))
+       write(line, '(A,3F8.1)') 'draw  ms l/a/95', vstats%draw_ms(k), da, dp
+       call draw_text(real(main_width) - 324.0, real(win_h) - 68.0, trim(line))
+       write(line, '(A,I0)') 'boxes drawn ', vstats%boxes_drawn
+       call draw_text(real(main_width) - 324.0, real(win_h) - 84.0, trim(line))
+       write(line, '(A,I0,A,I0)') 'cache hit ', hits, ' miss ', misses
+       call draw_text(real(main_width) - 324.0, real(win_h) - 100.0, trim(line))
+       write(line, '(A,F9.1,A,F8.1,A)') 'RSS ', real(rss_kb, real64) / 1024.0_real64, ' MB  index ', &
+            vstats%index_mb, ' MB'
+       call draw_text(real(main_width) - 324.0, real(win_h) - 116.0, trim(line))
+       write(line, '(A,I0)') 'frames ', vstats%frames
+       call draw_text(real(main_width) - 324.0, real(win_h) - 132.0, trim(line))
+    end if
+
+    if (show_help) then
+       call glColor4f(0.0_c_float, 0.0_c_float, 0.05_c_float, 0.85_c_float)
+       call fill_rect(20.0, real(win_h) - 30.0 - real(K_NHELP * 15), 680.0, real(win_h) - 20.0)
+       call glColor3f(1.0_c_float, 1.0_c_float, 1.0_c_float)
+       do i = 1, K_NHELP
+          call draw_text(28.0, real(win_h) - 22.0 - real(i * 15), trim(HELP_LINES(i)))
+       end do
+    end if
+  end subroutine RenderOverlays
+
+  !> Visible-box count of the last query (quads in the vertex buffers).
+  integer(int64) function drawn_boxes(n_layers, layers)
+    integer, intent(in) :: n_layers
+    type(DrawnLayer), intent(in) :: layers(:)
+    integer :: i
+    drawn_boxes = 0
+    do i = 1, n_layers
+       if (layers(i)%visible) drawn_boxes = drawn_boxes + int(layers(i)%vbo_count, int64)
+    end do
+  end function drawn_boxes
+
+  subroutine set_all(layers, n, v)
+    type(DrawnLayer), intent(inout) :: layers(:)
+    integer, intent(in) :: n
+    logical, intent(in) :: v
+    integer :: i
+    do i = 1, n
+       layers(i)%visible = v
+    end do
+  end subroutine set_all
+
+  subroutine toggle_or_solo(layers, n, idx, solo)
+    type(DrawnLayer), intent(inout) :: layers(:)
+    integer, intent(in) :: n, idx
+    logical, intent(in) :: solo
+    if (idx < 1 .or. idx > n) return
+    if (solo) then
+       call set_all(layers, n, .false.)
+       layers(idx)%visible = .true.
+    else
+       layers(idx)%visible = .not. layers(idx)%visible
+    end if
+  end subroutine toggle_or_solo
+
+  logical function env_set(name, val)
+    character(len=*), intent(in) :: name
+    character(len=*), intent(out) :: val
+    integer :: l, st
+    val = ''
+    call get_environment_variable(name, val, l, st)
+    env_set = (st == 0 .and. l > 0)
+  end function env_set
 
   subroutine SimpleWindow(n_layers, layers, win_x_in, win_y_in)
     integer, intent(in)             :: n_layers
@@ -491,17 +911,21 @@ contains
     real, intent(in)                :: win_x_in, win_y_in
 
     type(Box)         :: mbr, current_view
-    type(GLFWwindow)  :: window
+    type(c_ptr)       :: window
     type(CameraState) :: cam
-    type(InputState)  :: inp
-    type(Point2D)     :: mouse_screen, mouse_world
+    type(Point2D)     :: mouse_screen, mouse_world, msv
 
-    integer :: ierr, idx, active_layer, target_depth, num_rows, col, r
+    integer :: ierr, idx, active_layer, target_depth, scroll, nrows_vis, bench_step, bench_n
     integer(c_int) :: live_win_x, live_win_y, prev_win_x, prev_win_y
-    integer(c_int) :: ui_width, main_width, top_h, bot_h
-    real(c_double) :: mbr_span, max_zoom, bw, bh
-    real(c_float), allocatable :: layer_colors(:,:)
-    logical :: tree_mode, dirty, should_quit, is_down, any_input
+    integer(c_int) :: ui_width, main_width, list_h, side, etype, code, mods, action
+    integer(c_int) :: win_w0, win_h0
+    real(c_double) :: mbr_span, max_zoom, ex, ey
+    real(real64)   :: tf0, tq0, tq, td0, td
+    logical :: tree_mode, dirty, should_quit, any_input, outlines, show_hud, show_help, in_view
+    logical :: bench, shot_pending, shift
+    character(len=512) :: shot_path, envv, keys_script
+    logical :: keys_pending
+    character(len=24)  :: bench_kind
     integer(K_COORDINATE_KIND) :: min_span
 
     if (n_layers <= 0) then
@@ -509,69 +933,90 @@ contains
        return
     end if
 
-    ui_width     = 200_c_int
+    ui_width     = K_UI_WIDTH
     active_layer = 1
     target_depth = 2
-    tree_mode    = .true.
+    tree_mode    = .false.
+    outlines     = .true.
+    show_hud     = .false.
+    show_help    = .false.
+    scroll       = 0
     prev_win_x   = -1_c_int
     prev_win_y   = -1_c_int
+    win_w0 = int(win_x_in, c_int); win_h0 = int(win_y_in, c_int)
+    if (env_set('MAGVIEWER_SIZE', envv)) then
+       idx = index(envv, 'x')
+       if (idx > 1) then
+          read(envv(1:idx-1), *, iostat=ierr) win_w0
+          read(envv(idx+1:), *, iostat=ierr) win_h0
+       end if
+    end if
+    bench = env_set('MAGVIEWER_BENCH', envv)
+    if (bench) bench = (envv(1:1) /= '0')
+    shot_pending = env_set('MAGVIEWER_SCREENSHOT', shot_path)
+    if (env_set('MAGVIEWER_HUD', envv)) show_hud = (envv(1:1) /= '0')
+    keys_pending = env_set('MAGVIEWER_KEYS', keys_script)
+    if (env_set('MAGVIEWER_HELP', envv)) show_help = (envv(1:1) /= '0')
+    bench_step = 0
+    bench_n = 57
 
-    ! O(1) global MBR aggregation from compressed index roots
+    ! Global MBR from the compressed index roots
     call mbr%reset_to_infinity()
     do idx = 1, n_layers
        if (associated(layers(idx)%index)) then
-          if (.not. layers(idx)%index%is_empty()) then
-             mbr = mbr + layers(idx)%index%layer_mbr
-          end if
+          if (.not. layers(idx)%index%is_empty()) mbr = mbr + layers(idx)%index%layer_mbr
        end if
     end do
     if (.not. mbr%is_valid()) then
        mbr%x1 = 0; mbr%y1 = 0; mbr%x2 = 1000; mbr%y2 = 1000
     else
-       mbr_span = max(real(mbr%x2 - mbr%x1, c_double), real(mbr%y2 - mbr%y1, c_double)) * 0.1_c_double
+       mbr_span = max(real(mbr%x2 - mbr%x1, c_double), real(mbr%y2 - mbr%y1, c_double)) * 0.02_c_double
        call box_grow(mbr, int(max(1.0_c_double, mbr_span), kind=K_COORDINATE_KIND), &
             int(max(1.0_c_double, mbr_span), kind=K_COORDINATE_KIND))
     end if
 
-    ! Dynamic palette supporting any number of layers
-    allocate(layer_colors(3, max(60, n_layers + 2)))
-    do idx = 1, size(layer_colors, 2)
-       layer_colors(1, idx) = 0.5_c_float + 0.5_c_float * sin(real(idx, c_float) * 0.3_c_float)
-       layer_colors(2, idx) = 0.5_c_float + 0.5_c_float * sin(real(idx, c_float) * 0.3_c_float + 2.09_c_float)
-       layer_colors(3, idx) = 0.5_c_float + 0.5_c_float * sin(real(idx, c_float) * 0.3_c_float + 4.18_c_float)
-    end do
+    ! Palette (golden-angle hues, saturated, readable on the dark background)
     do idx = 1, n_layers
-       layers(idx)%color       = layer_colors(:, idx)
+       layers(idx)%color(1) = 0.55_c_float + 0.45_c_float * sin(real(idx, c_float) * 2.39996_c_float)
+       layers(idx)%color(2) = 0.55_c_float + 0.45_c_float * sin(real(idx, c_float) * 2.39996_c_float + 2.09_c_float)
+       layers(idx)%color(3) = 0.55_c_float + 0.45_c_float * sin(real(idx, c_float) * 2.39996_c_float + 4.18_c_float)
        layers(idx)%visible     = .true.
        layers(idx)%cache_valid = .false.
        call layers(idx)%chunk_cache%init(K_CSI_DEFAULT_CACHE)
     end do
 
-    call glfwSetErrorCallback(handle_error)
-    call glfwInit(ierr)
-    if (ierr /= 0) error stop 'Error whilst initialising GLFW'
+    call viewer_glfw_errors()
+    if (glfwInit() == 0_c_int) error stop 'Error whilst initialising GLFW (is DISPLAY set?)'
+    call viewer_context_hints()
 
-    window = glfwCreateWindow(int(win_x_in, c_int), int(win_y_in, c_int), 'MAGVIEWER')
-    if (.not. associated(window)) then
+    window = glfwCreateWindow(win_w0, win_h0, 'MAGVIEWER - ' // trim(vstats%file) // c_null_char, &
+         c_null_ptr, c_null_ptr)
+    if (.not. c_associated(window)) then
        call glfwTerminate()
        error stop 'Error whilst creating GLFW window'
     end if
 
     call glfwMakeContextCurrent(window)
+    call viewer_input_install(window)
+    call viewer_text_set_font(FONT_BITS)
+    if (bench) call viewer_swap_interval(0_c_int)
     call glDisable(GL_DEPTH_TEST)
     call glEnable(GL_BLEND)
     call glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-    cam%win_w = max(1.0_c_double, real(win_x_in, c_double) - real(ui_width, c_double))
-    cam%win_h = max(1.0_c_double, real(win_y_in, c_double))
+    cam%win_w = max(1.0_c_double, real(win_w0, c_double) - real(ui_width, c_double))
+    cam%win_h = max(1.0_c_double, real(win_h0, c_double))
     call cam%fit_to_mbr(mbr)
     dirty = .true.
+    write(*,'(A)') 'INFO: MAGVIEWER window open; press ? in the window for the key map.'
 
-    do while (.not. glfwWindowShouldClose(window))
+    do while (glfwWindowShouldClose(window) == 0_c_int)
+       tf0 = wall_seconds()
        call glfwGetWindowSize(window, live_win_x, live_win_y)
        main_width  = max(1_c_int, live_win_x - ui_width)
-       bot_h       = live_win_y / 2_c_int
-       top_h       = live_win_y - bot_h
+       side        = max(1_c_int, min(ui_width, live_win_y / 3_c_int))
+       list_h      = max(K_HEADER_H + K_ROW_H, live_win_y - side)
+       nrows_vis   = int((list_h - K_HEADER_H) / K_ROW_H)
        any_input   = .false.
        should_quit = .false.
 
@@ -583,7 +1028,13 @@ contains
           dirty      = .true.
        end if
 
-       ! --- Keyboard navigation ---
+       call glfwGetCursorPos(window, mouse_screen%x, mouse_screen%y)
+       in_view = mouse_screen%x >= real(ui_width, c_double) .and. mouse_screen%x < real(live_win_x, c_double) &
+                 .and. mouse_screen%y >= 0.0_c_double .and. mouse_screen%y < real(live_win_y, c_double)
+       msv%x = mouse_screen%x - real(ui_width, c_double)
+       msv%y = mouse_screen%y
+
+       ! --- held keys: continuous pan / zoom ---
        if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) then
           cam%pan_y = cam%pan_y + 5.0_c_double * cam%zoom; dirty = .true.; any_input = .true.
        end if
@@ -605,81 +1056,123 @@ contains
           cam%zoom = max(1.0e-4_c_double, cam%zoom / 1.02_c_double); dirty = .true.; any_input = .true.
        end if
 
-       ! Edge-triggered toggles
-       is_down = (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
-       if (is_down .and. .not. inp%r_was_down) then
-          tree_mode = .not. tree_mode
-          dirty = .true.
-          write(*,'(A,L1)') 'MAGVIEWER: tree_mode = ', tree_mode
-       end if
-       inp%r_was_down = is_down
-
-       is_down = (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-       if (is_down .and. .not. inp%s_was_down) then
-          target_depth = max(0, target_depth - 1)
-          dirty = .true.
-          write(*,'(A,I0)') 'MAGVIEWER: target_depth = ', target_depth
-       end if
-       inp%s_was_down = is_down
-
-       is_down = (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
-       if (is_down .and. .not. inp%t_was_down) then
-          target_depth = target_depth + 1
-          dirty = .true.
-          write(*,'(A,I0)') 'MAGVIEWER: target_depth = ', target_depth
-       end if
-       inp%t_was_down = is_down
-
-       if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS .and. &
-           (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL)  == GLFW_PRESS .or. &
-            glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS)) then
-          call cam%fit_to_mbr(mbr)
-          dirty = .true.
+       ! --- scripted key presses (MAGVIEWER_KEYS) after the first frame, for tests ---
+       if (keys_pending .and. vstats%frames >= 1) then
+          ierr = viewer_input_script(keys_script, int(len_trim(keys_script), c_int))
+          keys_pending = .false.
        end if
 
-       if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) should_quit = .true.
+       ! --- discrete events from the C queue ---
+       do while (viewer_input_next(etype, code, mods, action, ex, ey) /= 0)
+          shift = iand(mods, GLFW_MOD_SHIFT) /= 0
+          select case (etype)
+          case (1)                                   ! key press / repeat
+             if (action /= 1 .and. .not. (code == GLFW_KEY_PAGE_UP .or. code == GLFW_KEY_PAGE_DOWN)) cycle
+             select case (code)
+             case (GLFW_KEY_ESCAPE, GLFW_KEY_Q)
+                should_quit = .true.
+             case (GLFW_KEY_F)
+                call cam%fit_to_mbr(mbr); dirty = .true.
+             case (GLFW_KEY_A)
+                if (iand(mods, GLFW_MOD_CONTROL) /= 0) then
+                   call cam%fit_to_mbr(mbr)
+                else
+                   call set_all(layers, n_layers, .true.)
+                end if
+                dirty = .true.
+             case (GLFW_KEY_R)
+                tree_mode = .not. tree_mode; dirty = .true.
+                write(*,'(A,L1)') 'MAGVIEWER: tree_mode = ', tree_mode
+             case (GLFW_KEY_S)
+                target_depth = max(0, target_depth - 1); dirty = .true.
+                write(*,'(A,I0)') 'MAGVIEWER: target_depth = ', target_depth
+             case (GLFW_KEY_T)
+                target_depth = target_depth + 1; dirty = .true.
+                write(*,'(A,I0)') 'MAGVIEWER: target_depth = ', target_depth
+             case (GLFW_KEY_O)
+                outlines = .not. outlines
+             case (GLFW_KEY_G)
+                show_hud = .not. show_hud
+             case (GLFW_KEY_H)
+                show_help = .not. show_help
+             case (GLFW_KEY_P)
+                call PrintPerfReport(n_layers, layers)
+             case (GLFW_KEY_PAGE_UP)
+                scroll = max(0, scroll - max(1, nrows_vis - 1))
+             case (GLFW_KEY_PAGE_DOWN)
+                scroll = max(0, min(n_layers - nrows_vis, scroll + max(1, nrows_vis - 1)))
+             case (GLFW_KEY_0:GLFW_KEY_9)
+                idx = code - GLFW_KEY_0
+                if (idx == 0) idx = 10
+                call toggle_or_solo(layers, n_layers, idx, shift)
+                active_layer = idx; dirty = .true.
+             end select
+          case (2)                                   ! character
+             if (code == iachar('?')) then
+                call PrintKeyMap()
+             else if (code == iachar('/')) then
+                if (in_view) then
+                   call cam%screen_to_world(msv, mouse_world)
+                   write(*,'(A,F14.4,A,F14.4,A,F16.1,A,F16.1,A)') 'MAGVIEWER: cursor x ', &
+                        mouse_world%x / vstats%unit_per_um, ' um  y ', mouse_world%y / vstats%unit_per_um, &
+                        ' um  (', mouse_world%x, ', ', mouse_world%y, ' dbu)'
+                end if
+             end if
+          case (3)                                   ! scroll wheel
+             if (ex >= real(ui_width, c_double)) then
+                call cam%zoom_about(merge(0.8_c_double, 1.25_c_double, code > 0), &
+                     ex - real(ui_width, c_double), ey)
+                dirty = .true.; any_input = .true.
+             else
+                scroll = max(0, min(max(0, n_layers - nrows_vis), scroll - 3 * code))
+             end if
+          case (4)                                   ! mouse button
+             if (code == GLFW_MOUSE_BUTTON_LEFT .and. action == 1 .and. ex < real(ui_width, c_double) &
+                 .and. ey < real(list_h, c_double)) then
+                if (ey < real(K_HEADER_H, c_double)) then
+                   call set_all(layers, n_layers, ex < 0.5_c_double * real(ui_width, c_double))
+                else
+                   idx = scroll + int((ey - real(K_HEADER_H, c_double)) / real(K_ROW_H, c_double)) + 1
+                   call toggle_or_solo(layers, n_layers, idx, shift)
+                   if (idx <= n_layers) active_layer = idx
+                end if
+                dirty = .true.
+             end if
+          end select
+       end do
        if (should_quit) exit
+
+       ! --- scripted benchmark path ---
+       if (bench) then
+          bench_step = bench_step + 1
+          ! fit, 8 zoom steps (x0.6) about a point inside a tile, 30 half-screen pans east,
+          ! 10 north, 8 zoom steps out
+          if (bench_step == 1) then
+             call cam%fit_to_mbr(mbr); bench_kind = 'fit'
+          else if (bench_step <= 9) then
+             call cam%zoom_about(0.6_c_double, 0.37_c_double * cam%win_w, 0.40_c_double * cam%win_h)
+             bench_kind = 'zoom_in'
+          else if (bench_step <= 39) then
+             cam%pan_x = cam%pan_x + 0.5_c_double * cam%win_w * cam%zoom; bench_kind = 'pan_x'
+          else if (bench_step <= 49) then
+             cam%pan_y = cam%pan_y + 0.5_c_double * cam%win_h * cam%zoom; bench_kind = 'pan_y'
+          else if (bench_step <= bench_n) then
+             call cam%zoom_about(1.0_c_double / 0.6_c_double, 0.5_c_double * cam%win_w, &
+                  0.5_c_double * cam%win_h)
+             bench_kind = 'zoom_out'
+          end if
+          dirty = .true.
+       end if
 
        max_zoom = max(1.0_c_double, &
             max(1.2_c_double * real(mbr%x2 - mbr%x1, c_double) / max(1.0_c_double, cam%win_w), &
                 1.2_c_double * real(mbr%y2 - mbr%y1, c_double) / max(1.0_c_double, cam%win_h)))
        if (cam%zoom > max_zoom) cam%zoom = max_zoom
        call cam%update_bounds()
+       call cam%screen_to_world(msv, mouse_world)
 
-       ! Mouse tracking
-       call glfwGetCursorPos(window, mouse_screen%x, mouse_screen%y)
-       is_down = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
-       if (is_down .and. .not. inp%mouse_was_down) then
-          if (mouse_screen%x < real(ui_width, c_double) .and. &
-              mouse_screen%y < real(top_h, c_double)) then
-             num_rows = max(12, (n_layers + 6) / 5)
-             bw = real(ui_width, c_double) / 5.0_c_double
-             bh = real(top_h, c_double) / real(num_rows, c_double)
-             col = int(mouse_screen%x / bw)
-             r   = int(mouse_screen%y / bh)
-             idx = r * 5 + col + 1
-             if (idx >= 1 .and. idx <= n_layers) then
-                active_layer = idx
-                layers(idx)%visible = .not. layers(idx)%visible
-             else if (idx == n_layers + 1) then
-                layers(1:n_layers)%visible = .false.
-             else if (idx == n_layers + 2) then
-                layers(1:n_layers)%visible = .true.
-             end if
-          end if
-       end if
-       inp%mouse_was_down = is_down
-
-       is_down = (glfwGetKey(window, GLFW_KEY_SLASH) == GLFW_PRESS)
-       if (is_down .and. .not. inp%slash_was_down) then
-          if (mouse_screen%x >= real(ui_width, c_double)) then
-             mouse_screen%x = mouse_screen%x - real(ui_width, c_double)
-             call cam%screen_to_world(mouse_screen, mouse_world)
-             write(*,'(A,F12.2,A,F12.2)') 'World X: ', mouse_world%x, ' | World Y: ', mouse_world%y
-          end if
-       end if
-       inp%slash_was_down = is_down
-
+       ! --- query (index -> vertex buffers) ---
+       tq0 = wall_seconds()
        current_view = cam%to_view_box()
        if (dirty) then
           call InvalidateLayerCaches(n_layers, layers)
@@ -687,39 +1180,80 @@ contains
        end if
        min_span = int(max(0.0_c_double, cam%zoom * 0.5_c_double), kind=K_COORDINATE_KIND)
        call UpdateVisibleLayerCaches(n_layers, layers, current_view, tree_mode, target_depth, min_span)
+       tq = since_ms(tq0)
+       vstats%boxes_drawn = drawn_boxes(n_layers, layers)
 
+       ! --- draw ---
+       td0 = wall_seconds()
        call glViewport(0_c_int, 0_c_int, live_win_x, live_win_y)
-       call glClearColor(0.2_c_float, 0.2_c_float, 0.2_c_float, 1.0_c_float)
+       call glClearColor(0.08_c_float, 0.08_c_float, 0.10_c_float, 1.0_c_float)
        call glClear(GL_COLOR_BUFFER_BIT)
+       call RenderMainViewport(n_layers, layers, ui_width, main_width, live_win_y, cam, tree_mode, outlines)
+       call RenderMinimap(mbr, current_view, ui_width, side)
+       call RenderLayerPanel(n_layers, layers, active_layer, scroll, ui_width, side, list_h)
+       call RenderOverlays(n_layers, layers, ui_width, main_width, live_win_y, cam, mouse_world, in_view, &
+            show_hud, show_help, tree_mode)
+       call viewer_finish()                         ! include GPU time in the draw figure
+       td = since_ms(td0)
 
-       call RenderMainViewport(n_layers, layers, ui_width, main_width, live_win_y, cam, tree_mode)
-       call RenderMinimap(mbr, current_view, ui_width, bot_h)
-       call RenderLayerPanel(n_layers, layers, layer_colors, active_layer, ui_width, bot_h, top_h)
+       call record_frame(since_ms(tf0), tq, td)
+       if (vstats%first_frame_s < 0.0_real64) then
+          vstats%first_frame_s = wall_seconds() - real(vstats%t0_ticks, real64) / clock_rate_r()
+          write(*,'(A,F9.3,A,F9.2,A,F9.2,A,I0)') 'PERF: first frame ', vstats%first_frame_s, &
+               ' s after start (query ', tq, ' ms, draw ', td, ' ms, boxes ', vstats%boxes_drawn
+       end if
+       if (bench .and. bench_step <= bench_n) then
+          write(*,'(A,I3,1X,A10,A,F10.3,A,F10.3,A,I10,A,ES10.3)') 'BENCH step ', bench_step, bench_kind, &
+               ' query_ms ', tq, ' draw_ms ', td, ' boxes ', vstats%boxes_drawn, ' um_per_px ', &
+               cam%zoom / vstats%unit_per_um
+       end if
 
+       if (shot_pending .and. .not. keys_pending .and. ((.not. bench .and. vstats%frames >= 3) .or. (bench .and. bench_step >= bench_n))) then
+          if (viewer_screenshot_ppm(trim(shot_path) // c_null_char, live_win_x, live_win_y) == 0) then
+             write(*,'(A,A)') 'INFO: screenshot written to ', trim(shot_path)
+          else
+             write(*,'(A,A)') 'ERROR: screenshot failed: ', trim(shot_path)
+          end if
+          shot_pending = .false.
+          should_quit = .true.
+       end if
        call glfwSwapBuffers(window)
-       if (any_input) then
+       if (bench .and. bench_step >= bench_n) then
+          call PrintPerfReport(n_layers, layers)
+          should_quit = .true.
+       end if
+       if (should_quit) exit
+
+       if (any_input .or. bench) then
           call glfwPollEvents()
        else
-          call glfwWaitEventsTimeout(0.016_c_double)
+          call glfwWaitEventsTimeout(0.05_c_double)
        end if
     end do
 
     do idx = 1, n_layers
        call layers(idx)%destroy()
     end do
-    if (allocated(layer_colors)) deallocate(layer_colors)
     call glfwDestroyWindow(window)
     call glfwTerminate()
   end subroutine SimpleWindow
+
+  real(real64) function clock_rate_r()
+    integer(int64) :: r
+    call system_clock(count_rate=r)
+    clock_rate_r = real(max(1_int64, r), real64)
+  end function clock_rate_r
 
 end module DrawUsingOpenGL
 
 program magviewer
   use, intrinsic :: iso_fortran_env, only: int64, real64
   use, intrinsic :: iso_c_binding,   only: c_int
-  use DrawUsingOpenGL,              only: DrawnLayer, SimpleWindow, UpdateVisibleLayerCaches, K_MAX_OPENGL_CAPACITY
+  use, intrinsic :: iso_c_binding,   only: c_ptr, c_char, c_null_char, c_associated, c_int64_t, c_double, c_size_t
+  use DrawUsingOpenGL,              only: DrawnLayer, SimpleWindow, UpdateVisibleLayerCaches, K_MAX_OPENGL_CAPACITY, &
+                                          vstats, PrintKeyMap, wall_seconds
   use CompressedSpatialIndexModule, only: CompressedSpatialIndex, K_CSI_DEFAULT_CACHE
-  use LayoutDBLoaderModule,         only: LoadLayoutDBToCompressedIndex
+  use LayoutDBLoaderModule,         only: LoadLayoutDBToCompressedIndex, viewer_last_read_s, viewer_last_index_s
   use DesignModule,                 only: Design, Layer, DESIGN_DIRECTION_INPUT, RestoreSnapToLayer, &
                                           ClearLayer, DeleteDesign
   use GeometryModule,               only: Box
@@ -729,6 +1263,47 @@ program magviewer
   use SystemInformationModule,      only: ReadProcessMemoryUsage
   implicit none
 
+  interface   ! db/oasis_tables.cpp: table-only open of OASIS files
+     type(c_ptr) function ldb_oas_info_open(path, err, errn) bind(C, name='ldb_oas_info_open')
+       import :: c_ptr, c_char, c_size_t
+       character(kind=c_char), intent(in) :: path(*)
+       character(kind=c_char), intent(out) :: err(*)
+       integer(c_size_t), value :: errn
+     end function ldb_oas_info_open
+     subroutine ldb_oas_info_close(info) bind(C, name='ldb_oas_info_close')
+       import :: c_ptr
+       type(c_ptr), value :: info
+     end subroutine ldb_oas_info_close
+     integer(c_int) function ldb_oas_info_strict(info) bind(C, name='ldb_oas_info_strict')
+       import :: c_ptr, c_int
+       type(c_ptr), value :: info
+     end function ldb_oas_info_strict
+     real(c_double) function ldb_oas_info_unit(info) bind(C, name='ldb_oas_info_unit')
+       import :: c_ptr, c_double
+       type(c_ptr), value :: info
+     end function ldb_oas_info_unit
+     real(c_double) function ldb_oas_info_open_ms(info) bind(C, name='ldb_oas_info_open_ms')
+       import :: c_ptr, c_double
+       type(c_ptr), value :: info
+     end function ldb_oas_info_open_ms
+     integer(c_int) function ldb_oas_info_n_layernames(info) bind(C, name='ldb_oas_info_n_layernames')
+       import :: c_ptr, c_int
+       type(c_ptr), value :: info
+     end function ldb_oas_info_n_layernames
+     integer(c_int) function ldb_oas_info_layer_name(info, l, d, name, n) bind(C, name='ldb_oas_info_layer_name')
+       import :: c_ptr, c_int, c_char
+       type(c_ptr), value :: info
+       integer(c_int), value :: l, d, n
+       character(kind=c_char), intent(out) :: name(*)
+     end function ldb_oas_info_layer_name
+     integer(c_int) function ldb_oas_info_top(info, name, n) bind(C, name='ldb_oas_info_top')
+       import :: c_ptr, c_int, c_char
+       type(c_ptr), value :: info
+       integer(c_int), value :: n
+       character(kind=c_char), intent(out) :: name(*)
+     end function ldb_oas_info_top
+  end interface
+
   integer :: narg, iarg, ios, extpos, j, ch, max_layers, num_layers, i
   integer(int64) :: total_boxes, total_tree_b, total_chunk_b, total_comp_b, total_uncomp_b
   integer(int64) :: vm_kb, rss_kb, t_start, t_end, clock_rate
@@ -737,6 +1312,11 @@ program magviewer
   character(len=512) :: arg, filename
   character(len=16)  :: fext
   logical :: is_layoutdb, is_single_layer, use_hier, headless_info
+  type(c_ptr) :: oinfo
+  character(kind=c_char, len=256) :: cbuf
+  character(len=256) :: lname, topname
+  integer :: ll, dd, k, nlname
+  real(real64) :: t_tab
   type(Design), target :: load_design
   type(Layer),  target :: single_layer
   type(CompressedSpatialIndex), allocatable, target :: indices(:)
@@ -746,11 +1326,12 @@ program magviewer
   integer(K_COORDINATE_KIND) :: cx, cy, qw, qh, min_span
 
   call system_clock(count_rate=clock_rate)
+  call system_clock(count=vstats%t0_ticks)
 
   narg = command_argument_count()
   if (narg < 1) then
      write(*,'(A)') 'Usage: MAGVIEWER.exe <layout.mag|layout.gds|layout.oas|layer.bin|layer.snap> ' // &
-          '[max_layers] [--hier] [--info|--headless]'
+          '[max_layers] [--hier] [--info|--headless] [--keys]'
      stop 1
   end if
 
@@ -767,6 +1348,9 @@ program magviewer
         use_hier = .true.
      case ('--info', '--headless')
         headless_info = .true.
+     case ('--keys', '-?', '--help')
+        call PrintKeyMap()
+        stop 0
      case default
         if (len_trim(filename) == 0) then
            filename = trim(arg)
@@ -799,6 +1383,31 @@ program magviewer
   is_single_layer = (trim(fext) == 'bin' .or. trim(fext) == 'snap' .or. trim(fext) == 'snaz') &
                     .or. ((.not. is_layoutdb) .and. max_layers == 1)
 
+  vstats%file = trim(filename)
+  vstats%format = trim(fext)
+  oinfo = transfer(0_c_int64_t, oinfo)
+  nlname = 0
+  if (trim(fext) == 'oas' .or. trim(fext) == 'oasis') then
+     vstats%format = 'OASIS'
+     t_tab = wall_seconds()
+     oinfo = ldb_oas_info_open(trim(filename) // c_null_char, cbuf, int(len(cbuf), c_size_t))
+     if (c_associated(oinfo)) then
+        vstats%strict      = ldb_oas_info_strict(oinfo)
+        vstats%tables_ms   = ldb_oas_info_open_ms(oinfo)
+        if (ldb_oas_info_unit(oinfo) > 0.0_c_double) vstats%unit_per_um = ldb_oas_info_unit(oinfo)
+        nlname = ldb_oas_info_n_layernames(oinfo)
+        topname = ''
+        if (ldb_oas_info_top(oinfo, cbuf, int(len(cbuf), c_int)) /= 0) topname = cstr(cbuf)
+        write(*,'(A,I0,A,A,A,I0,A,F10.3,A,F8.1)') 'INFO: OASIS tables: strict=', vstats%strict, ' top=', &
+             trim(topname), ' layernames=', nlname, ' read in ', vstats%tables_ms, ' ms, unit/um=', &
+             vstats%unit_per_um
+     end if
+  else if (is_layoutdb) then
+     vstats%format = 'GDSII'
+  else if (.not. is_single_layer) then
+     vstats%format = 'Magic'
+  end if
+
   call system_clock(count=t_start)
   call global_mbr%reset_to_infinity()
 
@@ -820,6 +1429,8 @@ program magviewer
      end if
      call LoadLayoutDBToCompressedIndex(trim(filename), max_layers, use_hier, &
           indices, layer_names, num_layers, global_mbr)
+     vstats%read_s  = viewer_last_read_s
+     vstats%index_s = viewer_last_index_s
   else
      if (allocated(load_design%fileName)) deallocate(load_design%fileName)
      allocate(character(len=len_trim(filename)) :: load_design%fileName)
@@ -855,6 +1466,17 @@ program magviewer
   allocate(drawn_layers(max(1, num_layers)))
   do i = 1, num_layers
      drawn_layers(i)%name    = trim(layer_names(i))
+     drawn_layers(i)%label   = trim(layer_names(i))
+     ! Layer label: OASIS LAYERNAME when present, else layer/datatype (from names like L67_D20).
+     if (parse_ld(layer_names(i), ll, dd)) then
+        lname = ''
+        if (c_associated(oinfo)) then
+           if (ldb_oas_info_layer_name(oinfo, int(ll, c_int), int(dd, c_int), cbuf, int(len(cbuf), c_int)) /= 0) &
+                lname = cstr(cbuf)
+        end if
+        write(drawn_layers(i)%label, '(I0,A,I0)') ll, '/', dd
+        if (len_trim(lname) > 0) drawn_layers(i)%label = trim(lname) // '  ' // trim(drawn_layers(i)%label)
+     end if
      drawn_layers(i)%index   => indices(i)
      drawn_layers(i)%visible = .true.
      if (.not. indices(i)%is_empty()) then
@@ -952,9 +1574,54 @@ program magviewer
      stop 0
   end if
 
+  if (c_associated(oinfo)) call ldb_oas_info_close(oinfo)
+  vstats%load_s = t_load_s
+  if (vstats%read_s <= 0.0_real64) vstats%read_s = t_load_s
+  vstats%total_boxes = total_boxes
+  vstats%index_mb = real(total_comp_b, real64) / 1048576.0_real64
+  write(*,'(A)') 'INFO: layers:'
+  do i = 1, num_layers
+     write(*,'(A,I4,2X,A)') '  ', i, trim(drawn_layers(i)%label)
+  end do
+
   call SimpleWindow(num_layers, drawn_layers, 1600.0, 900.0)
 
   do i = 1, num_layers
      call indices(i)%destroy()
   end do
+
+contains
+
+  !> Layer and datatype from a loader layer name such as "L67_D20" (or "67/20", "67:20").
+  logical function parse_ld(nm, l, d)
+    character(len=*), intent(in) :: nm
+    integer, intent(out) :: l, d
+    integer :: p, q, ios
+    character(len=64) :: t
+    parse_ld = .false.; l = -1; d = -1
+    t = adjustl(nm)
+    if (t(1:1) == 'L') then
+       p = index(t, '_D')
+       if (p <= 2) return
+       read(t(2:p-1), *, iostat=ios) l; if (ios /= 0) return
+       read(t(p+2:), *, iostat=ios) d; if (ios /= 0) return
+    else
+       q = scan(t, '/:')
+       if (q <= 1) return
+       read(t(1:q-1), *, iostat=ios) l; if (ios /= 0) return
+       read(t(q+1:), *, iostat=ios) d; if (ios /= 0) return
+    end if
+    parse_ld = (l >= 0 .and. d >= 0)
+  end function parse_ld
+
+  function cstr(c) result(f)
+    character(kind=c_char, len=*), intent(in) :: c
+    character(len=len(c)) :: f
+    integer :: z
+    z = index(c, c_null_char)
+    f = ''
+    if (z > 1) f = c(1:z-1)
+    if (z == 0) f = c
+  end function cstr
+
 end program magviewer
