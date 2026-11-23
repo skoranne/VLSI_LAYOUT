@@ -20,7 +20,7 @@ module RTreeBuilderGPU
   public :: prep_boxes, prep_nodes, prep_i64, prep_i8, prep_logical
   public :: gpu_offload_enabled, ComputeInteractionsGPU, CertifyHealingGPU, &
        ComputeANDPairsCountGPU, ComputeANDPairsFillGPU, ComputeANDPairsGPU, &
-       ComputeTopoSelectGPU, ComputeMergeEdgesGPU
+       ComputeTopoSelectGPU, ComputeMergeEdgesGPU, ComputeNOTGPU
 
   integer, parameter :: K_MAX_TREE_DEPTH = 1024
   integer(kind=int64), parameter, public :: K_GPU_MIN_BOXES = 4096_int64
@@ -29,6 +29,10 @@ module RTreeBuilderGPU
   !> children needs at most 1 + 15*L slots for L internal levels. 160 covers L <= 10, i.e.
   !> 16^10 leaves (> 10^13 boxes). Kernels still guard every push and raise an overflow flag.
   integer(kind=int32), parameter, public :: K_GPU_DFS_STACK = 160_int32
+  !> Per-thread fragment capacity of the GPU NOT kernel (ping-pong, 2 x K x 4 int32 coords).
+  !> A box of A whose remainder needs more fragments (or a deeper DFS) is flagged and
+  !> recomputed on the CPU, so the cap only trades GPU coverage for register/local pressure.
+  integer(kind=int32), parameter, public :: K_GPU_NOT_FRAGS = 32_int32
 
 
 contains
@@ -1035,6 +1039,242 @@ contains
     !$omp end target data
     deallocate(Counts, Offsets)
   end subroutine ComputeANDPairsGPU
+
+  !> GPU NOT (A minus B): one thread per box of A walks B's R-tree in exactly the order of the
+  !> CPU path in CalculateNOT (pop top, push children in index order, leaves scanned in index
+  !> order) and applies the same 4-way split, so every A box yields the identical fragment list
+  !> on both paths.  Two passes over one kernel body (NotKernelPass): count, Thrust exclusive
+  !> scan of the counts on the device, fill.  Boxes whose remainder needs more than
+  !> K_GPU_NOT_FRAGS fragments or whose DFS exceeds K_GPU_DFS_STACK are not dropped: they are
+  !> returned in Fallback(1:NumFallback) for the caller to recompute on the CPU.
+  !> Status /= 0 means the GPU path failed as a whole (allocation / scan) -> CPU path.
+  subroutine ComputeNOTGPU(TreeNodes, NumNodes, SortedBoxesB, NumBoxesB, RootIndex, &
+       BoxesA, NumBoxesA, OutBoxes, OutCount, Fallback, NumFallback, Status)
+    integer(kind=int64), intent(in) :: NumNodes, NumBoxesB, NumBoxesA, RootIndex
+    type(RTreeNode), intent(in)     :: TreeNodes(NumNodes)
+    type(Box), intent(in)           :: SortedBoxesB(NumBoxesB)
+    type(Box), intent(in)           :: BoxesA(NumBoxesA)
+    type(Box), allocatable, intent(out) :: OutBoxes(:)
+    integer(kind=int64), intent(out) :: OutCount
+    integer(kind=int64), allocatable, intent(out) :: Fallback(:)
+    integer(kind=int64), intent(out) :: NumFallback
+    integer(kind=int32), intent(out) :: Status
+
+    integer(kind=int64), allocatable, target :: Counts(:), Offsets(:)
+    integer(kind=int8), allocatable :: Flags(:)
+    type(Box) :: Dummy(1)
+    integer(kind=int64) :: I, K
+    integer :: alloc_status
+    integer(c_int32_t) :: scan_rc
+
+    OutCount = 0_int64
+    NumFallback = 0_int64
+    Status = 0_int32
+    if (NumBoxesA <= 0 .or. NumBoxesB <= 0 .or. NumNodes <= 0 .or. RootIndex <= 0) then
+       Status = 1_int32
+       allocate(OutBoxes(0), Fallback(0))
+       return
+    end if
+    allocate(Counts(NumBoxesA), Offsets(NumBoxesA), Flags(NumBoxesA), stat=alloc_status)
+    if (alloc_status /= 0) then
+       Status = 2_int32
+       allocate(OutBoxes(0), Fallback(0))
+       return
+    end if
+    call first_touch_i8(Flags, NumBoxesA)
+
+    call prep_nodes(TreeNodes, NumNodes); call prep_boxes(SortedBoxesB, NumBoxesB); call prep_boxes(BoxesA, NumBoxesA)
+    call prep_i64(Counts, NumBoxesA); call prep_i64(Offsets, NumBoxesA); call prep_i8(Flags, NumBoxesA)
+    !$omp target data map(to: TreeNodes(1:NumNodes), SortedBoxesB(1:NumBoxesB), BoxesA(1:NumBoxesA)) &
+    !$omp map(alloc: Counts(1:NumBoxesA), Offsets(1:NumBoxesA), Flags(1:NumBoxesA))
+
+    call NotKernelPass(1, TreeNodes, NumNodes, SortedBoxesB, NumBoxesB, RootIndex, BoxesA, NumBoxesA, &
+         Counts, Offsets, Flags, Dummy, 1_int64)
+    !$omp target update from(Flags(1:NumBoxesA))
+
+    !$omp target data use_device_addr(Counts, Offsets)
+    scan_rc = thrust_exclusive_scan_i64(c_loc(Counts(1)), c_loc(Offsets(1)), NumBoxesA, OutCount)
+    !$omp end target data
+    if (scan_rc /= 0_c_int32_t) then
+       Status = 3_int32
+       OutCount = 0_int64
+       allocate(OutBoxes(0))
+    else
+       allocate(OutBoxes(max(OutCount, 1_int64)), stat=alloc_status)
+       if (alloc_status /= 0) then
+          Status = 4_int32
+          OutCount = 0_int64
+          allocate(OutBoxes(0))
+       else if (OutCount > 0_int64) then
+          call first_touch_boxes(OutBoxes, OutCount)
+          call prep_boxes(OutBoxes, OutCount)
+          !$omp target data map(from: OutBoxes(1:OutCount))
+          call NotKernelPass(2, TreeNodes, NumNodes, SortedBoxesB, NumBoxesB, RootIndex, BoxesA, NumBoxesA, &
+               Counts, Offsets, Flags, OutBoxes, OutCount)
+          !$omp end target data
+       end if
+    end if
+    !$omp end target data
+
+    if (Status == 0_int32) then
+       NumFallback = count(Flags /= 0_int8, kind=int64)
+       allocate(Fallback(NumFallback))
+       if (NumFallback > 0) then
+          K = 0
+          do I = 1, NumBoxesA
+             if (Flags(I) /= 0_int8) then
+                K = K + 1
+                Fallback(K) = I
+             end if
+          end do
+       end if
+    else
+       allocate(Fallback(0))
+    end if
+    deallocate(Counts, Offsets, Flags)
+  end subroutine ComputeNOTGPU
+
+  !> Kernel body shared by both NOT passes.  Mode 1: Counts(I) = #fragments (Flags(I)=1 and
+  !> Counts(I)=0 on fragment/stack overflow).  Mode 2: write fragments at Offsets(I)+1...
+  !> All arrays are already present on the device (enclosing target data in ComputeNOTGPU).
+  subroutine NotKernelPass(Mode, TreeNodes, NumNodes, SortedBoxesB, NumBoxesB, RootIndex, &
+       BoxesA, NumBoxesA, Counts, Offsets, Flags, OutBoxes, OutCap)
+    integer, intent(in) :: Mode
+    integer(kind=int64), intent(in) :: NumNodes, NumBoxesB, NumBoxesA, RootIndex, OutCap
+    type(RTreeNode), intent(in)     :: TreeNodes(NumNodes)
+    type(Box), intent(in)           :: SortedBoxesB(NumBoxesB)
+    type(Box), intent(in)           :: BoxesA(NumBoxesA)
+    integer(kind=int64), intent(inout) :: Counts(NumBoxesA), Offsets(NumBoxesA)
+    integer(kind=int8), intent(inout)  :: Flags(NumBoxesA)
+    type(Box), intent(inout)        :: OutBoxes(OutCap)
+
+    integer(kind=int64) :: I, J, ChildIdx, CurrNode, CEnd, W
+    integer(kind=int32) :: Stack(K_GPU_DFS_STACK), StackPtr
+    integer(kind=K_COORDINATE_KIND) :: FX1(K_GPU_NOT_FRAGS,2), FY1(K_GPU_NOT_FRAGS,2), &
+         FX2(K_GPU_NOT_FRAGS,2), FY2(K_GPU_NOT_FRAGS,2)
+    integer(kind=K_COORDINATE_KIND) :: rx1, ry1, rx2, ry2, fx1s, fy1s, fx2s, fy2s, ix1, iy1, ix2, iy2
+    integer(kind=int32) :: nf, nn, sb, db, idx
+    logical :: ovf, done
+    type(Box) :: QBox, NodeMbr, TargetBox
+
+    !$omp target teams distribute parallel do &
+    !$omp private(I,J,ChildIdx,CurrNode,CEnd,W,Stack,StackPtr,FX1,FY1,FX2,FY2, &
+    !$omp         rx1,ry1,rx2,ry2,fx1s,fy1s,fx2s,fy2s,ix1,iy1,ix2,iy2,nf,nn,sb,db,idx,ovf,done, &
+    !$omp         QBox,NodeMbr,TargetBox)
+    do I = 1, NumBoxesA
+       if (Mode == 2) then
+          if (Flags(I) /= 0_int8 .or. Counts(I) == 0_int64) cycle
+       end if
+       QBox = BoxesA(I)
+       ovf = .false.
+       nf = 1_int32
+       sb = 1_int32
+       FX1(1,1) = QBox%X1; FY1(1,1) = QBox%Y1; FX2(1,1) = QBox%X2; FY2(1,1) = QBox%Y2
+       NodeMbr = TreeNodes(RootIndex)%Mbr
+       !> same quick-accept test as the CPU path (boxes merely touching B's root MBR are kept)
+       if (.not. (QBox%X1 >= NodeMbr%X2 .or. QBox%X2 <= NodeMbr%X1 .or. &
+                  QBox%Y1 >= NodeMbr%Y2 .or. QBox%Y2 <= NodeMbr%Y1)) then
+          rx1 = QBox%X1; ry1 = QBox%Y1; rx2 = QBox%X2; ry2 = QBox%Y2
+          StackPtr = 1_int32
+          Stack(1) = int(RootIndex, kind=int32)
+          done = .false.
+          do while (StackPtr > 0_int32 .and. .not. done)
+             CurrNode = int(Stack(StackPtr), kind=int64)
+             StackPtr = StackPtr - 1_int32
+             if (TreeNodes(CurrNode)%IsLeaf) then
+                CEnd = min(TreeNodes(CurrNode)%ChildStart + int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64, &
+                     NumBoxesB)
+                do J = TreeNodes(CurrNode)%ChildStart, CEnd
+                   TargetBox = SortedBoxesB(J)
+                   if (rx1 < TargetBox%X2 .and. rx2 > TargetBox%X1 .and. &
+                       ry1 < TargetBox%Y2 .and. ry2 > TargetBox%Y1) then
+                      db = 3_int32 - sb
+                      nn = 0_int32
+                      do idx = 1_int32, nf
+                         fx1s = FX1(idx,sb); fy1s = FY1(idx,sb); fx2s = FX2(idx,sb); fy2s = FY2(idx,sb)
+                         if (fx1s >= TargetBox%X2 .or. fx2s <= TargetBox%X1 .or. &
+                             fy1s >= TargetBox%Y2 .or. fy2s <= TargetBox%Y1) then
+                            if (nn >= K_GPU_NOT_FRAGS) then
+                               ovf = .true.; exit
+                            end if
+                            nn = nn + 1_int32
+                            FX1(nn,db) = fx1s; FY1(nn,db) = fy1s; FX2(nn,db) = fx2s; FY2(nn,db) = fy2s
+                         else
+                            if (nn + 4_int32 > K_GPU_NOT_FRAGS) then
+                               ovf = .true.; exit
+                            end if
+                            ix1 = max(fx1s, TargetBox%X1); iy1 = max(fy1s, TargetBox%Y1)
+                            ix2 = min(fx2s, TargetBox%X2); iy2 = min(fy2s, TargetBox%Y2)
+                            if (fx1s < ix1) then
+                               nn = nn + 1_int32
+                               FX1(nn,db) = fx1s; FY1(nn,db) = fy1s; FX2(nn,db) = ix1; FY2(nn,db) = fy2s
+                            end if
+                            if (fx2s > ix2) then
+                               nn = nn + 1_int32
+                               FX1(nn,db) = ix2; FY1(nn,db) = fy1s; FX2(nn,db) = fx2s; FY2(nn,db) = fy2s
+                            end if
+                            if (fy1s < iy1) then
+                               nn = nn + 1_int32
+                               FX1(nn,db) = ix1; FY1(nn,db) = fy1s; FX2(nn,db) = ix2; FY2(nn,db) = iy1
+                            end if
+                            if (fy2s > iy2) then
+                               nn = nn + 1_int32
+                               FX1(nn,db) = ix1; FY1(nn,db) = iy2; FX2(nn,db) = ix2; FY2(nn,db) = fy2s
+                            end if
+                         end if
+                      end do
+                      if (ovf) then
+                         done = .true.; exit
+                      end if
+                      nf = nn
+                      sb = db
+                      if (nf == 0_int32) then
+                         done = .true.; exit
+                      end if
+                      rx1 = FX1(1,sb); ry1 = FY1(1,sb); rx2 = FX2(1,sb); ry2 = FY2(1,sb)
+                      do idx = 2_int32, nf
+                         if (FX1(idx,sb) < rx1) rx1 = FX1(idx,sb)
+                         if (FY1(idx,sb) < ry1) ry1 = FY1(idx,sb)
+                         if (FX2(idx,sb) > rx2) rx2 = FX2(idx,sb)
+                         if (FY2(idx,sb) > ry2) ry2 = FY2(idx,sb)
+                      end do
+                   end if
+                end do
+             else
+                CEnd = TreeNodes(CurrNode)%ChildStart + int(TreeNodes(CurrNode)%NumChildren, kind=int64) - 1_int64
+                do ChildIdx = TreeNodes(CurrNode)%ChildStart, CEnd
+                   NodeMbr = TreeNodes(ChildIdx)%Mbr
+                   if (rx1 < NodeMbr%X2 .and. rx2 > NodeMbr%X1 .and. &
+                       ry1 < NodeMbr%Y2 .and. ry2 > NodeMbr%Y1) then
+                      if (StackPtr >= K_GPU_DFS_STACK) then
+                         ovf = .true.; done = .true.; exit
+                      end if
+                      StackPtr = StackPtr + 1_int32
+                      Stack(StackPtr) = int(ChildIdx, kind=int32)
+                   end if
+                end do
+             end if
+          end do
+       end if
+       if (Mode == 1) then
+          if (ovf) then
+             Flags(I) = 1_int8
+             Counts(I) = 0_int64
+          else
+             Flags(I) = 0_int8
+             Counts(I) = int(nf, kind=int64)
+          end if
+       else
+          W = Offsets(I)
+          do idx = 1_int32, nf
+             if (W + idx <= OutCap) then
+                OutBoxes(W + idx)%X1 = FX1(idx,sb); OutBoxes(W + idx)%Y1 = FY1(idx,sb)
+                OutBoxes(W + idx)%X2 = FX2(idx,sb); OutBoxes(W + idx)%Y2 = FY2(idx,sb)
+             end if
+          end do
+       end if
+    end do
+  end subroutine NotKernelPass
 
   !> Single-pass GPU topological selection for all 10 K_TOPO_* predicates.
   !> Produces int8 KeepMask(1:NumBoxesA) with zero atomics and exact CPU parity.

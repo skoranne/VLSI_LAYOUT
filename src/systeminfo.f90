@@ -49,7 +49,16 @@ contains
   end subroutine InitSystem
 
   subroutine StartMarkTime(checkpointName)
+    use, intrinsic :: iso_fortran_env, only: output_unit
     character(len=*), intent(in) :: checkpointName
+    integer :: evlen, evstat
+    !> MAGPARSER_PHASE_TIMERS: announce the op before it runs, flushed, so a crash or
+    !> watchdog kill shows which op was active (stdout is block-buffered when redirected).
+    call get_environment_variable('MAGPARSER_PHASE_TIMERS', length=evlen, status=evstat)
+    if (evstat == 0 .and. evlen > 0) then
+       write(*,'(A,A)') 'MARK_BEGIN ', trim(checkpointName)
+       flush(output_unit)
+    end if
     call cpu_time(t1)
     call system_clock(count=start_tick)
   end subroutine StartMarkTime

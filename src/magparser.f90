@@ -310,7 +310,10 @@ contains
 100 continue ! this is end of file
     close(10)
     nullify(boxes)
-    NUM_LAYERS = hash_nitems( load_design%ht )
+    !> The hash holds every layer *name* seen in the file, including sections skipped
+    !> because they exceed MAX_LAYERS; only layers(1:MAX_LAYERS) exist.  Indexing past
+    !> that read garbage Layer records (huge n_used -> multi-GB GPU sort -> system OOM).
+    NUM_LAYERS = min( hash_nitems( load_design%ht ), MAX_LAYERS )
     ! Print parsed results
     write(*,*) 'Parsed ', hash_nitems(ht), ' layer(s).'
     call StopMarkTime("ReadDB")
@@ -530,7 +533,7 @@ contains
     end if
     deleted_layer_count = 0
     if( .not. allocated( load_design%layers ) ) return !> we have already flushed this db
-    do i=1,hash_nitems( load_design%ht)
+    do i=1,min( hash_nitems( load_design%ht), size( load_design%layers ) ) !> skipped sections have no layers(i)
        associate( resolved_layer => load_design%layers(i) )
          if( resolved_layer%n_used == 0 ) cycle
          !> Lets just assume we are writing in KLBIN

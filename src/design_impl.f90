@@ -16,7 +16,7 @@ submodule (DesignModule) DesignImplModule
    use PNumMergeModule
    use KLDataModule
    use BoostPolygonAPIModule
-   use ProfilerModule, only: get_cpu_time, RecordTime
+   use ProfilerModule, only: get_cpu_time, RecordTime, PhaseBegin, PhaseEnd
    use omp_lib
    implicit none
 
@@ -1080,6 +1080,58 @@ contains
         call CalculateNOT( input_layer_A, input_layer_B, output_layer )
         return
      end if
+     !> Experimental (MAGPARSER_XOR_VIA_NOT=1): A ^ B = (A - B) u (B - A).  The two parts have
+     !> disjoint interiors and each is non-overlapping, so concatenation is a healed layer; both
+     !> NOTs take the GPU path (ComputeNOTGPU) instead of the serial Boost sweep.  The box
+     !> decomposition differs from Boost's (same region/area), so digests differ from '^'.
+     !> Experimental (MAGPARSER_OR_VIA_NOT=1): A + B = A u (B - A); A (healed by PreprocessLayer
+     !> inside CalculateNOT) and B - A have disjoint interiors, so concatenation is healed.
+     if( control_parameter == K_BOOST_CONTROL_OR .and. env_flag_set('MAGPARSER_OR_VIA_NOT') ) then
+        block
+          type(Layer) :: bma
+          integer(kind=int64) :: na2, nb2
+          real(kind=real64) :: tp
+          tp = PhaseBegin('or.via_not')
+          call CalculateNOT( input_layer_B, input_layer_A, bma )   !> also preprocesses (heals) A
+          na2 = input_layer_A%n_used
+          nb2 = bma%n_used
+          !> build in a temporary first: the LHS may be the same layer as A
+          allocate( result_boxes( na2 + nb2 ) )
+          if( na2 > 0 ) result_boxes(1:na2) = input_layer_A%layer_boxes(1:na2)
+          if( nb2 > 0 ) result_boxes(na2+1:na2+nb2) = bma%layer_boxes(1:nb2)
+          call ClearLayer( bma )
+          call ClearLayer( output_layer )
+          call move_alloc( from=result_boxes, to=output_layer%layer_boxes )
+          output_layer%n_used = na2 + nb2
+          output_layer%n_alloc = na2 + nb2
+          output_layer%layerState = LAYER_STATE_HEAL
+          call PhaseEnd('or.via_not', tp, na2 + nb2)
+        end block
+        return
+     end if
+     if( control_parameter == K_BOOST_CONTROL_XOR .and. xor_via_not_enabled() ) then
+        block
+          type(Layer) :: amb, bma
+          integer(kind=int64) :: na2, nb2
+          real(kind=real64) :: tp
+          tp = PhaseBegin('xor.via_not')
+          call CalculateNOT( input_layer_A, input_layer_B, amb )
+          call CalculateNOT( input_layer_B, input_layer_A, bma )
+          na2 = amb%n_used
+          nb2 = bma%n_used
+          call ClearLayer( output_layer )
+          allocate( output_layer%layer_boxes( na2 + nb2 ) )
+          if( na2 > 0 ) output_layer%layer_boxes(1:na2) = amb%layer_boxes(1:na2)
+          if( nb2 > 0 ) output_layer%layer_boxes(na2+1:na2+nb2) = bma%layer_boxes(1:nb2)
+          call ClearLayer( amb )
+          call ClearLayer( bma )
+          output_layer%n_used = na2 + nb2
+          output_layer%n_alloc = na2 + nb2
+          output_layer%layerState = LAYER_STATE_HEAL
+          call PhaseEnd('xor.via_not', tp, na2 + nb2)
+        end block
+        return
+     end if
 #endif
      allocate( empty_boxes(0) )
      nA = input_layer_A%n_used
@@ -1131,6 +1183,21 @@ contains
       output_layer%n_used = size( output_layer%layer_boxes, kind=int64 )
       output_layer%n_alloc = output_layer%n_used
    end subroutine CalculateBoostOperation
+
+   logical function env_flag_set( name )
+     character(len=*), intent(in) :: name
+     character(len=8) :: ev
+     integer :: evlen, evstat
+     call get_environment_variable( name, ev, evlen, evstat )
+     env_flag_set = ( evstat == 0 .and. evlen > 0 .and. ev(1:1) /= '0' )
+   end function env_flag_set
+
+   logical function xor_via_not_enabled()
+     character(len=8) :: ev
+     integer :: evlen, evstat
+     call get_environment_variable( 'MAGPARSER_XOR_VIA_NOT', ev, evlen, evstat )
+     xor_via_not_enabled = ( evstat == 0 .and. evlen > 0 .and. ev(1:1) /= '0' )
+   end function xor_via_not_enabled
 
    module subroutine MergeBoxes( input_N, boxes, output_N )
       integer(kind=int64), intent(in) :: input_N

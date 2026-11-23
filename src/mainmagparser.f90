@@ -120,6 +120,7 @@ program mag_parser
   if (profiling_enabled) then
      call PrintProfileSummary()
   end if
+  call PrintPhaseSummary()  !> wall-clock phase table (MAGPARSER_PHASE_TIMERS=1)
   call DevicePrintStats()   !> GPU residency summary (MAGPARSER_GPU_RESIDENCY_STATS=1)
   
   !-----------------------------------------------------------------

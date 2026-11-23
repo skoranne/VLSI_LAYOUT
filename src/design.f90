@@ -598,10 +598,27 @@ contains
        call MortonSort( input_layer%layer_boxes )
 #endif
     else
+#if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+       !> Experimental (MAGPARSER_PRESORT_GPU=1): Thrust Morton sort (~7x faster than the CPU
+       !> OMT packing on 1e8 boxes) at the cost of a less overlap-minimising R-tree order.
+       if( presort_gpu_enabled() .and. input_layer%n_used >= 65536_int64 ) then
+          call SortBoxesDirect( input_layer%layer_boxes, input_layer%n_used )
+          call input_layer%mark( LAYER_STATE_SORT )
+          return
+       end if
+#endif
        call omt_pack( input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY )
     end if
     call input_layer%mark( LAYER_STATE_SORT )
   end subroutine sort_layer_boxes
+
+  logical function presort_gpu_enabled()
+    character(len=8) :: ev
+    integer :: evlen, evstat
+    call get_environment_variable( 'MAGPARSER_PRESORT_GPU', ev, evlen, evstat )
+    presort_gpu_enabled = ( evstat == 0 .and. evlen > 0 .and. ev(1:1) /= '0' )
+    if( presort_gpu_enabled ) presort_gpu_enabled = gpu_offload_enabled( 65536_int64 )
+  end function presort_gpu_enabled
 
   pure function all_boxes_valid( boxes ) result(retval)
     type(Box), intent(in) :: boxes(:)
@@ -824,6 +841,7 @@ contains
     type(Layer), intent(inout) :: input_layer
     real(kind=real64) :: overlap_area, overlap_perimeter
     integer(kind=int64) :: output_box_count
+    real(kind=real64) :: tp
 
     if( input_layer%n_used == 0 ) then
        input_layer%layerState = LAYER_STATE_PREPROCESSED
@@ -839,7 +857,9 @@ contains
          output_box_count = size( input_layer%layer_boxes, kind=int64 )
        end block
 #else
+       tp = PhaseBegin('pre.heal')
        call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+       call PhaseEnd('pre.heal', tp, input_layer%n_used)
 #endif
        input_layer%n_used = output_box_count
        input_layer%n_alloc = size( input_layer%layer_boxes, kind=int64 )
@@ -849,13 +869,23 @@ contains
           return
        end if
     end if
-    if( NeedsSorting( input_layer ) ) call sort_layer_boxes( input_layer, use_morton=.false. )
-    if( NeedsRTree( input_layer ) ) call rebuild_rtree( input_layer )
+    if( NeedsSorting( input_layer ) ) then
+       tp = PhaseBegin('pre.sort')
+       call sort_layer_boxes( input_layer, use_morton=.false. )
+       call PhaseEnd('pre.sort', tp, input_layer%n_used)
+    end if
+    if( NeedsRTree( input_layer ) ) then
+       tp = PhaseBegin('pre.rtree')
+       call rebuild_rtree( input_layer )
+       call PhaseEnd('pre.rtree', tp, input_layer%n_used)
+    end if
     if( NeedsPNum( input_layer ) ) then
+       tp = PhaseBegin('pre.pnum')
        call LayerDeviceEnsure( input_layer )   !> no-op unless PerformMerge will take the GPU path
        call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY, &
             input_layer%tree%tree_nodes, input_layer%tree%root_index, overlap_area, overlap_perimeter)
        call LayerDeviceDone( input_layer )
+       call PhaseEnd('pre.pnum', tp, input_layer%n_used)
        call input_layer%mark( LAYER_STATE_PNUM )
     end if
   end subroutine PreprocessLayerSL

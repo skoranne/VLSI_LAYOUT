@@ -1,0 +1,19 @@
+
+program study_fpu8x8g
+systeminfo
+var temp_folder /home/skoranne/.claude/jobs/560e4036/tmp/study_fpu8x8g/
+var temporary_layers 2
+var abort_on_xor 0
+var abort_on_assert_zero 0
+var debug_verbosity 0
+decl design d1 = /home/skoranne/GITHUB/VLSI_LAYOUT/src/regress/gpu_study/FPU_PD.mag
+decl memory m1 = nothing
+info
+exec init m1:nothing
+exec run m1:r = d1:poly * d1:diff
+exec run m1:r = d1:poly @ d1:diff
+exec run m1:r = d1:diff ! d1:poly
+exec run m1:r = d1:diff INTERACT d1:poly
+exec run m1:r = d1:poly ^ d1:diff
+exec run m1:r = d1:poly + d1:diff
+end

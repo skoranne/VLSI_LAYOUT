@@ -9,7 +9,7 @@ submodule (DesignModule) DesignBooleanImplModule
   use RTreeBuilder
   use RTreeBuilderGPU
   use PolygonFractureModule
-  use ProfilerModule, only: get_cpu_time, RecordTime
+  use ProfilerModule, only: get_cpu_time, RecordTime, PhaseBegin, PhaseEnd
   use omp_lib
   implicit none
 
@@ -294,7 +294,13 @@ contains
     type(RTreeNode) :: currNode, childNode
     integer(kind=K_COORDINATE_KIND) :: rem_x1, rem_y1, rem_x2, rem_y2
     integer :: nthreads, tid, alloc_status
-    logical :: has_tree
+    logical :: has_tree, use_gpu_not
+    ! GPU path (ComputeNOTGPU): its output plus the A boxes it hands back for CPU recompute
+    type(Box), allocatable :: gpu_out(:)
+    integer(kind=int64), allocatable :: fallback(:)
+    integer(kind=int64) :: gpu_count, n_fallback, n_work, ii, numNodesB
+    integer(kind=int32) :: gpu_status
+    real(kind=real64) :: tp
 
     if (profiling_enabled) t_start = get_cpu_time()
 
@@ -316,15 +322,6 @@ contains
        return
     end if
 
-    nthreads = max(1, omp_get_max_threads())
-    allocate(buffers(nthreads))
-    init_cap = max(K_INIT_BOX_COUNT, num_boxesA / int(nthreads, kind=int64) + 1024_int64)
-    do i = 1, nthreads
-       allocate(buffers(i)%layer_boxes(init_cap))
-       buffers(i)%n_alloc = init_cap
-       buffers(i)%n_used = 0
-    end do
-
     root_idx = input_layer_B%tree%root_index
     has_tree = allocated(input_layer_B%tree%tree_nodes)
     if (has_tree) then
@@ -332,15 +329,60 @@ contains
     end if
     if (has_tree) root_mbr = input_layer_B%tree%tree_nodes(root_idx)%mbr
 
+    !> GPU path: every A box is processed by ComputeNOTGPU; boxes it cannot finish within its
+    !> fixed fragment/stack budget come back in fallback(:) and go through the CPU loop below.
+    gpu_count = 0_int64
+    n_fallback = 0_int64
+    use_gpu_not = .false.
+    if (has_tree) use_gpu_not = gpu_offload_enabled(num_boxesA)
+    if (use_gpu_not) then
+       numNodesB = size(input_layer_B%tree%tree_nodes, kind=int64)
+       call LayerDeviceRelease(output_layer)
+       call LayerDeviceEnsure(input_layer_A, input_layer_B)
+       tp = PhaseBegin('not.gpu')
+       call ComputeNOTGPU(input_layer_B%tree%tree_nodes, numNodesB, input_layer_B%layer_boxes(1:num_boxesB), &
+            num_boxesB, root_idx, input_layer_A%layer_boxes(1:num_boxesA), num_boxesA, &
+            gpu_out, gpu_count, fallback, n_fallback, gpu_status)
+       call PhaseEnd('not.gpu', tp, num_boxesA)
+       call LayerDeviceDone(input_layer_A, input_layer_B)
+       if (gpu_status /= 0_int32) then
+          use_gpu_not = .false.
+          gpu_count = 0_int64
+          n_fallback = 0_int64
+          if (allocated(gpu_out)) deallocate(gpu_out)
+       end if
+    end if
+    if (use_gpu_not) then
+       n_work = n_fallback
+       tp = PhaseBegin('not.cpu_fallback')
+    else
+       n_work = num_boxesA
+       tp = PhaseBegin('not.cpu')
+    end if
+
+    nthreads = max(1, omp_get_max_threads())
+    allocate(buffers(nthreads))
+    init_cap = max(K_INIT_BOX_COUNT, n_work / int(nthreads, kind=int64) + 1024_int64)
+    do i = 1, nthreads
+       allocate(buffers(i)%layer_boxes(init_cap))
+       buffers(i)%n_alloc = init_cap
+       buffers(i)%n_used = 0
+    end do
+
     !$omp parallel default(shared) &
-    !$omp private(dfs_stack, sp, curr_idx, child_idx, c_end, i, k, m, tid, &
+    !$omp private(dfs_stack, sp, curr_idx, child_idx, c_end, i, ii, k, m, tid, &
     !$omp         boxA, boxB, currNode, childNode, frag_a, frag_b, &
     !$omp         n_frags, n_next, cur_buf, nxt_buf, rem_x1, rem_y1, rem_x2, rem_y2)
     tid = omp_get_thread_num() + 1
     allocate(frag_a(K_INIT_FRAG_CAP), frag_b(K_INIT_FRAG_CAP))
 
     !$omp do schedule(dynamic, 256)
-    over_all_boxes: do i = 1, num_boxesA
+    over_all_boxes: do ii = 1, n_work
+       if (use_gpu_not) then
+          i = fallback(ii)
+       else
+          i = ii
+       end if
        boxA = input_layer_A%layer_boxes(i)
 
        if (.not. has_tree) then
@@ -418,10 +460,10 @@ contains
                 childNode = input_layer_B%tree%tree_nodes(child_idx)
                 if (rem_x1 < childNode%mbr%x2 .and. rem_x2 > childNode%mbr%x1 .and. &
                     rem_y1 < childNode%mbr%y2 .and. rem_y2 > childNode%mbr%y1) then
-                   if (sp < K_DFS_STACK) then
-                      sp = sp + 1
-                      dfs_stack(sp) = child_idx
-                   end if
+                   !> never drop a subtree: a silently skipped B box would leave area in A-B
+                   if (sp >= K_DFS_STACK) error stop "CalculateNOT: R-tree DFS stack overflow"
+                   sp = sp + 1
+                   dfs_stack(sp) = child_idx
                 end if
              end do
           end if
@@ -444,7 +486,12 @@ contains
     deallocate(frag_a, frag_b)
     !$omp end parallel
 
-    num_boxesC = sum([ (buffers(i)%n_used, i=1,nthreads) ])
+    num_boxesC = gpu_count + sum([ (buffers(i)%n_used, i=1,nthreads) ])
+    if (use_gpu_not) then
+       call PhaseEnd('not.cpu_fallback', tp, n_fallback)
+    else
+       call PhaseEnd('not.cpu', tp, num_boxesA)
+    end if
     if (allocated(output_layer%layer_boxes)) deallocate(output_layer%layer_boxes)
     if (allocated(output_layer%tree%tree_nodes)) deallocate(output_layer%tree%tree_nodes)
     if (allocated(output_layer%pnumtable%arr)) deallocate(output_layer%pnumtable%arr)
@@ -452,6 +499,7 @@ contains
     output_layer%device_resident = .false.
 
     if (num_boxesC == 0) then
+       if (allocated(gpu_out)) deallocate(gpu_out)
        do tid = 1, nthreads
           call ClearLayer(buffers(tid))
        end do
@@ -463,11 +511,17 @@ contains
        return
     end if
 
-    allocate(output_layer%layer_boxes(num_boxesC), stat=alloc_status)
-    if (alloc_status /= 0) error stop "ALLOCATION FAILED in CalculateNOT"
+    if (gpu_count > 0 .and. gpu_count == num_boxesC .and. size(gpu_out, kind=int64) == gpu_count) then
+       call move_alloc(from=gpu_out, to=output_layer%layer_boxes)   !> no CPU fallback output: no copy
+    else
+       allocate(output_layer%layer_boxes(num_boxesC), stat=alloc_status)
+       if (alloc_status /= 0) error stop "ALLOCATION FAILED in CalculateNOT"
+       if (gpu_count > 0) output_layer%layer_boxes(1:gpu_count) = gpu_out(1:gpu_count)
+    end if
+    if (allocated(gpu_out)) deallocate(gpu_out)
 
     allocate(offsets(nthreads))
-    offset = 1
+    offset = gpu_count + 1
     do tid = 1, nthreads
        offsets(tid) = offset
        offset = offset + buffers(tid)%n_used

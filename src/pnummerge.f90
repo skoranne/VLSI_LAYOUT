@@ -9,6 +9,7 @@
 !Is there any better idea for this ?
 
 module PNumMergeModule
+  use ProfilerModule, only: PhaseBegin, PhaseEnd
   use iso_fortran_env, only : int32, int64, real64
   use CommonModule
   use GeometryModule
@@ -302,6 +303,7 @@ contains
     integer(kind=int64) :: num_nodes, gpu_edge_count, e
     integer(kind=int64), allocatable :: gpu_edges(:,:)
     integer(kind=int32) :: gpu_overflow
+    real(kind=real64)   :: tp
 
     num_boxes = size(sorted_boxes, kind=int64)
     call uf%init(num_boxes)
@@ -316,9 +318,12 @@ contains
     num_nodes = size(tree_nodes, kind=int64)
     if( num_nodes > 0 .and. gpu_offload_enabled(num_boxes) ) then
        gpu_overflow = 0_int32
+       tp = PhaseBegin('pnum.edges_gpu')
        call ComputeMergeEdgesGPU(tree_nodes, num_nodes, sorted_boxes, num_boxes, root_index, &
             gpu_edges, gpu_edge_count, overlap_area, overlap_perimeter, gpu_overflow)
+       call PhaseEnd('pnum.edges_gpu', tp, gpu_edge_count)
        if( gpu_overflow == 0_int32 ) then
+          tp = PhaseBegin('pnum.unionfind')
           if (abs(overlap_area) > K_SMALL_EPSILON) overlap_perimeter = 0.0_real64
           do e = 1_int64, gpu_edge_count
              call uf%insert(gpu_edges(1, e))
@@ -326,12 +331,14 @@ contains
              call uf%merge(gpu_edges(1, e), gpu_edges(2, e))
           end do
           call uf%fullreduce()
+          call PhaseEnd('pnum.unionfind', tp, gpu_edge_count)
           if (allocated(gpu_edges)) deallocate(gpu_edges)
           return
        end if
        if (allocated(gpu_edges)) deallocate(gpu_edges)
     end if
 
+    tp = PhaseBegin('pnum.edges_cpu')
     nthreads = omp_get_max_threads()
     allocate(buffers(nthreads), overlap_areas(nthreads), overlap_perimeters(nthreads))
 
@@ -405,11 +412,14 @@ contains
     overlap_area = sum(overlap_areas)
     overlap_perimeter = sum(overlap_perimeters)
     if (abs(overlap_area) > K_SMALL_EPSILON) overlap_perimeter = 0.0
+    call PhaseEnd('pnum.edges_cpu', tp, num_boxes)
 
+    tp = PhaseBegin('pnum.unionfind')
     do tid = 1, nthreads
        call process_edges(uf, buffers(tid))
     end do
     call uf%fullreduce()
+    call PhaseEnd('pnum.unionfind', tp, num_boxes)
   end subroutine PerformMerge
 
   !> Check for Single computation vs GPU

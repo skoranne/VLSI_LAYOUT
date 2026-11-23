@@ -4,6 +4,9 @@
 
 module ProfilerModule
    use, intrinsic :: iso_fortran_env, only: int64, real64
+   use, intrinsic :: iso_c_binding, only: c_char, c_null_char
+   use, intrinsic :: iso_fortran_env, only: output_unit
+   use omp_lib, only: omp_get_wtime
    implicit none
    private
 
@@ -18,6 +21,31 @@ module ProfilerModule
    logical :: profiler_initialized = .false.
 
    public :: PrintProfileSummary, InitProfiler, RecordTime, get_cpu_time
+   public :: PhaseTimersEnabled, PhaseBegin, PhaseEnd, PrintPhaseSummary
+
+   !> Wall-clock phase timers (MAGPARSER_PHASE_TIMERS=1).  PhaseBegin returns the start
+   !> time, so nested and concurrent (OpenMP task) phases need no shared stack; PhaseEnd
+   !> accumulates into a name table under a critical section, prints one PHASE line and
+   !> closes the matching NVTX range so nsys timelines carry the same names.
+   integer, parameter :: K_MAX_PHASES = 128
+   type :: PhaseEntry
+      character(len=32)   :: name = ''
+      real(kind=real64)   :: wall = 0.0_real64
+      integer(kind=int64) :: calls = 0
+      integer(kind=int64) :: items = 0
+   end type PhaseEntry
+   type(PhaseEntry), save :: phases(K_MAX_PHASES)
+   integer, save :: num_phases = 0
+   integer, save :: phase_state = -1     !< -1 unknown, 0 off, 1 on
+
+   interface
+      subroutine magparser_nvtx_push(name) bind(C, name="magparser_nvtx_push")
+         import :: c_char
+         character(kind=c_char), dimension(*), intent(in) :: name
+      end subroutine magparser_nvtx_push
+      subroutine magparser_nvtx_pop() bind(C, name="magparser_nvtx_pop")
+      end subroutine magparser_nvtx_pop
+   end interface
 
   contains
 
@@ -104,5 +132,81 @@ module ProfilerModule
        write(*,*) "======================================================================"
        write(*,*) ""
     end subroutine PrintProfileSummary
+
+    logical function PhaseTimersEnabled()
+       character(len=8) :: ev
+       integer :: evlen, evstat
+       if (phase_state < 0) then
+          call get_environment_variable('MAGPARSER_PHASE_TIMERS', ev, evlen, evstat)
+          !$omp critical(phase_lock)
+          if (evstat == 0 .and. evlen > 0 .and. ev(1:1) /= '0') then
+             phase_state = 1
+          else
+             phase_state = 0
+          end if
+          !$omp end critical(phase_lock)
+       end if
+       PhaseTimersEnabled = (phase_state == 1)
+    end function PhaseTimersEnabled
+
+    !> Returns the start time (0 when disabled); pass it to PhaseEnd.
+    function PhaseBegin(name) result(t0)
+       character(len=*), intent(in) :: name
+       real(kind=real64) :: t0
+       t0 = 0.0_real64
+       if (.not. PhaseTimersEnabled()) return
+       call magparser_nvtx_push(trim(name)//c_null_char)
+       !$omp critical(phase_lock)
+       write(*,'(A,A)') 'PHASE_BEGIN ', trim(name)
+       flush(output_unit)
+       !$omp end critical(phase_lock)
+       t0 = omp_get_wtime()
+    end function PhaseBegin
+
+    !> items: optional work count (boxes processed/produced) reported alongside the time.
+    subroutine PhaseEnd(name, t0, items)
+       character(len=*), intent(in) :: name
+       real(kind=real64), intent(in) :: t0
+       integer(kind=int64), intent(in), optional :: items
+       real(kind=real64) :: dt
+       integer :: i, slot
+       integer(kind=int64) :: n
+       if (.not. PhaseTimersEnabled()) return
+       dt = omp_get_wtime() - t0
+       call magparser_nvtx_pop()
+       n = 0
+       if (present(items)) n = items
+       !$omp critical(phase_lock)
+       slot = 0
+       do i = 1, num_phases
+          if (phases(i)%name == name) then
+             slot = i
+             exit
+          end if
+       end do
+       if (slot == 0 .and. num_phases < K_MAX_PHASES) then
+          num_phases = num_phases + 1
+          slot = num_phases
+          phases(slot)%name = name
+       end if
+       if (slot > 0) then
+          phases(slot)%wall = phases(slot)%wall + dt
+          phases(slot)%calls = phases(slot)%calls + 1
+          phases(slot)%items = phases(slot)%items + n
+       end if
+       write(*,'(A,A,F12.4,A,I0)') 'PHASE ', name(1:min(len(name),32)), dt, ' s items=', n
+       flush(output_unit)
+       !$omp end critical(phase_lock)
+    end subroutine PhaseEnd
+
+    subroutine PrintPhaseSummary()
+       integer :: i
+       if (.not. PhaseTimersEnabled() .or. num_phases == 0) return
+       write(*,'(A)') 'PHASE_SUMMARY name calls wall_s items'
+       do i = 1, num_phases
+          write(*,'(A,A32,I10,F14.4,I16)') 'PHASE_SUMMARY ', phases(i)%name, phases(i)%calls, &
+               phases(i)%wall, phases(i)%items
+       end do
+    end subroutine PrintPhaseSummary
 
 end module ProfilerModule

@@ -27,7 +27,7 @@ contour.o: geometry.o polygon_fracture.o
 hdfdata.o: geometry.o
 kldata.o: geometry.o
 datastructures.o: commonmodule.o
-pnummerge.o: datastructures.o rtree.o geometry.o gpu_pnummerge.o interaction.o utilities.o
+pnummerge.o: datastructures.o rtree.o geometry.o gpu_pnummerge.o interaction.o utilities.o profiler.o
 gpu_pnummerge.o: interaction.o device_registry.o
 polygon_fracture.o: commonmodule.o hdfdata.o
 design.o: device_registry.o datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o profiler.o

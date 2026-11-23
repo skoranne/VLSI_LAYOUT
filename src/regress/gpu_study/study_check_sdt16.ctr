@@ -1,0 +1,40 @@
+# Self-check for NOT (GPU/CPU) and XOR (Boost or MAGPARSER_XOR_VIA_NOT) via set identities.
+program study_check_sdt16
+systeminfo
+var temp_folder /home/skoranne/.claude/jobs/560e4036/tmp/study_check_sdt16/
+var temporary_layers 2
+var abort_on_xor 0
+var abort_on_assert_zero 1
+var debug_verbosity 0
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6.mag
+decl memory m = nothing
+info
+exec init m:nothing
+# --- NOT: n = poly - diff ; n * diff = 0 ; (n + poly*diff) == poly
+exec run m:ab = d1:poly * d1:diff
+exec run m:n = d1:poly @ d1:diff
+exec run m:z1 = m:n * d1:diff
+exec run m:z = m:z1 ASSERT_ZERO nothing
+exec run m:r = m:n + m:ab
+exec run m:d1 = m:r @ d1:poly
+exec run m:z = m:d1 ASSERT_ZERO nothing
+exec run m:d2 = d1:poly @ m:r
+exec run m:z = m:d2 ASSERT_ZERO nothing
+# --- NOT the other way (diff - poly), li1 - poly
+exec run m:n2 = d1:diff ! d1:poly
+exec run m:z2 = m:n2 * d1:poly
+exec run m:z = m:z2 ASSERT_ZERO nothing
+exec run m:n3 = d1:li1 ~ d1:poly
+exec run m:z3 = m:n3 * d1:poly
+exec run m:z = m:z3 ASSERT_ZERO nothing
+# --- XOR: x = poly ^ diff ; x * (poly*diff) = 0 ; x + poly*diff == poly + diff
+exec run m:x = d1:poly ^ d1:diff
+exec run m:z4 = m:x * m:ab
+exec run m:z = m:z4 ASSERT_ZERO nothing
+exec run m:o = d1:poly + d1:diff
+exec run m:u = m:x + m:ab
+exec run m:d3 = m:u @ m:o
+exec run m:z = m:d3 ASSERT_ZERO nothing
+exec run m:d4 = m:o @ m:u
+exec run m:z = m:d4 ASSERT_ZERO nothing
+end

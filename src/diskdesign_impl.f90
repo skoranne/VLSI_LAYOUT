@@ -17,7 +17,7 @@ submodule (DesignModule) DiskDesignImplModule
   use KLDataModule
   use BoxCodecModule
   use Utilities
-  use ProfilerModule, only: get_cpu_time, RecordTime
+  use ProfilerModule, only: get_cpu_time, RecordTime, PhaseBegin, PhaseEnd
   implicit none
 
   !> Disk based OOC (out of code) loading system
@@ -25,7 +25,7 @@ submodule (DesignModule) DiskDesignImplModule
 contains
   module subroutine BuildTree( input_layer )
     type(Layer), intent(inout), target :: input_layer
-    real(kind=real64)           :: t_start
+    real(kind=real64)           :: t_start, t_phase
     integer(kind=int64)         :: total_nodes, num_squares, n_used, i
     logical                     :: dominated_by_squares
     dominated_by_squares = .false.
@@ -46,6 +46,8 @@ contains
        if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
        return
     end if
+    if( .not. allocated( input_layer%layer_boxes ) ) error stop "BuildTree: n_used > 0 but layer_boxes not allocated"
+    if( n_used > size( input_layer%layer_boxes, kind=int64 ) ) error stop "BuildTree: n_used exceeds layer_boxes capacity"
     if( NeedsSorting( input_layer ) ) then
        num_squares = 0_int64
        do i = 1, n_used
@@ -60,7 +62,9 @@ contains
           dominated_by_squares = .true.
        end if
 #if defined(_CUDA) || defined(__NVCOMPILER_LLVM__)
+       t_phase = PhaseBegin('load.sort_gpu')
        call SortBoxesDirect( input_layer%layer_boxes, int( n_used, kind=int64 ) )
+       call PhaseEnd('load.sort_gpu', t_phase, n_used)
 #else
        if( dominated_by_squares ) then
           if( size( input_layer%layer_boxes, kind=int64 ) == n_used ) then
@@ -88,9 +92,11 @@ contains
     input_layer%tree%root_index = 0
     total_nodes = CalculateTotalNodes( n_used, K_LEAF_CAPACITY )
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
+    t_phase = PhaseBegin('load.rtree')
     call BuildRTree( input_layer%layer_boxes(1:n_used), K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
     call input_layer%mark( LAYER_STATE_RTREE )
     call LayerTreeBuilt( input_layer )
+    call PhaseEnd('load.rtree', t_phase, n_used)
 
     if (profiling_enabled) call RecordTime("BuildTree", get_cpu_time() - t_start)
   end subroutine BuildTree
@@ -124,6 +130,7 @@ contains
     character(*), intent(in)   :: snap_filename
     type(CompressedStream)     :: snappy_stream
     integer                    :: pos, iunit, ios
+    real(kind=real64)          :: tp
     !> for memory based layers we need an optimization that NO-FILE => EMPTY LAYER
     if( temporary_layers > 1 ) then
        open(newunit=iunit, file=snap_filename, status='old', access='stream', form='unformatted', iostat=ios)
@@ -138,17 +145,21 @@ contains
        if( allocated(input_layer%layer_boxes) )   deallocate(input_layer%layer_boxes)
        if( allocated(input_layer%pnumtable%arr) )  deallocate(input_layer%pnumtable%arr)
        if( allocated(input_layer%tree%tree_nodes) ) deallocate(input_layer%tree%tree_nodes)
+       tp = PhaseBegin('load.klbin')
        call LoadKLBin( snap_filename, input_layer%layer_boxes)
        input_layer%n_used  = size(input_layer%layer_boxes, kind=int64)
+       call PhaseEnd('load.klbin', tp, input_layer%n_used)
        input_layer%n_alloc = input_layer%n_used
        input_layer%tree%root_index = 0
        input_layer%layerState = LAYER_STATE_NONE
        call BuildTree( input_layer )
        return
     end if
+    tp = PhaseBegin('load.snap')
     call RestoreCompressedStreamFromDisk( snap_filename, snappy_stream )
     call DecompressStreamToBoxes( snappy_stream, input_layer%layer_boxes )
     input_layer%n_used  = size( input_layer%layer_boxes, kind=int64 )
+    call PhaseEnd('load.snap', tp, input_layer%n_used)
     input_layer%n_alloc = input_layer%n_used
     if( input_layer%n_used /= snappy_stream%total_boxes) then
        write(*,*) 'ERROR: SNAP restoration failed for file: ', snap_filename

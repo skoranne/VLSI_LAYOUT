@@ -1,0 +1,25 @@
+# GPU study workload: two-layer boolean/topo/sizing mix on small
+program study_small
+systeminfo
+var temp_folder /home/skoranne/.claude/jobs/560e4036/tmp/study_small/
+var temporary_layers 2
+var abort_on_xor 0
+var abort_on_assert_zero 0
+var debug_verbosity 0
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SMALL_SDT/SMALL_SDT.mag
+decl memory m1 = nothing
+info
+exec init m1:nothing
+exec run m1:and_pd = d1:poly * d1:diff
+exec run m1:or_pd = d1:poly + d1:diff
+exec run m1:xor_pd = d1:poly ^ d1:diff
+exec run m1:not_pd = d1:poly ! d1:diff
+exec run m1:not_dp = d1:diff @ d1:poly
+exec run m1:and2_pd = d1:poly AND2 d1:diff
+exec run m1:int_dp = d1:diff INTERACT d1:poly
+exec run m1:li_g = d1:li1 GROW nothing 0.001 0.001 0.001 0.001
+exec run m1:li_s = d1:li1 SIZE nothing -0.001
+exec run m1:li_or = m1:li_g ~ d1:li1
+exec run m1:li_ir = d1:li1 ~ m1:li_s
+exec run m1:li_ra = m1:li_or * d1:li1
+end

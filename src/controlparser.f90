@@ -674,6 +674,10 @@ contains
                      ' check spelling or existence of layer in db. Line: ', line_number-1
                 error stop "ERROR: layer not found"
              end if
+             if( rhs1_layer_index > size( design_dbs( rhs1_db_index )%layers ) ) then
+                write(*,*) 'ERROR: RHS1 layer index ', rhs1_layer_index, ' was skipped at load (raise max_layers). Line: ', line_number-1
+                error stop "ERROR: layer beyond max_layers"
+             end if
              rhs1_layer => design_dbs( rhs1_db_index )%layers( rhs1_layer_index )
              rest = adjustl(rest(pos+1:))
              !write(*,*) 'RESTD BEFORE CHAR OPERATOR SCAN = ', trim(rest)
@@ -695,6 +699,10 @@ contains
                    write(*,*) 'ERROR: RHS2 layer not found: ', trim(rest(1:pos-1)), &
                         ' check spelling or existence of layer in db: line: ', line_number-1
                    error stop "ERROR: layer not found"
+                end if
+                if( rhs2_layer_index > size( design_dbs( rhs2_db_index )%layers ) ) then
+                   write(*,*) 'ERROR: RHS2 layer index ', rhs2_layer_index, ' was skipped at load (raise max_layers). Line: ', line_number-1
+                   error stop "ERROR: layer beyond max_layers"
                 end if
                 rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
                 pos  = index( rest, ' ')
@@ -830,6 +838,10 @@ contains
                         if( .not. ins ) then
                            write(*,*) 'ERROR: TEXT RHS2 ', rhs2_source_name, ' layer not found.', ' ', trim(buf2(1:pos-1))
                            error stop "ERROR"
+                        end if
+                        if( rhs2_layer_index > size( design_dbs( rhs2_db_index )%layers ) ) then
+                           write(*,*) 'ERROR: RHS2 layer index ', rhs2_layer_index, ' was skipped at load (raise max_layers). Line: ', line_number-1
+                           error stop "ERROR: layer beyond max_layers"
                         end if
                         rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
                      else

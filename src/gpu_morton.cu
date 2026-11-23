@@ -126,6 +126,10 @@ extern "C"
         return 1;
     }
 }
+
+// NVTX range shims for the Fortran phase timers (ProfilerModule); no-ops without CUDA.
+extern "C" void magparser_nvtx_push(const char *) {}
+extern "C" void magparser_nvtx_pop(void) {}
 #else
 // ============================================================================
 // GPU implementation (nvcc -DUSE_GPU)
@@ -518,4 +522,9 @@ extern "C"
         return is_device_pointer(p) ? 1 : 0;
     }
 }
+// NVTX range shims for the Fortran phase timers (ProfilerModule): header-only NVTX3,
+// so nsys timelines show the same phase names as the MAGPARSER_PHASE_TIMERS log lines.
+#include <nvtx3/nvToolsExt.h>
+extern "C" void magparser_nvtx_push(const char *name) { nvtxRangePushA(name); }
+extern "C" void magparser_nvtx_pop(void) { nvtxRangePop(); }
 #endif

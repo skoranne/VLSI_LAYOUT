@@ -1,0 +1,25 @@
+# GPU study workload (results reuse m1:r so intermediates are freed): two-layer boolean/topo/sizing mix on sdt16
+program study_sdt16
+systeminfo
+var temp_folder /home/skoranne/.claude/jobs/560e4036/tmp/study_sdt16/
+var temporary_layers 2
+var abort_on_xor 0
+var abort_on_assert_zero 0
+var debug_verbosity 0
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/SDT16_DATA/SDT16_6x6.mag
+decl memory m1 = nothing
+info
+exec init m1:nothing
+exec run m1:r = d1:poly * d1:diff
+exec run m1:r = d1:poly + d1:diff
+exec run m1:r = d1:poly ^ d1:diff
+exec run m1:r = d1:poly ! d1:diff
+exec run m1:r = d1:diff @ d1:poly
+exec run m1:r = d1:poly AND2 d1:diff
+exec run m1:r = d1:diff INTERACT d1:poly
+exec run m1:li_g = d1:li1 GROW nothing 0.001 0.001 0.001 0.001
+exec run m1:li_s = d1:li1 SIZE nothing -0.001
+exec run m1:li_or = m1:li_g ~ d1:li1
+exec run m1:r = d1:li1 ~ m1:li_s
+exec run m1:r = m1:li_or * d1:li1
+end
