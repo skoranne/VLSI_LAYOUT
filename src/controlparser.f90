@@ -239,6 +239,8 @@ contains
     integer, parameter  :: K_MAX_DBS = 32 !< will this work
     character(len=256) :: line, keyword, rest
     integer :: unit, ios, pos, line_number, db_count, i
+    logical :: compact_on
+    integer(kind=int64) :: compact_budget
     integer :: lhs_db_index, rhs1_db_index, rhs2_db_index
     integer :: lhs_layer_index, rhs1_layer_index, rhs2_layer_index    
     type(Design), allocatable, target :: design_dbs(:)
@@ -262,6 +264,10 @@ contains
          integer(c_int) :: pid
        end function c_getpid
     end interface
+    compact_on = CompactLayersEnabled()
+    compact_budget = compact_budget_bytes()
+    if( compact_on ) write(*,'(A,F8.2,A)') 'INFO: compact layers ON, expanded budget ', &
+         real(compact_budget,8)/1073741824.0d0, ' GB'
     db_count = 1
     TEMPORARY_FOLDER = ''
     TEMPORARY_LAYER_PREFIX = "MTL_"
@@ -357,6 +363,7 @@ contains
        line_number = line_number+1
        ! Check if line is empty or contains only spaces
        if (len_trim(line) == 0) cycle
+       if( compact_on ) call enforce_compact_budget( design_dbs, db_count, compact_budget )
        line = adjustl(line)       ! Remove leading whitespace
        if (len(line) == 0) cycle  ! Skip empty lines
 
@@ -717,8 +724,12 @@ contains
                      design_dbs(rhs1_db_index)%designName,':',trim(design_dbs(rhs1_db_index)%layerNames(rhs1_layer_index)),&
                      operator_char, &
                      design_dbs(rhs2_db_index)%designName,':',trim(design_dbs(rhs2_db_index)%layerNames(rhs2_layer_index))
+                call LayerExpand( rhs1_layer )
+                call LayerExpand( rhs2_layer )
                 if( rhs1_layer%n_used == 0 ) call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
                 if( rhs2_layer%n_used == 0 ) call RestoreSnapToLayer( rhs2_layer, rhs2_layer%fileName )
+                call LayerDropCompact( lhs_layer )   !> about to be overwritten
+                call touch_layers( lhs_layer, rhs1_layer, rhs2_layer )
                 select case (operator_char)
                 case('+')
                    call StartMarkTime("OR")
@@ -849,10 +860,16 @@ contains
                      end if
                      call StartMarkTime(primary_operator)
                      if( associated( rhs1_layer ) ) then
+                        call LayerExpand( rhs1_layer )
                         if( rhs1_layer%n_used == 0 ) call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
                      end if
                      if( associated( rhs2_layer ) ) then
+                        call LayerExpand( rhs2_layer )
                         if( rhs2_layer%n_used == 0 ) call RestoreSnapToLayer( rhs2_layer, rhs2_layer%fileName )
+                     end if
+                     if( associated( lhs_layer ) ) then
+                        call LayerDropCompact( lhs_layer )
+                        call touch_layers( lhs_layer, rhs1_layer, rhs2_layer )
                      end if
 
                      select case (primary_operator)
@@ -1049,6 +1066,18 @@ contains
        case ('flush')
           call StartMarkTime("dbFlush")
           do i=1,size(design_dbs)
+             if( design_dbs(i)%design_direction == DESIGN_DIRECTION_OUTPUT .or. &
+                  ( temporary_layers == K_TEMPORARY_LAYER_DISK .and. &
+                  design_dbs(i)%design_direction == DESIGN_DIRECTION_MEMORY ) ) then
+                if( allocated( design_dbs(i)%layers ) ) then
+                   block
+                     integer :: jl
+                     do jl = 1, size( design_dbs(i)%layers )
+                        call LayerExpand( design_dbs(i)%layers(jl) )
+                     end do
+                   end block
+                end if
+             end if
              if( design_dbs(i)%design_direction == DESIGN_DIRECTION_OUTPUT ) then
                 call writeMagicLayoutFile( design_dbs(i) )
              end if
@@ -1088,6 +1117,57 @@ contains
 100 continue !end of file
     close(unit, status='delete')
   end subroutine ParseControlFile
+
+  !> Mark the layers used by the current op as most recently used (LRU clock).
+  subroutine touch_layers( a, b, c )
+    type(Layer), pointer, intent(in) :: a, b, c
+    integer(kind=int64), save :: clock = 0
+    clock = clock + 1
+    if( associated(a) ) a%last_use = clock
+    if( associated(b) ) b%last_use = clock
+    if( associated(c) ) c%last_use = clock
+  end subroutine touch_layers
+
+  integer(kind=int64) function compact_budget_bytes() result(nb)
+    character(len=32) :: ev
+    integer :: evlen, evstat, ios
+    real(kind=8) :: gb
+    gb = 16.0d0
+    call get_environment_variable( 'MAGPARSER_COMPACT_BUDGET_GB', ev, evlen, evstat )
+    if( evstat == 0 .and. evlen > 0 ) then
+       read(ev, *, iostat=ios) gb
+       if( ios /= 0 ) gb = 16.0d0
+    end if
+    nb = int( gb * 1073741824.0d0, int64 )
+  end function compact_budget_bytes
+
+  !> Compact least-recently-used expanded layers until the expanded working set fits
+  !> the budget. Layers used by the op on the previous line are compacted last.
+  subroutine enforce_compact_budget( dbs, ndb, budget )
+    type(Design), intent(inout), target :: dbs(:)
+    integer, intent(in) :: ndb
+    integer(kind=int64), intent(in) :: budget
+    integer(kind=int64) :: total, oldest
+    integer :: d, l, bd, bl
+    do
+       total = 0; oldest = huge(oldest); bd = 0; bl = 0
+       do d = 1, min( ndb, size(dbs) )
+          if( .not. allocated( dbs(d)%layers ) ) cycle
+          do l = 1, size( dbs(d)%layers )
+             associate( L_ => dbs(d)%layers(l) )
+               if( L_%is_compact .or. L_%n_used < 65536_int64 ) cycle
+               total = total + LayerExpandedBytes( L_ )
+               if( L_%last_use < oldest ) then
+                  oldest = L_%last_use; bd = d; bl = l
+               end if
+             end associate
+          end do
+       end do
+       if( total <= budget .or. bd == 0 ) exit
+       call LayerCompact( dbs(bd)%layers(bl) )
+       if( .not. dbs(bd)%layers(bl)%is_compact ) dbs(bd)%layers(bl)%last_use = huge(oldest)  !> not encodable: skip
+    end do
+  end subroutine enforce_compact_budget
 
   !> helper function, hopefully we do not have to debug them often
   !---------------------------------------------------------------

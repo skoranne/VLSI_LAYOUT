@@ -27,7 +27,7 @@
 !
 ! Environment
 !   MAGPARSER_GPU_RESIDENCY=0        disable residency (per-call maps only; A/B timing)
-!   MAGPARSER_GPU_MEM_BUDGET=<GB>    device bytes the registry may hold (default 40% of free)
+!   MAGPARSER_GPU_MEM_BUDGET=<GB>    device bytes the registry may hold (default min(40% of free, 8 GB))
 !   MAGPARSER_GPU_RESIDENCY_CHECK=1  verify reused buffers against the host (debug/regression)
 !   MAGPARSER_GPU_RESIDENCY_STATS=1  print upload/reuse statistics at the end of the run
 module DeviceRegistryModule
@@ -101,7 +101,9 @@ contains
     host_id = omp_get_initial_device()
     budget = 8_c_size_t * 1024_c_size_t**3
     if (magparser_gpu_mem_info(free_b, total_b) == 0 .and. free_b > 0) then
-       budget = int(0.40_real64 * real(free_b, real64), c_size_t)
+       ! Capped at 8 GB: on unified-memory parts (GB10/Grace) device copies come out of the same
+       ! LPDDR as the host arrays they duplicate, and 40% of "free" there is ~30 GB of copies.
+       budget = min( int(0.40_real64 * real(free_b, real64), c_size_t), 8_c_size_t * 1024_c_size_t**3 )
     end if
     call get_environment_variable('MAGPARSER_GPU_MEM_BUDGET', v, l, st)
     if (st == 0 .and. l > 0) then

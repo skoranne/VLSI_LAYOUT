@@ -10,6 +10,19 @@ Planned components:
 
 Build notes: integrate with `src/` makefiles/toolchains as needed; avoid hardcoding local paths.
 
+## bin2oas: KLBIN layer sets to compact OASIS
+
+`bin2oas in.mag out.oas` (or `bin2oas out.oas L:D file.bin ...`) writes the KLBIN files
+named in a Magic `.mag` (`KLBIN .../X_L<layer>_D<datatype>.bin`) as one flat OASIS cell.
+Each layer is sorted by shape (w,h), then row and x. RECTANGLE records use modal
+width, height and layer with XYRELATIVE deltas, so most records carry only an x delta.
+The stream is deflated in CBLOCKs (`--cblock-mb`, default 8). Measured sizes:
+SMALL_SDT went from 176 MB to 12.6 MB, and SDT16 (456M boxes) from 30 GB to 110 MB
+(0.24 B/box). Options are `--grid N` (grid steps per micron in START, default 1000),
+`--dedup` (drop exact duplicate boxes) and `--cell NAME`. CTRs reference the layers as
+`d1:L66_D20` (or `66:20`). `src/regress/gpu_study/to_oas.sh` rewrites a KLBIN-based
+CTR to use them.
+
 ## MPW_MERGE: multi-project-wafer shuttle assembly
 
 `MPW_MERGE` combines the per-slot OASIS files of an MPW shuttle into one OASIS

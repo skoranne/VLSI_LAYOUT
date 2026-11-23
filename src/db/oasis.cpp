@@ -186,6 +186,8 @@ private:
     std::future<std::unique_ptr<Window>> next_;
 };
 
+struct StreamHier {};                        // streaming parse met a PLACEMENT
+
 struct Parser {
     LdbFile* f;
     bool scan_only = false;                  // CBLOCK pre-scan: decode records, emit nothing
@@ -202,11 +204,21 @@ struct Parser {
     bool saw_end = false, want_props = false;
     std::vector<Rect> rects;                 // scratch
     std::vector<Pt> verts;             // scratch
+    // Streaming mode (ldb_stream_boxes): boxes go straight to the callback, nothing is stored.
+    // Valid for flat files only; a PLACEMENT aborts with StreamHier so the caller can fall back.
+    ldb_box_cb stream_cb = nullptr;
+    void* stream_ud = nullptr;
+    size_t streamed = 0;
 
     static const Repetition& single() { static const Repetition one; return one; }
 
     // --- geometry sinks ----------------------------------------------------
     void add_box(uint64_t layer, uint64_t dt, int kind, int64_t x1, int64_t y1, int64_t x2, int64_t y2) {
+        if (stream_cb) {
+            stream_cb(stream_ud, "", (int)layer, (int)dt, kind, std::min(x1, x2), std::min(y1, y2), std::max(x1, x2), std::max(y1, y2));
+            ++streamed;
+            return;
+        }
         LdbCell& c = cells[(size_t)cur].cell;
         LdbBoxElem be; be.layer = (int)layer; be.datatype = (int)dt; be.kind = kind;
         be.x1 = std::min(x1, x2); be.x2 = std::max(x1, x2); be.y1 = std::min(y1, y2); be.y2 = std::max(y1, y2);
@@ -265,6 +277,7 @@ struct Parser {
     }
 
     void placement(Reader& s, bool general) {
+        if (stream_cb && !scan_only) throw StreamHier{};
         if (cur < 0 && !scan_only) s.fail("PLACEMENT outside a cell");
         uint8_t info = s.u8();
         if (info & 0x80) {
@@ -597,11 +610,18 @@ struct Parser {
 
 } // namespace
 
-bool parse_oasis(LdbFile* f) {
+static int parse_oasis_impl(LdbFile* f, ldb_box_cb stream_cb, void* stream_ud);
+bool parse_oasis(LdbFile* f) { return parse_oasis_impl(f, nullptr, nullptr) == 0; }
+// Flat streaming parse: every box is passed to cb as it is decoded, with no per-box storage.
+// Returns 0 ok, 2 file has placements (hierarchical, nothing usable was streamed), -1 error (f->error).
+int parse_oasis_stream(LdbFile* f, ldb_box_cb cb, void* ud) { return parse_oasis_impl(f, cb, ud); }
+
+static int parse_oasis_impl(LdbFile* f, ldb_box_cb stream_cb, void* stream_ud) {
     static const char magic[] = "%SEMI-OASIS\r\n";
     const uint8_t* data = (const uint8_t*)f->map;
-    if (f->size < 13 || memcmp(data, magic, 13) != 0) { f->error = "not an OASIS file (bad magic)"; return false; }
+    if (f->size < 13 || memcmp(data, magic, 13) != 0) { f->error = "not an OASIS file (bad magic)"; return -1; }
     Parser ps; ps.f = f;
+    ps.stream_cb = stream_cb; ps.stream_ud = stream_ud;
     ps.nvst = db::nvcomp_init();
     ps.want_props = (f->open_flags & LDB_OPEN_PROPERTY) != 0 || f->strict_mode;
     const db::CblockBackend backend = db::cblock_backend_from_env();
@@ -631,7 +651,15 @@ bool parse_oasis(LdbFile* f) {
     } catch (const ParseError& e) {
         f->cells.clear(); f->cell_index.clear();
         f->error = "OASIS parse error: " + e.msg;
-        return false;
+        return -1;
+    } catch (const StreamHier&) {
+        f->cells.clear(); f->cell_index.clear();
+        f->error = "hierarchical OASIS (PLACEMENT): streaming not possible";
+        return 2;
+    }
+    if (stream_cb) {
+        f->error = "STREAMED BOXES=" + std::to_string(ps.streamed) + " CBLOCKS=" + std::to_string(ps.cblocks);
+        return 0;
     }
     // Original bytes are kept for the lossless write-back path.
     f->oasis_raw.assign(data, data + f->size);
@@ -650,5 +678,5 @@ bool parse_oasis(LdbFile* f) {
     if (const char* v = std::getenv("LDB_CBLOCK_VERBOSE")) {
         if (*v && *v != '0') std::fprintf(stderr, "LDB_OASIS %s\n", buf);
     }
-    return true;
+    return 0;
 }

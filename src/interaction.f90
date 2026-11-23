@@ -119,6 +119,13 @@ contains
 
 #if defined(_CUDA) || defined(__NVCOMPILER) || defined(__NVCOMPILER_LLVM__)
     if (omp_get_num_devices() <= 0) return
+    ! Inside a host parallel region (per-tile workers of the frame functions) offload only
+    ! tiles big enough to pay for it, whatever OMP_TARGET_OFFLOAD says: thousands of tiny
+    ! tiles were each launching kernels from worker threads.
+    if (omp_in_parallel()) then
+       use_gpu = (n_work >= max(min_work, K_GPU_MIN_BOXES))
+       return
+    end if
     call get_environment_variable('OMP_TARGET_OFFLOAD', offload_env, length=offload_len, status=offload_stat)
     if (offload_stat == 0 .and. offload_len > 0) then
        if (trim(offload_env) == 'DISABLED' .or. trim(offload_env) == 'disabled') then

@@ -45,6 +45,9 @@ typedef void (*ldb_box_cb)(void* ud, const char* cell, int layer, int datatype, 
 int ldb_iterate_boxes(ldb_file_t* f, ldb_box_cb cb, void* ud);
 /* Iterate geometry as boxes with hierarchy flattened (SREF/AREF expanded). */
 int ldb_iterate_boxes_flat(ldb_file_t* f, ldb_box_cb cb, void* ud);
+/* Streaming flat load (OASIS): boxes are passed to cb while parsing, nothing is stored.
+   Returns 0 ok, 2 hierarchical file (fall back to ldb_open), 3 not OASIS, -1 error. */
+int ldb_stream_boxes(const char* path, ldb_box_cb cb, void* ud, char* errbuf, size_t errbuf_sz);
 
 /* Iterate geometry as polygons with explicit vertices (DBU coordinates).
    xs/ys have npts entries. For bbox-only elements, a 4-point closed rectangle is emitted.

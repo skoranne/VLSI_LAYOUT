@@ -1,0 +1,19 @@
+
+program study_fpu8x8oas
+systeminfo
+var temp_folder /home/skoranne/.claude/jobs/560e4036/tmp/study_fpu8x8oas/
+var temporary_layers 2
+var abort_on_xor 0
+var abort_on_assert_zero 0
+var debug_verbosity 0
+decl design d1 = /home/skoranne/FPU_8x8_FLAT.oas
+decl memory m1 = nothing
+info
+exec init m1:nothing
+exec run m1:r = d1:L66_D20 * d1:L65_D20
+exec run m1:r = d1:L66_D20 @ d1:L65_D20
+exec run m1:r = d1:L65_D20 ! d1:L66_D20
+exec run m1:r = d1:L65_D20 INTERACT d1:L66_D20
+exec run m1:r = d1:L66_D20 ^ d1:L65_D20
+exec run m1:r = d1:L66_D20 + d1:L65_D20
+end

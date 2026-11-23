@@ -27,6 +27,7 @@ module DesignModule
   use ProfilerModule
   use BoostPolygonAPIModule
   use RTreeBuilderGPU
+  use CompactLayerModule
   use iso_c_binding
   use iso_fortran_env, only : int32, int64, real64
   use omp_lib
@@ -37,6 +38,7 @@ module DesignModule
        LAYER_STATE_SLSORT, LAYER_STATE_FINAL, LAYER_STATE_PREPROCESSED, LAYER_STATE_EVERYTHING
   public :: DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY
   public :: NeedsSorting, NeedsRTree, NeedsPNum, NeedsHealing
+  public :: LayerCompact, LayerExpand, LayerDropCompact, LayerExpandedBytes, CompactLayersEnabled
   public :: push_box, ClearLayer, CopyLayer, AssignFromBox, swap_layer, FinalizeLayer, DeleteDesign
   public :: LayerDeviceEnsure, LayerDeviceRelease, LayerTreeBuilt, LayerDeviceTouch, LayerDeviceDone
   public :: assignment(=)
@@ -99,6 +101,13 @@ module DesignModule
      integer(kind=int64)    :: dev_gen = 0       !> generation tag; changes when boxes/tree change
      integer                :: dev_boxes_id = 0  !> registry slot of layer_boxes(1:n_used), 0 = none
      integer                :: dev_tree_id = 0   !> registry slot of tree%tree_nodes, 0 = none
+     ! -- compact (Morton key + shape id) storage, see compact_layer.f90.  When is_compact,
+     !    the Box array, tree and pnum table are released (n_used = 0) and `compact` is the
+     !    only copy of the geometry; LayerExpand restores the Box form on demand.
+     type(CompactLayer)     :: compact
+     logical                :: is_compact = .false.
+     integer(kind=c_int)    :: compact_state = 0  !> layerState bits valid after expand (HEAL)
+     integer(kind=int64)    :: last_use = 0       !> op counter of the last use (LRU for the budget)
    contains
      procedure :: has     => layer_has_state
      procedure :: mark    => layer_mark_state
@@ -438,6 +447,7 @@ contains
   subroutine ClearLayer( input_layer_A )
     type(Layer), intent(inout), target :: input_layer_A
     call LayerDeviceRelease( input_layer_A )
+    if( input_layer_A%is_compact ) call LayerDropCompact( input_layer_A )
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
     if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
     call drop_rtree( input_layer_A )
@@ -490,6 +500,7 @@ contains
     integer(kind=int64), allocatable :: temp_pnum(:)
     character(len=:), allocatable    :: temp_fileName
 
+    if( a%is_compact .or. b%is_compact ) error stop "swap_layer: expand compact layers first"
     call swap_int64( a%n_used,  b%n_used )
     call swap_int64( a%n_alloc, b%n_alloc )
     call swap_int64( a%tree%root_index, b%tree%root_index )
@@ -857,13 +868,39 @@ contains
          output_box_count = size( input_layer%layer_boxes, kind=int64 )
        end block
 #else
-       tp = PhaseBegin('pre.heal')
-       call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
-       call PhaseEnd('pre.heal', tp, input_layer%n_used)
+       if( input_layer%n_used >= K_FRAME_THRESHOLD .and. .not. sl_heal_forced() ) then
+          !> Same strategy as the KLBIN load (PNumLoop): certify disjointness on the tree (GPU),
+          !> and only heal when needed, with the tiled parallel merge instead of the serial scanline.
+          if( NeedsSorting( input_layer ) ) then
+             tp = PhaseBegin('pre.sort')
+             call sort_layer_boxes( input_layer, use_morton=.false. )
+             call PhaseEnd('pre.sort', tp, input_layer%n_used)
+          end if
+          if( NeedsRTree( input_layer ) ) then
+             tp = PhaseBegin('pre.rtree')
+             call rebuild_rtree( input_layer )
+             call PhaseEnd('pre.rtree', tp, input_layer%n_used)
+          end if
+          tp = PhaseBegin('pre.certify')
+          if( CertifyHealing( input_layer ) ) then
+             call PhaseEnd('pre.certify', tp, input_layer%n_used)
+             call input_layer%mark( LAYER_STATE_HEAL )      !> boxes, order and tree unchanged
+          else
+             call PhaseEnd('pre.certify', tp, input_layer%n_used)
+             tp = PhaseBegin('pre.mergeheal')
+             call MergeHealLayer( input_layer )             !> sets state HEAL only
+             call PhaseEnd('pre.mergeheal', tp, input_layer%n_used)
+          end if
+          output_box_count = input_layer%n_used
+       else
+          tp = PhaseBegin('pre.heal')
+          call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+          call PhaseEnd('pre.heal', tp, input_layer%n_used)
+          input_layer%layerState = LAYER_STATE_HEAL !> the boxes changed: everything else is stale
+       end if
 #endif
        input_layer%n_used = output_box_count
-       input_layer%n_alloc = size( input_layer%layer_boxes, kind=int64 )
-       input_layer%layerState = LAYER_STATE_HEAL !> the boxes changed: everything else is stale
+       if( allocated( input_layer%layer_boxes ) ) input_layer%n_alloc = size( input_layer%layer_boxes, kind=int64 )
        if( input_layer%n_used == 0 ) then
           input_layer%layerState = LAYER_STATE_PREPROCESSED
           return
@@ -946,5 +983,98 @@ contains
 
     if (profiling_enabled) call RecordTime("PreprocessLayer", get_cpu_time() - t_start)
   end subroutine PreprocessLayer
+
+
+  !------------------------------------------------------------------
+  !  Compact layer storage (MAGPARSER_COMPACT_LAYERS=1)
+  !------------------------------------------------------------------
+  !> MAGPARSER_SL_HEAL=1 restores the serial scanline heal for all layer sizes.
+  logical function sl_heal_forced()
+    character(len=8) :: ev
+    integer :: evlen, evstat
+    call get_environment_variable( 'MAGPARSER_SL_HEAL', ev, evlen, evstat )
+    sl_heal_forced = ( evstat == 0 .and. evlen > 0 .and. ev(1:1) /= '0' )
+  end function sl_heal_forced
+
+  logical function CompactLayersEnabled()
+    character(len=8) :: ev
+    integer :: evlen, evstat
+    call get_environment_variable( 'MAGPARSER_COMPACT_LAYERS', ev, evlen, evstat )
+    CompactLayersEnabled = ( evstat == 0 .and. evlen > 0 .and. ev(1:1) /= '0' )
+  end function CompactLayersEnabled
+
+  !> Bytes held by the expanded (Box) form of a layer.
+  integer(kind=int64) function LayerExpandedBytes( L ) result(nb)
+    type(Layer), intent(in) :: L
+    nb = 0
+    if( allocated( L%layer_boxes ) ) nb = nb + 16_int64 * size( L%layer_boxes, kind=int64 )
+    if( allocated( L%tree%tree_nodes ) ) nb = nb + 32_int64 * size( L%tree%tree_nodes, kind=int64 )
+    if( allocated( L%pnumtable%arr ) ) nb = nb + 8_int64 * size( L%pnumtable%arr, kind=int64 )
+  end function LayerExpandedBytes
+
+  !> Box form -> compact (cold, bit-packed) form; frees boxes, tree and pnum table.
+  !> No-op for small layers or when the layer cannot be encoded exactly.
+  subroutine LayerCompact( L, min_boxes )
+    type(Layer), intent(inout), target :: L
+    integer(kind=int64), intent(in), optional :: min_boxes
+    integer(kind=int64) :: nmin
+    integer :: status
+    integer(kind=c_int) :: keep_state
+    real(kind=real64) :: tp
+    nmin = 65536_int64
+    if( present(min_boxes) ) nmin = min_boxes
+    if( L%is_compact .or. L%n_used < nmin ) return
+    tp = PhaseBegin('compact.encode')
+    keep_state = iand( L%layerState, LAYER_STATE_HEAL )
+    call CompactEncode( L%layer_boxes(1:L%n_used), L%n_used, L%compact, status )
+    if( status /= 0 ) then
+       call CompactRelease( L%compact )
+       call PhaseEnd('compact.encode', tp, 0_int64)
+       return
+    end if
+    call CompactPack( L%compact )
+    if( debug_verbosity > 0 .or. PhaseTimersEnabled() ) call CompactPrintStats( L%compact, 'layer' )
+    call LayerDeviceRelease( L )         !> device copies of the boxes/tree are now stale
+    if( allocated( L%layer_boxes ) ) deallocate( L%layer_boxes )
+    if( allocated( L%pnumtable%arr ) ) deallocate( L%pnumtable%arr )
+    call drop_rtree( L )
+    L%n_used = 0
+    L%n_alloc = 0
+    L%device_resident = .false.
+    L%is_compact = .true.
+    L%compact_state = keep_state
+    L%layerState = LAYER_STATE_NONE
+    call PhaseEnd('compact.encode', tp, L%compact%n)
+  end subroutine LayerCompact
+
+  !> Compact -> Box form (Morton order, marked SORT) and R-tree; the compact copy is released.
+  subroutine LayerExpand( L, build_tree )
+    type(Layer), intent(inout), target :: L
+    logical, intent(in), optional :: build_tree
+    real(kind=real64) :: tp
+    if( .not. L%is_compact ) return
+    tp = PhaseBegin('compact.decode')
+    call CompactUnpack( L%compact, drop_cold=.true. )
+    call CompactDecode( L%compact, L%layer_boxes )
+    L%n_used = L%compact%n
+    L%n_alloc = L%compact%n
+    call CompactRelease( L%compact )
+    L%is_compact = .false.
+    L%layerState = ior( L%compact_state, LAYER_STATE_SORT )
+    L%tree%root_index = 0
+    call PhaseEnd('compact.decode', tp, L%n_used)
+    if( present(build_tree) ) then
+       if( .not. build_tree ) return
+    end if
+    call BuildTree( L )
+  end subroutine LayerExpand
+
+  !> The layer is about to be overwritten: a compact copy would be stale.
+  subroutine LayerDropCompact( L )
+    type(Layer), intent(inout) :: L
+    if( .not. L%is_compact ) return
+    call CompactRelease( L%compact )
+    L%is_compact = .false.
+  end subroutine LayerDropCompact
 
 end module DesignModule

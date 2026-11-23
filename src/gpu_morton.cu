@@ -127,6 +127,13 @@ extern "C"
     }
 }
 
+// Sort plain uint64 keys (CompactLayerModule: Morton/shape keys). CPU build: std::sort.
+extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
+{
+    if (n > 1)
+        std::sort(h_keys, h_keys + n);
+    return 0;
+}
 // NVTX range shims for the Fortran phase timers (ProfilerModule); no-ops without CUDA.
 extern "C" void magparser_nvtx_push(const char *) {}
 extern "C" void magparser_nvtx_pop(void) {}
@@ -522,6 +529,41 @@ extern "C"
         return is_device_pointer(p) ? 1 : 0;
     }
 }
+// Sort plain uint64 keys on the device (CompactLayerModule: Morton/shape keys). Radix sort;
+// reuses the cached key scratch buffer. Returns 0 on success (caller falls back to CPU).
+extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
+{
+    if (n <= 1)
+        return 0;
+    std::lock_guard<std::mutex> lk(g_mutex);
+    const size_t bytes = (size_t)n * sizeof(uint64_t);
+    uint64_t *d_keys = (uint64_t *)g_keys.get(bytes);
+    if (!d_keys)
+        return 1;
+    cudaStream_t s = stream();
+    if (cudaMemcpyAsync(d_keys, h_keys, bytes, cudaMemcpyHostToDevice, s) != cudaSuccess)
+    {
+        end_call();
+        return 2;
+    }
+    try
+    {
+        thrust::sort(policy(), d_keys, d_keys + n);
+    }
+    catch (...)
+    {
+        cudaStreamSynchronize(s);
+        end_call();
+        return 3;
+    }
+    cudaError_t err = cudaMemcpyAsync(h_keys, d_keys, bytes, cudaMemcpyDeviceToHost, s);
+    cudaError_t serr = cudaStreamSynchronize(s);
+    end_call();
+    if (err != cudaSuccess)
+        return 4;
+    return (serr == cudaSuccess) ? 0 : 5;
+}
+
 // NVTX range shims for the Fortran phase timers (ProfilerModule): header-only NVTX3,
 // so nsys timelines show the same phase names as the MAGPARSER_PHASE_TIMERS log lines.
 #include <nvtx3/nvToolsExt.h>

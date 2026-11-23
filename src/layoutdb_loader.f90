@@ -23,6 +23,7 @@ module LayoutDBLoaderModule
      integer(c_int) :: last_layer_num = -2147483647_c_int
      integer(c_int) :: last_datatype  = -2147483647_c_int
      integer        :: last_layer_idx = 0
+     logical        :: compact = .false.   !> compact each layer when the stream moves on
      ! Open-addressed integer hash table: (layer_num, datatype) -> layer_idx
      integer(c_int) :: tab_layer(0:K_LD_CACHE_SIZE-1) = 0_c_int
      integer(c_int) :: tab_dtype(0:K_LD_CACHE_SIZE-1) = 0_c_int
@@ -112,6 +113,12 @@ contains
           end block
        end if
 
+       if (ctx%compact) then
+          if (ctx%last_layer_idx > 0 .and. ctx%last_layer_idx /= layer_idx) &
+               call LayerCompact(ctx%design%layers(ctx%last_layer_idx))
+          if (ctx%design%layers(layer_idx)%is_compact) &          !> interleaved file: append
+               call LayerExpand(ctx%design%layers(layer_idx), build_tree=.false.)
+       end if
        ctx%last_layer_num = layer_num
        ctx%last_datatype  = datatype
        ctx%last_layer_idx = layer_idx
@@ -229,6 +236,14 @@ contains
     write(*,'(A,A,A,I0)') 'INFO: Loading layout DB file (GDSII/OASIS): ', trim(fname), &
          ' format=', ldb_format_c(fh_out)
 
+    call init_design_ctx(load_design, MAX_LAYERS, ctx)
+  end subroutine load_ldb_common
+
+  subroutine init_design_ctx(load_design, MAX_LAYERS, ctx)
+    type(Design), intent(inout), target     :: load_design
+    integer, intent(in)                     :: MAX_LAYERS
+    type(ldb_load_ctx), intent(inout), target :: ctx
+    integer :: i
     if (allocated(load_design%layers))     deallocate(load_design%layers)
     if (allocated(load_design%layerNames)) deallocate(load_design%layerNames)
     allocate(load_design%layers(MAX_LAYERS))
@@ -249,7 +264,15 @@ contains
     ctx%last_datatype     = -2147483647_c_int
     ctx%last_layer_idx    = 0
     ctx%tab_idx           = 0
-  end subroutine load_ldb_common
+    ctx%compact           = CompactLayersEnabled()
+  end subroutine init_design_ctx
+
+  logical function stream_enabled()
+    character(len=8) :: ev
+    integer :: evlen, evstat
+    call get_environment_variable('MAGPARSER_OASIS_STREAM', ev, evlen, evstat)
+    stream_enabled = .not. (evstat == 0 .and. evlen > 0 .and. ev(1:1) == '0')
+  end function stream_enabled
 
   subroutine trim_design_layers(d, n_layers)
     type(Design), intent(inout) :: d
@@ -286,16 +309,47 @@ contains
     integer(c_int)            :: rc
     integer                   :: i
 
-    call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
-    if (.not. c_associated(fh)) return
     cb = c_funloc(box_callback)
-    rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
-    call ldb_close_c(fh)
+    ! Flat OASIS: stream boxes straight from the parser (no 48 B/box C++ copy of the geometry).
+    if (stream_enabled() .and. allocated(load_design%fileName)) then
+       block
+         character(kind=c_char), allocatable :: cpath(:)
+         character(kind=c_char) :: errbuf(512)
+         integer :: k, n
+         n = len_trim(load_design%fileName)
+         allocate(cpath(n + 1))
+         do k = 1, n
+            cpath(k) = load_design%fileName(k:k)
+         end do
+         cpath(n + 1) = c_null_char
+         errbuf = c_null_char
+         call init_design_ctx(load_design, MAX_LAYERS, ctx)
+         rc = ldb_stream_boxes_c(cpath, cb, c_loc(ctx), errbuf, 512_c_size_t)
+         if (rc == 0_c_int) then
+            write(*,'(A,A)') 'INFO: Streamed OASIS: ', trim(load_design%fileName)
+            fh = c_null_ptr
+         else
+            write(*,'(A,I0,A)') 'INFO: OASIS stream not possible (rc=', rc, '), using full reader'
+            do k = 1, size(load_design%layers)
+               call ClearLayer(load_design%layers(k))
+            end do
+         end if
+       end block
+    else
+       rc = -1_c_int
+    end if
+    if (rc /= 0_c_int) then
+       call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
+       if (.not. c_associated(fh)) return
+       rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
+       call ldb_close_c(fh)
+    end if
     call trim_design_layers(load_design, ctx%num_unique_layers)
+    if (ctx%compact .and. ctx%last_layer_idx > 0) call LayerCompact(load_design%layers(ctx%last_layer_idx))
     write(*,'(A,I0,A,A)') 'INFO: Loaded ', ctx%num_unique_layers, ' unique layers from ', trim(load_design%fileName)
     do i = 1, ctx%num_unique_layers
        write(*,'(A,I0,A,A,A,I0,A)') '  Layer ', i, ': ', trim(load_design%layerNames(i)), &
-            ' (', load_design%layers(i)%n_used, ' boxes)'
+            ' (', load_design%layers(i)%n_used + load_design%layers(i)%compact%n, ' boxes)'
     end do
   end subroutine LoadLayoutDBFile
 
@@ -316,11 +370,12 @@ contains
     rc = ldb_iterate_boxes_hier_c(fh, topc, -1_c_int, cb, c_loc(ctx))
     call ldb_close_c(fh)
     call trim_design_layers(load_design, ctx%num_unique_layers)
+    if (ctx%compact .and. ctx%last_layer_idx > 0) call LayerCompact(load_design%layers(ctx%last_layer_idx))
     write(*,'(A,I0,A,A)') 'INFO: Hierarchically loaded ', ctx%num_unique_layers, &
          ' unique layers from ', trim(load_design%fileName)
     do i = 1, ctx%num_unique_layers
        write(*,'(A,I0,A,A,A,I0,A)') '  Layer ', i, ': ', trim(load_design%layerNames(i)), &
-            ' (', load_design%layers(i)%n_used, ' boxes)'
+            ' (', load_design%layers(i)%n_used + load_design%layers(i)%compact%n, ' boxes)'
     end do
   end subroutine LoadLayoutDBFileHier
 

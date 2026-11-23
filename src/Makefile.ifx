@@ -87,7 +87,7 @@ version_mod.f90: ../.git/HEAD ../.git/index
 	@echo "end module version_mod" >> $@
 
 unit_test: test_contour.exe test_morton.exe CONVERT.exe test_boxmerge.exe \
-	   test_skiplist.exe
+	   test_skiplist.exe test_compact_layer.exe
 
 clean:
 	rm -f *.o *.mod *.a *.exe
@@ -130,6 +130,8 @@ CONVERT.exe: test_polygonfracture.o $(LIBRARY)
 test_boxmerge.exe: test_boxmerge.o $(LIBRARY)
 	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_skiplist.exe: test_skiplist.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_compact_layer.exe: test_compact_layer.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 generate_bin.exe: generate_bin.o $(LIBRARY)
 	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)

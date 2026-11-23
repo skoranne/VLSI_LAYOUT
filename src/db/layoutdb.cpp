@@ -33,6 +33,7 @@ static int detect_format(const uint8_t* p, size_t n) {
 
 // Forward decl parsers
 bool parse_gdsii(LdbFile* f);
+int parse_oasis_stream(LdbFile* f, ldb_box_cb cb, void* ud);
 bool parse_oasis(LdbFile* f);
 
 static std::string make_spill_path(size_t idx){
@@ -527,4 +528,21 @@ extern "C" int ldb_iterate_polygons_flat(ldb_file_t* fh, ldb_poly_cb cb, void* u
     }
     if(!any){ for(size_t ci=0; ci<f->cells.size(); ci++){ std::set<size_t> st; walk(ci,id,f->cells[ci].name.c_str(),st); } }
     return 0;
+}
+
+// Flat streaming load: OASIS boxes go straight to cb while parsing, no in-memory copy of the
+// geometry. Returns 0 ok, 2 hierarchical file (use ldb_open + ldb_iterate_boxes*),
+// 3 format not supported for streaming (GDSII), -1 error (errbuf).
+extern "C" int ldb_stream_boxes(const char* path, ldb_box_cb cb, void* ud, char* errbuf, size_t errbuf_sz) {
+    if (errbuf && errbuf_sz) errbuf[0] = '\0';
+    auto* f = new LdbFile();
+    if (!map_file(f, path, errbuf, errbuf_sz)) { delete f; return -1; }
+    int rc;
+    if (detect_format((const uint8_t*)f->map, f->size) != 2) rc = 3;
+    else {
+        rc = parse_oasis_stream(f, cb, ud);
+        if (errbuf && errbuf_sz) snprintf(errbuf, errbuf_sz, "%s", f->error.c_str());
+    }
+    ldb_close((ldb_file_t*)f);
+    return rc;
 }

@@ -30,6 +30,7 @@
 #include "oasis_rec.hpp"
 #include "oasis_codec.hpp"
 
+#include <stdexcept>
 #include <zlib.h>
 #include <glob.h>
 #include <fcntl.h>

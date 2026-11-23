@@ -15,6 +15,7 @@ submodule (DesignModule) DesignDeviceImplModule
   use iso_fortran_env, only: int32, int64
   use DeviceRegistryModule
   use RTreeBuilderGPU, only: gpu_offload_enabled
+  use omp_lib, only: omp_in_parallel
   implicit none
 
   integer(int64), parameter :: M32 = int(z'FFFFFFFF', int64)
@@ -89,6 +90,7 @@ contains
     type(Layer), intent(inout), target :: A
     type(Layer), intent(inout), target, optional :: B
     if( .not. DeviceRegistryEnabled() ) return
+    if( omp_in_parallel() ) return   !> tile workers of the frame functions run on the host
     call DeviceResetPins()   !> serial context only: no GPU call can be in flight
     !$omp critical (magparser_layer_residency)
     call ensure_one( A )
@@ -108,6 +110,7 @@ contains
     type(Layer), intent(inout), target :: A
     type(Layer), intent(inout), target, optional :: B
     if( .not. DeviceRegistryEnabled() ) return
+    if( omp_in_parallel() ) return
     call DeviceUnpin( A%dev_boxes_id ); call DeviceUnpin( A%dev_tree_id )
     if( present( B ) ) then
        if( .not. same_layer( A, B ) ) then

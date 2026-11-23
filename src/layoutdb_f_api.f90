@@ -61,6 +61,16 @@ module layoutdb_f_api
        type(c_ptr), value :: ud
      end function ldb_iterate_boxes_c
 
+     function ldb_stream_boxes_c(path, cb, ud, errbuf, errsz) bind(C, name="ldb_stream_boxes")
+       import :: c_ptr, c_funptr, c_int, c_char, c_size_t
+       integer(c_int) :: ldb_stream_boxes_c
+       character(kind=c_char), intent(in) :: path(*)
+       type(c_funptr), value :: cb
+       type(c_ptr), value :: ud
+       character(kind=c_char) :: errbuf(*)
+       integer(c_size_t), value :: errsz
+     end function ldb_stream_boxes_c
+
      function ldb_print_hierarchy_c(f, out_fp) bind(C, name="ldb_print_hierarchy")
        import :: c_ptr, c_int
        integer(c_int) :: ldb_print_hierarchy_c

@@ -534,6 +534,7 @@ contains
     deleted_layer_count = 0
     if( .not. allocated( load_design%layers ) ) return !> we have already flushed this db
     do i=1,min( hash_nitems( load_design%ht), size( load_design%layers ) ) !> skipped sections have no layers(i)
+       call LayerExpand( load_design%layers(i) )   !> compact layers carry no Box array
        associate( resolved_layer => load_design%layers(i) )
          if( resolved_layer%n_used == 0 ) cycle
          !> Lets just assume we are writing in KLBIN

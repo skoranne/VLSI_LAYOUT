@@ -1,4 +1,4 @@
-LIB_OBJS = commonmodule.o device_registry.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o \
+LIB_OBJS = commonmodule.o device_registry.o compact_layer.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
 	   polygon_fracture.o boxmerge.o kldata.o design_impl.o design_boolean_impl.o design_topo_impl.o design_device_impl.o gpu_morton_sort.o\
@@ -30,7 +30,7 @@ datastructures.o: commonmodule.o
 pnummerge.o: datastructures.o rtree.o geometry.o gpu_pnummerge.o interaction.o utilities.o profiler.o
 gpu_pnummerge.o: interaction.o device_registry.o
 polygon_fracture.o: commonmodule.o hdfdata.o
-design.o: device_registry.o datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o profiler.o
+design.o: compact_layer.o device_registry.o datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o profiler.o
 design_impl.o: commonmodule.o design.o geometry.o boost_polygon_apif.o diskdesign_impl.o
 design_boolean_impl.o: commonmodule.o design.o geometry.o rtree.o interaction.o polygon_fracture.o profiler.o
 design_topo_impl.o: commonmodule.o design.o geometry.o rtree.o interaction.o
@@ -47,3 +47,5 @@ interaction.o: gpu_morton_sort.o utilities.o device_registry.o
 RLEMerge.o: gpu_morton_sort.o interaction.o
 event_sorter_apif.o: commonmodule.o event_sorter.o polygon_fracture.o device_registry.o
 
+compact_layer.o: commonmodule.o geometry.o
+test_compact_layer.o: compact_layer.o kldata.o geometry.o
