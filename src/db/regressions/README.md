@@ -23,6 +23,19 @@ cd src && ./MAGPARSER.exe db/regressions/SDT_oasis.ctr 16
 ```
 Notes: external `/scratch1/...` paths and some in-repo layouts may need to be present (non-LFS) on the test machine; adjust `temp_folder`/paths as needed for x86-64+IFX runs.
 
+## FASCL per-polygon properties -> OASIS (`fascl/`)
+- `run_fascl_regression.sh [MAGPARSER.exe] [workdir]`: generates `fascl_in.gds` with KLayout
+  (`gen_fascl_input.py`: rects, L/U shapes, rings, two holes, overlapping and corner-touching boxes,
+  lattices and irregular placements), runs `fascl_props.ctr` (FASCL lambdas defining INT, FLOAT,
+  STRING, STRUCT and WHEN-guarded properties; `propdump`; `oasout` with STRICT+CBLOCK+repetitions,
+  64-byte CBLOCKs, no repetitions, plain; `.mag` output of a COPY to `*.oas`) and checks each OASIS
+  file with `fascl_check.py`: geometry XOR, one shape per connected polygon, every property value
+  recomputed from the input, CSV dumps, STRICT table offsets, CBLOCKs, repetition types and instance
+  counts, PROPERTY-REPEAT; plus a lambda runtime type error. Exit 0 = pass. See `src/FASCL.md`.
+```sh
+bash src/db/regressions/fascl/run_fascl_regression.sh src/MAGPARSER.exe
+```
+
 ## MPW_MERGE (shuttle assembly)
 - `mpw_merge_check.rb`: KLayout batch script that compares one slot of an `MPW_MERGE`
   output with its original file. It walks the hierarchy cell by cell and compares

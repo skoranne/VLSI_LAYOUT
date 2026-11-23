@@ -1,0 +1,1368 @@
+! File   : fascl.f90
+! Author : Sandeep Koranne (C) 2026. All rights reserved.
+! Purpose: FASCL (FASt Calculation of Lambdas on Coupling Length) for the CTR language.
+!
+! FASCL was first written in Lisp (2000-2001): find externally facing edges that meet a
+! spacing criterion, then call a user lambda on each candidate (condition function +
+! user function, results accumulated per net).  This module brings the lambda engine
+! into MAGPARSER: a CTR statement attaches per-polygon properties computed by a lambda.
+!
+!   PROPERTY:PNUM = d1:met1 FASCL [ (id) PNUM = POLYGON_NUMBER(id) ] d1:nothing
+!
+! (also accepted after `exec run`).  The lambda runs once for every polygon of d1:met1;
+! `id` is the polygon id from the PNum pass.  Names on the left of '=' (comma separated)
+! are the properties written to the layer's PropertyTable; other assigned names are
+! locals.  The second operand is the coupling partner layer of the (future) spacing
+! stage; unary lambdas take `nothing` there.
+!
+! Lambda language (case-sensitive names, keywords upper case):
+!   lambda := '[' '(' param {',' param} ')' stmt {';' stmt} ']'
+!   stmt   := NAME '=' expr | NAME '.' FIELD '=' expr | 'WHEN' expr | expr
+!             (a lone expr is allowed when exactly one property is defined; it is the value)
+!   expr   := || && == != < <= > >= + - * / % unary - ! with usual precedence, ( ), literals
+!             123  1.5  2.0e-3  "text"  , names, NAME.field, calls, STRUCT(f=expr, ...)
+!   geometry of a polygon id:  POLYGON_NUMBER POLYGON_ID AREA NUM_BOXES BBOX_X1 BBOX_Y1
+!                              BBOX_X2 BBOX_Y2 BBOX_WIDTH BBOX_HEIGHT
+!   values: INT FLOAT STRING ABS SQRT POW MIN MAX IF(c,a,b)
+!   existing property of the layer:  NAME(id)  and  NAME.field(id)
+!   '/' always gives FLOAT, '%' is integer modulo, '+' concatenates when a STRING is involved.
+!   WHEN c : the polygon gets no value for any defined property unless c is true.
+module FASCLModule
+  use iso_fortran_env, only: int64, real64
+  use DesignModule
+  use PNumMergeModule
+  use PropertyTableModule
+  use CommonModule, only: K_LEAF_CAPACITY
+  implicit none
+  private
+  public :: FASCLExecute, FASCLParseStatement, LayerEnsureProperties, FASCLRunLambda
+
+  ! ---- tokens
+  integer, parameter :: T_EOF = 0, T_ID = 1, T_INT = 2, T_FLT = 3, T_STR = 4, T_OP = 5
+  type :: Token
+     integer :: kind = T_EOF
+     character(len=:), allocatable :: s
+     integer(int64) :: iv = 0
+     real(real64)   :: rv = 0.0_real64
+  end type Token
+
+  ! ---- AST
+  integer, parameter :: N_INT = 1, N_FLT = 2, N_STR = 3, N_PARAM = 4, N_LOCAL = 5, N_BIN = 6, &
+       N_NEG = 7, N_NOT = 8, N_CALL = 9, N_PROP = 10, N_PROPF = 11, N_FIELD = 12, N_STRUCT = 13
+  integer, parameter :: B_ADD = 1, B_SUB = 2, B_MUL = 3, B_DIV = 4, B_MOD = 5, B_EQ = 6, B_NE = 7, &
+       B_LT = 8, B_LE = 9, B_GT = 10, B_GE = 11, B_AND = 12, B_OR = 13
+  integer, parameter :: F_PNUM = 1, F_PID = 2, F_AREA = 3, F_NBOX = 4, F_BX1 = 5, F_BY1 = 6, F_BX2 = 7, &
+       F_BY2 = 8, F_BW = 9, F_BH = 10, F_INT = 11, F_FLOAT = 12, F_STRING = 13, F_ABS = 14, F_SQRT = 15, &
+       F_POW = 16, F_MIN = 17, F_MAX = 18, F_IF = 19
+  type :: Node
+     integer :: op = 0, fn = 0, slot = 0, col = 0
+     integer(int64) :: iv = 0
+     real(real64)   :: rv = 0.0_real64
+     character(len=:), allocatable :: sv
+     integer :: a = 0, b = 0
+     integer, allocatable :: args(:)
+     type(PropString), allocatable :: names(:)
+  end type Node
+
+  integer, parameter :: S_ASSIGN = 1, S_FASSIGN = 2, S_WHEN = 3
+  type :: Stmt
+     integer :: kind = 0, slot = 0, expr = 0
+     character(len=:), allocatable :: field
+  end type Stmt
+
+  type, public :: Lambda
+     integer :: nparams = 0
+     type(PropString), allocatable :: params(:)
+     integer :: nslots = 0
+     type(PropString), allocatable :: slots(:)       !> local / property names
+     integer :: nnodes = 0
+     type(Node), allocatable :: nodes(:)
+     integer :: nstmts = 0
+     type(Stmt), allocatable :: stmts(:)
+  end type Lambda
+
+  !> Parser state
+  type :: Parser
+     type(Token), allocatable :: toks(:)
+     integer :: ntok = 0, pos = 1
+     integer :: status = 0
+     character(len=:), allocatable :: msg
+  end type Parser
+
+  type :: ValueColumn
+     type(PropValue), allocatable :: v(:)
+  end type ValueColumn
+
+contains
+
+  !=================================================================
+  ! Statement splitter: "PROPERTY:A[,B] = db:layer FASCL [ ... ] db2:layer2"
+  !=================================================================
+  subroutine FASCLParseStatement( text, names, opA, lam_text, opB, status, msg )
+    character(len=*), intent(in) :: text
+    type(PropString), allocatable, intent(out) :: names(:)
+    character(len=:), allocatable, intent(out) :: opA, lam_text, opB, msg
+    integer, intent(out) :: status
+    character(len=:), allocatable :: s, lhs, rhs
+    integer :: p, q, depth, i, n
+    logical :: in_str
+    status = 1
+    opA = ''; lam_text = ''; opB = ''; msg = ''
+    s = trim(adjustl(text))
+    if( len(s) >= 9 ) then
+       if( s(1:9) == 'PROPERTY:' ) s = s(10:)
+    end if
+    p = index( s, '=' )
+    if( p == 0 ) then
+       msg = 'FASCL: expected PROPERTY:NAME = layer FASCL [ lambda ] layer'; allocate(names(0)); return
+    end if
+    lhs = trim(adjustl(s(1:p-1)))
+    rhs = trim(adjustl(s(p+1:)))
+    ! property names
+    n = 1
+    do i = 1, len(lhs)
+       if( lhs(i:i) == ',' ) n = n + 1
+    end do
+    allocate( names(n) )
+    q = 1
+    do i = 1, n
+       p = index( lhs(q:), ',' )
+       if( p == 0 ) then
+          names(i)%s = trim(adjustl(lhs(q:)))
+       else
+          names(i)%s = trim(adjustl(lhs(q:q+p-2)))
+          q = q + p
+       end if
+       if( .not. valid_name( names(i)%s ) ) then
+          msg = 'FASCL: invalid property name "'//names(i)%s//'"'; return
+       end if
+    end do
+    ! operand A
+    p = index( rhs, ' ' )
+    if( p == 0 ) then
+       msg = 'FASCL: missing FASCL keyword'; return
+    end if
+    opA = rhs(1:p-1)
+    rhs = trim(adjustl(rhs(p+1:)))
+    if( len(rhs) < 5 ) then
+       msg = 'FASCL: missing FASCL keyword'; return
+    end if
+    if( rhs(1:5) /= 'FASCL' ) then
+       msg = 'FASCL: expected FASCL after '//opA; return
+    end if
+    rhs = trim(adjustl(rhs(6:)))
+    if( len(rhs) == 0 ) then
+       msg = 'FASCL: missing lambda'; return
+    end if
+    if( rhs(1:1) /= '[' ) then
+       msg = 'FASCL: lambda must start with ['; return
+    end if
+    depth = 0; in_str = .false.; q = 0
+    i = 1
+    do while( i <= len(rhs) )
+       if( in_str ) then
+          if( rhs(i:i) == '\' ) then
+             i = i + 1
+          else if( rhs(i:i) == '"' ) then
+             in_str = .false.
+          end if
+       else
+          select case( rhs(i:i) )
+          case( '"' ); in_str = .true.
+          case( '[' ); depth = depth + 1
+          case( ']' )
+             depth = depth - 1
+             if( depth == 0 ) then
+                q = i; exit
+             end if
+          end select
+       end if
+       i = i + 1
+    end do
+    if( q == 0 ) then
+       msg = 'FASCL: unbalanced [ ] in lambda'; return
+    end if
+    lam_text = rhs(1:q)
+    opB = trim(adjustl(rhs(q+1:)))
+    if( len(opB) == 0 ) opB = 'nothing'
+    p = index( opB, ' ' )
+    if( p > 0 ) opB = opB(1:p-1)
+    status = 0
+  end subroutine FASCLParseStatement
+
+  pure logical function valid_name( s )
+    character(len=*), intent(in) :: s
+    integer :: i
+    valid_name = len(s) > 0
+    if( .not. valid_name ) return
+    valid_name = is_alpha( s(1:1) ) .or. s(1:1) == '_'
+    do i = 2, len(s)
+       if( .not. ( is_alpha(s(i:i)) .or. is_digit(s(i:i)) .or. s(i:i) == '_' ) ) valid_name = .false.
+    end do
+  end function valid_name
+
+  pure logical function is_alpha( c )
+    character, intent(in) :: c
+    is_alpha = ( c >= 'a' .and. c <= 'z' ) .or. ( c >= 'A' .and. c <= 'Z' )
+  end function is_alpha
+  pure logical function is_digit( c )
+    character, intent(in) :: c
+    is_digit = c >= '0' .and. c <= '9'
+  end function is_digit
+
+  !=================================================================
+  ! Lexer
+  !=================================================================
+  subroutine lex( src, p )
+    character(len=*), intent(in) :: src
+    type(Parser), intent(inout) :: p
+    integer :: i, j, n
+    character(len=:), allocatable :: buf
+    logical :: is_flt
+    integer :: ios
+    allocate( p%toks(16) )
+    p%ntok = 0
+    n = len(src)
+    i = 1
+    do while( i <= n )
+       if( src(i:i) == ' ' .or. src(i:i) == achar(9) ) then
+          i = i + 1; cycle
+       end if
+       if( is_alpha(src(i:i)) .or. src(i:i) == '_' ) then
+          j = i
+          do while( j < n )
+             if( .not. ( is_alpha(src(j+1:j+1)) .or. is_digit(src(j+1:j+1)) .or. src(j+1:j+1) == '_' ) ) exit
+             j = j + 1
+          end do
+          call push( T_ID, src(i:j) )
+          i = j + 1
+       else if( is_digit(src(i:i)) .or. ( src(i:i) == '.' .and. i < n .and. is_digit(src(min(i+1,n):min(i+1,n))) ) ) then
+          j = i; is_flt = .false.
+          do while( j < n )
+             if( is_digit(src(j+1:j+1)) ) then
+                j = j + 1
+             else if( src(j+1:j+1) == '.' .and. .not. is_flt ) then
+                is_flt = .true.; j = j + 1
+             else if( ( src(j+1:j+1) == 'e' .or. src(j+1:j+1) == 'E' ) .and. j+1 < n ) then
+                if( is_digit(src(j+2:j+2)) ) then
+                   is_flt = .true.; j = j + 1
+                else if( ( src(j+2:j+2) == '-' .or. src(j+2:j+2) == '+' ) .and. j+2 < n ) then
+                   if( .not. is_digit(src(j+3:j+3)) ) exit
+                   is_flt = .true.; j = j + 2
+                else
+                   exit
+                end if
+             else
+                exit
+             end if
+          end do
+          if( is_flt ) then
+             call push( T_FLT, src(i:j) )
+             read( src(i:j), *, iostat=ios ) p%toks(p%ntok)%rv
+          else
+             call push( T_INT, src(i:j) )
+             read( src(i:j), *, iostat=ios ) p%toks(p%ntok)%iv
+          end if
+          if( ios /= 0 ) then
+             p%status = 1; p%msg = 'bad number '//src(i:j); return
+          end if
+          i = j + 1
+       else if( src(i:i) == '"' ) then
+          buf = ''
+          j = i + 1
+          do
+             if( j > n ) then
+                p%status = 1; p%msg = 'unterminated string'; return
+             end if
+             if( src(j:j) == '\' .and. j < n ) then
+                buf = buf // src(j+1:j+1); j = j + 2; cycle
+             end if
+             if( src(j:j) == '"' ) exit
+             buf = buf // src(j:j)
+             j = j + 1
+          end do
+          call push( T_STR, buf )
+          i = j + 1
+       else
+          if( i < n ) then
+             select case( src(i:i+1) )
+             case( '==', '!=', '<=', '>=', '&&', '||' )
+                call push( T_OP, src(i:i+1) ); i = i + 2; cycle
+             end select
+          end if
+          if( index( '()[],;=.+-*/%<>!', src(i:i) ) == 0 ) then
+             p%status = 1; p%msg = 'unexpected character "'//src(i:i)//'"'; return
+          end if
+          call push( T_OP, src(i:i) )
+          i = i + 1
+       end if
+    end do
+    call push( T_EOF, '' )
+  contains
+    subroutine push( k, s )
+      integer, intent(in) :: k
+      character(len=*), intent(in) :: s
+      type(Token), allocatable :: tmp(:)
+      if( p%ntok == size(p%toks) ) then
+         allocate( tmp( 2*size(p%toks) ) )
+         tmp(1:p%ntok) = p%toks(1:p%ntok)
+         call move_alloc( tmp, p%toks )
+      end if
+      p%ntok = p%ntok + 1
+      p%toks(p%ntok)%kind = k
+      p%toks(p%ntok)%s = s
+    end subroutine push
+  end subroutine lex
+
+  logical function at( p, s )
+    type(Parser), intent(in) :: p
+    character(len=*), intent(in) :: s
+    at = .false.
+    if( p%toks(p%pos)%kind == T_OP .or. p%toks(p%pos)%kind == T_ID ) at = ( p%toks(p%pos)%s == s )
+  end function at
+
+  subroutine expect( p, s )
+    type(Parser), intent(inout) :: p
+    character(len=*), intent(in) :: s
+    if( p%status /= 0 ) return
+    if( at( p, s ) ) then
+       p%pos = p%pos + 1
+    else
+       p%status = 1
+       p%msg = 'expected "'//s//'" near "'//p%toks(p%pos)%s//'"'
+    end if
+  end subroutine expect
+
+  !=================================================================
+  ! Compiler: text -> Lambda
+  !=================================================================
+  subroutine FASCLCompile( src, defined, t, lam, status, msg )
+    character(len=*), intent(in) :: src
+    type(PropString), intent(in) :: defined(:)       !> properties this statement defines
+    type(PropertyTable), intent(in) :: t             !> for NAME(id) reads of existing columns
+    type(Lambda), intent(out) :: lam
+    integer, intent(out) :: status
+    character(len=:), allocatable, intent(out) :: msg
+    type(Parser) :: p
+    integer :: e, slot, k, save_pos
+    character(len=:), allocatable :: nm, fld
+
+    msg = ''
+    p%msg = ''
+    call lex( src, p )
+    allocate( lam%params(4), lam%slots(8), lam%nodes(64), lam%stmts(8) )
+    if( p%status == 0 ) call expect( p, '[' )
+    if( p%status == 0 ) call expect( p, '(' )
+    do while( p%status == 0 )
+       if( p%toks(p%pos)%kind /= T_ID ) then
+          p%status = 1; p%msg = 'lambda parameter name expected'; exit
+       end if
+       call add_param( p%toks(p%pos)%s )
+       p%pos = p%pos + 1
+       if( at( p, ',' ) ) then
+          p%pos = p%pos + 1; cycle
+       end if
+       call expect( p, ')' ); exit
+    end do
+    do while( p%status == 0 )
+       if( at( p, ']' ) ) exit
+       if( at( p, 'WHEN' ) ) then
+          p%pos = p%pos + 1
+          call parse_expr( p, lam, t, e )
+          if( p%status == 0 ) call add_stmt( S_WHEN, 0, e, '' )
+       else if( p%toks(p%pos)%kind == T_ID .and. p%toks(p%pos+1)%kind == T_OP .and. &
+            p%toks(min(p%pos+1,p%ntok))%s == '=' ) then
+          nm = p%toks(p%pos)%s
+          p%pos = p%pos + 2
+          call parse_expr( p, lam, t, e )
+          if( p%status == 0 ) then
+             slot = slot_of( nm, .true. )
+             call add_stmt( S_ASSIGN, slot, e, '' )
+          end if
+       else if( p%toks(p%pos)%kind == T_ID .and. at_offset( p, 1, '.' ) .and. &
+            p%toks(min(p%pos+2,p%ntok))%kind == T_ID .and. at_offset( p, 3, '=' ) ) then
+          nm = p%toks(p%pos)%s
+          fld = p%toks(p%pos+2)%s
+          p%pos = p%pos + 4
+          call parse_expr( p, lam, t, e )
+          if( p%status == 0 ) then
+             slot = slot_of( nm, .true. )
+             call add_stmt( S_FASSIGN, slot, e, fld )
+          end if
+       else
+          save_pos = p%pos
+          call parse_expr( p, lam, t, e )
+          if( p%status == 0 ) then
+             if( size(defined) /= 1 ) then
+                p%status = 1
+                p%msg = 'a bare expression is only allowed when exactly one property is defined'
+             else
+                slot = slot_of( defined(1)%s, .true. )
+                call add_stmt( S_ASSIGN, slot, e, '' )
+             end if
+          end if
+       end if
+       if( p%status /= 0 ) exit
+       if( at( p, ';' ) ) then
+          p%pos = p%pos + 1
+       else if( .not. at( p, ']' ) ) then
+          p%status = 1; p%msg = 'expected ; or ] near "'//p%toks(p%pos)%s//'"'
+       end if
+    end do
+    if( p%status == 0 ) call expect( p, ']' )
+    if( p%status == 0 .and. p%toks(p%pos)%kind /= T_EOF ) then
+       p%status = 1; p%msg = 'text after the closing ] of the lambda'
+    end if
+    if( p%status == 0 ) then
+       if( lam%nparams /= 1 ) then
+          p%status = 1
+          p%msg = 'only unary lambdas (id) are supported; coupling lambdas (id1,id2) need the spacing stage'
+       end if
+    end if
+    if( p%status == 0 ) then
+       do k = 1, size(defined)
+          if( slot_of( defined(k)%s, .false. ) == 0 ) then
+             p%status = 1; p%msg = 'property '//defined(k)%s//' is never assigned in the lambda'; exit
+          end if
+       end do
+    end if
+    status = p%status
+    if( status /= 0 ) msg = 'FASCL lambda: '//p%msg
+  contains
+    logical function at_offset( pp, off, s )
+      type(Parser), intent(in) :: pp
+      integer, intent(in) :: off
+      character(len=*), intent(in) :: s
+      at_offset = .false.
+      if( pp%pos + off > pp%ntok ) return
+      if( pp%toks(pp%pos+off)%kind /= T_OP ) return
+      at_offset = pp%toks(pp%pos+off)%s == s
+    end function at_offset
+    subroutine add_param( s )
+      character(len=*), intent(in) :: s
+      type(PropString), allocatable :: tmp(:)
+      if( lam%nparams == size(lam%params) ) then
+         allocate( tmp( 2*size(lam%params) ) ); tmp(1:lam%nparams) = lam%params(1:lam%nparams)
+         call move_alloc( tmp, lam%params )
+      end if
+      lam%nparams = lam%nparams + 1
+      lam%params(lam%nparams)%s = s
+    end subroutine add_param
+    integer function slot_of( s, create )
+      character(len=*), intent(in) :: s
+      logical, intent(in) :: create
+      type(PropString), allocatable :: tmp(:)
+      integer :: k2
+      do k2 = 1, lam%nslots
+         if( lam%slots(k2)%s == s ) then
+            slot_of = k2; return
+         end if
+      end do
+      slot_of = 0
+      if( .not. create ) return
+      if( lam%nslots == size(lam%slots) ) then
+         allocate( tmp( 2*size(lam%slots) ) ); tmp(1:lam%nslots) = lam%slots(1:lam%nslots)
+         call move_alloc( tmp, lam%slots )
+      end if
+      lam%nslots = lam%nslots + 1
+      lam%slots(lam%nslots)%s = s
+      slot_of = lam%nslots
+    end function slot_of
+    subroutine add_stmt( kind, slot_, expr_, field_ )
+      integer, intent(in) :: kind, slot_, expr_
+      character(len=*), intent(in) :: field_
+      type(Stmt), allocatable :: tmp(:)
+      if( lam%nstmts == size(lam%stmts) ) then
+         allocate( tmp( 2*size(lam%stmts) ) ); tmp(1:lam%nstmts) = lam%stmts(1:lam%nstmts)
+         call move_alloc( tmp, lam%stmts )
+      end if
+      lam%nstmts = lam%nstmts + 1
+      lam%stmts(lam%nstmts)%kind = kind
+      lam%stmts(lam%nstmts)%slot = slot_
+      lam%stmts(lam%nstmts)%expr = expr_
+      lam%stmts(lam%nstmts)%field = field_
+    end subroutine add_stmt
+  end subroutine FASCLCompile
+
+  integer function new_node( lam, op )
+    type(Lambda), intent(inout) :: lam
+    integer, intent(in) :: op
+    type(Node), allocatable :: tmp(:)
+    if( lam%nnodes == size(lam%nodes) ) then
+       allocate( tmp( 2*size(lam%nodes) ) )
+       tmp(1:lam%nnodes) = lam%nodes(1:lam%nnodes)
+       call move_alloc( tmp, lam%nodes )
+    end if
+    lam%nnodes = lam%nnodes + 1
+    lam%nodes(lam%nnodes)%op = op
+    new_node = lam%nnodes
+  end function new_node
+
+  integer function bin_node( lam, code, a, b ) result(k)
+    type(Lambda), intent(inout) :: lam
+    integer, intent(in) :: code, a, b
+    k = new_node( lam, N_BIN )
+    lam%nodes(k)%fn = code
+    lam%nodes(k)%a = a
+    lam%nodes(k)%b = b
+  end function bin_node
+
+  recursive subroutine parse_expr( p, lam, t, e )
+    type(Parser), intent(inout) :: p
+    type(Lambda), intent(inout) :: lam
+    type(PropertyTable), intent(in) :: t
+    integer, intent(out) :: e
+    integer :: r
+    call parse_and( p, lam, t, e )
+    do while( p%status == 0 .and. at( p, '||' ) )
+       p%pos = p%pos + 1
+       call parse_and( p, lam, t, r )
+       e = bin_node( lam, B_OR, e, r )
+    end do
+  end subroutine parse_expr
+
+  recursive subroutine parse_and( p, lam, t, e )
+    type(Parser), intent(inout) :: p
+    type(Lambda), intent(inout) :: lam
+    type(PropertyTable), intent(in) :: t
+    integer, intent(out) :: e
+    integer :: r
+    call parse_cmp( p, lam, t, e )
+    do while( p%status == 0 .and. at( p, '&&' ) )
+       p%pos = p%pos + 1
+       call parse_cmp( p, lam, t, r )
+       e = bin_node( lam, B_AND, e, r )
+    end do
+  end subroutine parse_and
+
+  recursive subroutine parse_cmp( p, lam, t, e )
+    type(Parser), intent(inout) :: p
+    type(Lambda), intent(inout) :: lam
+    type(PropertyTable), intent(in) :: t
+    integer, intent(out) :: e
+    integer :: r, code
+    call parse_add( p, lam, t, e )
+    do while( p%status == 0 )
+       code = 0
+       if( at( p, '==' ) ) code = B_EQ
+       if( at( p, '!=' ) ) code = B_NE
+       if( at( p, '<' ) )  code = B_LT
+       if( at( p, '<=' ) ) code = B_LE
+       if( at( p, '>' ) )  code = B_GT
+       if( at( p, '>=' ) ) code = B_GE
+       if( code == 0 ) exit
+       p%pos = p%pos + 1
+       call parse_add( p, lam, t, r )
+       e = bin_node( lam, code, e, r )
+    end do
+  end subroutine parse_cmp
+
+  recursive subroutine parse_add( p, lam, t, e )
+    type(Parser), intent(inout) :: p
+    type(Lambda), intent(inout) :: lam
+    type(PropertyTable), intent(in) :: t
+    integer, intent(out) :: e
+    integer :: r, code
+    call parse_mul( p, lam, t, e )
+    do while( p%status == 0 )
+       code = 0
+       if( at( p, '+' ) ) code = B_ADD
+       if( at( p, '-' ) ) code = B_SUB
+       if( code == 0 ) exit
+       p%pos = p%pos + 1
+       call parse_mul( p, lam, t, r )
+       e = bin_node( lam, code, e, r )
+    end do
+  end subroutine parse_add
+
+  recursive subroutine parse_mul( p, lam, t, e )
+    type(Parser), intent(inout) :: p
+    type(Lambda), intent(inout) :: lam
+    type(PropertyTable), intent(in) :: t
+    integer, intent(out) :: e
+    integer :: r, code
+    call parse_unary( p, lam, t, e )
+    do while( p%status == 0 )
+       code = 0
+       if( at( p, '*' ) ) code = B_MUL
+       if( at( p, '/' ) ) code = B_DIV
+       if( at( p, '%' ) ) code = B_MOD
+       if( code == 0 ) exit
+       p%pos = p%pos + 1
+       call parse_unary( p, lam, t, r )
+       e = bin_node( lam, code, e, r )
+    end do
+  end subroutine parse_mul
+
+  recursive subroutine parse_unary( p, lam, t, e )
+    type(Parser), intent(inout) :: p
+    type(Lambda), intent(inout) :: lam
+    type(PropertyTable), intent(in) :: t
+    integer, intent(out) :: e
+    integer :: a
+    if( at( p, '-' ) ) then
+       p%pos = p%pos + 1
+       call parse_unary( p, lam, t, a )
+       e = new_node( lam, N_NEG ); lam%nodes(e)%a = a
+    else if( at( p, '!' ) ) then
+       p%pos = p%pos + 1
+       call parse_unary( p, lam, t, a )
+       e = new_node( lam, N_NOT ); lam%nodes(e)%a = a
+    else
+       call parse_postfix( p, lam, t, e )
+    end if
+  end subroutine parse_unary
+
+  recursive subroutine parse_postfix( p, lam, t, e )
+    type(Parser), intent(inout) :: p
+    type(Lambda), intent(inout) :: lam
+    type(PropertyTable), intent(in) :: t
+    integer, intent(out) :: e
+    integer :: a
+    call parse_primary( p, lam, t, e )
+    do while( p%status == 0 .and. at( p, '.' ) )
+       p%pos = p%pos + 1
+       if( p%toks(p%pos)%kind /= T_ID ) then
+          p%status = 1; p%msg = 'field name expected after .'; return
+       end if
+       a = e
+       e = new_node( lam, N_FIELD )
+       lam%nodes(e)%a = a
+       lam%nodes(e)%sv = p%toks(p%pos)%s
+       p%pos = p%pos + 1
+    end do
+  end subroutine parse_postfix
+
+  recursive subroutine parse_primary( p, lam, t, e )
+    type(Parser), intent(inout) :: p
+    type(Lambda), intent(inout) :: lam
+    type(PropertyTable), intent(in) :: t
+    integer, intent(out) :: e
+    character(len=:), allocatable :: nm, fld
+    integer :: k, fn, nargs, a
+    integer, allocatable :: args(:)
+    type(PropString), allocatable :: fnames(:)
+    e = 0
+    if( p%status /= 0 ) return
+    select case( p%toks(p%pos)%kind )
+    case( T_INT )
+       e = new_node( lam, N_INT ); lam%nodes(e)%iv = p%toks(p%pos)%iv; p%pos = p%pos + 1
+    case( T_FLT )
+       e = new_node( lam, N_FLT ); lam%nodes(e)%rv = p%toks(p%pos)%rv; p%pos = p%pos + 1
+    case( T_STR )
+       e = new_node( lam, N_STR ); lam%nodes(e)%sv = p%toks(p%pos)%s; p%pos = p%pos + 1
+    case( T_OP )
+       if( at( p, '(' ) ) then
+          p%pos = p%pos + 1
+          call parse_expr( p, lam, t, e )
+          call expect( p, ')' )
+       else
+          p%status = 1; p%msg = 'unexpected "'//p%toks(p%pos)%s//'"'
+       end if
+    case( T_ID )
+       nm = p%toks(p%pos)%s
+       p%pos = p%pos + 1
+       if( nm == 'STRUCT' ) then
+          call expect( p, '(' )
+          allocate( args(0), fnames(0) )
+          do while( p%status == 0 .and. .not. at( p, ')' ) )
+             if( p%toks(p%pos)%kind /= T_ID ) then
+                p%status = 1; p%msg = 'STRUCT field name expected'; return
+             end if
+             fnames = [ fnames, PropString( p%toks(p%pos)%s ) ]
+             p%pos = p%pos + 1
+             call expect( p, '=' )
+             call parse_expr( p, lam, t, a )
+             args = [ args, a ]
+             if( at( p, ',' ) ) p%pos = p%pos + 1
+          end do
+          call expect( p, ')' )
+          e = new_node( lam, N_STRUCT )
+          lam%nodes(e)%args = args
+          lam%nodes(e)%names = fnames
+          return
+       end if
+       ! NAME.field(id) : field of an existing STRUCT property
+       fld = ''
+       if( at( p, '.' ) .and. p%toks(p%pos+1)%kind == T_ID .and. p%pos + 2 <= p%ntok ) then
+          if( p%toks(p%pos+2)%kind == T_OP .and. p%toks(p%pos+2)%s == '(' .and. &
+               PropColumnIndex( t, nm ) > 0 ) then
+             fld = p%toks(p%pos+1)%s
+             p%pos = p%pos + 2
+          end if
+       end if
+       if( at( p, '(' ) ) then
+          p%pos = p%pos + 1
+          allocate( args(0) )
+          do while( p%status == 0 .and. .not. at( p, ')' ) )
+             call parse_expr( p, lam, t, a )
+             args = [ args, a ]
+             if( at( p, ',' ) ) then
+                p%pos = p%pos + 1
+             else if( .not. at( p, ')' ) ) then
+                p%status = 1; p%msg = 'expected , or ) in call to '//nm
+             end if
+          end do
+          call expect( p, ')' )
+          if( p%status /= 0 ) return
+          nargs = size(args)
+          fn = builtin( nm )
+          if( fn > 0 .and. len(fld) == 0 ) then
+             if( nargs /= arity( fn ) ) then
+                p%status = 1; p%msg = nm//' takes '//itoa(arity(fn))//' argument(s)'; return
+             end if
+             e = new_node( lam, N_CALL )
+             lam%nodes(e)%fn = fn
+             lam%nodes(e)%args = args
+          else
+             k = PropColumnIndex( t, nm )
+             if( k == 0 ) then
+                p%status = 1; p%msg = 'unknown function or property "'//nm//'"'; return
+             end if
+             if( nargs /= 1 ) then
+                p%status = 1; p%msg = 'property read '//nm//'(id) takes one argument'; return
+             end if
+             if( len(fld) > 0 ) then
+                e = new_node( lam, N_PROPF ); lam%nodes(e)%sv = fld
+             else
+                e = new_node( lam, N_PROP )
+             end if
+             lam%nodes(e)%col = k
+             lam%nodes(e)%a = args(1)
+          end if
+       else
+          do k = 1, lam%nparams
+             if( lam%params(k)%s == nm ) then
+                e = new_node( lam, N_PARAM ); lam%nodes(e)%slot = k
+                return
+             end if
+          end do
+          do k = 1, lam%nslots
+             if( lam%slots(k)%s == nm ) then
+                e = new_node( lam, N_LOCAL ); lam%nodes(e)%slot = k
+                return
+             end if
+          end do
+          p%status = 1; p%msg = 'unknown name "'//nm//'" (not a parameter or an earlier assignment)'
+       end if
+    case default
+       p%status = 1; p%msg = 'unexpected end of lambda'
+    end select
+  end subroutine parse_primary
+
+  pure function itoa( i ) result(s)
+    integer, intent(in) :: i
+    character(len=:), allocatable :: s
+    character(len=16) :: b
+    write(b,'(I0)') i
+    s = trim(b)
+  end function itoa
+
+  pure integer function builtin( nm )
+    character(len=*), intent(in) :: nm
+    select case( nm )
+    case( 'POLYGON_NUMBER' ); builtin = F_PNUM
+    case( 'POLYGON_ID' );     builtin = F_PID
+    case( 'AREA' );           builtin = F_AREA
+    case( 'NUM_BOXES', 'NUM_RECTS' ); builtin = F_NBOX
+    case( 'BBOX_X1' );        builtin = F_BX1
+    case( 'BBOX_Y1' );        builtin = F_BY1
+    case( 'BBOX_X2' );        builtin = F_BX2
+    case( 'BBOX_Y2' );        builtin = F_BY2
+    case( 'BBOX_WIDTH' );     builtin = F_BW
+    case( 'BBOX_HEIGHT' );    builtin = F_BH
+    case( 'INT' );            builtin = F_INT
+    case( 'FLOAT' );          builtin = F_FLOAT
+    case( 'STRING' );         builtin = F_STRING
+    case( 'ABS' );            builtin = F_ABS
+    case( 'SQRT' );           builtin = F_SQRT
+    case( 'POW' );            builtin = F_POW
+    case( 'MIN' );            builtin = F_MIN
+    case( 'MAX' );            builtin = F_MAX
+    case( 'IF' );             builtin = F_IF
+    case default;             builtin = 0
+    end select
+  end function builtin
+
+  pure integer function arity( fn )
+    integer, intent(in) :: fn
+    select case( fn )
+    case( F_POW, F_MIN, F_MAX ); arity = 2
+    case( F_IF );                arity = 3
+    case default;                arity = 1
+    end select
+  end function arity
+
+  !=================================================================
+  ! Evaluator
+  !=================================================================
+  pure function err( m ) result(v)
+    character(len=*), intent(in) :: m
+    type(PropValue) :: v
+    v%kind = PV_ERROR
+    v%s = m
+  end function err
+
+  pure function ival( i ) result(v)
+    integer(int64), intent(in) :: i
+    type(PropValue) :: v
+    v%kind = PV_INT; v%i = i
+  end function ival
+
+  pure function rval( r ) result(v)
+    real(real64), intent(in) :: r
+    type(PropValue) :: v
+    v%kind = PV_FLOAT; v%r = r
+  end function rval
+
+  pure logical function is_num( v )
+    type(PropValue), intent(in) :: v
+    is_num = v%kind == PV_INT .or. v%kind == PV_FLOAT
+  end function is_num
+
+  pure real(real64) function as_real( v )
+    type(PropValue), intent(in) :: v
+    if( v%kind == PV_INT ) then
+       as_real = real( v%i, real64 )
+    else
+       as_real = v%r
+    end if
+  end function as_real
+
+  pure logical function truthy( v )
+    type(PropValue), intent(in) :: v
+    select case( v%kind )
+    case( PV_INT );    truthy = v%i /= 0
+    case( PV_FLOAT );  truthy = v%r /= 0.0_real64
+    case( PV_STRING ); truthy = len( v%s ) > 0
+    case( PV_STRUCT ); truthy = .true.
+    case default;      truthy = .false.
+    end select
+  end function truthy
+
+  !> Polygon ordinal of an id-valued argument (0 + error value when invalid).
+  function ord_of( t, v, e ) result(ord)
+    type(PropertyTable), intent(in) :: t
+    type(PropValue), intent(in) :: v
+    type(PropValue), intent(inout) :: e
+    integer(int64) :: ord
+    ord = 0
+    if( v%kind /= PV_INT ) then
+       e = err( 'polygon id must be an INT' ); return
+    end if
+    ord = PropOrdinalOfId( t, v%i )
+    if( ord == 0 ) e = err( 'not a polygon id of this layer' )
+  end function ord_of
+
+  recursive function eval( lam, k, ids, locals, t ) result(v)
+    type(Lambda), intent(in) :: lam
+    integer, intent(in) :: k
+    integer(int64), intent(in) :: ids(:)
+    type(PropValue), intent(in) :: locals(:)
+    type(PropertyTable), intent(in) :: t
+    type(PropValue) :: v, a, b, c
+    integer(int64) :: ord
+    integer :: j
+    associate( nd => lam%nodes(k) )
+      select case( nd%op )
+      case( N_INT );   v = ival( nd%iv )
+      case( N_FLT );   v = rval( nd%rv )
+      case( N_STR );   v%kind = PV_STRING; v%s = nd%sv
+      case( N_PARAM ); v = ival( ids(nd%slot) )
+      case( N_LOCAL )
+         v = locals( nd%slot )
+         if( v%kind == PV_NONE ) v = err( lam%slots(nd%slot)%s//' used before it is assigned' )
+      case( N_NEG )
+         a = eval( lam, nd%a, ids, locals, t )
+         select case( a%kind )
+         case( PV_INT );   v = ival( -a%i )
+         case( PV_FLOAT ); v = rval( -a%r )
+         case( PV_ERROR ); v = a
+         case default;     v = err( 'unary - needs a number' )
+         end select
+      case( N_NOT )
+         a = eval( lam, nd%a, ids, locals, t )
+         if( a%kind == PV_ERROR ) then
+            v = a
+         else
+            v = ival( merge( 0_int64, 1_int64, truthy( a ) ) )
+         end if
+      case( N_BIN )
+         if( nd%fn == B_AND .or. nd%fn == B_OR ) then
+            a = eval( lam, nd%a, ids, locals, t )
+            if( a%kind == PV_ERROR ) then
+               v = a; return
+            end if
+            if( nd%fn == B_AND .and. .not. truthy( a ) ) then
+               v = ival( 0_int64 ); return
+            end if
+            if( nd%fn == B_OR .and. truthy( a ) ) then
+               v = ival( 1_int64 ); return
+            end if
+            b = eval( lam, nd%b, ids, locals, t )
+            if( b%kind == PV_ERROR ) then
+               v = b
+            else
+               v = ival( merge( 1_int64, 0_int64, truthy( b ) ) )
+            end if
+            return
+         end if
+         a = eval( lam, nd%a, ids, locals, t )
+         if( a%kind == PV_ERROR ) then
+            v = a; return
+         end if
+         b = eval( lam, nd%b, ids, locals, t )
+         if( b%kind == PV_ERROR ) then
+            v = b; return
+         end if
+         v = binop( nd%fn, a, b )
+      case( N_STRUCT )
+         v%kind = PV_STRUCT
+         allocate( v%f( size(nd%args) ) )
+         do j = 1, size( nd%args )
+            a = eval( lam, nd%args(j), ids, locals, t )
+            if( a%kind == PV_ERROR ) then
+               v = a; return
+            end if
+            if( a%kind == PV_STRUCT ) then
+               v = err( 'STRUCT fields must be INT, FLOAT or STRING (no nesting)' ); return
+            end if
+            v%f(j)%name = nd%names(j)%s
+            v%f(j)%kind = a%kind; v%f(j)%i = a%i; v%f(j)%r = a%r
+            if( allocated( a%s ) ) v%f(j)%s = a%s
+         end do
+      case( N_FIELD )
+         a = eval( lam, nd%a, ids, locals, t )
+         if( a%kind == PV_ERROR ) then
+            v = a; return
+         end if
+         if( a%kind /= PV_STRUCT ) then
+            v = err( '.'//nd%sv//' applied to a non-STRUCT value' ); return
+         end if
+         v = err( 'STRUCT has no field '//nd%sv )
+         do j = 1, size( a%f )
+            if( a%f(j)%name == nd%sv ) then
+               v = PropValue()
+               v%kind = a%f(j)%kind; v%i = a%f(j)%i; v%r = a%f(j)%r
+               if( allocated( a%f(j)%s ) ) v%s = a%f(j)%s
+               exit
+            end if
+         end do
+      case( N_PROP, N_PROPF )
+         a = eval( lam, nd%a, ids, locals, t )
+         if( a%kind == PV_ERROR ) then
+            v = a; return
+         end if
+         c = PropValue()
+         ord = ord_of( t, a, c )
+         if( c%kind == PV_ERROR ) then
+            v = c; return
+         end if
+         if( nd%op == N_PROP ) then
+            v = PropGetValue( t, nd%col, ord )
+         else
+            v = PropGetField( t, nd%col, nd%sv, ord )
+         end if
+         if( v%kind == PV_NONE ) v = err( 'property '//t%cols(nd%col)%name//' has no value on this polygon' )
+      case( N_CALL )
+         v = call_builtin( lam, nd, ids, locals, t )
+      case default
+         v = err( 'internal: bad node' )
+      end select
+    end associate
+  end function eval
+
+  function binop( code, a, b ) result(v)
+    integer, intent(in) :: code
+    type(PropValue), intent(in) :: a, b
+    type(PropValue) :: v
+    logical :: both_int, r
+    if( a%kind == PV_STRUCT .or. b%kind == PV_STRUCT ) then
+       v = err( 'operators do not apply to STRUCT values' ); return
+    end if
+    if( code == B_ADD .and. ( a%kind == PV_STRING .or. b%kind == PV_STRING ) ) then
+       v%kind = PV_STRING
+       v%s = PropValueToString( a ) // PropValueToString( b )
+       return
+    end if
+    if( a%kind == PV_STRING .and. b%kind == PV_STRING ) then
+       select case( code )
+       case( B_EQ ); r = a%s == b%s
+       case( B_NE ); r = a%s /= b%s
+       case( B_LT ); r = llt( a%s, b%s )
+       case( B_LE ); r = lle( a%s, b%s )
+       case( B_GT ); r = lgt( a%s, b%s )
+       case( B_GE ); r = lge( a%s, b%s )
+       case default
+          v = err( 'operator not defined on STRING' ); return
+       end select
+       v = ival( merge( 1_int64, 0_int64, r ) ); return
+    end if
+    if( .not. ( is_num( a ) .and. is_num( b ) ) ) then
+       v = err( 'operator mixes STRING and number' ); return
+    end if
+    both_int = a%kind == PV_INT .and. b%kind == PV_INT
+    select case( code )
+    case( B_ADD )
+       if( both_int ) then
+          v = ival( a%i + b%i )
+       else
+          v = rval( as_real(a) + as_real(b) )
+       end if
+    case( B_SUB )
+       if( both_int ) then
+          v = ival( a%i - b%i )
+       else
+          v = rval( as_real(a) - as_real(b) )
+       end if
+    case( B_MUL )
+       if( both_int ) then
+          v = ival( a%i * b%i )
+       else
+          v = rval( as_real(a) * as_real(b) )
+       end if
+    case( B_DIV )
+       if( as_real(b) == 0.0_real64 ) then
+          v = err( 'division by zero' )
+       else
+          v = rval( as_real(a) / as_real(b) )
+       end if
+    case( B_MOD )
+       if( .not. both_int ) then
+          v = err( '% needs INT operands' )
+       else if( b%i == 0 ) then
+          v = err( 'modulo by zero' )
+       else
+          v = ival( modulo( a%i, b%i ) )
+       end if
+    case default
+       select case( code )
+       case( B_EQ ); r = as_real(a) == as_real(b)
+       case( B_NE ); r = as_real(a) /= as_real(b)
+       case( B_LT ); r = as_real(a) <  as_real(b)
+       case( B_LE ); r = as_real(a) <= as_real(b)
+       case( B_GT ); r = as_real(a) >  as_real(b)
+       case( B_GE ); r = as_real(a) >= as_real(b)
+       end select
+       if( both_int ) then
+          select case( code )
+          case( B_EQ ); r = a%i == b%i
+          case( B_NE ); r = a%i /= b%i
+          case( B_LT ); r = a%i <  b%i
+          case( B_LE ); r = a%i <= b%i
+          case( B_GT ); r = a%i >  b%i
+          case( B_GE ); r = a%i >= b%i
+          end select
+       end if
+       v = ival( merge( 1_int64, 0_int64, r ) )
+    end select
+  end function binop
+
+  recursive function call_builtin( lam, nd, ids, locals, t ) result(v)
+    type(Lambda), intent(in) :: lam
+    type(Node), intent(in) :: nd
+    integer(int64), intent(in) :: ids(:)
+    type(PropValue), intent(in) :: locals(:)
+    type(PropertyTable), intent(in) :: t
+    type(PropValue) :: v, a, b, e
+    integer(int64) :: ord
+    integer :: ios
+    if( nd%fn == F_IF ) then
+       a = eval( lam, nd%args(1), ids, locals, t )
+       if( a%kind == PV_ERROR ) then
+          v = a
+       else if( truthy( a ) ) then
+          v = eval( lam, nd%args(2), ids, locals, t )
+       else
+          v = eval( lam, nd%args(3), ids, locals, t )
+       end if
+       return
+    end if
+    a = eval( lam, nd%args(1), ids, locals, t )
+    if( a%kind == PV_ERROR ) then
+       v = a; return
+    end if
+    if( size( nd%args ) > 1 ) then
+       b = eval( lam, nd%args(2), ids, locals, t )
+       if( b%kind == PV_ERROR ) then
+          v = b; return
+       end if
+    end if
+    select case( nd%fn )
+    case( F_PNUM, F_PID, F_AREA, F_NBOX, F_BX1, F_BY1, F_BX2, F_BY2, F_BW, F_BH )
+       e = PropValue()
+       ord = ord_of( t, a, e )
+       if( e%kind == PV_ERROR ) then
+          v = e; return
+       end if
+       select case( nd%fn )
+       case( F_PNUM ); v = ival( ord )
+       case( F_PID );  v = ival( a%i )
+       case( F_AREA ); v = ival( t%area(ord) )
+       case( F_NBOX ); v = ival( t%poly_start(ord+1) - t%poly_start(ord) )
+       case( F_BX1 );  v = ival( int( t%bbox(ord)%x1, int64 ) )
+       case( F_BY1 );  v = ival( int( t%bbox(ord)%y1, int64 ) )
+       case( F_BX2 );  v = ival( int( t%bbox(ord)%x2, int64 ) )
+       case( F_BY2 );  v = ival( int( t%bbox(ord)%y2, int64 ) )
+       case( F_BW );   v = ival( int( t%bbox(ord)%x2, int64 ) - int( t%bbox(ord)%x1, int64 ) )
+       case( F_BH );   v = ival( int( t%bbox(ord)%y2, int64 ) - int( t%bbox(ord)%y1, int64 ) )
+       end select
+    case( F_INT )
+       select case( a%kind )
+       case( PV_INT );    v = a
+       case( PV_FLOAT );  v = ival( int( a%r, int64 ) )
+       case( PV_STRING )
+          v = ival( 0_int64 )
+          read( a%s, *, iostat=ios ) v%i
+          if( ios /= 0 ) v = err( 'INT: cannot convert "'//a%s//'"' )
+       case default;      v = err( 'INT: bad argument' )
+       end select
+    case( F_FLOAT )
+       select case( a%kind )
+       case( PV_INT, PV_FLOAT ); v = rval( as_real( a ) )
+       case( PV_STRING )
+          v = rval( 0.0_real64 )
+          read( a%s, *, iostat=ios ) v%r
+          if( ios /= 0 ) v = err( 'FLOAT: cannot convert "'//a%s//'"' )
+       case default; v = err( 'FLOAT: bad argument' )
+       end select
+    case( F_STRING )
+       v%kind = PV_STRING
+       v%s = PropValueToString( a )
+    case( F_ABS )
+       if( a%kind == PV_INT ) then
+          v = ival( abs( a%i ) )
+       else if( a%kind == PV_FLOAT ) then
+          v = rval( abs( a%r ) )
+       else
+          v = err( 'ABS needs a number' )
+       end if
+    case( F_SQRT )
+       if( .not. is_num( a ) ) then
+          v = err( 'SQRT needs a number' )
+       else if( as_real( a ) < 0 ) then
+          v = err( 'SQRT of a negative number' )
+       else
+          v = rval( sqrt( as_real( a ) ) )
+       end if
+    case( F_POW )
+       if( .not. ( is_num( a ) .and. is_num( b ) ) ) then
+          v = err( 'POW needs numbers' )
+       else
+          v = rval( as_real( a ) ** as_real( b ) )
+       end if
+    case( F_MIN, F_MAX )
+       if( .not. ( is_num( a ) .and. is_num( b ) ) ) then
+          v = err( 'MIN/MAX need numbers' )
+       else if( a%kind == PV_INT .and. b%kind == PV_INT ) then
+          v = ival( merge( min( a%i, b%i ), max( a%i, b%i ), nd%fn == F_MIN ) )
+       else
+          v = rval( merge( min( as_real(a), as_real(b) ), max( as_real(a), as_real(b) ), nd%fn == F_MIN ) )
+       end if
+    case default
+       v = err( 'internal: unknown builtin' )
+    end select
+  end function call_builtin
+
+  !> Run the lambda statements for one polygon; locals(slot) hold the results.
+  !> skipped = a WHEN guard was false; errv%kind == PV_ERROR on a runtime error.
+  subroutine run_one( lam, id, locals, t, skipped, errv )
+    type(Lambda), intent(in) :: lam
+    integer(int64), intent(in) :: id
+    type(PropValue), intent(inout) :: locals(:)
+    type(PropertyTable), intent(in) :: t
+    logical, intent(out) :: skipped
+    type(PropValue), intent(inout) :: errv
+    type(PropValue) :: v
+    type(PropField), allocatable :: tmp(:)
+    integer :: s, j, n
+    integer(int64) :: ids(1)
+    ids(1) = id
+    skipped = .false.
+    do s = 1, lam%nstmts
+       associate( st => lam%stmts(s) )
+         v = eval( lam, st%expr, ids, locals, t )
+         if( v%kind == PV_ERROR ) then
+            errv = v; return
+         end if
+         select case( st%kind )
+         case( S_WHEN )
+            if( .not. truthy( v ) ) then
+               skipped = .true.; return
+            end if
+         case( S_ASSIGN )
+            locals( st%slot ) = v
+         case( S_FASSIGN )
+            if( v%kind == PV_STRUCT ) then
+               errv = err( 'STRUCT fields must be INT, FLOAT or STRING (no nesting)' ); return
+            end if
+            associate( L => locals( st%slot ) )
+              if( L%kind /= PV_STRUCT ) then
+                 if( L%kind /= PV_NONE ) then
+                    errv = err( lam%slots(st%slot)%s//'.'//st%field//' = ... on a non-STRUCT value' ); return
+                 end if
+                 L%kind = PV_STRUCT
+                 allocate( L%f(0) )
+              end if
+              n = 0
+              do j = 1, size( L%f )
+                 if( L%f(j)%name == st%field ) then
+                    n = j; exit
+                 end if
+              end do
+              if( n == 0 ) then
+                 allocate( tmp( size(L%f) + 1 ) )
+                 tmp(1:size(L%f)) = L%f
+                 call move_alloc( tmp, L%f )
+                 n = size( L%f )
+                 L%f(n)%name = st%field
+              end if
+              L%f(n)%kind = v%kind; L%f(n)%i = v%i; L%f(n)%r = v%r
+              if( allocated( v%s ) ) then
+                 L%f(n)%s = v%s
+              else if( allocated( L%f(n)%s ) ) then
+                 deallocate( L%f(n)%s )
+              end if
+            end associate
+         end select
+       end associate
+    end do
+  end subroutine run_one
+
+  !=================================================================
+  ! Bring the layer to Box form with polygon numbers and (re)index its table.
+  !=================================================================
+  subroutine LayerEnsureProperties( L, lname )
+    type(Layer), intent(inout), target :: L
+    character(len=*), intent(in) :: lname
+    logical :: dropped
+    real(kind=real64) :: oa, op
+    call LayerExpand( L )
+    if( L%n_used > 0 ) then
+       if( NeedsHealing( L ) .or. NeedsPNum( L ) ) call PreprocessLayer( L )
+       if( NeedsPNum( L ) ) then
+          if( NeedsRTree( L ) ) call BuildTree( L )
+          call PerformMerge( L%pnumtable, L%layer_boxes(1:L%n_used), K_LEAF_CAPACITY, &
+               L%tree%tree_nodes, L%tree%root_index, oa, op )
+          call L%mark( LAYER_STATE_PNUM )
+       end if
+    end if
+    if( .not. allocated( L%props ) ) allocate( L%props )
+    if( L%n_used > 0 ) then
+       call PropTableIndex( L%props, L%layer_boxes, L%n_used, L%pnumtable, dropped )
+    else
+       call PropTableIndex( L%props, L%layer_boxes, 0_int64, L%pnumtable, dropped )
+    end if
+    if( dropped ) write(*,'(A,A,A)') 'WARNING: layer ', lname, &
+         ' changed since its properties were computed; stale properties dropped'
+  end subroutine LayerEnsureProperties
+
+  !> Compile and run `lam_text` over every polygon of L, defining properties `names`.
+  subroutine FASCLRunLambda( L, lname, names, lam_text, status, msg )
+    type(Layer), intent(inout), target :: L
+    character(len=*), intent(in) :: lname
+    type(PropString), intent(in) :: names(:)
+    character(len=*), intent(in) :: lam_text
+    integer, intent(out) :: status
+    character(len=:), allocatable, intent(out) :: msg
+    type(Lambda) :: lam
+    type(ValueColumn), allocatable :: outs(:)
+    integer, allocatable :: out_slot(:)
+    type(PropValue), allocatable :: locals(:)
+    type(PropValue) :: errv, first_err
+    integer(int64) :: ord, np, err_ord, nskip
+    integer :: k, j
+    logical :: skipped
+    real(real64) :: t0, t1
+
+    call LayerEnsureProperties( L, lname )
+    call FASCLCompile( lam_text, names, L%props, lam, status, msg )
+    if( status /= 0 ) return
+    np = L%props%n_poly
+    allocate( outs( size(names) ), out_slot( size(names) ) )
+    do k = 1, size(names)
+       allocate( outs(k)%v(np) )
+       out_slot(k) = 0
+       do j = 1, lam%nslots
+          if( lam%slots(j)%s == names(k)%s ) out_slot(k) = j
+       end do
+    end do
+    err_ord = huge(err_ord)
+    nskip = 0
+    call cpu_time( t0 )
+    !$omp parallel private(locals, errv, skipped, k, ord)
+    allocate( locals( lam%nslots ) )
+    !$omp do schedule(dynamic, 512) reduction(+:nskip)
+    do ord = 1, np
+       do k = 1, lam%nslots
+          locals(k) = PropValue()
+       end do
+       errv = PropValue()
+       call run_one( lam, L%props%poly_id(ord), locals, L%props, skipped, errv )
+       if( errv%kind == PV_ERROR ) then
+          !$omp critical (fascl_err)
+          if( ord < err_ord ) then
+             err_ord = ord
+             first_err = errv
+          end if
+          !$omp end critical (fascl_err)
+          cycle
+       end if
+       if( skipped ) then
+          nskip = nskip + 1
+          cycle
+       end if
+       do k = 1, size(out_slot)
+          outs(k)%v(ord) = locals( out_slot(k) )
+       end do
+    end do
+    !$omp end do
+    deallocate( locals )
+    !$omp end parallel
+    call cpu_time( t1 )
+    if( err_ord /= huge(err_ord) ) then
+       status = 1
+       write(msg,'(A)') ''
+       msg = 'FASCL runtime error on polygon #'//i8toa(err_ord)//' (id '// &
+            i8toa(L%props%poly_id(err_ord))//'): '//first_err%s
+       return
+    end if
+    do k = 1, size(names)
+       call PropCommitColumn( L%props, names(k)%s, outs(k)%v, status, msg )
+       if( status /= 0 ) return
+    end do
+    write(*,'(A,A,A,I0,A,I0,A,F10.3,A)') 'FASCL: ', lname, ' polygons=', np, ' skipped(WHEN)=', nskip, &
+         ' cpu=', t1 - t0, ' s'
+    status = 0
+    msg = ''
+  end subroutine FASCLRunLambda
+
+  pure function i8toa( i ) result(s)
+    integer(int64), intent(in) :: i
+    character(len=:), allocatable :: s
+    character(len=24) :: b
+    write(b,'(I0)') i
+    s = trim(b)
+  end function i8toa
+
+  !> Execute a parsed FASCL statement on resolved layers (B may be null for `nothing`).
+  subroutine FASCLExecute( names, A, lnameA, B, lam_text, status, msg )
+    type(PropString), intent(in) :: names(:)
+    type(Layer), intent(inout), target :: A
+    character(len=*), intent(in) :: lnameA
+    type(Layer), pointer, intent(in) :: B
+    character(len=*), intent(in) :: lam_text
+    integer, intent(out) :: status
+    character(len=:), allocatable, intent(out) :: msg
+    if( associated( B ) ) then
+       if( B%n_used > 0 .or. B%is_compact ) then
+          status = 1
+          msg = 'FASCL: a non-empty second layer needs coupling (spacing) lambdas, which are not implemented yet; use nothing'
+          return
+       end if
+    end if
+    call FASCLRunLambda( A, lnameA, names, lam_text, status, msg )
+    if( status == 0 ) call PropTablePrint( A%props, lnameA )
+  end subroutine FASCLExecute
+
+end module FASCLModule
