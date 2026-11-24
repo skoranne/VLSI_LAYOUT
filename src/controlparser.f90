@@ -34,6 +34,7 @@ module ControlModule
   use PropertyTableModule
   use FASCLModule
   use FASCLConnectModule
+  use TechStackModule
   use PropOasisModule
   use iso_fortran_env, only: int32, int64, real64
   implicit none
@@ -408,7 +409,16 @@ contains
           write(*,*) 'Variable found: ', trim(rest)
           pos = index( rest, ' ' )
           write(*,*) 'VAR x = ', trim(rest(1:pos-1))
-          if( trim(rest(1:pos-1)) == 'temp_folder' ) then
+          if( trim(rest(1:pos-1)) == 'tech' ) then
+             !> var tech SKY130|ASAP7|GT2N : layer-name aliases for designs loaded from now on
+             current_tech = TechCanon( trim(adjustl(rest(pos+1:))) )
+             if( len_trim(current_tech) == 0 ) then
+                write(*,'(A,I0,A,A,A)') 'ERROR: line ', line_number-1, ': unknown technology "', &
+                     trim(adjustl(rest(pos+1:))), '" (SKY130, ASAP7, GT2N, GT2N_BS, GT2N_FULL)'
+                error stop "var tech failed"
+             end if
+             write(*,'(A,A)') 'INFO: technology ', trim(current_tech)
+          else if( trim(rest(1:pos-1)) == 'temp_folder' ) then
              rest = adjustl(rest)
              pos = index( rest, ' ' )
              rest = trim( adjustl( rest(pos+1:)))             
@@ -545,6 +555,7 @@ contains
              !write(*,*) 'DB file handle = ', trim(keyword(1:pos)) !> file
              design_dbs(db_count)%fileName = trim(keyword(1:pos))
              call LoadDesignFileByExt(design_dbs(db_count), MAX_LAYERS)
+             if( len_trim(current_tech) > 0 ) call ApplyTechAliases( design_dbs(db_count), current_tech )
              db_count = db_count + 1
           else if( trim(rest(1:pos-1)) == 'hierdesign' ) then
              rest = adjustl(rest(pos+1:))
@@ -557,6 +568,7 @@ contains
              pos = index( keyword, ' ' )
              design_dbs(db_count)%fileName = trim(keyword(1:pos))
              call LoadDesignFileByExtHier(design_dbs(db_count), MAX_LAYERS)
+             if( len_trim(current_tech) > 0 ) call ApplyTechAliases( design_dbs(db_count), current_tech )
              db_count = db_count + 1
           else if( trim(rest(1:pos-1)) == 'memory' ) then
              rest = adjustl(rest(pos+1:))             
@@ -603,7 +615,8 @@ contains
              end if
           end if
           if( trim(rest(1:pos-1)) == 'oasout' .or. trim(rest(1:pos-1)) == 'propdump' .or. &
-               trim(rest(1:pos-1)) == 'propinfo' .or. trim(rest(1:pos-1)) == 'netinfo' ) then
+               trim(rest(1:pos-1)) == 'propinfo' .or. trim(rest(1:pos-1)) == 'netinfo' .or. &
+               trim(rest(1:pos-1)) == 'defcheck' .or. trim(rest(1:pos-1)) == 'tech' ) then
              call RunPropertyCommand( trim(rest(1:pos-1)), trim(adjustl(rest(pos+1:))), ht, design_dbs, line_number-1 )
              cycle read_loop
           end if
@@ -1308,7 +1321,8 @@ contains
        end if
     end if
     if( status == 0 ) call ResolveLayerSpec( opB, ht, dbs, B, status, msg )
-    if( status == 0 .and. index( lam, 'NET_ID' ) > 0 ) call EnsureNetsFresh( A, ht, dbs, status, msg )
+    if( status == 0 .and. ( index( lam, 'NET_ID' ) > 0 .or. index( lam, 'NET_NAME' ) > 0 ) ) &
+         call EnsureNetsFresh( A, ht, dbs, status, msg )
     if( status == 0 ) call FASCLExecute( names, A, opA, B, lam, status, msg )
     if( status /= 0 ) then
        write(*,'(A,I0,A,A)') 'ERROR: line ', line_no, ': ', msg
@@ -1326,7 +1340,11 @@ contains
     type(PropString), allocatable :: specs(:), tmp(:)
     type(LayerPtr), allocatable :: Ls(:)
     character(len=:), allocatable :: rest, msg
-    integer :: k, n, status, rec
+    integer :: k, n, status, rec, idb
+    logical :: found
+    character(len=16) :: stack_tech
+    character(len=64) :: lo, hi
+    character(len=64), allocatable :: sspec(:), sdefn(:)
     call StartMarkTime("CONNECT")
     write(*,'(A,A)') 'CONNECT statement: ', trim(text)
     allocate( specs(8) )
@@ -1345,14 +1363,58 @@ contains
        end if
     end do
     specs = specs(1:n)
-    allocate( Ls(n) )
     status = 0
     msg = ''
-    do k = 1, n
-       call ResolveLayerSpec( specs(k)%s, ht, dbs, Ls(k)%p, status, msg )
-       if( status /= 0 ) exit
-    end do
+    stack_tech = ''
+    if( n >= 1 ) then
+       if( specs(1)%s == 'STACK' ) then
+          !> CONNECT STACK <tech> <db> [lo hi]
+          if( n /= 3 .and. n /= 5 ) then
+             status = 1; msg = 'CONNECT STACK <SKY130|ASAP7|GT2N|GT2N_BS|GT2N_FULL> <db> [lo hi]'
+          else
+             call hash_get( ht, specs(3)%s, idb, found )
+             if( .not. found ) then
+                status = 1; msg = 'CONNECT STACK: unknown db "'//specs(3)%s//'"'
+             else
+                lo = ''; hi = ''
+                if( n == 5 ) then
+                   lo = specs(4)%s; hi = specs(5)%s
+                end if
+                call ApplyTechAliases( dbs(idb), specs(2)%s )
+                call TechStackSpecs( specs(2)%s, specs(3)%s, dbs(idb)%ht, trim(lo), trim(hi), sspec, sdefn, status, msg )
+                if( status == 0 ) then
+                   stack_tech = TechCanon( specs(2)%s )
+                   n = size(sspec)
+                   deallocate( specs )
+                   allocate( specs(n) )
+                   do k = 1, n
+                      specs(k)%s = trim(sspec(k))
+                   end do
+                   write(*,'(A)', advance='no') 'CONNECT STACK '//trim(stack_tech)//':'
+                   do k = 1, n
+                      write(*,'(A)', advance='no') ' '//trim(sdefn(k))//'='//specs(k)%s
+                   end do
+                   write(*,*)
+                end if
+             end if
+          end if
+       end if
+    end if
+    allocate( Ls(n) )
+    if( status == 0 ) then
+       do k = 1, n
+          call ResolveLayerSpec( specs(k)%s, ht, dbs, Ls(k)%p, status, msg )
+          if( status /= 0 ) exit
+       end do
+    end if
     if( status == 0 ) call ConnectNew( specs, Ls, rec, status, msg )
+    if( status == 0 .and. len_trim(stack_tech) > 0 ) then
+       connect_records(rec)%tech = stack_tech
+       allocate( connect_records(rec)%defn(n) )
+       do k = 1, n
+          connect_records(rec)%defn(k)%s = trim(sdefn(k))
+       end do
+    end if
     if( status /= 0 ) then
        write(*,'(A,I0,A,A)') 'ERROR: line ', line_no, ': ', msg
        error stop "CONNECT statement failed"
@@ -1405,6 +1467,18 @@ contains
     end if
   end subroutine EnsureNetsFresh
 
+  !> Add the layer names of technology `tech` (met1, M3, BV0 ...) as aliases of the
+  !> L<layer>_<datatype> layers present in design D.
+  subroutine ApplyTechAliases( D, tech )
+    type(Design), intent(inout) :: D
+    character(len=*), intent(in) :: tech
+    integer :: nadd, npres
+    if( .not. allocated( D%designName ) ) return
+    call TechAliasLayers( D%ht, tech, nadd, npres )
+    write(*,'(A,A,A,A,A,I0,A,I0,A)') 'INFO: tech ', trim(TechCanon(tech)), ' on ', D%designName, ': ', npres, &
+         ' stack layers present, ', nadd, ' layer-name aliases added'
+  end subroutine ApplyTechAliases
+
   pure function itoa_cp( i ) result(s)
     integer, intent(in) :: i
     character(len=:), allocatable :: s
@@ -1417,11 +1491,12 @@ contains
   !> exec propdump <db:layer> <file.csv>
   !> exec propinfo <db:layer>
   subroutine RunPropertyCommand( cmd, args, ht, dbs, line_no )
+    use iso_c_binding, only: c_char, c_double, c_int32_t, c_null_char
     character(len=*), intent(in) :: cmd, args
     type(hash_type), intent(in) :: ht
     type(Design), intent(inout), target :: dbs(:)
     integer, intent(in) :: line_no
-    character(len=1024) :: tok(4)
+    character(len=1024) :: tok(6)
     integer :: ntok, status, ios, idb, i, k, st2
     character(len=:), allocatable :: msg, lname, m2
     type(Layer), pointer :: L
@@ -1429,10 +1504,17 @@ contains
     integer(int64) :: lno, dt
     logical :: ok, found
     character(len=1024) :: rest
+    interface
+       integer(c_int32_t) function fdef_layout_dbu( path, dbu ) bind(C, name='fdef_layout_dbu')
+         import :: c_char, c_double, c_int32_t
+         character(kind=c_char), intent(in) :: path(*)
+         real(c_double), intent(out) :: dbu
+       end function fdef_layout_dbu
+    end interface
     tok = ''
     ntok = 0
     rest = adjustl(args)
-    do while( len_trim(rest) > 0 .and. ntok < 4 )
+    do while( len_trim(rest) > 0 .and. ntok < 6 )
        k = index( trim(rest), ' ' )
        ntok = ntok + 1
        if( k == 0 ) then
@@ -1444,6 +1526,82 @@ contains
     status = 0
     msg = ''
     select case( cmd )
+    case( 'tech' )
+       !> exec tech list | exec tech <db> <TECH>
+       if( trim(tok(1)) == 'list' ) then
+          write(*,'(A)') 'Built-in interconnect stacks (layer=GDS layer/datatype):'
+          call TechList()
+       else
+          call hash_get( ht, trim(tok(1)), idb, found )
+          if( .not. found ) then
+             status = 1; msg = 'exec tech: unknown db "'//trim(tok(1))//'"'
+          else if( len_trim( TechCanon( trim(tok(2)) ) ) == 0 ) then
+             status = 1; msg = 'exec tech: unknown technology "'//trim(tok(2))//'" (SKY130, ASAP7, GT2N, GT2N_BS, GT2N_FULL)'
+          else
+             call ApplyTechAliases( dbs(idb), trim(tok(2)) )
+          end if
+       end if
+    case( 'defcheck' )
+       !> exec defcheck <db:layer> <file.def[.gz]> [report_prefix|-] [strict] [lef=a.lef[,b.lef]]
+       call ResolveLayerSpec( trim(tok(1)), ht, dbs, L, status, msg )
+       if( status == 0 ) then
+          if( .not. associated(L) ) then
+             status = 1; msg = 'defcheck needs a layer of a CONNECT'
+          else if( len_trim(tok(2)) == 0 ) then
+             status = 1; msg = 'defcheck: exec defcheck <db:layer> <file.def> [report_prefix|-] [strict]'
+          end if
+       end if
+       if( status == 0 ) call EnsureNetsFresh( L, ht, dbs, status, msg )
+       if( status == 0 ) then
+          call LayerEnsureProperties( L, trim(tok(1)) )
+          if( L%props%net_rec == 0 .or. .not. allocated( L%props%net ) ) then
+             status = 1; msg = 'defcheck: layer '//trim(tok(1))//' is not part of a CONNECT'
+          end if
+       end if
+       if( status == 0 ) then
+          block
+            type(LayerPtr), allocatable :: Ls(:)
+            integer(int64) :: dstats(16)
+            character(len=1024) :: prefix, lefs
+            logical :: strict
+            integer :: rec, nm, kc
+            real(c_double) :: ldbu
+            rec = L%props%net_rec
+            nm = size( connect_records(rec)%specs )
+            allocate( Ls(nm) )
+            do k = 1, nm
+               call ResolveLayerSpec( connect_records(rec)%specs(k)%s, ht, dbs, Ls(k)%p, status, msg )
+               if( status /= 0 ) exit
+            end do
+            !> optional tokens after the DEF: [report_prefix|-] [strict] [lef=a.lef,b.lef]
+            prefix = ''; lefs = ''; strict = .false.
+            do kc = 3, ntok
+               if( trim(tok(kc)) == 'strict' ) then
+                  strict = .true.
+               else if( index( tok(kc), 'lef=' ) == 1 ) then
+                  lefs = tok(kc)(5:)
+               else if( trim(tok(kc)) /= '-' ) then
+                  prefix = tok(kc)
+               end if
+            end do
+            !> the layout's own database units: from the file of the first member's db
+            ldbu = 0
+            kc = index( connect_records(rec)%specs(1)%s, ':' )
+            call hash_get( ht, connect_records(rec)%specs(1)%s(1:kc-1), idb, found )
+            if( found ) then
+               if( allocated( dbs(idb)%fileName ) ) then
+                  if( fdef_layout_dbu( trim(dbs(idb)%fileName)//c_null_char, ldbu ) /= 0 ) ldbu = 0
+               end if
+            end if
+            if( status == 0 ) call DefCheck( rec, Ls, trim(tok(2)), trim(lefs), trim(prefix), ldbu, dstats, status, msg )
+            if( status == 0 .and. strict ) then
+               if( dstats(7) + dstats(10) + dstats(3) > 0 ) then
+                  status = 1
+                  msg = 'defcheck strict: the layout does not match the DEF (opens/shorts/misses above)'
+               end if
+            end if
+          end block
+       end if
     case( 'netinfo' )
        call ResolveLayerSpec( trim(tok(1)), ht, dbs, L, status, msg )
        if( status == 0 ) then

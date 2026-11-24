@@ -25,6 +25,7 @@
 !                              BBOX_X2 BBOX_Y2 BBOX_WIDTH BBOX_HEIGHT
 !                              PERIMETER VERTICES LINE_END_DIR LINE_END_WIDTH LINE_END_LENGTH
 !                              NET_ID (net of the polygon from a CONNECT statement)
+!                              NET_NAME (DEF net name of that net, after exec defcheck)
 !   values: INT FLOAT STRING ABS SQRT POW MIN MAX IF(c,a,b)
 !   existing property of the layer:  NAME(id)  and  NAME.field(id)
 !   '/' always gives FLOAT, '%' is integer modulo, '+' concatenates when a STRING is involved.
@@ -69,7 +70,7 @@ module FASCLModule
   integer, parameter :: F_PNUM = 1, F_PID = 2, F_AREA = 3, F_NBOX = 4, F_BX1 = 5, F_BY1 = 6, F_BX2 = 7, &
        F_BY2 = 8, F_BW = 9, F_BH = 10, F_INT = 11, F_FLOAT = 12, F_STRING = 13, F_ABS = 14, F_SQRT = 15, &
        F_POW = 16, F_MIN = 17, F_MAX = 18, F_IF = 19, F_PERIM = 20, F_NVERT = 21, F_LEDIR = 22, &
-       F_LELEN = 23, F_LEW = 24, F_NET = 25
+       F_LELEN = 23, F_LEW = 24, F_NET = 25, F_NETNAME = 26
   type :: Node
      integer :: op = 0, fn = 0, slot = 0, col = 0
      integer(int64) :: iv = 0
@@ -802,6 +803,7 @@ contains
     case( 'LINE_END_LENGTH' ); builtin = F_LELEN
     case( 'LINE_END_WIDTH' ); builtin = F_LEW
     case( 'NET_ID' );         builtin = F_NET
+    case( 'NET_NAME' );       builtin = F_NETNAME
     case default;             builtin = 0
     end select
   end function builtin
@@ -1112,7 +1114,7 @@ contains
     end if
     select case( nd%fn )
     case( F_PNUM, F_PID, F_AREA, F_NBOX, F_BX1, F_BY1, F_BX2, F_BY2, F_BW, F_BH, &
-          F_PERIM, F_NVERT, F_LEDIR, F_LELEN, F_LEW, F_NET )
+          F_PERIM, F_NVERT, F_LEDIR, F_LELEN, F_LEW, F_NET, F_NETNAME )
        e = PropValue()
        ord = ord_of( t, a, e )
        if( e%kind == PV_ERROR ) then
@@ -1158,6 +1160,12 @@ contains
              v = err( 'NET_ID: layer is not part of a CONNECT' ); return
           end if
           v = ival( t%net(ord) )
+       case( F_NETNAME )
+          if( .not. allocated( t%net ) ) then
+             v = err( 'NET_NAME: layer is not part of a CONNECT' ); return
+          end if
+          v%kind = PV_STRING
+          v%s = PropNetName( t%net_rec, t%net(ord) )
        end select
     case( F_INT )
        select case( a%kind )
@@ -1385,10 +1393,17 @@ contains
     call LayerEnsureProperties( L, lname )
     call FASCLCompile( lam_text, names, L%props, lam, status, msg )
     if( status /= 0 ) return
-    if( lambda_calls( lam, [ F_NET ] ) ) then
+    if( lambda_calls( lam, [ F_NET, F_NETNAME ] ) ) then
        if( L%props%net_rec == 0 .or. .not. allocated( L%props%net ) ) then
           status = 1
           msg = 'NET_ID: layer '//lname//' is not part of a CONNECT (CONNECT db:metal db:via db:metal ... must come first)'
+          return
+       end if
+    end if
+    if( lambda_calls( lam, [ F_NETNAME ] ) ) then
+       if( .not. PropNetNamesHave( L%props%net_rec ) ) then
+          status = 1
+          msg = 'NET_NAME: no DEF net names for the CONNECT of '//lname//' (exec defcheck '//lname//' file.def must come first)'
           return
        end if
     end if

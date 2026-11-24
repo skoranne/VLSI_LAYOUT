@@ -98,6 +98,16 @@ module PropertyTableModule
        PropGetField, PropOrdinalOfId, PropKindName, PropTablePrint, PropTableDumpCSV, PropValueToString, &
        PropDropOutline, PropDropNets
 
+  !> DEF net names of the extracted nets of a CONNECT record (exec defcheck), read by the FASCL
+  !> NET_NAME builtin: lab(net id) = DEF net name, "a|b|..." for a short, "" when unnamed.
+  type :: NetNameSet
+     logical :: have = .false.
+     character(len=:), allocatable :: def_file
+     type(PropString), allocatable :: lab(:)
+  end type NetNameSet
+  type(NetNameSet), allocatable, save :: net_names(:)
+  public :: PropNetNamesSet, PropNetNamesDrop, PropNetName, PropNetNamesHave
+
 contains
 
   !=================================================================
@@ -321,6 +331,58 @@ contains
     t%have_outline = .false.
     t%n_outline_fail = 0
   end subroutine PropDropOutline
+
+  subroutine PropNetNamesSet( rec, def_file, lab )
+    integer, intent(in) :: rec
+    character(len=*), intent(in) :: def_file
+    type(PropString), allocatable, intent(inout) :: lab(:)
+    type(NetNameSet), allocatable :: tmp(:)
+    integer :: k
+    if( .not. allocated( net_names ) ) allocate( net_names(max(8, rec)) )
+    if( size(net_names) < rec ) then
+       allocate( tmp(max(rec, 2*size(net_names))) )
+       do k = 1, size(net_names)
+          call move_set( net_names(k), tmp(k) )
+       end do
+       call move_alloc( tmp, net_names )
+    end if
+    net_names(rec)%have = .true.
+    net_names(rec)%def_file = def_file
+    call move_alloc( lab, net_names(rec)%lab )
+  contains
+    subroutine move_set( a, b )
+      type(NetNameSet), intent(inout) :: a, b
+      b%have = a%have
+      if( allocated( a%def_file ) ) call move_alloc( a%def_file, b%def_file )
+      if( allocated( a%lab ) ) call move_alloc( a%lab, b%lab )
+    end subroutine move_set
+  end subroutine PropNetNamesSet
+
+  subroutine PropNetNamesDrop( rec )
+    integer, intent(in) :: rec
+    if( .not. allocated( net_names ) ) return
+    if( rec < 1 .or. rec > size(net_names) ) return
+    net_names(rec)%have = .false.
+    if( allocated( net_names(rec)%lab ) ) deallocate( net_names(rec)%lab )
+  end subroutine PropNetNamesDrop
+
+  logical function PropNetNamesHave( rec ) result(h)
+    integer, intent(in) :: rec
+    h = .false.
+    if( .not. allocated( net_names ) ) return
+    if( rec < 1 .or. rec > size(net_names) ) return
+    h = net_names(rec)%have
+  end function PropNetNamesHave
+
+  function PropNetName( rec, net ) result(s)
+    integer, intent(in) :: rec
+    integer(int64), intent(in) :: net
+    character(len=:), allocatable :: s
+    s = ''
+    if( .not. PropNetNamesHave( rec ) ) return
+    if( net < 1 .or. net > size( net_names(rec)%lab, kind=int64 ) ) return
+    if( allocated( net_names(rec)%lab(net)%s ) ) s = net_names(rec)%lab(net)%s
+  end function PropNetName
 
   subroutine PropDropNets( t )
     type(PropertyTable), intent(inout) :: t

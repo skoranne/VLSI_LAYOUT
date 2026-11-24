@@ -75,6 +75,7 @@ expr   := || && == != < <= > >= + - * / % unary - !, parentheses
 | `LINE_END_WIDTH(id)` | length of that end edge (0 if none) |
 | `LINE_END_LENGTH(id)` | the shorter of the two edges next to the end (0 if none) |
 | `NET_ID(id)` | net number from the layer's `CONNECT` (see below) |
+| `NET_NAME(id)` | DEF net name of that net after `exec defcheck` (`"a|b"` for a short, `""` if unnamed) |
 
 **Line end**: an outline edge whose two corners are both convex and which is strictly shorter
 than both neighbouring edges (outer contour and hole contours alike). The narrowest one is
@@ -114,6 +115,77 @@ exec netinfo d1:met1
 * Scale (SKY130 SDT_16, li1/mcon/met1, 1.6 M polygons, 64 threads): 4.5 s, 281,929 nets,
   identical to an independent KLayout positive-overlap union (every met1 polygon in the same net).
 
+## Built-in stacks: `var tech`, `CONNECT STACK` (`tech_stacks.f90`)
+
+```
+var tech SKY130                    # layer names for designs loaded from here on
+decl design d1 = SDT_16.oas
+CONNECT STACK SKY130 d1            # li1 mcon met1 via met2 via2 met3 via3 met4 via4 met5
+CONNECT STACK GT2N d2 M1 M5        # a slice, by layer name
+exec tech d3 ASAP7                 # names for a design that is already loaded
+exec tech list                     # print the stacks
+```
+
+| stack | layers (GDS layer/datatype) | default |
+|---|---|---|
+| `SKY130` (also SKYWATER130, SKY130A/B) | poly 66/20, licon1 66/44, li1 67/20, mcon 67/44, met1 68/20, via 68/44, met2 69/20, via2 69/44, met3 70/20, via3 70/44, met4 71/20, via4 71/44, met5 72/20 | li1..met5 |
+| `ASAP7` | M1 19/0, V1 21/0, M2 20/0, V2 25/0, M3 30/0, V3 35/0 ... M9 90/0 (V*n* = 5+10*n*) | all |
+| `GT2N` (front side) | M0 20/0, V0 22/0, M1 25/0, ... M13 85/0, V13 87/0, RDL 90/0 | all |
+| `GT2N_BS` (backside) | BPR 8/0, BV0 910/0, BM1 920/0, BV1 930/0, ... BM4 980/0, BV4 990/0, BRDL 1000/0 | all |
+| `GT2N_FULL` | BRDL ... BM1 BV0 BPR, VBPR 9/0, M0 V0 M1 ... RDL (backside power up into the front side) | all |
+
+The numbers are those of the PDKs' own maps: SKY130 KLayout tech / Magic CALMA table; ASAP7
+`asap7_TechLib.layermap` and `asap7_fromAPR.layermap` (pdks/asap7) and ORFS `asap7.lyt`; GT2N
+`techlib/gt2_techfile.layermap` and the platform's `gt2n.lyt` (whose net tracer joins
+`BPR,VBPR,M0`). SKY130 diff is left out on purpose: it runs under the gates and would short
+source and drain; poly/licon1 can be added with a slice (`CONNECT STACK SKY130 d1 poly met5`).
+ASAP7's V0 joins M1 to both LIG and LISD, which is not a chain, so the ASAP7 stack starts at M1.
+
+* `var tech X` (and `exec tech db X`, and `CONNECT STACK X db`) add the stack's layer names, as
+  written, in lower and in upper case (plus `via1` for SKY130 `via`, `licon` for `licon1`), as
+  aliases of the `L<layer>_<datatype>` layers present in the design: `d1:met1`, `d1:M3`.
+* `CONNECT STACK X db [lo hi]` lists the stack layers present in the design: absent layers at
+  either end are dropped, an absent layer inside the slice is an error (load with enough
+  `max_layers`). A slice starts and ends on routing layers.
+* The CONNECT record remembers the stack, so `exec defcheck` knows the DEF layer names. For a
+  plain `CONNECT` they are found by matching its layers (by name or by number) against the
+  stacks of `var tech`, or of every stack if no tech is set (it must be unambiguous).
+
+## DEF cross-check: `exec defcheck`, `NET_NAME` (`db/def_probe.cpp`)
+
+```
+exec defcheck d1:met1 SDT_16.def [report_prefix|-] [strict] [lef=tech.lef[,more.lef]]
+PROPERTY:NET,NAME = d1:met1 FASCL [ (id) NET = NET_ID(id) ; NAME = NET_NAME(id) ] d1:nothing
+```
+
+Checks the nets of the CONNECT that `d1:met1` belongs to against the DEF the layout was streamed
+from (`.def` or `.def.gz`), net by net:
+
+* the routing of every regular and special net becomes probes on the stack's routing layers: the
+  midpoint of every wire segment, the centre of every `RECT`, and every via point on the via's
+  bottom and top metal. Via layers come from the DEF `VIAS` section, then from `VIA` blocks of the
+  `lef=` files; for a via found in neither, the stated layer and the next routing layer of the
+  stack are probed (right for OpenROAD/LibreLane DEFs, which state the lower layer; pass the tech
+  LEF for DEFs from other tools). Probes on layers outside the CONNECT are counted, not checked;
+* each probe looks up the polygon under it and its NET_ID (parallel R-tree point queries);
+* **open**: a DEF net whose probes land on more than one extracted net; **short**: an extracted net
+  carrying probes of more than one DEF net; **miss**: a probe with no polygon under it;
+* DEF coordinates are scaled to the layout grid read from the layout file (GDSII UNITS / OASIS
+  START unit; an integer factor either way, e.g. ASAP7 DEF 4000/um); DEF escapes are removed
+  (`bus\[3\]` is the net `bus[3]`);
+* the extracted nets get the DEF names: `NET_NAME(id)`; a short gives `"a|b|..."` (at most 8 names),
+  an unnamed net (cell-internal nodes) `""`. Recomputing the nets drops the names;
+* `report_prefix` writes `<prefix>_opens.csv` (DEF net, each extracted net with a probe location),
+  `_shorts.csv`, `_misses.csv` and `_names.csv` (extracted net -> DEF name); `strict` makes any
+  open, short or miss a CTR error.
+
+The summary ends with `DEFCHECK RESULT: opens=N shorts=N misses=N`. Results:
+
+| design | layout / DEF | stack | probes | result | time |
+|---|---|---|---|---|---|
+| TinySoC (SKY130) | KLayout stream-out / final DEF, 337 nets | li1..met5 | 6,074 | clean, 336 nets named | 12 ms |
+| SDT_16 (SKY130) | Magic GDS -> OASIS / final DEF 54 MB, 50,867 nets | li1..met5, 1.9 M polygons | 962,809 | clean | 1.0 s (CONNECT 4.5 s) |
+
 ## OASIS output (`prop_oasis.f90`, `db/prop_oasis_writer.cpp`)
 
 `exec oasout`, and any output layer whose `.mag` entry names a `*.oas` file (e.g.
@@ -152,3 +224,13 @@ and the line ends of every polygon and the nets of an m1/via/m2 stack (overlappi
 and corner-touching vias, a via joining two wires, a chain through m2, m2 over m1 without a via)
 from the input with KLayout, including the automatic recompute after the via layer changes; the
 runner also checks that `NET_ID` without `CONNECT` and a two-layer `CONNECT` are rejected.
+
+`db/regressions/defcheck/run_defcheck_regression.sh [MAGPARSER.exe] [workdir] [--scale]` runs
+`defcheck.ctr` on: TinySoC against its DEF (with and without the tech LEF); TinySoC with a via cut
+removed, a met2 strap and a DEF wire moved off the die (an open, a short and a miss); synthetic
+ASAP7 and GT2N (backside + VBPR + front) designs made by `gen_defcheck_input.py` with layer numbers
+taken from the PDK maps; and a GT2N M1..M5 slice. `defcheck_kl.py` recomputes every result with
+KLayout's own LEF/DEF reader and net extraction (opens, shorts and missed nets as sets, and the
+NET_NAME of every polygon). Negative tests: unknown technology, a slice starting on a cut, defcheck
+without CONNECT, a missing DEF, NET_NAME before defcheck, `strict` on a mismatch. `--scale` adds
+SDT_16 against its 54 MB DEF.

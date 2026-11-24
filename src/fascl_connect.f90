@@ -18,6 +18,9 @@ module FASCLConnectModule
   use GeometryModule, only: Box
   use PropertyTableModule
   use FASCLModule, only: LayerEnsureProperties
+  use TechStackModule, only: TechDefNames, current_tech
+  use CommonModule, only: GetPrecision
+  use iso_c_binding, only: c_char, c_int32_t, c_int64_t, c_null_char
   implicit none
   private
 
@@ -29,6 +32,8 @@ module FASCLConnectModule
      type(PropString), allocatable :: specs(:)
      logical :: live = .false.
      integer(int64) :: n_nets = 0, n_contacts = 0, n_polygons = 0
+     character(len=16) :: tech = ''                    !> built-in stack (CONNECT STACK / var tech)
+     type(PropString), allocatable :: defn(:)          !> DEF layer name per member
   end type ConnectRecord
 
   type(ConnectRecord), allocatable, public, save :: connect_records(:)
@@ -36,7 +41,51 @@ module FASCLConnectModule
 
   integer, parameter :: K_STACK = 512
 
-  public :: ConnectNew, ConnectCompute, NetInfoPrint, ConnectValidate
+  public :: ConnectNew, ConnectCompute, NetInfoPrint, ConnectValidate, DefCheck
+
+  !> db/def_probe.cpp
+  interface
+     integer(c_int32_t) function fdef_open( path, layers, lefs, nprobe, nnet, nskip, units ) bind(C, name='fdef_open')
+       import :: c_char, c_int32_t, c_int64_t
+       character(kind=c_char), intent(in) :: path(*), layers(*), lefs(*)
+       integer(c_int64_t), intent(out) :: nprobe, nnet, nskip
+       integer(c_int32_t), intent(out) :: units
+     end function fdef_open
+     integer(c_int32_t) function fdef_probes( h, layer, x, y, net, kind ) bind(C, name='fdef_probes')
+       import :: c_int32_t, c_int64_t
+       integer(c_int32_t), value :: h
+       integer(c_int32_t), intent(out) :: layer(*), kind(*)
+       integer(c_int64_t), intent(out) :: x(*), y(*), net(*)
+     end function fdef_probes
+     integer(c_int32_t) function fdef_check( h, nid, n_ext, prefix, layer_names, stats ) bind(C, name='fdef_check')
+       import :: c_char, c_int32_t, c_int64_t
+       integer(c_int32_t), value :: h
+       integer(c_int64_t), intent(in) :: nid(*)
+       integer(c_int64_t), value :: n_ext
+       character(kind=c_char), intent(in) :: prefix(*), layer_names(*)
+       integer(c_int64_t), intent(out) :: stats(16)
+     end function fdef_check
+     integer(c_int32_t) function fdef_label( h, e, buf, buflen ) bind(C, name='fdef_label')
+       import :: c_char, c_int32_t, c_int64_t
+       integer(c_int32_t), value :: h, buflen
+       integer(c_int64_t), value :: e
+       character(kind=c_char), intent(out) :: buf(*)
+     end function fdef_label
+     integer(c_int32_t) function fdef_report( h, buf, buflen ) bind(C, name='fdef_report')
+       import :: c_char, c_int32_t
+       integer(c_int32_t), value :: h, buflen
+       character(kind=c_char), intent(out) :: buf(*)
+     end function fdef_report
+     integer(c_int32_t) function fdef_error( buf, buflen ) bind(C, name='fdef_error')
+       import :: c_char, c_int32_t
+       integer(c_int32_t), value :: buflen
+       character(kind=c_char), intent(out) :: buf(*)
+     end function fdef_error
+     subroutine fdef_close( h ) bind(C, name='fdef_close')
+       import :: c_int32_t
+       integer(c_int32_t), value :: h
+     end subroutine fdef_close
+  end interface
 
 contains
 
@@ -115,6 +164,7 @@ contains
     status = 0; msg = ''
     call cpu_time( t0 )
     n = size(Ls)
+    call PropNetNamesDrop( rec )            !> net numbers change: DEF names are stale
     !> Every member: healed, PNum'd, indexed, with an R-tree that matches the box order.
     do k = 1, n
        associate( L => Ls(k)%p )
@@ -318,5 +368,185 @@ contains
     write(*,'(A,I0,A,I0,A,I0,A)') '  nets on this layer=', distinct, '  largest: net ', bign, &
          ' (', big, ' polygons on this layer)'
   end subroutine NetInfoPrint
+
+  !> Extracted net (props%net) of the polygon of L that contains (x,y), 0 if none. Polygons of
+  !> one layer never touch (touching boxes are one polygon), so any containing box decides.
+  integer(int64) function point_net( L, x, y ) result(nid)
+    type(Layer), intent(in) :: L
+    integer(int64), intent(in) :: x, y
+    integer(int64) :: stack(K_STACK), curr, child, k, c_end
+    integer :: sp
+    nid = 0
+    if( L%n_used == 0 ) return
+    sp = 1
+    stack(1) = L%tree%root_index
+    do while( sp > 0 )
+       curr = stack(sp)
+       sp = sp - 1
+       associate( nd => L%tree%tree_nodes(curr) )
+         if( x < nd%mbr%x1 .or. x > nd%mbr%x2 .or. y < nd%mbr%y1 .or. y > nd%mbr%y2 ) cycle
+         if( nd%IsLeaf ) then
+            c_end = min( nd%ChildStart + int( nd%NumChildren, int64 ) - 1_int64, L%n_used )
+            do k = nd%ChildStart, c_end
+               associate( b => L%layer_boxes(k) )
+                 if( x >= b%x1 .and. x <= b%x2 .and. y >= b%y1 .and. y <= b%y2 ) then
+                    nid = L%props%net( L%props%box_ord(k) )
+                    return
+                 end if
+               end associate
+            end do
+         else
+            c_end = nd%ChildStart + int( nd%NumChildren, int64 ) - 1_int64
+            do child = nd%ChildStart, c_end
+               if( sp >= K_STACK ) error stop 'defcheck: R-tree DFS stack overflow'
+               sp = sp + 1
+               stack(sp) = child
+            end do
+         end if
+       end associate
+    end do
+  end function point_net
+
+  !> exec defcheck: probe the routing of every DEF net (db/def_probe.cpp) on the routing members
+  !> of CONNECT record `rec`, look up the extracted net under each probe and report opens,
+  !> shorts and misses; the DEF names become the NET_NAME of the extracted nets.
+  !> stats(1..16) = fdef_check stats 0..15 (see def_probe.cpp).
+  subroutine DefCheck( rec, Ls, def_path, lefs, prefix, layout_dbu, stats, status, msg )
+    integer, intent(in) :: rec
+    character(len=*), intent(in) :: lefs             !> comma-separated LEF files ('' = none)
+    real(real64), intent(in) :: layout_dbu       !> layout database units per micron (<= 0: CTR precision)
+    type(LayerPtr), intent(inout) :: Ls(:)
+    character(len=*), intent(in) :: def_path, prefix
+    integer(int64), intent(out) :: stats(16)
+    integer, intent(out) :: status
+    character(len=:), allocatable, intent(out) :: msg
+    character(len=64), allocatable :: sp(:), defn(:)
+    character(len=16) :: tech_used
+    character(len=:), allocatable :: names
+    integer(c_int32_t) :: h, units, rc
+    integer(c_int64_t) :: np, nn, nskip
+    integer(c_int32_t), allocatable :: lay(:), pkind(:)
+    integer(c_int64_t), allocatable :: px(:), py(:), pnet(:), nid(:)
+    integer(c_int64_t) :: cstats(16)
+    type(PropString), allocatable :: lab(:)
+    character(len=8192) :: buf
+    character(len=:), allocatable :: rep
+    integer(int64) :: i, e, mult, dv, nr, m
+    real(real64) :: ref, ratio
+    integer :: k, n, ln, p0, p1
+    real(real64) :: t0, t1
+    integer(int64) :: c0, c1, cr
+
+    status = 0; msg = ''; stats = 0
+    call cpu_time( t0 ); call system_clock( c0, cr )
+    n = size(Ls)
+    nr = ( n + 1 ) / 2
+    !> DEF layer names of the members
+    if( .not. allocated( connect_records(rec)%defn ) ) then
+       allocate( sp(n) )
+       do k = 1, n
+          sp(k) = connect_records(rec)%specs(k)%s
+       end do
+       call TechDefNames( current_tech, sp, defn, tech_used, status, msg )
+       if( status /= 0 ) then
+          msg = 'defcheck: '//msg; return
+       end if
+       allocate( connect_records(rec)%defn(n) )
+       do k = 1, n
+          connect_records(rec)%defn(k)%s = trim(defn(k))
+       end do
+       connect_records(rec)%tech = tech_used
+    end if
+    names = ''
+    do k = 1, n, 2
+       names = names//' '//connect_records(rec)%defn(k)%s
+    end do
+    names = trim(adjustl(names))
+    do k = 1, n, 2
+       associate( L => Ls(k)%p )
+         if( L%n_used > 0 ) then
+            if( .not. allocated( L%tree%tree_nodes ) .or. .not. allocated( L%props%net ) ) then
+               status = 1; msg = 'defcheck: the nets of '//connect_records(rec)%specs(k)%s//' are out of date'
+               return
+            end if
+            if( size( L%props%box_ord, kind=int64 ) /= L%n_used ) then
+               status = 1; msg = 'defcheck: the nets of '//connect_records(rec)%specs(k)%s//' are out of date'
+               return
+            end if
+         end if
+       end associate
+    end do
+
+    h = fdef_open( trim(def_path)//c_null_char, names//c_null_char, trim(lefs)//c_null_char, np, nn, nskip, units )
+    if( h == 0 ) then
+       ln = fdef_error( buf, len(buf, kind=c_int32_t) )
+       msg = 'defcheck: '//buf(1:min(ln, len(buf)))
+       status = 1; return
+    end if
+    m = max( np, 1_int64 )
+    allocate( lay(m), pkind(m), px(m), py(m), pnet(m), nid(m) )
+    rc = fdef_probes( h, lay, px, py, pnet, pkind )
+    !> DEF units vs layout grid
+    !> DEF units -> layout grid: an integer factor either way (ASAP7 DEFs use 4000/um)
+    mult = 1; dv = 1
+    ref = layout_dbu
+    if( ref <= 0 ) ref = real( GetPrecision(), real64 )
+    if( units > 0 .and. ref > 0 ) then
+       ratio = ref / real( units, real64 )
+       if( ratio >= 1 .and. abs( ratio - nint(ratio) ) < 1d-9 ) then
+          mult = nint( ratio, int64 )
+       else if( ratio < 1 .and. abs( 1/ratio - nint(1/ratio) ) < 1d-9 ) then
+          dv = nint( 1/ratio, int64 )
+       else
+          write(*,'(A,I0,A,F0.3,A)') 'WARNING: defcheck: DEF units ', units, ' and layout grid ', ref, &
+               ' per micron differ by a non-integer factor; coordinates used as they are'
+       end if
+    end if
+    if( mult /= 1 .or. dv /= 1 ) then
+       do i = 1, np
+          px(i) = px(i) * mult / dv; py(i) = py(i) * mult / dv
+       end do
+    end if
+    !$omp parallel do schedule(dynamic, 4096)
+    do i = 1, np
+       nid(i) = point_net( Ls(2*lay(i)-1)%p, px(i), py(i) )
+    end do
+    !$omp end parallel do
+    rc = fdef_check( h, nid, int(connect_records(rec)%n_nets, c_int64_t), trim(prefix)//c_null_char, &
+         names//c_null_char, cstats )
+    stats = cstats
+    allocate( lab( connect_records(rec)%n_nets ) )
+    do e = 1, connect_records(rec)%n_nets
+       ln = fdef_label( h, int(e, c_int64_t), buf, len(buf, kind=c_int32_t) )
+       lab(e)%s = buf(1:min(ln, len(buf)))
+    end do
+    call PropNetNamesSet( rec, def_path, lab )
+    ln = fdef_report( h, buf, len(buf, kind=c_int32_t) )
+    rep = buf(1:min(ln, len(buf)))
+    call fdef_close( h )
+    call cpu_time( t1 ); call system_clock( c1 )
+
+    write(*,'(A,I0,A,A,A,A,A)') 'DEFCHECK CONNECT #', rec, ' (', trim(connect_records(rec)%tech), ') vs ', &
+         trim(def_path), ':'
+    write(*,'(A,A,A,I0,A,F0.1)') '  routing layers: ', names, '   DEF units/um: ', units, '  layout units/um: ', ref
+    write(*,'(A,I0,A,I0,A,I0,A,I0,A)') '  DEF nets=', stats(4), ' (special ', stats(13), ')  probes=', stats(1), &
+         ' (+', stats(14), ' on layers outside the stack)'
+    write(*,'(A,I0,A,I0,A,I0,A)') '  probes on metal=', stats(2), '  missed=', stats(3), ' (in ', stats(8), ' DEF nets)'
+    write(*,'(A,I0,A,I0,A,I0,A,I0,A,I0)') '  DEF nets: probed=', stats(5), ' clean=', stats(6), ' opens=', stats(7), &
+         ' (special ', stats(15), ')  without probes=', stats(12)
+    write(*,'(A,I0,A,I0,A,I0,A,I0,A,I0)') '  extracted nets=', connect_records(rec)%n_nets, ': named=', stats(9), &
+         ' shorts=', stats(10), ' (special ', stats(16), ')  unnamed=', stats(11)
+    p0 = 1
+    do while( p0 <= len(rep) )
+       p1 = index( rep(p0:), achar(10) )
+       if( p1 == 0 ) then
+          write(*,'(A)') rep(p0:); exit
+       end if
+       write(*,'(A)') rep(p0:p0+p1-2)
+       p0 = p0 + p1
+    end do
+    write(*,'(A,I0,A,I0,A,I0,A,F9.3,A,F9.3,A)') 'DEFCHECK RESULT: opens=', stats(7), ' shorts=', stats(10), &
+         ' misses=', stats(3), '  cpu=', t1 - t0, ' s wall=', real(c1-c0, real64)/real(cr, real64), ' s'
+  end subroutine DefCheck
 
 end module FASCLConnectModule
