@@ -1,0 +1,11 @@
+magic
+tech sky130A
+<< b_and >>
+KLBIN o1_b_and.bin
+<< b_or >>
+KLBIN o1_b_or.bin
+<< b_xor >>
+KLBIN o1_b_xor.bin
+<< b_not >>
+KLBIN o1_b_not.bin
+<< end >>

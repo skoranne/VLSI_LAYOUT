@@ -36,6 +36,46 @@ module DeviceRegistryModule
   use omp_lib
   implicit none
   private
+#if defined(__GFORTRAN__) && (__GNUC__ < 10)
+  !> gfortran < 10: omp_lib has no Fortran interfaces for the OpenMP 4.5 device memory
+  !> routines, but libgomp exports them as C functions (same semantics).
+  interface
+     type(c_ptr) function omp_target_alloc(size, device_num) bind(c, name='omp_target_alloc')
+       import :: c_ptr, c_size_t, c_int
+       integer(c_size_t), value :: size
+       integer(c_int), value :: device_num
+     end function omp_target_alloc
+     subroutine omp_target_free(device_ptr, device_num) bind(c, name='omp_target_free')
+       import :: c_ptr, c_int
+       type(c_ptr), value :: device_ptr
+       integer(c_int), value :: device_num
+     end subroutine omp_target_free
+     integer(c_int) function omp_target_is_present(ptr, device_num) bind(c, name='omp_target_is_present')
+       import :: c_ptr, c_int
+       type(c_ptr), value :: ptr
+       integer(c_int), value :: device_num
+     end function omp_target_is_present
+     integer(c_int) function omp_target_memcpy(dst, src, length, dst_offset, src_offset, dst_device_num, &
+          src_device_num) bind(c, name='omp_target_memcpy')
+       import :: c_ptr, c_size_t, c_int
+       type(c_ptr), value :: dst, src
+       integer(c_size_t), value :: length, dst_offset, src_offset
+       integer(c_int), value :: dst_device_num, src_device_num
+     end function omp_target_memcpy
+     integer(c_int) function omp_target_associate_ptr(host_ptr, device_ptr, size, device_offset, device_num) &
+          bind(c, name='omp_target_associate_ptr')
+       import :: c_ptr, c_size_t, c_int
+       type(c_ptr), value :: host_ptr, device_ptr
+       integer(c_size_t), value :: size, device_offset
+       integer(c_int), value :: device_num
+     end function omp_target_associate_ptr
+     integer(c_int) function omp_target_disassociate_ptr(ptr, device_num) bind(c, name='omp_target_disassociate_ptr')
+       import :: c_ptr, c_int
+       type(c_ptr), value :: ptr
+       integer(c_int), value :: device_num
+     end function omp_target_disassociate_ptr
+  end interface
+#endif
 
   public :: DeviceRegistryEnabled, DeviceAcquire, DeviceUnpin, DeviceReleaseId, &
        DevicePrepare, DevicePrintStats, DeviceNextGeneration, DeviceDropAll, DeviceResetPins

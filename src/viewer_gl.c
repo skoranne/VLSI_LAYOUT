@@ -25,6 +25,8 @@ extern void glPixelStorei(GLenum p, GLint v);
 extern void glReadPixels(GLint x, GLint y, GLsizei w, GLsizei h, GLenum f, GLenum t, void* d);
 extern void glReadBuffer(GLenum m);
 extern void glFinish(void);
+extern void glWindowPos2i(GLint x, GLint y);
+extern void glDrawPixels(GLsizei w, GLsizei h, GLenum f, GLenum t, const void* d);
 #define GL_UNPACK_ALIGNMENT 0x0CF5
 #define GL_PACK_ALIGNMENT 0x0D05
 #define GL_RGB 0x1907
@@ -149,3 +151,11 @@ int viewer_screenshot_ppm(const char* path, int w, int h) {
     return 0;
 }
 void viewer_finish(void) { glFinish(); }
+
+/* Draw a w x h RGB image (rows bottom to top) with its lower-left pixel at window pixel (x, y). */
+void viewer_draw_rgb(int x, int y, int w, int h, const unsigned char* rgb) {
+    if (w <= 0 || h <= 0 || !rgb) return;
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glWindowPos2i(x, y);
+    glDrawPixels(w, h, GL_RGB, GL_UNSIGNED_BYTE, rgb);
+}

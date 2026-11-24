@@ -82,6 +82,39 @@ removes those within a part. Pan frames are at 0.61 um/px.
 4. *Draw on real hardware*. Needs a machine with a display and GPU (or EGL on the NVIDIA
    driver) for real numbers; the shader renderer is Phase 5.
 
+**Phase 2: strict-mode open + sidecar (done)**
+
+- **Sidecar `<file>.oas.mvi`.** `src/db/oasis_sidecar.cpp`, C API `ldb_mvi_*`. It holds:
+  - one entry per unit: a top-level CBLOCK, or a run of inline records split at CELL records and every 4 MB;
+  - per (unit, layer) box counts and bboxes;
+  - modal snapshots for units whose decode depends on earlier modal state;
+  - a per-layer density pyramid: 1024 tiles on the longer side, box counts plus clipped covered area, 2x2-reduced levels.
+- **How the build works.** Each unit is decoded speculatively in parallel, starting with every modal variable undefined. The parser (`src/db/oasis_parser.hpp`, shared with `oasis.cpp`) throws on the first use of an undefined variable. A sequential pass then fixes up the true state, re-decodes the dependent units and saves their snapshots.
+- **Validity and location.** The sidecar is validated against the OASIS file's size and mtime. If the input directory is read-only, it is written to `$MAGVIEWER_CACHE_DIR` or `$TMPDIR`.
+- **Fallback.** Hierarchical files fall back to the Phase 1 loader. The sidecar handles flat files only.
+- **Tools:**
+  - `db/db_mvi build|info|check|bench`. `check` decodes every layer from the sidecar and compares count and an order-free hash with the streaming parser.
+  - `test_layout_files.exe file.oas [windows] [frac]`: Fortran API test. Tiled windows are checked against a brute-force oracle.
+- **Viewer** (`MAGVIEWER_SIDECAR=1`, the default for OASIS without `--hier`; code in `viewer_tiles.f90`, type `TiledLayout`). It opens instantly and picks a mode per frame:
+  - **density:** a CPU-composited image of the pyramid for all visible layers;
+  - **geometry:** used when the pyramid estimate of boxes in view is at most `MAGVIEWER_FRAME_BOXES` (default 3M), with 2x hysteresis. It decodes the units the view touches into a tile LRU (`MAGVIEWER_CACHE_GB`, default 4). Sub-pixel boxes are drawn 1 px wide.
+  - The minimap is a density image of the whole design.
+  - `MAGVIEWER_VIEW=x1,y1,x2,y2` (um) sets the start view.
+- **Fortran front end** (`layout_files.f90`, `LayoutFilesModule`): `LayoutFile`, `OasisTables`, `LayoutSidecar` own the C handles, with finalizers. Julia: `src/db/julia/LayoutDB`.
+
+| File | Sidecar build (wall / peak RSS) | .mvi size | First frame (Phase 1 → 2) | Peak RSS of the GUI bench (Phase 1 → 2) |
+|---|---|---|---|---|
+| MW_8x8_1L | 2.5 s / 0.3 GB | 9 MB | 12.6 s after a 79 s load → 0.15 s | 3.2 → 2.1 GB |
+| MW_8x8_5L | 9.6 s / 3.2 GB | 47 MB | 20.1 s after a 281 s load → (not run) | 14.8 → (not run) |
+| MW_8x8_10L | 11.1 s / 4.1 GB | 94 MB | 19.3 s after a 337 s load → 0.17 s | 18.2 → 12.3 GB |
+
+**Results.**
+- All MW_8x8 units are independent: 0 dependent units. The KLayout-written `kl_strict.oas` has 18 dependent units, and its snapshots decode exactly.
+- `db_mvi check` on 10L (4.1 B boxes, every layer) matches the streaming parser, at 430–730 Mbox/s.
+- Density frames take 30–100 ms.
+
+**Open issues (Phase 3 work).** Geometry frames on 10L at 0.61 um/px have 2–5 s query and 1–5 s software-GL draw (1–5 M boxes). A view touches 30–70 units of about 2 M boxes each, so decode is far larger than the view, and the 4 GB tile LRU churns. The fixes are smaller decode units (per-bin sub-units in the sidecar, or compact tiles in a disk cache), decode-ahead on a worker thread, and GPU draw (Phase 5).
+
 ## 1. Current state (what exists today)
 
 | Area | Today | File |

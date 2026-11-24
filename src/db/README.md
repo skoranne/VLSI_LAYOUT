@@ -79,6 +79,48 @@ chunks, whose multi-threaded encoder has a known race. To test load and pan/zoom
 without a display: `test_viewer_index.exe file.oas [max_layers] [windows] [frac]`
 (`TVI_VERIFY=1` adds a brute-force oracle).
 
+## Sidecar index (.mvi), parser header, and language front ends
+
+**Parser header.** `oasis_parser.hpp` holds the OASIS record parser (`namespace oasis_parse`), shared by:
+- `oasis.cpp` (whole-file model and `ldb_stream_boxes`);
+- `oasis_sidecar.cpp`.
+
+For speculative decoding, the parser has three extra modes:
+- **Tracking** (`Parser::track`): the first use of an undefined modal variable throws `Parser::Dependent`.
+- **Skip** (`Parser::skip`): drops boxes that have already been emitted.
+- **Top-level hook:** a callback at each record outside CBLOCKs.
+
+**Sidecar.** `oasis_sidecar.cpp` (`ldb_mvi_*` in `layoutdb.h`) builds and reads `<file>.oas.mvi` for flat OASIS. It records:
+- units (CBLOCKs and inline runs);
+- per (unit, layer) counts and bboxes;
+- modal snapshots;
+- a per-layer density pyramid.
+
+`ldb_mvi_decode` decodes any set of units in parallel (`LDB_THREADS`). Hierarchical files return 2. Plan and numbers: `src/MAGVIEWER_TODO.md` §0.
+
+```
+db_mvi build file.oas [out.mvi] [--grid N]   # MW_8x8_10L (4.1 B boxes): 11 s, 94 MB
+db_mvi info  file.oas                        # units, dependent units, per-layer counts/coverage
+db_mvi check file.oas                        # every layer: sidecar decode == streaming parser
+db_mvi bench file.oas [frac] [n]             # random windows: units touched, decode time
+```
+
+**Fortran** (`src/layout_files.f90`, `LayoutFilesModule`, part of `libmagparser.a`): OO wrappers that own the C handles.
+- `LayoutFile`: GDSII/OASIS model, extent, top cells, properties, boxes, write.
+- `OasisTables`: strict tables, layer names, cell offsets and bboxes.
+- `LayoutSidecar`: density levels as zero-copy array views, units in a window, parallel decode into `Box` arrays.
+
+`src/viewer_tiles.f90` (`TiledLayout`) builds the viewer's tile LRU and density images on top of these wrappers. Test: `test_layout_files.exe file.oas`.
+
+**Julia** (`julia/LayoutDB`, over `liblayoutdb.so`; `make liblayoutdb.so`):
+- `LayoutFile`, `boxes`, `polygons`, `properties`, `cell_extents`, `write_oasis`/`write_gds`;
+- `stream_boxes`;
+- `OasisTables`;
+- `Sidecar` with `density` (zero-copy), `units_in` and `decode`;
+- `dbu_per_micron`.
+
+Run the tests with `julia --project=julia/LayoutDB -e 'using Pkg; Pkg.test()'`. Set `LAYOUTDB_TEST_OAS=flat_strict.oas` to add a real design. JuliaXLS uses this package through `bsc_julia/src/PhysicalImplementation/layout_io.jl`. `ENV["LAYOUTDB_LIB"]` overrides the library path.
+
 ## MPW_MERGE: multi-project-wafer shuttle assembly
 
 `MPW_MERGE` combines the per-slot OASIS files of an MPW shuttle into one OASIS

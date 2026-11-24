@@ -473,9 +473,12 @@ contains
     type(Layer), intent(inout), target :: output_layer
     type(Layer), intent(in), target :: input_layer_A
     integer(kind=int64) :: n
+    type(c_ptr) :: p_out, p_in
     !> Self-copy (e.g. `X = X COPY nothing`, or `X = X NOT Y` with empty Y via CalculateNOT):
     !> the deallocations below would free the input before it is read.
-    if( c_associated( c_loc(output_layer), c_loc(input_layer_A) ) ) return
+    !> (two temporaries: gfortran rejects c_loc() results passed straight to c_associated here)
+    p_out = c_loc(output_layer); p_in = c_loc(input_layer_A)
+    if( c_associated( p_out, p_in ) ) return
     n = input_layer_A%n_used
     if( n == 0 ) then
        call ClearLayer( output_layer )

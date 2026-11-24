@@ -1,0 +1,39 @@
+# cluster_boolean.ctr -- Boolean AND/OR/NOT/XOR for CLUSTER mode (cluster/mp/mpcoord.jl --ctr).
+# The same file also runs unchanged in plain MAGPARSER.exe, which gives the ground truth.
+# Inputs: julia ../tools/genmag.jl cluster_bool_in.mag 200000 ; copy cluster_bool_out.mag (the
+# output template: layer -> KLBIN o1_<layer>.bin, as MAGPARSER requires) into the run directory.
+#   *  AND (intersection)   +  OR (Boost)   ^  XOR (Boost)   @  NOT (frame)   !  NOT (Boost)
+program cluster_boolean
+systeminfo
+var debug_verbosity 0
+decl design d1 = cluster_bool_in.mag
+decl output o1 = cluster_bool_out.mag
+decl memory m1 = nothing
+info
+exec init m1:nothing
+
+# --- metal1 vs metal2: the four Boolean ops (plus Boost NOT) ---
+exec run o1:and12  = d1:metal1 * d1:metal2
+exec run o1:or12   = d1:metal1 + d1:metal2
+exec run o1:xor12  = d1:metal1 ^ d1:metal2
+exec run o1:not12  = d1:metal1 @ d1:metal2
+exec run o1:bnot12 = d1:metal1 ! d1:metal2
+exec run o1:not21  = d1:metal2 @ d1:metal1
+
+# --- via1 against the metals ---
+exec run o1:v_m1   = d1:via1 * d1:metal1
+exec run o1:v_or   = d1:via1 + d1:metal2
+exec run o1:v_xor  = d1:via1 ^ d1:metal1
+exec run o1:v_not  = d1:via1 @ d1:metal2
+
+# --- chained ops (DAG edges between cluster tasks) ---
+exec run o1:vm12   = o1:v_m1 * d1:metal2
+exec run o1:xorand = o1:xor12 + o1:and12
+exec run o1:onlyv  = o1:v_not @ d1:metal1
+
+# --- identities, every one must be empty ---
+exec run o1:id_or  = o1:xorand ^ o1:or12
+exec run o1:id_xor = o1:xor12 ^ o1:xor12
+exec run o1:id_not = o1:not12 ^ o1:bnot12
+flush
+end

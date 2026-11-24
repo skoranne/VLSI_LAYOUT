@@ -441,6 +441,10 @@ contains
              else
                 write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
              end if             
+          else if( trim(rest(1:pos-1)) == 'cluster_tile_boxes' .or. trim(rest(1:pos-1)) == 'cluster_tiles' ) then
+             !> read by the CLUSTER-mode front-end (cluster/mp/mpcoord.jl --ctr): ops whose inputs
+             !> exceed cluster_tile_boxes (default 10000000) are split into tiles across nodes
+             write(*,*) 'INFO: CLUSTER directive (used by mpcoord --ctr; no effect here): ', trim(rest)
           else if( trim(rest(1:pos-1)) == 'trs_rules' .or. trim(rest(1:pos-1)) == 'trs_enable' ) then
              !> consumed at compile time by TRSFindRulesFile / TRSOptimizeFile
              write(*,*) 'INFO: TRS directive (handled before execution): ', trim(rest)

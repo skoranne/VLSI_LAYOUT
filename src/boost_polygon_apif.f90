@@ -14,7 +14,13 @@ module BoostPolygonAPIModule
      function PerformBoostPolygonMergeAlloc(input, N, outN) result(res_ptr) bind(c, name="PerformBoostPolygonMergeAlloc")
        import :: c_long, c_ptr, Box
        implicit none
+#ifdef __GFORTRAN__
+       !> gfortran: Box has type-bound procedures, so it is not C interoperable (not even as
+       !> type(*)); pass the address of the contiguous box array (4 x int32 per box).
+       type(c_ptr), value :: input
+#else
        type(Box), dimension(*), intent(in) :: input
+#endif
        integer(c_long), value, intent(in) :: N
        integer(c_long), intent(out) :: outN
        type(c_ptr) :: res_ptr
@@ -24,7 +30,11 @@ module BoostPolygonAPIModule
           result(res_ptr) bind(c, name="PerformBoostPolygonOperationAlloc")
        import :: c_long, c_ptr, Box
        implicit none
+#ifdef __GFORTRAN__
+       type(c_ptr), value :: input_A, input_B
+#else
        type(Box), dimension(*), intent(in) :: input_A, input_B
+#endif
        integer(c_long), value, intent(in) :: AN, BN, control_parameter, control_value
        integer(c_long), intent(out) :: outN
        type(c_ptr) :: res_ptr
@@ -40,14 +50,19 @@ module BoostPolygonAPIModule
 contains
 
   subroutine OperateBoxesUsingBoostPolygon(input_boxes_A, input_boxes_B, merged_boxes, control_parameter, control_value)
+#ifdef __GFORTRAN__
+    type(Box), dimension(:), intent(in), contiguous, target :: input_boxes_A, input_boxes_B
+    type(Box), target :: dummy_box(1)
+#else
     type(Box), dimension(:), intent(in) :: input_boxes_A, input_boxes_B
+    type(Box) :: dummy_box(1)
+#endif
     type(Box), dimension(:), allocatable, intent(out) :: merged_boxes
     integer(c_long), intent(in) :: control_parameter, control_value
     integer(c_long) :: AN, BN, outN
     integer :: alloc_status
     type(c_ptr) :: c_out_ptr
     type(Box), pointer :: f_out_ptr(:)
-    type(Box) :: dummy_box(1)
 
     AN = size(input_boxes_A, kind=c_long)
     BN = size(input_boxes_B, kind=c_long)
@@ -57,6 +72,18 @@ contains
     end if
 
     outN = 0_c_long
+#ifdef __GFORTRAN__
+    if (AN > 0 .and. BN > 0) then
+       c_out_ptr = PerformBoostPolygonOperationAlloc(c_loc(input_boxes_A), AN, c_loc(input_boxes_B), BN, outN, &
+            control_parameter, control_value)
+    else if (AN > 0) then
+       c_out_ptr = PerformBoostPolygonOperationAlloc(c_loc(input_boxes_A), AN, c_loc(dummy_box), 0_c_long, outN, &
+            control_parameter, control_value)
+    else
+       c_out_ptr = PerformBoostPolygonOperationAlloc(c_loc(dummy_box), 0_c_long, c_loc(input_boxes_B), BN, outN, &
+            control_parameter, control_value)
+    end if
+#else
     if (AN > 0 .and. BN > 0) then
        c_out_ptr = PerformBoostPolygonOperationAlloc(input_boxes_A, AN, input_boxes_B, BN, outN, control_parameter, control_value)
     else if (AN > 0) then
@@ -64,6 +91,7 @@ contains
     else
        c_out_ptr = PerformBoostPolygonOperationAlloc(dummy_box, 0_c_long, input_boxes_B, BN, outN, control_parameter, control_value)
     end if
+#endif
 
     if (outN == 0) then
        if (c_associated(c_out_ptr)) call FreeBoostPolygonBuffer(c_out_ptr)
@@ -87,7 +115,11 @@ contains
   end subroutine OperateBoxesUsingBoostPolygon
 
   subroutine MergeBoxesUsingBoostPolygon(input_boxes, merged_boxes)
+#ifdef __GFORTRAN__
+    type(Box), dimension(:), intent(in), contiguous, target :: input_boxes
+#else
     type(Box), dimension(:), intent(in) :: input_boxes
+#endif
     type(Box), dimension(:), allocatable, intent(out) :: merged_boxes
     integer(c_long) :: N, outN
     integer :: alloc_status
@@ -101,7 +133,11 @@ contains
     end if
 
     outN = 0_c_long
+#ifdef __GFORTRAN__
+    c_out_ptr = PerformBoostPolygonMergeAlloc(c_loc(input_boxes), N, outN)
+#else
     c_out_ptr = PerformBoostPolygonMergeAlloc(input_boxes, N, outN)
+#endif
     if (outN == 0) then
        if (c_associated(c_out_ptr)) call FreeBoostPolygonBuffer(c_out_ptr)
        allocate(merged_boxes(0))

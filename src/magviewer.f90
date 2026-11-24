@@ -15,20 +15,39 @@
 !       MAGVIEWER_BENCH=1             scripted zoom/pan path; prints per-step query/draw ms
 !       MAGVIEWER_EGL=1               create the GL context through EGL (X servers without GLX)
 !       MAGVIEWER_HUD=1, MAGVIEWER_HELP=1  start with the HUD / key-map overlay shown
+!       MAGVIEWER_VIEW=x1,y1,x2,y2    start view in um (tests, benchmarks)
 !       MAGVIEWER_KEYS='g 3 ?'        key presses injected after the first frame (tests);
 !                                     tokens: a letter/digit/symbol, PgUp, PgDn, Esc, S-<x> (Shift)
-!  Headless load/query check without a display: test_viewer_index.exe.
+!       MAGVIEWER_SIDECAR=0           flat OASIS: load everything (the Phase 1 path) instead of
+!                                     opening through the sidecar index (file.oas.mvi)
+!       MAGVIEWER_FRAME_BOXES=N       sidecar mode: draw geometry when at most N boxes are in
+!                                     view, else the density pyramid (default 3000000)
+!       MAGVIEWER_CACHE_GB=G          sidecar mode: decoded tile cache budget (default 4)
+!  Flat OASIS opens through the sidecar (built on first open, about 3 s per billion boxes):
+!  nothing is loaded up front; zoomed out the view is drawn from the density pyramid, zoomed
+!  in from CBLOCKs decoded on demand (viewer_tiles.f90).
+!  Headless load/query check without a display: test_viewer_index.exe, or --headless.
 
 module DrawUsingOpenGL
-  use, intrinsic :: iso_fortran_env, only: int32, int64, real64
+  use, intrinsic :: iso_fortran_env, only: int8, int32, int64, real64
   use, intrinsic :: iso_c_binding
   use CommonModule,                 only: K_COORDINATE_KIND
   use GeometryModule,               only: Box, box_grow
   use CompressedSpatialIndexModule, only: CompressedSpatialIndex, ChunkLRUCache, K_CSI_DEFAULT_CACHE
   use SystemInformationModule,      only: ReadProcessMemoryUsage
   use ViewerFontModule,             only: FONT_BITS, FONT_W, FONT_H
+  use ViewerTileSourceModule,       only: TiledLayout
   implicit none
   private
+
+  !> Sidecar-backed geometry source (flat OASIS); null when layers come from indices.
+  type(TiledLayout), pointer, public :: tiled => null()
+  !> Density images (sidecar mode): main view rebuilt when stale, minimap when its size or
+  !> the visible layers change.
+  integer(int8), allocatable :: density_img(:), minimap_img(:)
+  logical :: density_stale = .true.
+  integer :: minimap_side = -1
+  logical, allocatable :: minimap_vis(:)
 
   integer, parameter, public :: K_MAX_OPENGL_CAPACITY = 500000
   real(c_double), parameter  :: K_AUTO_LOD_ZOOM_RATIO = 0.015_c_double
@@ -215,6 +234,11 @@ module DrawUsingOpenGL
        character(kind=c_char), intent(in) :: path(*)
        integer(c_int), value :: w, h
      end function viewer_screenshot_ppm
+     subroutine viewer_draw_rgb(x, y, w, h, rgb) bind(C, name="viewer_draw_rgb")
+       import :: c_int, c_int8_t
+       integer(c_int), value :: x, y, w, h
+       integer(c_int8_t), intent(in) :: rgb(*)
+     end subroutine viewer_draw_rgb
      subroutine viewer_finish() bind(C, name="viewer_finish")
      end subroutine viewer_finish
      subroutine viewer_swap_interval(n) bind(C, name="viewer_swap_interval")
@@ -343,6 +367,7 @@ module DrawUsingOpenGL
      integer(c_int), allocatable            :: vbo_verts(:)
      integer                                :: vbo_count   = 0
      logical                                :: cache_valid = .false.
+     logical                                :: density     = .false.  ! drawn from the density image
    contains
      procedure :: destroy => drawn_layer_destroy
   end type DrawnLayer
@@ -533,6 +558,9 @@ contains
        hits = hits + layers(i)%chunk_cache%hits
        misses = misses + layers(i)%chunk_cache%misses
     end do
+    if (associated(tiled)) then
+       hits = hits + tiled%hits; misses = misses + tiled%misses
+    end if
     call ReadProcessMemoryUsage(vm_kb, rss_kb)
     write(*,'(A)') '---------------- MAGVIEWER performance ----------------'
     write(*,'(A,A)') '  file            ', trim(vstats%file)
@@ -556,6 +584,16 @@ contains
          vstats%draw_ms(int(mod(max(0_int64, vstats%frames - 1), int(K_RING, int64))) + 1), da, dp
     write(*,'(A,I0)') '  boxes drawn     ', vstats%boxes_drawn
     write(*,'(A,I0,A,I0)') '  chunk cache     hits ', hits, '  misses ', misses
+    if (associated(tiled)) then
+       write(*,'(A,A)') '  sidecar         ', tiled%side%path
+       write(*,'(A,I0,A,I0,A,F8.2,A,F8.3,A)') '                  units ', tiled%side%n_units, '  dependent ', &
+            tiled%side%n_dependent, '  built in ', tiled%side%build_s, ' s  opened in ', tiled%side%open_s, ' s'
+       write(*,'(A,I0,A,F9.1,A,F9.1,A,I0)') '  tile cache      tiles ', tiled%n_tiles, '  ', &
+            real(tiled%bytes, real64) / 1048576.0_real64, ' MB of ', real(tiled%budget, real64) / 1048576.0_real64, &
+            ' MB  frame budget ', tiled%frame_boxes
+       write(*,'(A,A,A,I0,A,F9.2,A)') '  last frame      ', merge('geometry', 'density ', tiled%geometry), &
+            '  boxes in view ', tiled%estimate, '  decode ', tiled%decode_ms, ' ms'
+    end if
     write(*,'(A,F10.1,A,F10.1,A)') '  memory          VmRSS ', real(rss_kb, real64) / 1024.0_real64, &
          ' MB  VmSize ', real(vm_kb, real64) / 1024.0_real64, ' MB'
     write(*,'(A)') '--------------------------------------------------------'
@@ -593,6 +631,10 @@ contains
     integer(K_COORDINATE_KIND), intent(in) :: min_span
     integer :: i
 
+    if (associated(tiled)) then
+       call UpdateTiledLayerCaches(n_layers, layers, current_view, min_span)
+       return
+    end if
     !$omp parallel do default(none) &
     !$omp shared(n_layers, layers, current_view, tree_mode, target_depth, min_span) &
     !$omp private(i) schedule(dynamic, 1)
@@ -621,6 +663,32 @@ contains
     !$omp end parallel do
   end subroutine UpdateVisibleLayerCaches
 
+  !> Sidecar mode: density pyramid when the view holds more boxes than the frame budget,
+  !> otherwise geometry from the decoded tiles. All layers are refreshed together (one mode).
+  subroutine UpdateTiledLayerCaches(n_layers, layers, current_view, min_span)
+    integer, intent(in)                    :: n_layers
+    type(DrawnLayer), intent(inout)        :: layers(:)
+    type(Box), intent(in)                  :: current_view
+    integer(K_COORDINATE_KIND), intent(in) :: min_span
+    logical :: vis(n_layers), geometry
+    integer :: i
+    if (all(layers(1:n_layers)%cache_valid .or. .not. layers(1:n_layers)%visible)) return
+    vis = layers(1:n_layers)%visible
+    geometry = tiled%choose_mode(vis, current_view, 2.0_real64 * real(max(1, min_span), real64))
+    if (geometry) call tiled%prepare(vis, current_view)
+    density_stale = .true.
+    !$omp parallel do default(shared) private(i) schedule(dynamic, 1)
+    do i = 1, n_layers
+       if (.not. vis(i)) cycle
+       layers(i)%density = .not. geometry
+       layers(i)%vbo_count = 0
+       if (geometry) call tiled%geometry_quads(i, current_view, min_span, layers(i)%vbo_verts, &
+            layers(i)%vbo_count, K_MAX_OPENGL_CAPACITY * 8)
+       layers(i)%cache_valid = .true.
+    end do
+    !$omp end parallel do
+  end subroutine UpdateTiledLayerCaches
+
 
   ! ------------------------------------------------------------------
   ! OpenGL Render Passes
@@ -641,6 +709,17 @@ contains
     call glMatrixMode(GL_MODELVIEW)
     call glLoadIdentity()
 
+    if (associated(tiled)) then
+       if (any(layers(1:n_layers)%density .and. layers(1:n_layers)%visible)) then
+          if (density_stale) then
+             call tiled%density_image(layers(1:n_layers)%visible, layer_colors(n_layers, layers), &
+                  cam%left, cam%bottom, cam%zoom, int(main_width), int(win_h), density_img)
+             density_stale = .false.
+          end if
+          call viewer_draw_rgb(ui_width, 0_c_int, main_width, win_h, density_img)
+          return
+       end if
+    end if
     call glEnableClientState(GL_VERTEX_ARRAY)
     do i = 1, n_layers
        if (.not. layers(i)%visible) cycle
@@ -676,9 +755,28 @@ contains
     call glDisableClientState(GL_VERTEX_ARRAY)
   end subroutine RenderMainViewport
 
-  subroutine RenderMinimap(mbr, current_view, ui_width, bot_h)
+  !> 'D' density, 'G' geometry (sidecar mode), 'I' index.
+  character(len=1) function bench_mode()
+    bench_mode = 'I'
+    if (associated(tiled)) bench_mode = merge('G', 'D', tiled%geometry)
+  end function bench_mode
+
+  !> Layer colours as a (3, n) array for the density compositor.
+  function layer_colors(n_layers, layers) result(c)
+    integer, intent(in) :: n_layers
+    type(DrawnLayer), intent(in) :: layers(:)
+    real(c_float) :: c(3, n_layers)
+    integer :: i
+    do i = 1, n_layers
+       c(:, i) = layers(i)%color
+    end do
+  end function layer_colors
+
+  subroutine RenderMinimap(mbr, current_view, ui_width, bot_h, n_layers, layers)
     type(Box), intent(in)      :: mbr, current_view
     integer(c_int), intent(in) :: ui_width, bot_h
+    integer, intent(in)        :: n_layers
+    type(DrawnLayer), intent(in) :: layers(:)
     integer(c_int) :: side
     real(c_double) :: mbr_w, mbr_h, mbr_cx, mbr_cy, half_dim
     real(c_double) :: cur_w, cur_h, min_sz, cx, cy, draw_w, draw_h
@@ -700,13 +798,31 @@ contains
     call glMatrixMode(GL_MODELVIEW)
     call glLoadIdentity()
 
-    call glColor3f(0.1_c_float, 0.1_c_float, 0.1_c_float)
-    call glBegin(GL_QUADS)
-    call glVertex2f(real(mbr%x1, c_float), real(mbr%y1, c_float))
-    call glVertex2f(real(mbr%x2, c_float), real(mbr%y1, c_float))
-    call glVertex2f(real(mbr%x2, c_float), real(mbr%y2, c_float))
-    call glVertex2f(real(mbr%x1, c_float), real(mbr%y2, c_float))
-    call glEnd()
+    if (associated(tiled)) then           ! whole design from the density pyramid
+       if (minimap_side /= side .or. .not. allocated(minimap_vis)) then
+          minimap_side = -1
+       else if (size(minimap_vis) /= n_layers) then
+          minimap_side = -1
+       else if (any(minimap_vis .neqv. layers(1:n_layers)%visible)) then
+          minimap_side = -1
+       end if
+       if (minimap_side < 0) then
+          call tiled%density_image(layers(1:n_layers)%visible, layer_colors(n_layers, layers), &
+               mbr_cx - half_dim, mbr_cy - half_dim, 2.0_c_double * half_dim / real(side, c_double), &
+               int(side), int(side), minimap_img)
+          minimap_side = side
+          minimap_vis = layers(1:n_layers)%visible
+       end if
+       call viewer_draw_rgb(0_c_int, 0_c_int, side, side, minimap_img)
+    else
+       call glColor3f(0.1_c_float, 0.1_c_float, 0.1_c_float)
+       call glBegin(GL_QUADS)
+       call glVertex2f(real(mbr%x1, c_float), real(mbr%y1, c_float))
+       call glVertex2f(real(mbr%x2, c_float), real(mbr%y1, c_float))
+       call glVertex2f(real(mbr%x2, c_float), real(mbr%y2, c_float))
+       call glVertex2f(real(mbr%x1, c_float), real(mbr%y2, c_float))
+       call glEnd()
+    end if
 
     cur_w  = real(current_view%x2, c_double) - real(current_view%x1, c_double)
     cur_h  = real(current_view%y2, c_double) - real(current_view%y1, c_double)
@@ -816,6 +932,9 @@ contains
        write(line, '(A,ES9.2,A,I0,A,F7.1,A)') 'um/px ', cam%zoom / u, ' | boxes ', vstats%boxes_drawn, &
             ' | ', last, ' ms   (? keys)'
     end if
+    if (associated(tiled)) then
+       if (.not. tiled%geometry) line = trim(line) // ' | density'
+    end if
     call glColor3f(0.9_c_float, 0.9_c_float, 0.6_c_float)
     call draw_text(6.0, 3.0, trim(adjustl(line)))
 
@@ -828,9 +947,12 @@ contains
           hits = hits + layers(i)%chunk_cache%hits
           misses = misses + layers(i)%chunk_cache%misses
        end do
+       if (associated(tiled)) then
+          hits = hits + tiled%hits; misses = misses + tiled%misses
+       end if
        call ReadProcessMemoryUsage(vm_kb, rss_kb)
        call glColor4f(0.0_c_float, 0.0_c_float, 0.0_c_float, 0.70_c_float)
-       call fill_rect(real(main_width) - 330.0, real(win_h) - 140.0, real(main_width) - 4.0, real(win_h) - 4.0)
+       call fill_rect(real(main_width) - 330.0, real(win_h) - 156.0, real(main_width) - 4.0, real(win_h) - 4.0)
        call glColor3f(0.6_c_float, 1.0_c_float, 0.6_c_float)
        write(line, '(A,F6.1,A,F7.2,A,F7.2)') 'fps', 1000.0_real64 / max(0.01_real64, fa), &
             '  load s', vstats%load_s, '  1st s', vstats%first_frame_s
@@ -850,6 +972,15 @@ contains
        call draw_text(real(main_width) - 324.0, real(win_h) - 116.0, trim(line))
        write(line, '(A,I0)') 'frames ', vstats%frames
        call draw_text(real(main_width) - 324.0, real(win_h) - 132.0, trim(line))
+       if (associated(tiled)) then
+          if (tiled%geometry) then
+             write(line, '(A,I0,A,F7.1,A,F7.0,A)') 'tiles ', tiled%n_tiles, '  decode ', tiled%decode_ms, &
+                  ' ms  ', real(tiled%bytes, real64) / 1048576.0_real64, ' MB'
+          else
+             write(line, '(A,I0,A,ES9.2)') 'density level ', tiled%level, '  in view ', real(tiled%estimate, real64)
+          end if
+          call draw_text(real(main_width) - 324.0, real(win_h) - 148.0, trim(line))
+       end if
     end if
 
     if (show_help) then
@@ -962,6 +1093,7 @@ contains
 
     ! Global MBR from the compressed index roots
     call mbr%reset_to_infinity()
+    if (associated(tiled)) mbr = tiled%mbr()
     do idx = 1, n_layers
        if (associated(layers(idx)%index)) then
           if (.not. layers(idx)%index%is_empty()) mbr = mbr + layers(idx)%index%layer_mbr
@@ -1007,6 +1139,19 @@ contains
     cam%win_w = max(1.0_c_double, real(win_w0, c_double) - real(ui_width, c_double))
     cam%win_h = max(1.0_c_double, real(win_h0, c_double))
     call cam%fit_to_mbr(mbr)
+    if (env_set('MAGVIEWER_VIEW', envv)) then        ! start view x1,y1,x2,y2 in um
+       block
+         real(c_double) :: v(4)
+         type(Box) :: vb
+         read(envv, *, iostat=ierr) v
+         if (ierr == 0) then
+            v = v * vstats%unit_per_um
+            vb = Box(int(v(1), K_COORDINATE_KIND), int(v(2), K_COORDINATE_KIND), &
+                     int(v(3), K_COORDINATE_KIND), int(v(4), K_COORDINATE_KIND))
+            call cam%fit_to_mbr(vb)
+         end if
+       end block
+    end if
     dirty = .true.
     write(*,'(A)') 'INFO: MAGVIEWER window open; press ? in the window for the key map.'
 
@@ -1189,7 +1334,7 @@ contains
        call glClearColor(0.08_c_float, 0.08_c_float, 0.10_c_float, 1.0_c_float)
        call glClear(GL_COLOR_BUFFER_BIT)
        call RenderMainViewport(n_layers, layers, ui_width, main_width, live_win_y, cam, tree_mode, outlines)
-       call RenderMinimap(mbr, current_view, ui_width, side)
+       call RenderMinimap(mbr, current_view, ui_width, side, n_layers, layers)
        call RenderLayerPanel(n_layers, layers, active_layer, scroll, ui_width, side, list_h)
        call RenderOverlays(n_layers, layers, ui_width, main_width, live_win_y, cam, mouse_world, in_view, &
             show_hud, show_help, tree_mode)
@@ -1203,9 +1348,9 @@ contains
                ' s after start (query ', tq, ' ms, draw ', td, ' ms, boxes ', vstats%boxes_drawn
        end if
        if (bench .and. bench_step <= bench_n) then
-          write(*,'(A,I3,1X,A10,A,F10.3,A,F10.3,A,I10,A,ES10.3)') 'BENCH step ', bench_step, bench_kind, &
+          write(*,'(A,I3,1X,A10,A,F10.3,A,F10.3,A,I10,A,ES10.3,A,A)') 'BENCH step ', bench_step, bench_kind, &
                ' query_ms ', tq, ' draw_ms ', td, ' boxes ', vstats%boxes_drawn, ' um_per_px ', &
-               cam%zoom / vstats%unit_per_um
+               cam%zoom / vstats%unit_per_um, ' mode ', bench_mode()
        end if
 
        if (shot_pending .and. .not. keys_pending .and. ((.not. bench .and. vstats%frames >= 3) .or. (bench .and. bench_step >= bench_n))) then
@@ -1249,9 +1394,10 @@ end module DrawUsingOpenGL
 program magviewer
   use, intrinsic :: iso_fortran_env, only: int64, real64
   use, intrinsic :: iso_c_binding,   only: c_int
-  use, intrinsic :: iso_c_binding,   only: c_ptr, c_char, c_null_char, c_associated, c_int64_t, c_double, c_size_t
   use DrawUsingOpenGL,              only: DrawnLayer, SimpleWindow, UpdateVisibleLayerCaches, K_MAX_OPENGL_CAPACITY, &
-                                          vstats, PrintKeyMap, wall_seconds
+                                          vstats, PrintKeyMap, wall_seconds, tiled
+  use LayoutFilesModule,            only: OasisTables, SidecarLayer
+  use ViewerTileSourceModule,       only: TiledLayout
   use CompressedSpatialIndexModule, only: CompressedSpatialIndex, K_CSI_DEFAULT_CACHE
   use LayoutDBLoaderModule,         only: LoadLayoutDBToCompressedIndex, viewer_last_read_s, viewer_last_index_s
   use DesignModule,                 only: Design, Layer, DESIGN_DIRECTION_INPUT, RestoreSnapToLayer, &
@@ -1263,46 +1409,6 @@ program magviewer
   use SystemInformationModule,      only: ReadProcessMemoryUsage
   implicit none
 
-  interface   ! db/oasis_tables.cpp: table-only open of OASIS files
-     type(c_ptr) function ldb_oas_info_open(path, err, errn) bind(C, name='ldb_oas_info_open')
-       import :: c_ptr, c_char, c_size_t
-       character(kind=c_char), intent(in) :: path(*)
-       character(kind=c_char), intent(out) :: err(*)
-       integer(c_size_t), value :: errn
-     end function ldb_oas_info_open
-     subroutine ldb_oas_info_close(info) bind(C, name='ldb_oas_info_close')
-       import :: c_ptr
-       type(c_ptr), value :: info
-     end subroutine ldb_oas_info_close
-     integer(c_int) function ldb_oas_info_strict(info) bind(C, name='ldb_oas_info_strict')
-       import :: c_ptr, c_int
-       type(c_ptr), value :: info
-     end function ldb_oas_info_strict
-     real(c_double) function ldb_oas_info_unit(info) bind(C, name='ldb_oas_info_unit')
-       import :: c_ptr, c_double
-       type(c_ptr), value :: info
-     end function ldb_oas_info_unit
-     real(c_double) function ldb_oas_info_open_ms(info) bind(C, name='ldb_oas_info_open_ms')
-       import :: c_ptr, c_double
-       type(c_ptr), value :: info
-     end function ldb_oas_info_open_ms
-     integer(c_int) function ldb_oas_info_n_layernames(info) bind(C, name='ldb_oas_info_n_layernames')
-       import :: c_ptr, c_int
-       type(c_ptr), value :: info
-     end function ldb_oas_info_n_layernames
-     integer(c_int) function ldb_oas_info_layer_name(info, l, d, name, n) bind(C, name='ldb_oas_info_layer_name')
-       import :: c_ptr, c_int, c_char
-       type(c_ptr), value :: info
-       integer(c_int), value :: l, d, n
-       character(kind=c_char), intent(out) :: name(*)
-     end function ldb_oas_info_layer_name
-     integer(c_int) function ldb_oas_info_top(info, name, n) bind(C, name='ldb_oas_info_top')
-       import :: c_ptr, c_int, c_char
-       type(c_ptr), value :: info
-       integer(c_int), value :: n
-       character(kind=c_char), intent(out) :: name(*)
-     end function ldb_oas_info_top
-  end interface
 
   integer :: narg, iarg, ios, extpos, j, ch, max_layers, num_layers, i
   integer(int64) :: total_boxes, total_tree_b, total_chunk_b, total_comp_b, total_uncomp_b
@@ -1312,11 +1418,13 @@ program magviewer
   character(len=512) :: arg, filename
   character(len=16)  :: fext
   logical :: is_layoutdb, is_single_layer, use_hier, headless_info
-  type(c_ptr) :: oinfo
-  character(kind=c_char, len=256) :: cbuf
-  character(len=256) :: lname, topname
-  integer :: ll, dd, k, nlname
-  real(real64) :: t_tab
+  type(OasisTables) :: tables
+  type(TiledLayout), allocatable, target :: tiled_src
+  type(SidecarLayer) :: sl
+  character(len=256) :: lname
+  character(len=32)  :: envv
+  integer :: ll, dd, k, envl, envs
+  logical :: use_sidecar
   type(Design), target :: load_design
   type(Layer),  target :: single_layer
   type(CompressedSpatialIndex), allocatable, target :: indices(:)
@@ -1385,22 +1493,15 @@ program magviewer
 
   vstats%file = trim(filename)
   vstats%format = trim(fext)
-  oinfo = transfer(0_c_int64_t, oinfo)
-  nlname = 0
   if (trim(fext) == 'oas' .or. trim(fext) == 'oasis') then
      vstats%format = 'OASIS'
-     t_tab = wall_seconds()
-     oinfo = ldb_oas_info_open(trim(filename) // c_null_char, cbuf, int(len(cbuf), c_size_t))
-     if (c_associated(oinfo)) then
-        vstats%strict      = ldb_oas_info_strict(oinfo)
-        vstats%tables_ms   = ldb_oas_info_open_ms(oinfo)
-        if (ldb_oas_info_unit(oinfo) > 0.0_c_double) vstats%unit_per_um = ldb_oas_info_unit(oinfo)
-        nlname = ldb_oas_info_n_layernames(oinfo)
-        topname = ''
-        if (ldb_oas_info_top(oinfo, cbuf, int(len(cbuf), c_int)) /= 0) topname = cstr(cbuf)
+     if (tables%open(trim(filename))) then
+        vstats%strict    = merge(1, 0, tables%strict())
+        vstats%tables_ms = tables%open_ms()
+        if (tables%unit() > 0.0_real64) vstats%unit_per_um = tables%unit()
         write(*,'(A,I0,A,A,A,I0,A,F10.3,A,F8.1)') 'INFO: OASIS tables: strict=', vstats%strict, ' top=', &
-             trim(topname), ' layernames=', nlname, ' read in ', vstats%tables_ms, ' ms, unit/um=', &
-             vstats%unit_per_um
+             tables%top(), ' layernames=', tables%n_layernames(), ' read in ', vstats%tables_ms, &
+             ' ms, unit/um=', vstats%unit_per_um
      end if
   else if (is_layoutdb) then
      vstats%format = 'GDSII'
@@ -1411,7 +1512,38 @@ program magviewer
   call system_clock(count=t_start)
   call global_mbr%reset_to_infinity()
 
-  if (is_single_layer) then
+  ! Flat OASIS: open through the sidecar index (density pyramid + on-demand CBLOCK decode).
+  use_sidecar = vstats%format == 'OASIS' .and. .not. use_hier
+  call get_environment_variable('MAGVIEWER_SIDECAR', envv, envl, envs)
+  if (envs == 0 .and. envl > 0) use_sidecar = use_sidecar .and. envv(1:1) /= '0'
+  if (use_sidecar) then
+     allocate(tiled_src)
+     if (tiled_src%open(trim(filename))) then
+        write(*,'(A,A,A,F8.3,A)') 'INFO: MAGVIEWER sidecar ', tiled_src%side%path, &
+             merge(' built ', ' opened', tiled_src%side%built), tiled_src%side%open_s, ' s'
+        if (tiled_src%side%built) write(*,'(A,A)') 'INFO: ', tiled_src%side%summary
+        write(*,'(A,I0,A,I0,A,I0,A,I0,A,I0)') 'INFO: sidecar units=', tiled_src%side%n_units, ' dependent=', &
+             tiled_src%side%n_dependent, ' layers=', tiled_src%side%n_layers, ' boxes=', &
+             tiled_src%side%total_boxes, ' density levels=', tiled_src%side%n_levels
+        tiled => tiled_src
+        if (tiled_src%side%unit > 0.0_real64) vstats%unit_per_um = tiled_src%side%unit
+     else
+        write(*,'(A,A,A)') 'INFO: no sidecar (', tiled_src%side%error, '); loading the whole file'
+        deallocate(tiled_src)
+     end if
+  end if
+
+  if (associated(tiled)) then
+     num_layers = tiled%n_layers()
+     allocate(indices(max(1, num_layers)), layer_names(max(1, num_layers)))
+     do i = 1, num_layers
+        sl = tiled%layer(i)
+        write(layer_names(i), '(A,I0,A,I0)') 'L', sl%layer, '_D', sl%datatype
+     end do
+     global_mbr = tiled%mbr()
+     vstats%read_s = tiled%side%open_s
+     vstats%index_s = 0.0_real64
+  else if (is_single_layer) then
      call RestoreSnapToLayer(single_layer, trim(filename))
      num_layers = 1
      allocate(indices(1), layer_names(1))
@@ -1469,17 +1601,16 @@ program magviewer
      drawn_layers(i)%label   = trim(layer_names(i))
      ! Layer label: OASIS LAYERNAME when present, else layer/datatype (from names like L67_D20).
      if (parse_ld(layer_names(i), ll, dd)) then
-        lname = ''
-        if (c_associated(oinfo)) then
-           if (ldb_oas_info_layer_name(oinfo, int(ll, c_int), int(dd, c_int), cbuf, int(len(cbuf), c_int)) /= 0) &
-                lname = cstr(cbuf)
-        end if
+        lname = tables%layer_name(int(ll, int64), int(dd, int64))
         write(drawn_layers(i)%label, '(I0,A,I0)') ll, '/', dd
         if (len_trim(lname) > 0) drawn_layers(i)%label = trim(lname) // '  ' // trim(drawn_layers(i)%label)
      end if
      drawn_layers(i)%index   => indices(i)
      drawn_layers(i)%visible = .true.
-     if (.not. indices(i)%is_empty()) then
+     if (associated(tiled)) then
+        sl = tiled%layer(i)
+        total_boxes = total_boxes + sl%count
+     else if (.not. indices(i)%is_empty()) then
         total_boxes    = total_boxes    + indices(i)%n_boxes
         total_tree_b   = total_tree_b   + indices(i)%tree_bytes()
         total_chunk_b  = total_chunk_b  + indices(i)%chunk_bytes()
@@ -1489,6 +1620,7 @@ program magviewer
      end if
   end do
 
+  if (associated(tiled)) global_mbr = tiled%mbr()
   if (total_comp_b > 0_int64) then
      ratio = real(total_uncomp_b, real64) / real(total_comp_b, real64)
   else
@@ -1574,7 +1706,7 @@ program magviewer
      stop 0
   end if
 
-  if (c_associated(oinfo)) call ldb_oas_info_close(oinfo)
+  call tables%close()
   vstats%load_s = t_load_s
   if (vstats%read_s <= 0.0_real64) vstats%read_s = t_load_s
   vstats%total_boxes = total_boxes
@@ -1614,14 +1746,5 @@ contains
     parse_ld = (l >= 0 .and. d >= 0)
   end function parse_ld
 
-  function cstr(c) result(f)
-    character(kind=c_char, len=*), intent(in) :: c
-    character(len=len(c)) :: f
-    integer :: z
-    z = index(c, c_null_char)
-    f = ''
-    if (z > 1) f = c(1:z-1)
-    if (z == 0) f = c
-  end function cstr
 
 end program magviewer

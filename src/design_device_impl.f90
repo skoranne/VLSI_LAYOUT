@@ -102,7 +102,9 @@ contains
 
   logical function same_layer( A, B )
     type(Layer), intent(in), target :: A, B
-    same_layer = c_associated( c_loc( A ), c_loc( B ) )
+    type(c_ptr) :: pa, pb
+    pa = c_loc( A ); pb = c_loc( B )      !> temporaries: gfortran rejects c_loc() inline here
+    same_layer = c_associated( pa, pb )
   end function same_layer
 
   !> Unpin the device copies pinned by LayerDeviceEnsure (they stay resident for reuse).

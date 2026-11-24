@@ -571,13 +571,14 @@ contains
   !> while it streamed), taking ownership of them. Same tree as build_from_compact; chunks
   !> never span parts, so a part's last chunk may be partial (its unused leaves are empty).
   subroutine csi_build_from_compact_parts(this, parts)
-    class(CompressedSpatialIndex), intent(inout) :: this
+    class(CompressedSpatialIndex), intent(inout), target :: this
     type(CompactLayer), intent(inout)            :: parts(:)
     integer(int64) :: ic, i, j, l0, nout, leaf, c_start, c_end, n_internal, nch, kb
     integer :: p, np, q
     integer(K_COORDINATE_KIND) :: lx1, ly1
     type(Box) :: agg
     logical :: first
+    type(CompactLayer), pointer :: c          !> gfortran: no associate on part_ref (defined later)
     type(Box), allocatable :: buf(:)
 
     call this%destroy()
@@ -608,7 +609,7 @@ contains
     this%n_boxes = 0_int64
     first = .true.
     do p = 1, np
-       associate (c => part_ref(this, p))
+       c => part_ref(this, p)
          nch = nch + (c%nblk + K_CSI_CL_BLOCKS - 1_int64) / K_CSI_CL_BLOCKS
          this%n_boxes = this%n_boxes + c%n
          do i = 1_int64, c%nblk
@@ -619,19 +620,17 @@ contains
                agg%x2 = max(agg%x2, c%blk_mbr(i)%x2); agg%y2 = max(agg%y2, c%blk_mbr(i)%y2)
             end if
          end do
-       end associate
     end do
     allocate(this%chunk_part(nch), this%chunk_kb0(nch), this%chunk_kb1(nch))
     ic = 0_int64
     do p = 1, np
-       associate (c => part_ref(this, p))
+       c => part_ref(this, p)
          do kb = 1_int64, c%nblk, K_CSI_CL_BLOCKS
             ic = ic + 1_int64
             this%chunk_part(ic) = int(p, int32)
             this%chunk_kb0(ic) = kb
             this%chunk_kb1(ic) = min(kb + K_CSI_CL_BLOCKS - 1_int64, c%nblk)
          end do
-       end associate
     end do
     this%n_chunks = nch
     this%layer_mbr = agg

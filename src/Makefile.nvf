@@ -36,10 +36,22 @@ NSYS_DUR ?= 0
 NSYS_TRACE ?= cuda,nvtx,openmp,osrt
 NSYS_OUT ?= /tmp/magparser_nvf_profile
 STRICT ?= 0
-ifeq ($(DEBUG),1)
-   FCFLAGS = -cuda -O0 -Mbounds -g -traceback -Mchkptr -Mpreprocess -mp=gpu -gpu=$(GPU_CC) -fopenmp -Minfo=accel,mp
+# GPU=0: CPU-only nvfortran build for hosts with no CUDA (e.g. JN6-TX2, Jetson on Ubuntu 18.04).
+#   No -cuda / -mp=gpu, the nvfortran macros are undefined so the Fortran takes the same
+#   non-CUDA paths as the ifx build, and the .cu files are compiled as C++ CPU stubs.
+GPU ?= 1
+ifeq ($(GPU),0)
+   CUDA_FLAG :=
+   FCOMP_GPU := -mp -U_CUDA -U__NVCOMPILER -U__NVCOMPILER_LLVM__
+   NVCOMP := 0
 else
-   FCFLAGS = -cuda -O3 -g -fno-strict-aliasing -Mpreprocess -mp=gpu -gpu=$(GPU_CC) -fopenmp -Minfo=accel,mp
+   CUDA_FLAG := -cuda
+   FCOMP_GPU := -mp=gpu -gpu=$(GPU_CC) -Minfo=accel,mp
+endif
+ifeq ($(DEBUG),1)
+   FCFLAGS = $(CUDA_FLAG) -O0 -Mbounds -g -traceback -Mchkptr -Mpreprocess $(FCOMP_GPU) -fopenmp
+else
+   FCFLAGS = $(CUDA_FLAG) -O3 -g -fno-strict-aliasing -Mpreprocess $(FCOMP_GPU) -fopenmp
 endif
 ifeq ($(STRICT),1)
    FCFLAGS += -Mstandard -Mbounds -Mchkptr -Minform=inform -traceback
@@ -48,7 +60,9 @@ endif
 # --- Linker Variables ---
 #LDFLAGS = -L/scratch1/skoranne/INTELCOMPILERS/lib/
 LDFLAGS = -L/scratch1/skoranne/NVCOMPILERS/lib/
-LDLIBS = db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd -lpthread
+# ZSTD_LIBS: override where only the runtime libzstd.so.1 exists, e.g. ZSTD_LIBS=-l:libzstd.so.1
+ZSTD_LIBS ?= -lzstd
+LDLIBS = db/liblayoutdb.a -lz -lstdc++ -lsnappy $(ZSTD_LIBS) -lpthread
 # nvCOMP for GPU OASIS CBLOCK decompression (auto-detected; NVCOMP=0 to disable).
 # nvfortran -cuda already links cudart, so only libnvcomp is added here.
 include db/nvcomp.mk
@@ -63,7 +77,7 @@ include DEPENDENCIES.txt
 # Measured on SDT.ctr: -O2 only gains ~9% in layer flush time, so -O1 stays the safe default.
 BOX_CODEC_OPT ?= -O1
 box_codec.o:	box_codec.f90
-	$(FORTRAN_COMPILER) -Mpreprocess -c $(BOX_CODEC_OPT) -g -cuda box_codec.f90
+	$(FORTRAN_COMPILER) -Mpreprocess -c $(BOX_CODEC_OPT) -g $(CUDA_FLAG) $(if $(filter 0,$(GPU)),$(FCOMP_GPU)) box_codec.f90
 
 # Create a list of all object files that will be compiled
 ALL_OBJS = $(LIB_OBJS) mainmagparser.o test_contour.o
@@ -156,10 +170,17 @@ snappy_api.o:	       snappy_api.cpp
 		       g++ -O3 -Wall -c snappy_api.cpp -o snappy_api.o
 boost_polygon_api.o:   boost_polygon_api.cpp
 		       g++ -O3 -funroll-loops -I /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost boost_polygon_api.cpp -c
+ifeq ($(GPU),0)
+event_sorter.o:	       event_sorter.cu
+		       g++ -x c++ -O3 -c event_sorter.cu
+gpu_morton.o:   gpu_morton.cu
+		       g++ -O3 -c -x c++ gpu_morton.cu
+else
 event_sorter.o:	       event_sorter.cu
 		       $(NVCC) $(NVCCFLAGS) -c event_sorter.cu
 gpu_morton.o:   gpu_morton.cu
 		       $(NVCC) $(NVCCFLAGS) -c gpu_morton.cu
+endif
 # Nsight Systems profiling for nvfortran+OpenMP target offload (GB10). Example:
 #   make -f Makefile.nvf profile CTR=check_interactions.ctr LAYERS=10
 #   make -f Makefile.nvf profile-delayed NSYS_DELAY=30 NSYS_DUR=60 CTR=check_interactions.ctr LAYERS=10
@@ -187,5 +208,9 @@ viewer_gl.o: viewer_gl.c
 	gcc -c -O2 -I$(GLFW_INC) viewer_gl.c -o $@
 viewer_font.o: viewer_font.f90
 	$(FORTRAN_COMPILER) -c -O2 viewer_font.f90 -o $@
-MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o db/liblayoutdb.a
-	$(FORTRAN_COMPILER) $(FCFLAGS) magviewer.f90 viewer_font.o $(LIBRARY) viewer_gl.o $(GLFW_LIB) $(LIBGL) -ldl -lm -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
+test_layout_files.exe: test_layout_files.f90 viewer_tiles.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_layout_files.f90 viewer_tiles.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+viewer_tiles.o: viewer_tiles.f90 $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) -c viewer_tiles.f90 -o $@
+MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o viewer_tiles.o db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) magviewer.f90 viewer_font.o viewer_tiles.o $(LIBRARY) viewer_gl.o $(GLFW_LIB) $(LIBGL) -ldl -lm -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)

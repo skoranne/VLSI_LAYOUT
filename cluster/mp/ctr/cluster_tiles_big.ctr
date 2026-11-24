@@ -1,0 +1,16 @@
+# cluster_tiles_big.ctr -- one large AND, OR, XOR and NOT, each split into tiles across the nodes.
+# Inputs: julia ../tools/genmag.jl cluster_big_in.mag 2000000 20000000 ; copy cluster_tiles_big_out.mag.
+# 2M + 2M input boxes > cluster_tile_boxes 1M, so each op becomes max(4, worker slots) tiles.
+# (The default threshold is 10 million boxes; it is lowered here so the test stays quick.)
+program cluster_tiles_big
+systeminfo
+var debug_verbosity 0
+var cluster_tile_boxes 1000000
+decl design d1 = cluster_big_in.mag
+decl output o1 = cluster_tiles_big_out.mag
+exec run o1:b_and = d1:metal1 * d1:metal2
+exec run o1:b_or  = d1:metal1 + d1:metal2
+exec run o1:b_xor = d1:metal1 ^ d1:metal2
+exec run o1:b_not = d1:metal1 @ d1:metal2
+flush
+end

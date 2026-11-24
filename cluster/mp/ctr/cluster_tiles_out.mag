@@ -1,0 +1,37 @@
+magic
+tech sky130A
+<< t_and >>
+KLBIN o1_t_and.bin
+<< t_or >>
+KLBIN o1_t_or.bin
+<< t_xor >>
+KLBIN o1_t_xor.bin
+<< t_not >>
+KLBIN o1_t_not.bin
+<< t_bnot >>
+KLBIN o1_t_bnot.bin
+<< t_fnot >>
+KLBIN o1_t_fnot.bin
+<< w_not >>
+KLBIN o1_w_not.bin
+<< w_xor >>
+KLBIN o1_w_xor.bin
+<< t_grow >>
+KLBIN o1_t_grow.bin
+<< t_size >>
+KLBIN o1_t_size.bin
+<< or2 >>
+KLBIN o1_or2.bin
+<< and2 >>
+KLBIN o1_and2.bin
+<< shr >>
+KLBIN o1_shr.bin
+<< inter >>
+KLBIN o1_inter.bin
+<< ninter >>
+KLBIN o1_ninter.bin
+<< inside >>
+KLBIN o1_inside.bin
+<< cpy >>
+KLBIN o1_cpy.bin
+<< end >>

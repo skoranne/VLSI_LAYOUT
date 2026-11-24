@@ -1,6 +1,8 @@
 CXX ?= g++
 AR ?= ar
 CXXFLAGS ?= -O2 -std=c++17 -Wall -Wextra -I. -DLAYOUTDB_USE_ZLIB
+# Position-independent so the same objects build liblayoutdb.so (Julia ccall shims).
+CXXFLAGS += -fPIC
 LDFLAGS ?= -lz
 # The Fortran link on macOS (ifort) targets an older libc++ than the default
 # SDK; without a matching deployment target std::function leaves undefined
@@ -14,18 +16,25 @@ include $(dir $(lastword $(MAKEFILE_LIST)))nvcomp.mk
 CXXFLAGS += $(NVCOMP_CXXFLAGS)
 LDFLAGS += $(NVCOMP_LDLIBS) $(NVCOMP_CUDART) -pthread
 
-CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp gdsii.cpp oasis.cpp oasis_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp oasis_tables.cpp
+CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp gdsii.cpp oasis.cpp oasis_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp oasis_tables.cpp oasis_sidecar.cpp
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
 
-TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent bin2oas db_oasinfo
+TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent bin2oas db_oasinfo db_mvi
 
-all: $(TESTS) liblayoutdb.a
+all: $(TESTS) liblayoutdb.a liblayoutdb.so
 
-$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h fracture.hpp oasis_codec.hpp nvcomp_support.hpp
+$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h fracture.hpp oasis_codec.hpp nvcomp_support.hpp oasis_parser.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 liblayoutdb.a: $(CORE_OBJS)
 	$(AR) rcs $@ $^
+
+# Shared library for Julia (julia/LayoutDB) and other FFI users.
+liblayoutdb.so: $(CORE_OBJS)
+	$(CXX) -shared $^ -o $@ $(LDFLAGS)
+
+db_mvi: db_mvi.cpp $(CORE_OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 db_oasinfo: db_oasinfo.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
@@ -62,6 +71,6 @@ db_hier_extent: db_hier_extent.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:
-	rm -f $(CORE_OBJS) oasis_rec.o $(TESTS) *.rt *.oas.out
+	rm -f $(CORE_OBJS) oasis_rec.o $(TESTS) liblayoutdb.a liblayoutdb.so *.rt *.oas.out
 
 .PHONY: all clean

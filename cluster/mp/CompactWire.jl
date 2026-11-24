@@ -155,8 +155,9 @@ function decode_layer(b::Vector{UInt8})
         width = b[p+1:p+nb]; p += cld(nb, 8) * 8
         packed = reinterpret(UInt64, ra(Int64, r, p, Int(h.npacked))); p += 8 * Int(h.npacked)
         if h.wide
-            sp = reinterpret(UInt64, ra(Int64, r, p, Int(h.nsid)))
-            sid = [getfield_bits(collect(sp), i, Int(h.sbits)) for i in 1:n]
+            sp = collect(reinterpret(UInt64, ra(Int64, r, p, Int(h.nsid))))   # once, not per box
+            sb = Int(h.sbits)
+            sid = [getfield_bits(sp, i, sb) for i in 1:n]
         end
         packed = collect(packed)
         for k in 1:nb

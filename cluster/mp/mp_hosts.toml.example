@@ -27,10 +27,11 @@ tmp = "/tmp"
 env = { OMP_NUM_THREADS = "16" }
 
 [[host]]
-name = "JN6-TX2"            # aarch64 8 GB; needs Julia 1.13 and a MAGPARSER build
+name = "JN6-TX2"            # aarch64 Jetson TX2 8 GB; gfortran 13.4 CPU-only build (Makefile.gfortran, see README Notes)
 ssh = "JN6-TX2.local"
-julia = "/home/skoranne/julia-1.11.3/bin/julia"
+julia = "/home/skoranne/julia-1.13.4/bin/julia"
 magparser = "/home/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe"
 workers = 1
 tmp = "/tmp"
 reserve_mb = 1536
+env = { OMP_NUM_THREADS = "4" }

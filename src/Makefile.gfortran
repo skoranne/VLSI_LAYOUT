@@ -1,0 +1,80 @@
+################################################################################
+# File   : Makefile.gfortran
+# Purpose: CPU-only GNU Fortran build of MAGPARSER.exe, for hosts where neither
+#          nvfortran nor ifx can be used (e.g. JN6-TX2: Jetson TX2, ARMv8.0, Ubuntu
+#          18.04; NVHPC >= 23 runtimes need ARMv8.1 LSE atomics, NVHPC 22 lacks
+#          shiftl/shiftr). GPU hosts keep Makefile.nvf (OpenMP target offload).
+#
+#   make -f Makefile.gfortran MAGPARSER.exe            (build serially: DEPENDENCIES.txt
+#   make -f Makefile.gfortran DEBUG=1 MAGPARSER.exe     does not list every .mod edge)
+#
+# The Fortran takes the same non-CUDA paths as the ifx build; the .cu files are compiled
+# as C++ CPU stubs. Variables: FC, BOOST_DIR, ZSTD_LIBS (e.g. -l:libzstd.so.1).
+################################################################################
+FC ?= gfortran
+ifeq ($(FC),f77)
+  FC := gfortran
+endif
+FORTRAN_COMPILER := $(FC)
+BOOST_DIR ?= /scratch1/skoranne/OSS_EDA_TOOLS/boost/boost
+ZSTD_LIBS ?= -lzstd
+GFLAGS = -cpp -fopenmp -ffree-line-length-none -fno-range-check -fallow-argument-mismatch
+# gfortran < 10 has no -fallow-argument-mismatch
+GFC_MAJOR := $(shell $(FC) -dumpversion 2>/dev/null | cut -d. -f1)
+ifeq ($(shell test "$(GFC_MAJOR)" -lt 10 2>/dev/null && echo old),old)
+  GFLAGS := $(filter-out -fallow-argument-mismatch,$(GFLAGS))
+endif
+ifeq ($(DEBUG),1)
+   FCFLAGS = -g -O0 -fcheck=all -fbacktrace $(GFLAGS)
+else
+   FCFLAGS = -g -O2 -fbacktrace $(GFLAGS)
+endif
+
+GIT_HASH := $(shell git rev-parse --short HEAD)
+LDFLAGS ?=
+LDLIBS = db/liblayoutdb.a -lz -lstdc++ -lsnappy $(ZSTD_LIBS) -lpthread
+LIBRARY = libmagparser.a
+
+include DEPENDENCIES.txt
+
+.PHONY: all clean FORCE
+FORCE:
+all: MAGPARSER.exe
+
+version_mod.f90: ../.git/HEAD ../.git/index
+	@echo "module version_mod" > $@
+	@echo "  implicit none" >> $@
+	@echo "  character(len=*), parameter :: commit_hash = '$(GIT_HASH)'" >> $@
+	@echo "end module version_mod" >> $@
+
+clean:
+	rm -f *.o *.mod *.smod *.a *.exe
+
+%.o: %.f90
+	$(FC) $(FCFLAGS) -c $< -o $@
+%.o: %.F90
+	$(FC) $(FCFLAGS) -c $< -o $@
+
+$(LIBRARY): $(LIB_OBJS)
+	ar rcs $@ $^
+
+db/liblayoutdb.a: FORCE
+	$(MAKE) -C db liblayoutdb.a NVCOMP=0
+
+MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_compact_wire.exe: test_compact_wire.o $(LIBRARY) db/liblayoutdb.a
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+rpc_socket.o: rpc_socket.c
+	$(CC) -O2 -Wall -c rpc_socket.c -o $@
+systeminfo_macos.o: systeminfo_macos.c
+	$(CC) -O3 -Wall -c systeminfo_macos.c -o $@
+snappy_api.o: snappy_api.cpp
+	g++ -O3 -Wall -c snappy_api.cpp -o $@
+boost_polygon_api.o: boost_polygon_api.cpp
+	g++ -O3 -funroll-loops -I$(BOOST_DIR) -c boost_polygon_api.cpp -o $@
+event_sorter.o: event_sorter.cu
+	g++ -x c++ -O3 -c event_sorter.cu -o $@
+gpu_morton.o: gpu_morton.cu
+	g++ -x c++ -O3 -c gpu_morton.cu -o $@
