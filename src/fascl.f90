@@ -23,19 +23,34 @@
 !             123  1.5  2.0e-3  "text"  , names, NAME.field, calls, STRUCT(f=expr, ...)
 !   geometry of a polygon id:  POLYGON_NUMBER POLYGON_ID AREA NUM_BOXES BBOX_X1 BBOX_Y1
 !                              BBOX_X2 BBOX_Y2 BBOX_WIDTH BBOX_HEIGHT
+!                              PERIMETER VERTICES LINE_END_DIR LINE_END_WIDTH LINE_END_LENGTH
+!                              NET_ID (net of the polygon from a CONNECT statement)
 !   values: INT FLOAT STRING ABS SQRT POW MIN MAX IF(c,a,b)
 !   existing property of the layer:  NAME(id)  and  NAME.field(id)
 !   '/' always gives FLOAT, '%' is integer modulo, '+' concatenates when a STRING is involved.
 !   WHEN c : the polygon gets no value for any defined property unless c is true.
 module FASCLModule
-  use iso_fortran_env, only: int64, real64
+  use iso_fortran_env, only: int8, int32, int64, real64
+  use, intrinsic :: iso_c_binding, only: c_int64_t, c_int32_t
   use DesignModule
   use PNumMergeModule
   use PropertyTableModule
   use CommonModule, only: K_LEAF_CAPACITY
   implicit none
   private
-  public :: FASCLExecute, FASCLParseStatement, LayerEnsureProperties, FASCLRunLambda
+  public :: FASCLExecute, FASCLParseStatement, LayerEnsureProperties, FASCLRunLambda, PropEnsureOutline
+
+  interface
+     !> db/prop_oasis_writer.cpp: perimeter, vertices, narrowest line end of one polygon
+     function fpo_poly_geom( nbox, boxes, out, le_dir ) bind(C, name='fpo_poly_geom') result(st)
+       import :: c_int64_t, c_int32_t
+       integer(c_int64_t), value :: nbox
+       integer(c_int64_t), intent(in) :: boxes(*)
+       integer(c_int64_t), intent(out) :: out(4)
+       integer(c_int32_t), intent(out) :: le_dir
+       integer(c_int32_t) :: st
+     end function fpo_poly_geom
+  end interface
 
   ! ---- tokens
   integer, parameter :: T_EOF = 0, T_ID = 1, T_INT = 2, T_FLT = 3, T_STR = 4, T_OP = 5
@@ -53,7 +68,8 @@ module FASCLModule
        B_LT = 8, B_LE = 9, B_GT = 10, B_GE = 11, B_AND = 12, B_OR = 13
   integer, parameter :: F_PNUM = 1, F_PID = 2, F_AREA = 3, F_NBOX = 4, F_BX1 = 5, F_BY1 = 6, F_BX2 = 7, &
        F_BY2 = 8, F_BW = 9, F_BH = 10, F_INT = 11, F_FLOAT = 12, F_STRING = 13, F_ABS = 14, F_SQRT = 15, &
-       F_POW = 16, F_MIN = 17, F_MAX = 18, F_IF = 19
+       F_POW = 16, F_MIN = 17, F_MAX = 18, F_IF = 19, F_PERIM = 20, F_NVERT = 21, F_LEDIR = 22, &
+       F_LELEN = 23, F_LEW = 24, F_NET = 25
   type :: Node
      integer :: op = 0, fn = 0, slot = 0, col = 0
      integer(int64) :: iv = 0
@@ -780,6 +796,12 @@ contains
     case( 'MIN' );            builtin = F_MIN
     case( 'MAX' );            builtin = F_MAX
     case( 'IF' );             builtin = F_IF
+    case( 'PERIMETER' );      builtin = F_PERIM
+    case( 'VERTICES', 'NUM_VERTICES' ); builtin = F_NVERT
+    case( 'LINE_END_DIR' );   builtin = F_LEDIR
+    case( 'LINE_END_LENGTH' ); builtin = F_LELEN
+    case( 'LINE_END_WIDTH' ); builtin = F_LEW
+    case( 'NET_ID' );         builtin = F_NET
     case default;             builtin = 0
     end select
   end function builtin
@@ -1089,7 +1111,8 @@ contains
        end if
     end if
     select case( nd%fn )
-    case( F_PNUM, F_PID, F_AREA, F_NBOX, F_BX1, F_BY1, F_BX2, F_BY2, F_BW, F_BH )
+    case( F_PNUM, F_PID, F_AREA, F_NBOX, F_BX1, F_BY1, F_BX2, F_BY2, F_BW, F_BH, &
+          F_PERIM, F_NVERT, F_LEDIR, F_LELEN, F_LEW, F_NET )
        e = PropValue()
        ord = ord_of( t, a, e )
        if( e%kind == PV_ERROR ) then
@@ -1106,6 +1129,35 @@ contains
        case( F_BY2 );  v = ival( int( t%bbox(ord)%y2, int64 ) )
        case( F_BW );   v = ival( int( t%bbox(ord)%x2, int64 ) - int( t%bbox(ord)%x1, int64 ) )
        case( F_BH );   v = ival( int( t%bbox(ord)%y2, int64 ) - int( t%bbox(ord)%y1, int64 ) )
+       case( F_PERIM, F_NVERT, F_LEDIR, F_LELEN, F_LEW )
+          if( .not. allocated( t%perim ) ) then
+             v = err( 'outline measures not computed' ); return
+          end if
+          select case( nd%fn )
+          case( F_PERIM ); v = ival( t%perim(ord) )
+          case( F_NVERT )
+             if( t%nvert(ord) < 0 ) then
+                v = err( 'VERTICES: outline could not be traced' )
+             else
+                v = ival( t%nvert(ord) )
+             end if
+          case( F_LEW );   v = ival( t%le_w(ord) )
+          case( F_LELEN ); v = ival( t%le_len(ord) )
+          case( F_LEDIR )
+             v%kind = PV_STRING
+             select case( int( t%le_dir(ord) ) )
+             case( 0 ); v%s = 'E'
+             case( 1 ); v%s = 'N'
+             case( 2 ); v%s = 'W'
+             case( 3 ); v%s = 'S'
+             case default; v%s = ''
+             end select
+          end select
+       case( F_NET )
+          if( .not. allocated( t%net ) ) then
+             v = err( 'NET_ID: layer is not part of a CONNECT' ); return
+          end if
+          v = ival( t%net(ord) )
        end select
     case( F_INT )
        select case( a%kind )
@@ -1258,6 +1310,61 @@ contains
   end subroutine LayerEnsureProperties
 
   !> Compile and run `lam_text` over every polygon of L, defining properties `names`.
+  !> True if the compiled lambda calls any of the given builtins.
+  pure logical function lambda_calls( lam, fns )
+    type(Lambda), intent(in) :: lam
+    integer, intent(in) :: fns(:)
+    integer :: k
+    lambda_calls = .false.
+    do k = 1, lam%nnodes
+       if( lam%nodes(k)%op == N_CALL ) then
+          if( any( fns == lam%nodes(k)%fn ) ) then
+             lambda_calls = .true.; return
+          end if
+       end if
+    end do
+  end function lambda_calls
+
+  !> Perimeter, vertex count and narrowest line end of every polygon (lazy, cached in the
+  !> table until the geometry changes). Polygons are the healed, disjoint boxes of the layer.
+  subroutine PropEnsureOutline( t, boxes )
+    type(PropertyTable), intent(inout) :: t
+    type(Box), intent(in) :: boxes(:)
+    integer(int64) :: p, j, nb, k, nfail
+    integer(c_int64_t), allocatable :: buf(:)
+    integer(c_int64_t) :: o(4)
+    integer(c_int32_t) :: d, st
+    if( t%have_outline ) return
+    call PropDropOutline( t )
+    allocate( t%perim(t%n_poly), t%nvert(t%n_poly), t%le_w(t%n_poly), t%le_len(t%n_poly), &
+         t%le_dir(t%n_poly) )
+    nfail = 0
+    !$omp parallel private(buf, p, j, nb, k, o, d, st)
+    allocate( buf(64) )
+    !$omp do schedule(dynamic, 256) reduction(+:nfail)
+    do p = 1, t%n_poly
+       nb = t%poly_start(p+1) - t%poly_start(p)
+       if( size(buf, kind=int64) < 4*nb ) then
+          deallocate( buf ); allocate( buf( 4*nb + 64 ) )
+       end if
+       do j = 1, nb
+          k = t%poly_boxes( t%poly_start(p) + j - 1 )
+          buf(4*j-3) = boxes(k)%x1; buf(4*j-2) = boxes(k)%y1
+          buf(4*j-1) = boxes(k)%x2; buf(4*j)   = boxes(k)%y2
+       end do
+       st = fpo_poly_geom( nb, buf, o, d )
+       if( st /= 0 ) nfail = nfail + 1
+       t%perim(p) = o(1); t%nvert(p) = o(2); t%le_w(p) = o(3); t%le_len(p) = o(4)
+       t%le_dir(p) = int( d, int8 )
+    end do
+    !$omp end do
+    deallocate( buf )
+    !$omp end parallel
+    t%n_outline_fail = nfail
+    t%have_outline = .true.
+    if( nfail > 0 ) write(*,'(A,I0,A)') 'WARNING: FASCL outline could not be traced for ', nfail, ' polygon(s)'
+  end subroutine PropEnsureOutline
+
   subroutine FASCLRunLambda( L, lname, names, lam_text, status, msg )
     type(Layer), intent(inout), target :: L
     character(len=*), intent(in) :: lname
@@ -1278,6 +1385,15 @@ contains
     call LayerEnsureProperties( L, lname )
     call FASCLCompile( lam_text, names, L%props, lam, status, msg )
     if( status /= 0 ) return
+    if( lambda_calls( lam, [ F_NET ] ) ) then
+       if( L%props%net_rec == 0 .or. .not. allocated( L%props%net ) ) then
+          status = 1
+          msg = 'NET_ID: layer '//lname//' is not part of a CONNECT (CONNECT db:metal db:via db:metal ... must come first)'
+          return
+       end if
+    end if
+    if( lambda_calls( lam, [ F_PERIM, F_NVERT, F_LEDIR, F_LELEN, F_LEW ] ) ) &
+         call PropEnsureOutline( L%props, L%layer_boxes )
     np = L%props%n_poly
     allocate( outs( size(names) ), out_slot( size(names) ) )
     do k = 1, size(names)

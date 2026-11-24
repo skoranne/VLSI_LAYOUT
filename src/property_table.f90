@@ -82,10 +82,21 @@ module PropertyTableModule
      integer(int64), allocatable :: area(:)        !> sum of (disjoint) box areas
      integer                     :: n_cols = 0
      type(PropColumn), allocatable :: cols(:)
+     !> Outline measures (FASCL PERIMETER/VERTICES/LINE_END_*), computed on first use and
+     !> kept while the geometry signature is unchanged (like the columns).
+     logical :: have_outline = .false.
+     integer(int64) :: n_outline_fail = 0
+     integer(int64), allocatable :: perim(:), nvert(:), le_w(:), le_len(:)
+     integer(int8),  allocatable :: le_dir(:)      !> -1 none, 0 E, 1 N, 2 W, 3 S
+     !> Nets from a CONNECT statement (FASCL NET_ID): record id, global net count, ordinal -> net.
+     integer        :: net_rec = 0
+     integer(int64) :: n_nets = 0
+     integer(int64), allocatable :: net(:)
   end type PropertyTable
 
   public :: PropTableIndex, PropTableClear, PropColumnIndex, PropCommitColumn, PropGetValue, &
-       PropGetField, PropOrdinalOfId, PropKindName, PropTablePrint, PropTableDumpCSV, PropValueToString
+       PropGetField, PropOrdinalOfId, PropKindName, PropTablePrint, PropTableDumpCSV, PropValueToString, &
+       PropDropOutline, PropDropNets
 
 contains
 
@@ -107,9 +118,12 @@ contains
     if( present(dropped) ) dropped = .false.
     h = 0
     if( n > 0 ) h = BoxSetHash( boxes, n )
-    if( t%n_cols > 0 .and. ( t%geom_n /= n .or. t%geom_hash /= h ) ) then
-       if( present(dropped) ) dropped = .true.
+    if( t%geom_n /= n .or. t%geom_hash /= h ) then
+       !> geometry changed: values computed for the old polygons are meaningless now
+       if( present(dropped) ) dropped = ( t%n_cols > 0 )
        call drop_columns( t )
+       call PropDropOutline( t )
+       call PropDropNets( t )
     end if
     t%geom_n = n
     t%geom_hash = h
@@ -164,7 +178,14 @@ contains
        kx2(p) = boxes(amin(r))%x2; ky2(p) = boxes(amin(r))%y2
     end do
     call sort_perm4( kx1, ky1, kx2, ky2, perm )
-    t%poly_id = t%poly_id(perm)
+    !> permute through kx1 (no longer needed): `poly_id = poly_id(perm)` aliases and makes ifx
+    !> build an n-element stack temporary (SIGSEGV with an 8 MB stack above ~1M polygons)
+    do p = 1, np
+       kx1(p) = t%poly_id( perm(p) )
+    end do
+    do p = 1, np
+       t%poly_id(p) = kx1(p)
+    end do
     deallocate( kx1, ky1, kx2, ky2, perm )
 
     allocate( t%id_ord(nid), source=0_int64 )
@@ -229,7 +250,9 @@ contains
     integer(int64) :: n, width, lo, mid, hi, i, j, k
     n = size(a, kind=int64)
     allocate( perm(n), tmp(n) )
-    perm = [( i, i = 1, n )]
+    do i = 1, n                      !> explicit loop: an array constructor is a stack temporary
+       perm(i) = i
+    end do
     width = 1
     do while( width < n )
        lo = 1
@@ -288,10 +311,30 @@ contains
     t%n_cols = 0
   end subroutine drop_columns
 
+  subroutine PropDropOutline( t )
+    type(PropertyTable), intent(inout) :: t
+    if( allocated(t%perim) )  deallocate( t%perim )
+    if( allocated(t%nvert) )  deallocate( t%nvert )
+    if( allocated(t%le_w) )   deallocate( t%le_w )
+    if( allocated(t%le_len) ) deallocate( t%le_len )
+    if( allocated(t%le_dir) ) deallocate( t%le_dir )
+    t%have_outline = .false.
+    t%n_outline_fail = 0
+  end subroutine PropDropOutline
+
+  subroutine PropDropNets( t )
+    type(PropertyTable), intent(inout) :: t
+    if( allocated(t%net) ) deallocate( t%net )
+    t%net_rec = 0
+    t%n_nets = 0
+  end subroutine PropDropNets
+
   subroutine PropTableClear( t )
     type(PropertyTable), intent(inout) :: t
     call drop_index( t )
     call drop_columns( t )
+    call PropDropOutline( t )
+    call PropDropNets( t )
     t%n_poly = 0
     t%n_rect = 0
     t%geom_n = -1
@@ -649,6 +692,9 @@ contains
     integer :: k, j
     write(*,'(A,A,A,I0,A,I0,A,I0,A,I0)') 'PROPERTY TABLE ', lname, ': polygons=', t%n_poly, &
          ' (single-rect=', t%n_rect, ', multi-box=', t%n_poly - t%n_rect, ') columns=', t%n_cols
+    if( t%have_outline ) write(*,'(A,I0,A)') '  outline measures cached (', t%n_outline_fail, ' trace failures)'
+    if( t%net_rec > 0 .and. allocated(t%net) ) write(*,'(A,I0,A,I0,A)') '  nets: CONNECT #', t%net_rec, &
+         ', ', t%n_nets, ' nets in the connected stack'
     do k = 1, t%n_cols
        associate( c => t%cols(k) )
          write(*,'(A,A,A,A,A,I0)') '  ', c%name, ' : ', PropKindName(c%kind), ' set on ', count( c%d%present )

@@ -33,6 +33,7 @@ module ControlModule
   use TRSOptimizerModule
   use PropertyTableModule
   use FASCLModule
+  use FASCLConnectModule
   use PropOasisModule
   use iso_fortran_env, only: int32, int64, real64
   implicit none
@@ -390,6 +391,11 @@ contains
              cycle read_loop
           end if
        end if
+       !> CONNECT db:routing db:cut db:routing [db:cut db:routing ...]  (nets for FASCL NET_ID)
+       if( trim(keyword) == 'CONNECT' ) then
+          call RunConnectStatement( trim(rest), ht, design_dbs, line_number-1 )
+          cycle read_loop
+       end if
        ! Process based on keyword
        select case (keyword)
        case ('program')
@@ -597,7 +603,7 @@ contains
              end if
           end if
           if( trim(rest(1:pos-1)) == 'oasout' .or. trim(rest(1:pos-1)) == 'propdump' .or. &
-               trim(rest(1:pos-1)) == 'propinfo' ) then
+               trim(rest(1:pos-1)) == 'propinfo' .or. trim(rest(1:pos-1)) == 'netinfo' ) then
              call RunPropertyCommand( trim(rest(1:pos-1)), trim(adjustl(rest(pos+1:))), ht, design_dbs, line_number-1 )
              cycle read_loop
           end if
@@ -1302,6 +1308,7 @@ contains
        end if
     end if
     if( status == 0 ) call ResolveLayerSpec( opB, ht, dbs, B, status, msg )
+    if( status == 0 .and. index( lam, 'NET_ID' ) > 0 ) call EnsureNetsFresh( A, ht, dbs, status, msg )
     if( status == 0 ) call FASCLExecute( names, A, opA, B, lam, status, msg )
     if( status /= 0 ) then
        write(*,'(A,I0,A,A)') 'ERROR: line ', line_no, ': ', msg
@@ -1309,6 +1316,102 @@ contains
     end if
     call StopMarkTime("FASCL")
   end subroutine RunFASCLStatement
+
+  !> CONNECT db:routing db:cut db:routing [db:cut db:routing ...]
+  subroutine RunConnectStatement( text, ht, dbs, line_no )
+    character(len=*), intent(in) :: text
+    type(hash_type), intent(in) :: ht
+    type(Design), intent(inout), target :: dbs(:)
+    integer, intent(in) :: line_no
+    type(PropString), allocatable :: specs(:), tmp(:)
+    type(LayerPtr), allocatable :: Ls(:)
+    character(len=:), allocatable :: rest, msg
+    integer :: k, n, status, rec
+    call StartMarkTime("CONNECT")
+    write(*,'(A,A)') 'CONNECT statement: ', trim(text)
+    allocate( specs(8) )
+    n = 0
+    rest = trim(adjustl(text))
+    do while( len_trim(rest) > 0 )
+       k = index( rest, ' ' )
+       if( n == size(specs) ) then
+          allocate( tmp(2*n) ); tmp(1:n) = specs(1:n); call move_alloc( tmp, specs )
+       end if
+       n = n + 1
+       if( k == 0 ) then
+          specs(n)%s = rest; rest = ''
+       else
+          specs(n)%s = rest(1:k-1); rest = trim(adjustl(rest(k+1:)))
+       end if
+    end do
+    specs = specs(1:n)
+    allocate( Ls(n) )
+    status = 0
+    msg = ''
+    do k = 1, n
+       call ResolveLayerSpec( specs(k)%s, ht, dbs, Ls(k)%p, status, msg )
+       if( status /= 0 ) exit
+    end do
+    if( status == 0 ) call ConnectNew( specs, Ls, rec, status, msg )
+    if( status /= 0 ) then
+       write(*,'(A,I0,A,A)') 'ERROR: line ', line_no, ': ', msg
+       error stop "CONNECT statement failed"
+    end if
+    call StopMarkTime("CONNECT")
+  end subroutine RunConnectStatement
+
+  !> Before NET_ID is read on L: its CONNECT record must be live and L one of its members
+  !> (a COPY of a member carries the nets but is not connected: they are dropped). If any
+  !> member layer changed since the nets were computed, recompute them.
+  subroutine EnsureNetsFresh( L, ht, dbs, status, msg )
+    type(Layer), pointer, intent(in) :: L
+    type(hash_type), intent(in) :: ht
+    type(Design), intent(inout), target :: dbs(:)
+    integer, intent(out) :: status
+    character(len=:), allocatable, intent(out) :: msg
+    type(LayerPtr), allocatable :: Ls(:)
+    integer :: rec, k, n
+    logical :: member, stale
+    status = 0
+    msg = ''
+    if( .not. allocated( L%props ) ) return
+    rec = L%props%net_rec
+    if( rec <= 0 .or. rec > n_connect_records ) return
+    if( .not. connect_records(rec)%live ) then
+       status = 1
+       msg = 'NET_ID: the CONNECT #'//itoa_cp(rec)//' of this layer was superseded by a later CONNECT'
+       return
+    end if
+    n = size( connect_records(rec)%specs )
+    allocate( Ls(n) )
+    member = .false.
+    do k = 1, n
+       call ResolveLayerSpec( connect_records(rec)%specs(k)%s, ht, dbs, Ls(k)%p, status, msg )
+       if( status /= 0 ) return
+       if( associated( Ls(k)%p, L ) ) member = .true.
+    end do
+    if( .not. member ) then
+       call PropDropNets( L%props )
+       return
+    end if
+    stale = .false.
+    do k = 1, n
+       call LayerEnsureProperties( Ls(k)%p, connect_records(rec)%specs(k)%s )
+       if( Ls(k)%p%props%net_rec /= rec .or. .not. allocated( Ls(k)%p%props%net ) ) stale = .true.
+    end do
+    if( stale ) then
+       write(*,'(A,I0,A)') 'INFO: CONNECT #', rec, ': member geometry changed, recomputing nets'
+       call ConnectCompute( rec, Ls, status, msg )
+    end if
+  end subroutine EnsureNetsFresh
+
+  pure function itoa_cp( i ) result(s)
+    integer, intent(in) :: i
+    character(len=:), allocatable :: s
+    character(len=16) :: b
+    write(b,'(I0)') i
+    s = trim(b)
+  end function itoa_cp
 
   !> exec oasout   <db>|<db:layer> <file.oas> [layer datatype]
   !> exec propdump <db:layer> <file.csv>
@@ -1341,6 +1444,22 @@ contains
     status = 0
     msg = ''
     select case( cmd )
+    case( 'netinfo' )
+       call ResolveLayerSpec( trim(tok(1)), ht, dbs, L, status, msg )
+       if( status == 0 ) then
+          if( .not. associated(L) ) then
+             status = 1; msg = 'netinfo needs a layer'
+          end if
+       end if
+       if( status == 0 ) call EnsureNetsFresh( L, ht, dbs, status, msg )
+       if( status == 0 ) then
+          call LayerEnsureProperties( L, trim(tok(1)) )
+          if( L%props%net_rec == 0 .or. .not. allocated( L%props%net ) ) then
+             status = 1; msg = 'netinfo: layer '//trim(tok(1))//' is not part of a CONNECT'
+          else
+             call NetInfoPrint( L, trim(tok(1)) )
+          end if
+       end if
     case( 'propinfo', 'propdump' )
        call ResolveLayerSpec( trim(tok(1)), ht, dbs, L, status, msg )
        if( status == 0 ) then

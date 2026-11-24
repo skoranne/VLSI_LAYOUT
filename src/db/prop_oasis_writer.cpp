@@ -127,8 +127,13 @@ static void simplify(std::vector<P>& L) {
     }
 }
 
-// Returns the outline (outer contour with holes keyholed in); empty on failure.
-static std::vector<P> trace_outline(const std::vector<std::array<int64_t, 4>>& boxes) {
+// Boundary loops of one polygon (disjoint boxes), interior on the left of every edge:
+// the outer loop counter-clockwise, holes clockwise, corner contacts walked as right turns
+// (one self-touching loop). Collinear vertices removed. *perimeter = total boundary length
+// (valid even when tracing fails). Returns false on a broken boundary.
+static bool trace_loops(const std::vector<std::array<int64_t, 4>>& boxes,
+                        std::vector<std::vector<P>>& loops, int64_t* perimeter) {
+    loops.clear();
     std::map<int64_t, std::vector<std::pair<int64_t, int64_t>>> hpos, hneg, vpos, vneg;
     for (auto& b : boxes) {
         hpos[b[1]].push_back({ b[0], b[2] });   // bottom edge: interior above
@@ -139,6 +144,11 @@ static std::vector<P> trace_outline(const std::vector<std::array<int64_t, 4>>& b
     std::vector<Edge> E;
     add_cover_edges(hpos, hneg, true, E);
     add_cover_edges(vpos, vneg, false, E);
+    if (perimeter) {
+        int64_t s = 0;
+        for (auto& e : E) s += std::llabs(e.b.x - e.a.x) + std::llabs(e.b.y - e.a.y);
+        *perimeter = s;
+    }
     // Split every edge at the vertices of the other orientation lying on it, so that each
     // vertex has matching in/out edges (corner-sharing boundaries).
     std::unordered_map<P, std::vector<size_t>, PHash> outs;
@@ -176,7 +186,6 @@ static std::vector<P> trace_outline(const std::vector<std::array<int64_t, 4>>& b
         E.swap(S);
     }
     for (size_t i = 0; i < E.size(); ++i) outs[E[i].a].push_back(i);
-    std::vector<std::vector<P>> loops;
     for (size_t s0 = 0; s0 < E.size(); ++s0) {
         if (E[s0].used) continue;
         std::vector<P> L;
@@ -199,13 +208,19 @@ static std::vector<P> trace_outline(const std::vector<std::array<int64_t, 4>>& b
                 int rank = turn == 3 ? 0 : (turn == 0 ? 1 : 2);
                 if (rank < best_rank) { best_rank = rank; best = j; }
             }
-            if (best == SIZE_MAX) return {};                // broken boundary
+            if (best == SIZE_MAX) return false;             // broken boundary
             cur = best;
         }
         simplify(L);
         if (L.size() >= 4) loops.push_back(std::move(L));
     }
-    if (loops.empty()) return {};
+    return !loops.empty();
+}
+
+// Returns the outline (outer contour with holes keyholed in); empty on failure.
+static std::vector<P> trace_outline(const std::vector<std::array<int64_t, 4>>& boxes) {
+    std::vector<std::vector<P>> loops;
+    if (!trace_loops(boxes, loops, nullptr)) return {};
     std::vector<P> outer;
     std::vector<std::vector<P>> holes;
     for (auto& L : loops) {
@@ -253,6 +268,36 @@ static std::vector<P> trace_outline(const std::vector<std::array<int64_t, 4>>& b
         outer.swap(d);
     }
     return outer;
+}
+
+// Narrowest line end over all loops: an edge whose two end vertices are convex corners
+// (left turns: interior is on the left of every loop, holes included) and which is strictly
+// shorter than both neighbouring edges. width = its length, len = shorter neighbour,
+// dir = outward normal (0 E, 1 N, 2 W, 3 S). Ties: lowest endpoint (x, then y), then dir.
+// dir = -1 when the polygon has no line end.
+static void line_end(const std::vector<std::vector<P>>& loops, int64_t& w, int64_t& len, int& dir) {
+    w = 0; len = 0; dir = -1;
+    P bp{ 0, 0 };
+    for (auto& L : loops) {
+        size_t n = L.size();
+        if (n < 4) continue;
+        auto elen = [&](size_t i) { const P& a = L[i % n]; const P& b = L[(i + 1) % n];
+                                    return std::llabs(b.x - a.x) + std::llabs(b.y - a.y); };
+        auto edir = [&](size_t i) { return dir_of(L[i % n], L[(i + 1) % n]); };
+        for (size_t i = 0; i < n; ++i) {
+            size_t ip = (i + n - 1) % n, in = (i + 1) % n;
+            int dp = edir(ip), d = edir(i), dn = edir(in);
+            if ((d - dp + 4) % 4 != 1 || (dn - d + 4) % 4 != 1) continue;   // both corners convex
+            int64_t li = elen(i), lp = elen(ip), ln = elen(in);
+            if (!(li < lp && li < ln)) continue;
+            const P& a = L[i]; const P& b = L[in];
+            P lo = (a.x < b.x || (a.x == b.x && a.y < b.y)) ? a : b;
+            int od = (d + 3) % 4;                                            // outward normal
+            bool better = dir < 0 || li < w ||
+                (li == w && (lo.x < bp.x || (lo.x == bp.x && (lo.y < bp.y || (lo.y == bp.y && od < dir)))));
+            if (better) { w = li; len = std::min(lp, ln); dir = od; bp = lo; }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -722,6 +767,38 @@ void* fpo_create(const char* path, const char* cell, int64_t grid_per_micron, in
 }
 
 // Uncompressed bytes per CBLOCK (default 4 MiB); blocks always end on a record boundary.
+// Outline measures of one polygon given as disjoint boxes (4*nbox int64 x1,y1,x2,y2).
+// out[0] perimeter, out[1] vertices (simplified loop sizes summed over outer + holes, before
+// keyholing; a corner-contact vertex counts once per visit), out[2] line-end width,
+// out[3] line-end length; *le_dir -1 none / 0 E / 1 N / 2 W / 3 S.
+// Thread-safe (no shared state). Returns 0, or 1 if the outline could not be traced
+// (out[0] still valid, out[1] = -1, no line end).
+int32_t fpo_poly_geom(int64_t nbox, const int64_t* boxes, int64_t* out, int32_t* le_dir) {
+    out[0] = out[1] = out[2] = out[3] = 0; *le_dir = -1;
+    if (nbox <= 0) return 1;
+    if (nbox == 1) {
+        int64_t w = boxes[2] - boxes[0], h = boxes[3] - boxes[1];
+        out[0] = 2 * (w + h); out[1] = 4;
+        if (w < h)      { out[2] = w; out[3] = h; *le_dir = 3; }   // vertical wire: south end
+        else if (h < w) { out[2] = h; out[3] = w; *le_dir = 2; }   // horizontal wire: west end
+        return 0;
+    }
+    std::vector<std::array<int64_t, 4>> bx((size_t)nbox);
+    for (int64_t i = 0; i < nbox; ++i)
+        bx[(size_t)i] = { boxes[4 * i], boxes[4 * i + 1], boxes[4 * i + 2], boxes[4 * i + 3] };
+    std::vector<std::vector<P>> loops;
+    int64_t perim = 0;
+    bool ok = trace_loops(bx, loops, &perim);
+    out[0] = perim;
+    if (!ok) { out[1] = -1; return 1; }
+    int64_t nv = 0;
+    for (auto& L : loops) nv += (int64_t)L.size();
+    out[1] = nv;
+    int d; line_end(loops, out[2], out[3], d);
+    *le_dir = d;
+    return 0;
+}
+
 void fpo_set_cblock_bytes(void* h, int64_t n) {
     if (n > 0) ((OasisPropWriter*)h)->cblock_bytes = (size_t)n;
 }

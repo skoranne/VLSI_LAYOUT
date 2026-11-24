@@ -70,3 +70,44 @@ for y in (50000, 51000):
 
 ly.write(out)
 print("wrote", out)
+
+# ---------------------------------------------------------------------------------------------
+# Second file: outline measures + CONNECT/NET_ID stack (m1 71/20, via 72/20, m2 73/20,
+# alternate via set 74/20 = 72/20 plus one via that joins the "m2 over m1 without via" pair).
+# ---------------------------------------------------------------------------------------------
+nl = pya.Layout()
+nl.dbu = 0.001
+nt = nl.create_cell("NETS")
+M1, V, M2, V2 = nl.layer(71, 20), nl.layer(72, 20), nl.layer(73, 20), nl.layer(74, 20)
+def nb(li, x1, y1, x2, y2):
+    nt.shapes(li).insert(pya.Box(x1, y1, x2, y2))
+def via(x1, y1, x2, y2):
+    nb(V, x1, y1, x2, y2); nb(V2, x1, y1, x2, y2)
+Y = 60000
+nb(M1, 0, Y, 10000, Y + 200)                                         # straight wire: W end
+nb(M1, 12000, Y, 16000, Y + 300); nb(M1, 15800, Y + 300, 16000, Y + 3000)   # L, unequal widths
+nb(M1, 20000, Y, 21000, Y + 1000)                                    # square pad: no line end
+nb(M1, 23000, Y, 27000, Y + 400); nb(M1, 24800, Y + 400, 25200, Y + 2000)   # T
+nb(M1, 30000, Y, 30500, Y + 500); nb(M1, 30500, Y + 500, 31000, Y + 1000)   # corner-touching pair
+nb(M1, 33000, Y, 37000, Y + 1000); nb(M1, 33000, Y + 3000, 37000, Y + 4000) # ring ...
+nb(M1, 33000, Y + 1000, 34000, Y + 3000); nb(M1, 36000, Y + 1000, 37000, Y + 3000)
+nb(M1, 34000, Y + 1800, 35000, Y + 2200)                             # ... with a stub into the hole
+# nets
+nb(M1, 40000, Y, 44000, Y + 200); nb(M2, 43000, Y - 1000, 43200, Y + 3000)
+via(43050, Y + 50, 43150, Y + 150)                                   # inside m1 and m2: connects
+nb(M1, 40000, Y + 1000, 42000, Y + 1200); nb(M2, 42050, Y + 900, 42400, Y + 1300)
+via(42000, Y + 1050, 42100, Y + 1150)                                # abuts m1 edge: m2 only
+nb(M1, 40000, Y + 2000, 41000, Y + 2200)
+via(41000, Y + 2200, 41100, Y + 2300)                                # m1 corner only: own net
+nb(M1, 46000, Y, 48000, Y + 200); nb(M2, 46500, Y - 1000, 46700, Y + 1000)  # m2 over m1, no via
+nb(V2, 46550, Y + 50, 46650, Y + 150)                                # ... joined only in 74/20
+nb(M1, 50000, Y, 51000, Y + 200); nb(M1, 51100, Y, 52000, Y + 200)
+via(50950, Y + 50, 51150, Y + 150)                                   # straddles two m1: merges
+nb(M1, 54000, Y, 55000, Y + 200); nb(M1, 56900, Y, 58000, Y + 200)   # m1-via-m2-via-m1 chain
+nb(M2, 54700, Y + 400, 57200, Y + 600)
+nb(M2, 54700, Y, 54950, Y + 600); nb(M2, 56950, Y, 57200, Y + 600)
+via(54800, Y + 50, 54900, Y + 150); via(57000, Y + 50, 57100, Y + 150)
+via(60000, Y, 60100, Y + 100)                                        # isolated via
+nout = out.replace(".gds", "_net.gds") if out.endswith(".gds") else out + "_net.gds"
+nl.write(nout)
+print("wrote", nout)

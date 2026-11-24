@@ -34,5 +34,27 @@ var oasis_cblock 1
 var oasis_strict 1
 # --- properties travel with COPY into an output db whose .mag names an .oas file
 exec run o1:met1 = d1:L68_20 COPY nothing
+# --- single-layer outline measures
+PROPERTY:PERIM,NV,LED,LEW,LEL = d1:L68_20 FASCL [ (id) PERIM = PERIMETER(id); NV = VERTICES(id); LED = LINE_END_DIR(id); LEW = LINE_END_WIDTH(id); LEL = LINE_END_LENGTH(id) ] d1:nothing
+exec propdump d1:L68_20 fascl_geom68.csv
+decl design d2 = fascl_in_net.gds
+decl memory n2 = nothing
+exec run n2:via = d2:L72_20 COPY nothing
+PROPERTY:PERIM,NV,LED,LEW,LEL = d2:L71_20 FASCL [ (id) PERIM = PERIMETER(id); NV = VERTICES(id); LED = LINE_END_DIR(id); LEW = LINE_END_WIDTH(id); LEL = LINE_END_LENGTH(id) ] d2:nothing
+exec propdump d2:L71_20 fascl_geom71.csv
+# --- CONNECT m1 via m2: NET_ID on every member
+CONNECT d2:L71_20 n2:via d2:L73_20
+PROPERTY:NET = d2:L71_20 FASCL [ (id) NET_ID(id) ] d2:nothing
+PROPERTY:NET = n2:via FASCL [ (id) NET_ID(id) ] d2:nothing
+PROPERTY:NET = d2:L73_20 FASCL [ (id) NET_ID(id) ] d2:nothing
+exec netinfo d2:L71_20
+exec propdump d2:L71_20 fascl_net71.csv
+exec propdump n2:via fascl_net72.csv
+exec propdump d2:L73_20 fascl_net73.csv
+# --- a member changes (via layer replaced by the 74/20 set): nets are recomputed on next use
+exec run n2:via = d2:L74_20 COPY nothing
+PROPERTY:NET2 = d2:L73_20 FASCL [ (id) NET_ID(id) ] d2:nothing
+exec propdump d2:L73_20 fascl_net73b.csv
+delete n2
 flush
 end

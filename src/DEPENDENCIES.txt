@@ -7,7 +7,7 @@ LIB_OBJS = commonmodule.o device_registry.o compact_layer.o systeminfo.o systemi
 	   snappy_api.o snappy_apif.o layout_statistics.o box_codec.o serialization.o\
 	   diskdesign_impl.o gridlayer.o utilities.o event_sorter_apif.o event_sorter.o\
 	   gpu_morton.o layoutdb_f_api.o layout_files.o compressed_spatial_index.o layoutdb_loader.o profiler.o trs_optimizer.o \
-           rpc_socket.o compact_wire.o rpc_server.o property_table.o fascl.o prop_oasis.o
+           rpc_socket.o compact_wire.o rpc_server.o property_table.o fascl.o fascl_connect.o prop_oasis.o
 
 
 boxbytestream.o: commonmodule.o
@@ -40,7 +40,7 @@ device_registry.o: gpu_morton.o
 diskdesign_impl.o: design.o serialization.o box_codec.o snappy_apif.o utilities.o
 magparser.o: prop_oasis.o polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
 mainmagparser.o: magparser.o controlparser.o rpc_server.o
-controlparser.o: fascl.o prop_oasis.o design.o band_exec.o layoutdb_loader.o trs_optimizer.o
+controlparser.o: fascl.o prop_oasis.o design.o band_exec.o layoutdb_loader.o trs_optimizer.o fascl_connect.o
 compressed_spatial_index.o: commonmodule.o geometry.o morton.o box_codec.o snappy_apif.o compact_layer.o
 layout_files.o: geometry.o
 layoutdb_loader.o: layoutdb_f_api.o design.o geometry.o commonmodule.o hashtable.o compressed_spatial_index.o
@@ -60,4 +60,5 @@ rpc_server.o: compact_wire.o compact_layer.o design.o version_mod.o rpc_socket.o
 test_compact_wire.o: compact_wire.o compact_layer.o geometry.o
 property_table.o: geometry.o datastructures.o compact_layer.o
 fascl.o: design.o property_table.o pnummerge.o
+fascl_connect.o: fascl.o design.o property_table.o
 prop_oasis.o: fascl.o design.o property_table.o

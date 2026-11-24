@@ -42,6 +42,29 @@ if [ "$full" -ge "$norep" ]; then
 else
   echo "repetitions: $full bytes vs $norep bytes without"
 fi
+# outline builtins and CONNECT / NET_ID, recomputed independently in KLayout
+"$KLAYOUT" -b -r "$HERE/fascl_geom_check.py" -rd ref=fascl_in.gds -rd refnet=fascl_in_net.gds \
+    -rd geom68=fascl_geom68.csv -rd geom71=fascl_geom71.csv -rd net71=fascl_net71.csv \
+    -rd net72=fascl_net72.csv -rd net73=fascl_net73.csv -rd net73b=fascl_net73b.csv || status=1
+if grep -q "member geometry changed, recomputing nets" magparser.log; then
+  echo "nets recomputed after a member layer changed"
+else
+  echo "FAIL: CONNECT nets were not recomputed after the via layer changed"; status=1
+fi
+# a statement that must fail with the given message
+expect_error() {   # name message ctr-body-line
+  printf 'program %s\ndecl design d1 = fascl_in.gds\ndecl design d2 = fascl_in_net.gds\n%s\nend\n' "$1" "$3" > "$1.ctr"
+  if "$EXE" "$1.ctr" 16 > "$1.log" 2>&1; then
+    echo "FAIL: $1 did not fail"; status=1
+  elif ! grep -q "$2" "$1.log"; then
+    echo "FAIL: $1: missing message '$2'"; tail -3 "$1.log"; status=1
+  else
+    echo "$1 rejected: $(grep -m1 "$2" "$1.log" | sed 's/^ *//')"
+  fi
+}
+expect_error fascl_nonet "not part of a CONNECT" \
+  'PROPERTY:N = d1:L70_20 FASCL [ (id) NET_ID(id) ] d1:nothing'
+expect_error fascl_conn2 "expected routing cut routing" 'CONNECT d2:L71_20 d2:L72_20'
 # the lambda engine must reject bad programs with a clear error
 cat > fascl_bad.ctr <<'EOF'
 program fascl_bad

@@ -69,11 +69,50 @@ expr   := || && == != < <= > >= + - * / % unary - !, parentheses
 | `INT(x)`, `FLOAT(x)`, `STRING(x)` | conversions (STRING of a FLOAT uses 17 digits) |
 | `ABS`, `SQRT`, `POW(a,b)`, `MIN(a,b)`, `MAX(a,b)`, `IF(c,a,b)` | arithmetic (`IF` evaluates one branch) |
 | `NAME(id)`, `NAME.field(id)` | an existing property (or STRUCT field) of this layer |
+| `PERIMETER(id)` | boundary length in dbu, holes included |
+| `VERTICES(id)` (`NUM_VERTICES`) | corners of the outer contour plus every hole (collinear points dropped; a vertex where parts touch at a corner counts once per visit) |
+| `LINE_END_DIR(id)` | outward direction `"N"`/`"S"`/`"E"`/`"W"` of the polygon's narrowest line end, `""` if none |
+| `LINE_END_WIDTH(id)` | length of that end edge (0 if none) |
+| `LINE_END_LENGTH(id)` | the shorter of the two edges next to the end (0 if none) |
+| `NET_ID(id)` | net number from the layer's `CONNECT` (see below) |
+
+**Line end**: an outline edge whose two corners are both convex and which is strictly shorter
+than both neighbouring edges (outer contour and hole contours alike). The narrowest one is
+reported; ties go to the lowest endpoint (x, then y), then direction, so a straight horizontal
+wire reports its W end and a vertical wire its S end. Squares and shapes whose end edges are not
+shorter than their sides have no line end. On a jogged wire `LINE_END_LENGTH` is the length up to
+the first jog. Outline measures are computed once per layer on first use (in parallel, by
+`db/prop_oasis_writer.cpp` `fpo_poly_geom`) and cached until the geometry changes.
 
 `/` always gives FLOAT, `%` is integer modulo, `+` concatenates when either side is a STRING,
 comparisons give INT 0/1. `WHEN c` drops the polygon (no value for any defined property) unless
 `c` is true. Runtime errors (type mismatch, division by zero, missing property) stop the run with
 the first failing polygon's ordinal and id. The loop over polygons runs in parallel (OpenMP).
+
+## Connectivity: `CONNECT`, `NET_ID`, `exec netinfo` (`fascl_connect.f90`)
+
+```
+CONNECT d1:li1 d1:mcon d1:met1 d1:via d1:met2
+PROPERTY:NET = d1:met1 FASCL [ (id) NET = NET_ID(id) ] d1:nothing
+exec netinfo d1:met1
+```
+
+* Operands are read as routing / cut / routing triples: odd positions are routing layers, even
+  positions the cut layers between them (an odd number >= 3 of distinct layers, any db).
+* Within a layer a net element is a polygon (PNum component; touching boxes, corners included,
+  are one polygon). Across layers, a cut polygon connects the routing polygons below and above
+  it that it **overlaps with positive area**; touching edges or corners do not connect, and two
+  routing layers never connect without a cut.
+* Nets are global over the whole stack and numbered 1..N by first appearance over (stack
+  position, polygon ordinal): net 1 holds polygon #1 of the first listed layer. The numbering is
+  independent of thread count and box order.
+* Each member layer stores its nets in its property table. A layer belongs to at most one live
+  `CONNECT`; listing it in a later one supersedes the earlier (whose other layers then report an
+  error for `NET_ID`). If any member layer changes, the nets are recomputed automatically the next
+  time `NET_ID` or `netinfo` is used. A `COPY` of a member layer does not carry its nets.
+* Members must share one database grid (coordinates are compared as integers).
+* Scale (SKY130 SDT_16, li1/mcon/met1, 1.6 M polygons, 64 threads): 4.5 s, 281,929 nets,
+  identical to an independent KLayout positive-overlap union (every met1 polygon in the same net).
 
 ## OASIS output (`prop_oasis.f90`, `db/prop_oasis_writer.cpp`)
 
@@ -108,4 +147,8 @@ layer or file name (`L68_20`, `68:20`, `..._L68_D20...`), else the layer index a
 writes OASIS in every option combination, then checks with KLayout: geometry XOR, one shape per
 connected polygon, every property value recomputed independently from the input, the CSV dumps,
 STRICT table offsets, CBLOCKs, repetition types and expanded instance counts, PROPERTY-REPEAT, and
-that a bad lambda reports a runtime error.
+that a bad lambda reports a runtime error. `fascl_geom_check.py` recomputes PERIMETER, VERTICES
+and the line ends of every polygon and the nets of an m1/via/m2 stack (overlapping, edge-abutting
+and corner-touching vias, a via joining two wires, a chain through m2, m2 over m1 without a via)
+from the input with KLayout, including the automatic recompute after the via layer changes; the
+runner also checks that `NET_ID` without `CONNECT` and a two-layer `CONNECT` are rejected.
