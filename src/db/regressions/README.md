@@ -17,9 +17,21 @@ Run with a fully built MAGPARSER (e.g. `make -C src -f Makefile.ifx` or `Makefil
 - `ovlp_sq_gds.ctr`: GDSII direct-frontend sanity/XOR regression using `src/ovlp_sq.gds`.
 - `ctr_oasis_gds.ctr`: minimal sample showing `decl design ... = file.gds|file.oas` and layer refs.
 
-Example:
+Example (the 2nd argument is `max_layers`; SDT_16.oas has 33 drawn layers, layers beyond the
+limit are dropped with a `WARNING: ... layer(s) not loaded` line):
 ```sh
-cd src && ./MAGPARSER.exe db/regressions/SDT_oasis.ctr 16
+cd src && ./MAGPARSER.exe db/regressions/SDT_oasis.ctr 64
+```
+
+## Hierarchical GDSII/OASIS load (`hier_load/`)
+- `run_hier_load_regression.sh [MAGPARSER.exe] [workdir]`: KLayout builds a hierarchical layout
+  (`gen_hier_input.py`: all 8 orthogonal orientations, a mirrored regular array, a 3-level
+  rotated/mirrored nest, abutting flipped rows, irregular OASIS repetitions) as `.oas` and `.gds`;
+  MAGPARSER loads each with `decl design` and writes it with `exec oasout`; `hier_check.py` XORs the
+  result with KLayout's flattening per layer. Guards the fix where `decl design` loaded only each
+  cell's local shapes (SDT_16.oas lost the standard-cell met1 rails, 3% of the area).
+```sh
+bash src/db/regressions/hier_load/run_hier_load_regression.sh src/MAGPARSER.exe
 ```
 Notes: external `/scratch1/...` paths and some in-repo layouts may need to be present (non-LFS) on the test machine; adjust `temp_folder`/paths as needed for x86-64+IFX runs.
 
