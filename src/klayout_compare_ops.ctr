@@ -1,0 +1,63 @@
+# KLayout-vs-MAGPARSER comparison CTR (no code changes required)
+# Purpose: exercise MAGPARSER ops that have KLayout DRC/Region equivalents.
+# Run from src/:  ./MAGPARSER.exe klayout_compare_ops.ctr
+# Optional digest: MAGPARSER_LAYER_DIGEST=1 ./MAGPARSER.exe klayout_compare_ops.ctr
+#
+# KLayout reference (example, run separately):
+#   klayout -b -r boolean_ops.rb \
+#     -rd file_a=../examples/INV.mag -rd layer_a=9/0 \
+#     -rd file_b=../examples/INV.mag -rd layer_b=3/0 \
+#     -rd op=AND -rd out_file=/tmp/km_and.gds
+# Layer mapping for examples/INV.mag (Magic layers): poly, ndiff, pdiff, metal1, nwell.
+# For KLayout GDS layer numbers, use the project-specific GDS export mapping.
+
+program klayout_compare_ops
+systeminfo
+var debug_verbosity 0
+var abort_on_xor 0
+var temporary_layers 1
+
+decl design d1 = ../examples/INV.mag
+decl memory m1 = nothing
+info
+
+exec init m1:nothing
+
+# --- Boolean ops (KLayout: &, +, -, ^ / and, or, not, xor) ---
+exec run m1:and_pn   = d1:poly * d1:ndiff
+exec run m1:or_pn    = d1:poly + d1:ndiff
+exec run m1:not_pn   = d1:poly @ d1:ndiff
+exec run m1:bnot_pn  = d1:poly ! d1:ndiff
+exec run m1:xor_pn   = d1:poly ^ d1:ndiff
+exec run m1:or2_pn   = d1:poly OR2 d1:ndiff
+exec run m1:and2_pn  = d1:poly AND2 d1:ndiff
+exec run m1:not2_pn  = d1:poly NOT d1:ndiff
+exec run m1:xor2_pn  = d1:poly XOR d1:ndiff
+
+# --- Single-layer / utility (KLayout: merged/dup/bbox analogs) ---
+exec run m1:and_poly = d1:poly AND nothing
+exec run m1:extent_poly = d1:poly EXTENT nothing
+exec run m1:copy_poly = d1:poly COPY nothing
+
+# --- Sizing / morphology (KLayout: size/sized; GROW/SHRINK are MAGPARSER forms) ---
+exec run m1:grow_poly = d1:poly GROW nothing 0.1 0.1 0.1 0.1
+exec run m1:shrink_poly = d1:poly SHRINK nothing 0.05
+exec run m1:size_poly = d1:poly SIZE nothing 0.1
+
+# --- Topological selectors (KLayout: interacting/inside/outside/overlapping...) ---
+exec run m1:interact_pn = d1:poly INTERACT d1:ndiff
+exec run m1:not_interact_pn = d1:poly NOT_INTERACT d1:ndiff
+exec run m1:inside_pn = d1:poly INSIDE d1:ndiff
+exec run m1:outside_pn = d1:poly OUTSIDE d1:ndiff
+exec run m1:touch_pn = d1:poly TOUCH d1:ndiff
+exec run m1:overlaps_pn = d1:poly OVERLAPS d1:ndiff
+
+# --- Identity/self checks (XOR self should be empty) ---
+var abort_on_xor 1
+exec run m1:xor_id_poly = d1:poly ^ d1:poly
+exec run m1:xor_id_ndiff = d1:ndiff ^ d1:ndiff
+
+flush
+delete m1
+delete d1
+end
