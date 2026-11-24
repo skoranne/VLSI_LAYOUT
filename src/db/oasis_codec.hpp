@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 
 namespace oasis_codec {
 
@@ -29,14 +30,19 @@ struct Reader {
     void need(uint64_t k) const { if (k > n - off) fail("truncated record"); }
     uint8_t u8() { need(1); return p[off++]; }
 
+    // Unsigned integer (7.2.1). Values beyond 64 bits are a fatal error (7.2.3).
+    // Redundant high-order zero groups are allowed (there is no length restriction).
     uint64_t uint_() {
         uint64_t v = 0;
-        for (int sh = 0; sh < 70; sh += 7) {
+        for (unsigned sh = 0;;) {                    // sh saturates at 70: no overflow on long zero runs
             uint8_t b = u8();
-            if (sh < 64) v |= uint64_t(b & 0x7f) << sh;
+            const uint64_t g = b & 0x7f;
+            if (sh >= 64) { if (g) fail("unsigned integer exceeds 64 bits"); }
+            else if (sh == 63 && (g >> 1)) fail("unsigned integer exceeds 64 bits");
+            else v |= g << sh;
             if (!(b & 0x80)) return v;
+            if (sh < 64) sh += 7;
         }
-        fail("unsigned integer too long");
     }
     // Sign is the least significant bit, magnitude the remaining bits.
     int64_t sint() { uint64_t u = uint_(); int64_t m = (int64_t)(u >> 1); return (u & 1) ? -m : m; }
@@ -50,16 +56,17 @@ struct Reader {
         switch (type) {
         case 0: return (double)uint_();
         case 1: return -(double)uint_();
-        case 2: return 1.0 / (double)uint_();
-        case 3: return -1.0 / (double)uint_();
-        case 4: { double a = (double)uint_(), b = (double)uint_(); return a / b; }
-        case 5: { double a = (double)uint_(), b = (double)uint_(); return -a / b; }
+        case 2: return 1.0 / denom();
+        case 3: return -1.0 / denom();
+        case 4: { double a = (double)uint_(), b = denom(); return a / b; }
+        case 5: { double a = (double)uint_(), b = denom(); return -a / b; }
         case 6: { need(4); float f; memcpy(&f, p + off, 4); off += 4; return f; }
         case 7: { need(8); double d; memcpy(&d, p + off, 8); off += 8; return d; }
         }
         fail("invalid real type " + std::to_string(type));
     }
     double real() { return real_of(uint_()); }
+    double denom() { uint64_t d = uint_(); if (d == 0) fail("real with zero denominator"); return (double)d; }   // 7.3.3
 
     static void octant(unsigned dir, int64_t mag, int64_t& dx, int64_t& dy) {
         static const int ox[8] = { 1, 0, -1, 0, 1, -1, -1, 1 };
@@ -76,6 +83,17 @@ struct Reader {
         dy = (int64_t)(v >> 1); if (v & 1) dy = -dy;
     }
 };
+
+// String classes (7.4): n-string = printable 0x21-0x7E, length > 0; a-string adds SP.
+inline bool is_nstring(const std::string& s) {
+    if (s.empty()) return false;
+    for (unsigned char c : s) if (c < 0x21 || c > 0x7e) return false;
+    return true;
+}
+inline bool is_astring(const std::string& s) {
+    for (unsigned char c : s) if (c < 0x20 || c > 0x7e) return false;
+    return true;
+}
 
 // ---------------------------------------------------------------------------
 // Repetitions
@@ -179,11 +197,59 @@ struct Encoder {
     void sint(int64_t v) { uint_((mag(v) << 1) | (v < 0 ? 1u : 0u)); }      // sign in the low bit
     void str(const std::string& s) { uint_(s.size()); bytes(s.data(), s.size()); }
     void real_whole(uint64_t v) { uint_(0); uint_(v); }
-    void real_double(double v) { uint_(7); bytes(&v, 8); }
-    void gdelta(int64_t dx, int64_t dy) {                                   // general form
+    void real_double(double v) { uint_(7); bytes(&v, 8); }                  // little-endian host (7.3.2)
+    // Shortest exact form (7.3): whole number (type 0/1), reciprocal (2/3), else IEEE double.
+    void real(double v) {
+        const double a = std::fabs(v);
+        if (std::isfinite(v) && a < 9.0e15 && a == std::floor(a)) { uint_(v < 0 ? 1 : 0); uint_((uint64_t)a); return; }
+        if (std::isfinite(v) && a > 0 && a <= 1.0) {
+            const double r = 1.0 / a;
+            if (r < 9.0e15 && r == std::floor(r) && 1.0 / r == a) { uint_(v < 0 ? 3 : 2); uint_((uint64_t)r); return; }
+        }
+        real_double(v);
+    }
+    void delta1(int64_t d) { sint(d); }                                     // 7.5.2 (same as signed-integer)
+    void delta2(int64_t dx, int64_t dy) {                                   // 7.5.3, one of dx/dy is 0
+        unsigned dir = dx > 0 ? 0 : dy > 0 ? 1 : dx < 0 ? 2 : 3;
+        uint_(((dx ? mag(dx) : mag(dy)) << 2) | dir);
+    }
+    void delta3(int64_t dx, int64_t dy) { uint_((oct_mag(dx, dy) << 3) | octant_dir(dx, dy)); }   // 7.5.4
+    // g-delta (7.5.5): the one-integer octangular form when it applies, else the (x,y) pair.
+    void gdelta(int64_t dx, int64_t dy) {
+        if (octangular(dx, dy) && oct_mag(dx, dy) < (1ull << 59)) {
+            uint_((oct_mag(dx, dy) << 4) | (octant_dir(dx, dy) << 1)); return;
+        }
         uint_((mag(dx) << 2) | (dx < 0 ? 2u : 0u) | 1u);
         uint_((mag(dy) << 1) | (dy < 0 ? 1u : 0u));
     }
+    static bool octangular(int64_t dx, int64_t dy) { return dx == 0 || dy == 0 || mag(dx) == mag(dy); }
+    static uint64_t oct_mag(int64_t dx, int64_t dy) { return dx ? mag(dx) : mag(dy); }
+    // 0 E, 1 N, 2 W, 3 S, 4 NE, 5 NW, 6 SW, 7 SE (zero vector: east, magnitude 0)
+    static unsigned octant_dir(int64_t dx, int64_t dy) {
+        if (dy == 0) return dx < 0 ? 2 : 0;
+        if (dx == 0) return dy > 0 ? 1 : 3;
+        if (dx > 0) return dy > 0 ? 4 : 7;
+        return dy > 0 ? 5 : 6;
+    }
 };
+
+// CTRAPEZOID rules (29.6-29.8), shared by the parser (oasis_parser.hpp) and the record scanner
+// (oasis_rec.cpp) so both readers accept exactly the same records.
+struct CtrapRule { bool no_w, no_h; };
+// 29.6: types 16-19, 22, 23 and 25 have no height; types 20 and 21 no width.
+inline CtrapRule ctrap_rule(uint64_t t) {
+    return { t == 20 || t == 21, (t >= 16 && t <= 19) || t == 22 || t == 23 || t == 25 };
+}
+// 29.7: geometry-w/h always become the bounding box of the figure.
+inline void ctrap_implied_box(uint64_t t, int64_t& w, int64_t& h) {
+    const CtrapRule r = ctrap_rule(t);
+    if (r.no_h) h = (t == 22 || t == 23) ? 2 * w : w;
+    if (r.no_w) w = 2 * h;
+}
+// 29.8: width/height constraints of the figure.
+inline bool ctrap_consistent(uint64_t t, int64_t w, int64_t h) {
+    return !(((t <= 3 || t == 6 || t == 7) && w < h) || ((t == 4 || t == 5) && w < 2 * h) ||
+             (((t >= 8 && t <= 11) || t == 14 || t == 15) && h < w) || ((t == 12 || t == 13) && h < 2 * w));
+}
 
 } // namespace oasis_codec

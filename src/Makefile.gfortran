@@ -78,3 +78,11 @@ event_sorter.o: event_sorter.cu
 	g++ -x c++ -O3 -c event_sorter.cu -o $@
 gpu_morton.o: gpu_morton.cu
 	g++ -x c++ -O3 -c gpu_morton.cu -o $@
+
+# Any-angle exact kernel unit tests
+.PHONY: unit_test_anyangle
+unit_test_anyangle: test_wide_int.exe test_predicates.exe
+test_wide_int.exe: test_wide_int.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_predicates.exe: test_predicates.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)

@@ -20,6 +20,10 @@ typedef struct {
 #define LDB_OPEN_STRICT       1u  /* OASIS: enforce/expect STRICT mode semantics; strict validation */
 #define LDB_OPEN_PROPERTY     2u  /* parse and retain properties (PROPERTY mode) */
 #define LDB_OPEN_LOW_MEMORY   4u  /* keep large-cell geometry in disk-access/on-demand storage */
+#define LDB_OPEN_SHAPES       8u  /* OASIS: also keep exact polygons, paths and texts next to the boxes
+                                     (lossless model re-encoding, ldb_iterate_polygons); can take
+                                     several times the box memory on flat polygon-heavy files.
+                                     GDSII always keeps them (except with LOW_MEMORY). */
 
 typedef struct {
     uint32_t flags;
@@ -65,9 +69,26 @@ int ldb_print_propnames(ldb_file_t* f, void* out_fp);
 typedef void (*ldb_property_cb)(void* ud, int target_kind, const char* cell, const char* propname, const char* propvalue);
 int ldb_iterate_properties(ldb_file_t* f, ldb_property_cb cb, void* ud);
 
-/* lossless record-stream roundtrip for GDSII: returns 0 on success */
+/* GDSII writer: a file read from GDSII is written back record for record (lossless);
+   any other model (e.g. read from OASIS) is encoded as GDSII from the model. 0 on success. */
 int ldb_write_gdsii(const ldb_file_t* f, const char* out_path, char* errbuf, size_t errbuf_sz);
-/* OASIS writer (basic/MULTIGON support) */
+/* Database units per micron (OASIS START unit, GDSII UNITS); 0 if unknown. */
+double ldb_dbu_per_micron(const ldb_file_t* f);
+
+/* OASIS writer options (oasis_writer.cpp, streaming writer oasis_writer.hpp). */
+typedef struct {
+    int strict;              /* 1: strict name tables, references by number, S_* properties (default 1) */
+    int cblock_kb;           /* CBLOCK size in KiB of uncompressed records; 0 = no compression (default 4096) */
+    int repetitions;         /* 1: find rectangle arrays and write them as repetitions (default 1) */
+    int validation;          /* 0 none, 1 CRC32, 2 CHECKSUM32 (default 1) */
+    int reencode;            /* 1: re-encode a model read from OASIS instead of copying its bytes (default 0) */
+    int independent_cblocks; /* 1: every CBLOCK decodes without the previous one's modal state (default 0) */
+    int deflate_level;       /* zlib level 1..9 (default 6) */
+} ldb_oasis_write_opts_t;
+void ldb_oasis_write_opts_default(ldb_oasis_write_opts_t* o);
+int ldb_write_oasis_opts(const ldb_file_t* f, const char* out_path, const ldb_oasis_write_opts_t* o,
+                         char* errbuf, size_t errbuf_sz);
+/* OASIS writer with the default options */
 int ldb_write_oasis(const ldb_file_t* f, const char* out_path, char* errbuf, size_t errbuf_sz);
 /* create synthetic GEAR-like curvilinear MULTIGON OASIS for 3DIC test */
 int ldb_write_oasis_gear_multigon(const char* out_path, char* errbuf, size_t errbuf_sz);

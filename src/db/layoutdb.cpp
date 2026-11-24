@@ -315,9 +315,18 @@ extern "C" size_t ldb_memory_bytes(const ldb_file_t* fh){
     return s;
 }
 
+bool write_gdsii_model(const LdbFile* f, const char* path, std::string& err);   // gdsii.cpp
+
+extern "C" double ldb_dbu_per_micron(const ldb_file_t* fh){ return fh ? ((const LdbFile*)fh)->dbu_per_micron : 0.0; }
+
 extern "C" int ldb_write_gdsii(const ldb_file_t* fh, const char* out_path, char* errbuf, size_t errbuf_sz){
     auto* f=(const LdbFile*)fh; if(errbuf&&errbuf_sz) errbuf[0]='\0';
-    if(!f || f->format!=1 || f->gds_records.empty()){ if(errbuf) snprintf(errbuf,errbuf_sz,"no GDSII record stream loaded"); return -1; }
+    if(!f){ if(errbuf) snprintf(errbuf,errbuf_sz,"null"); return -1; }
+    if(f->format!=1 || f->gds_records.empty()){
+        std::string err;
+        if(!write_gdsii_model(f, out_path, err)){ if(errbuf) snprintf(errbuf,errbuf_sz,"%s",err.c_str()); return -1; }
+        return 0;
+    }
     FILE* fp=fopen(out_path,"wb"); if(!fp){ if(errbuf) snprintf(errbuf,errbuf_sz,"open for write failed"); return -1; }
     for(auto& r: f->gds_records){ if(fwrite(r.bytes.data(),1,r.bytes.size(),fp)!=r.bytes.size()){ fclose(fp); if(errbuf) snprintf(errbuf,errbuf_sz,"write failed"); return -1; } }
     fclose(fp); return 0;
@@ -462,6 +471,8 @@ extern "C" int ldb_iterate_polygons(ldb_file_t* fh, ldb_poly_cb cb, void* ud){
                 for(auto& pt: p.pts){ xs.push_back(pt.x); ys.push_back(pt.y); }
                 cb(ud, c.name.c_str(), p.layer, p.datatype, p.kind, (int)xs.size(), xs.data(), ys.data());
             }
+            if(c.polys_extra)
+                for(auto& b: c.boxes) if(b.kind==2) ldb_emit_poly_as_rect(cb,ud,c.name.c_str(),b.layer,b.datatype,b.kind,b.x1,b.y1,b.x2,b.y2);
         } else if(!c.boxes.empty()){
             for(auto& b: c.boxes){ ldb_emit_poly_as_rect(cb,ud,c.name.c_str(),b.layer,b.datatype,b.kind,b.x1,b.y1,b.x2,b.y2); }
         } else if(!c.boxes_compact.empty() || c.boxes_on_disk){
@@ -492,6 +503,7 @@ extern "C" int ldb_iterate_polygons_flat(ldb_file_t* fh, ldb_poly_cb cb, void* u
         };
         if(!c.polys.empty()){
             for(auto& p: c.polys) emit_poly_pts(p.layer,p.datatype,p.kind,p.pts);
+            if(c.polys_extra) for(auto& b: c.boxes) if(b.kind==2) emit_box(b);
         } else if(!c.boxes.empty()){
             for(auto& b: c.boxes) emit_box(b);
         } else if(!c.boxes_compact.empty() || c.boxes_on_disk){

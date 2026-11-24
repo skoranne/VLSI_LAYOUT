@@ -16,14 +16,14 @@ include $(dir $(lastword $(MAKEFILE_LIST)))nvcomp.mk
 CXXFLAGS += $(NVCOMP_CXXFLAGS)
 LDFLAGS += $(NVCOMP_LDLIBS) $(NVCOMP_CUDART) -pthread
 
-CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp gdsii.cpp oasis.cpp oasis_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp oasis_tables.cpp oasis_sidecar.cpp
+CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp gdsii.cpp oasis.cpp oasis_writer.cpp oasis_model_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp oasis_tables.cpp oasis_sidecar.cpp
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
 
-TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent bin2oas db_oasinfo db_mvi
+TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent bin2oas db_oasinfo db_mvi db_oasis_selftest
 
 all: $(TESTS) liblayoutdb.a liblayoutdb.so
 
-$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h fracture.hpp oasis_codec.hpp nvcomp_support.hpp oasis_parser.hpp
+$(CORE_OBJS): %.o: %.cpp layoutdb.h layoutdb_internal.hpp db_stats.h fracture.hpp oasis_codec.hpp nvcomp_support.hpp oasis_parser.hpp oasis_writer.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 liblayoutdb.a: $(CORE_OBJS)
@@ -39,8 +39,13 @@ db_mvi: db_mvi.cpp $(CORE_OBJS)
 db_oasinfo: db_oasinfo.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-bin2oas: bin2oas.cpp oasis_codec.hpp
-	$(CXX) $(CXXFLAGS) -O3 -fopenmp $< -o $@ -lz
+# OASIS/GDSII conformance self-test (spec tables, every record type, writer round trips);
+# regressions/oasis_conformance.sh compares its outputs with KLayout.
+db_oasis_selftest: db_oasis_selftest.cpp $(CORE_OBJS) oasis_rec.o
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+bin2oas: bin2oas.cpp oasis_writer.o oasis_writer.hpp oasis_codec.hpp
+	$(CXX) $(CXXFLAGS) -O3 -fopenmp bin2oas.cpp oasis_writer.o -o $@ -lz
 
 db_extent: db_extent.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)

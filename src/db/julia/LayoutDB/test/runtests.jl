@@ -52,7 +52,10 @@ end
         @test dbu_per_micron(tmp_oas) ≈ dbu_per_micron(gds)
         @test same_boxes(gds_boxes, boxes(g))
         @test same_boxes(gds_boxes, stream_boxes(tmp_oas))
-        @test_throws ErrorException write_gds(g, tempname() * ".gds")   # GDSII writer: GDSII-sourced files only
+        gds3 = write_gds(g, tempname() * ".gds")                        # GDSII from the OASIS cell model
+        h = LayoutFile(gds3)
+        @test same_boxes(gds_boxes, boxes(h))
+        close(h); rm(gds3; force = true)
         gds2 = tempname() * ".gds"                                      # lossless GDSII rewrite
         write_gds(LayoutFile(gds), gds2)
         @test read(gds2) == read(gds)
