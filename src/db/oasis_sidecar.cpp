@@ -103,7 +103,12 @@ struct Mapped {
         if (fd < 0) { err = std::string("cannot open ") + path; return false; }
         struct stat st; fstat(fd, &st);
         n = (size_t)st.st_size;
-        mtime_ns = (uint64_t)st.st_mtim.tv_sec * 1000000000ull + (uint64_t)st.st_mtim.tv_nsec;
+#ifdef __APPLE__
+        const struct timespec& mt = st.st_mtimespec;    // macOS name of st_mtim
+#else
+        const struct timespec& mt = st.st_mtim;
+#endif
+        mtime_ns = (uint64_t)mt.tv_sec * 1000000000ull + (uint64_t)mt.tv_nsec;
         void* m = n ? mmap(nullptr, n, PROT_READ, MAP_SHARED, fd, 0) : nullptr;
         ::close(fd);
         if (n && m == MAP_FAILED) { err = std::string("cannot map ") + path; n = 0; return false; }

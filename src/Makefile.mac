@@ -46,6 +46,8 @@ LDLIBS ?= db/liblayoutdb.a -lz -lstdc++ -lsnappy -lzstd -lpthread $(LDLIBS_HDF5)
 LIBRARY = libmagparser.a
 
 include DEPENDENCIES.txt
+# libiomp5 on macOS has no omp_target_* device routines (see omp_target_host.c).
+LIB_OBJS += omp_target_host.o
 
 # --- Phony ---
 .PHONY: all clean unit_test
@@ -103,6 +105,12 @@ BOOST_XOR_CHECKER.exe: boost_xor_checker.cpp
 
 systeminfo_macos.o: systeminfo_macos.c
 	$(CC) -O3 -Wall -c systeminfo_macos.c -o $@
+
+omp_target_host.o: omp_target_host.c
+	$(CC) -O3 -Wall -c omp_target_host.c -o $@
+
+rpc_socket.o: rpc_socket.c
+	$(CC) -O2 -Wall -c rpc_socket.c -o $@
 
 snappy_api.o: snappy_api.cpp
 	$(CXX) -O3 -Wall $(CPPFLAGS_EXTRA) -c snappy_api.cpp -o $@

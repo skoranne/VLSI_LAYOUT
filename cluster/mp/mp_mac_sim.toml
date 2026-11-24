@@ -1,0 +1,22 @@
+# mp_mac_sim.toml -- two simulated nodes on the Mac (ifort build). DYLD_LIBRARY_PATH is set
+# per host because exporting it in the shell that starts julia makes julia crash.
+[coordinator]
+http = 8091
+
+[[host]]
+name = "mac-a"
+ssh = "local"
+julia = "/Users/skoranne/.juliaup/bin/julia"
+magparser = "/Users/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe"
+workers = 2
+tmp = "/tmp"
+env = { OMP_NUM_THREADS = "4", OMP_STACKSIZE = "512M", DYLD_LIBRARY_PATH = "/opt/intel/oneapi/intelpython/python3.9/envs/2022.2.1/lib:/usr/local/opt/zstd/lib" }
+
+[[host]]
+name = "mac-b"
+ssh = "local"
+julia = "/Users/skoranne/.juliaup/bin/julia"
+magparser = "/Users/skoranne/GITHUB/VLSI_LAYOUT/src/MAGPARSER.exe"
+workers = 1
+tmp = "/tmp"
+env = { OMP_NUM_THREADS = "4", OMP_STACKSIZE = "512M", DYLD_LIBRARY_PATH = "/opt/intel/oneapi/intelpython/python3.9/envs/2022.2.1/lib:/usr/local/opt/zstd/lib" }
