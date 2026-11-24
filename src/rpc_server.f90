@@ -16,8 +16,13 @@
 !    response : 'MPRS' int32 status int64 elapsed_us int64 n_out int32 msglen msg(msglen)
 !               int64 len bytes(len)                 (len = 0: no layer returned)
 !  status: 0 ok, 1 unknown op, 2 bad input layer, 3 wrong number of layers.
-!  Ops: PING QUIT | OR OR2 AND NOT XOR BOOSTNOT <topological ops> (2 layers) |
-!       GROW e n w s, SHRINK e [n w s], EXTENT, COPY, MERGE (1 layer).  Sizes in DBU.
+!  Ops: PING QUIT | OR OR2 AND AND2 NOT FRAMENOT XOR BOOSTNOT SIZE2 d <topological ops> (2 layers) |
+!       GROW e n w s, SHRINK e [n w s], SIZE d, EXTENT, COPY, MERGE, GRID (1 layer).  Sizes in DBU.
+!  Tiles (the BandExecModule tile manager, driven by cluster/mp/mpcoord.jl for layers above
+!  the CTR variable cluster_tile_boxes): TILE_<OP> runs <OP> on the boxes the coordinator
+!  extracted for one band and clips the result to it. params: lo hi clip p1..p4, where p1..p4
+!  are <OP>'s own parameters (GROW e n w s, SIZE d). <OP>: OR AND NOT FRAMENOT BOOSTNOT XOR
+!  GROW SIZE. Layers: as for <OP>.
 module RPCServerModule
   use iso_c_binding
   use iso_fortran_env, only: int8, int32, int64, real64, compiler_version
@@ -26,6 +31,7 @@ module RPCServerModule
   use CompactLayerModule, only: CompactLayer, CompactEncode, CompactPack, CompactRelease
   use CompactWireModule
   use DesignModule
+  use BandExecModule, only: TileApply, TileClip, TileOpCode
   use version_mod, only: commit_hash
   implicit none
   private
@@ -202,7 +208,8 @@ contains
     integer(int8), allocatable :: out(:)
     integer(int32) :: status
     integer(int64) :: t0, t1, rate, n_out, topo
-    integer :: need, ok
+    integer :: need, ok, topc
+    logical :: ran
     character(len=:), allocatable :: msg
     integer(K_COORDINATE_KIND) :: iv(4)
 
@@ -225,11 +232,27 @@ contains
           status = 2; msg = 'malformed CompactLayer input'
        else
           topo = topo_code(op)
+          if (len(op) > 5) then
+             if (op(1:5) == 'TILE_') then
+                ! one tile: the coordinator sent only the boxes meeting [lo-halo, hi+halo]
+                topc = TileOpCode(op(6:))
+                iv = int(params(4:7), K_COORDINATE_KIND)
+                ran = TileApply(topc, A, B, C, need == 2, iv, params(4))
+                if (ran) call TileClip(C, params(1), params(2), params(3) /= 0)
+                topo = -2
+             end if
+          end if
+          if (topo /= -2) then
           select case (op)
           case ('OR');       call CalculateBoostOperation(A, B, C, K_BOOST_CONTROL_OR, 0_int64)
           case ('OR2');      call CalculateOR(A, B, C)
           case ('AND');      call CalculateAND(A, B, C)
+          case ('AND2');     call CalculateFrameAND(A, B, C)
           case ('NOT');      call CalculateNOT(A, B, C)
+          case ('FRAMENOT'); call CalculateFrameNOT(A, B, C)
+          case ('SIZE');     call CalculateBoostOperation(A, A, C, K_BOOST_CONTROL_SIZE, params(1))
+          case ('SIZE2');    call CalculateBoostOperation(A, B, C, K_BOOST_CONTROL_SIZE, params(1))
+          case ('GRID');     call CreateGRID(A, C, 10, 10, 10)
           case ('XOR');      call CalculateBoostOperation(A, B, C, K_BOOST_CONTROL_XOR, 0_int64)
           case ('BOOSTNOT'); call CalculateBoostOperation(A, B, C, K_BOOST_CONTROL_NOT, 0_int64)
           case ('GROW')
@@ -249,6 +272,7 @@ contains
           case default
              call CalculateTopologicalSelect(A, B, C, topo)
           end select
+          end if
           call encode_layer(C, out, n_out)
        end if
     end if
@@ -263,8 +287,10 @@ contains
   integer function layers_needed(op) result(n)
     character(len=*), intent(in) :: op
     select case (op)
-    case ('OR', 'OR2', 'AND', 'NOT', 'XOR', 'BOOSTNOT'); n = 2
-    case ('GROW', 'SHRINK', 'EXTENT', 'COPY', 'MERGE');  n = 1
+    case ('OR', 'OR2', 'AND', 'AND2', 'NOT', 'FRAMENOT', 'XOR', 'BOOSTNOT', 'SIZE2'); n = 2
+    case ('GROW', 'SHRINK', 'SIZE', 'EXTENT', 'COPY', 'MERGE', 'GRID');           n = 1
+    case ('TILE_OR', 'TILE_AND', 'TILE_NOT', 'TILE_FRAMENOT', 'TILE_BOOSTNOT', 'TILE_XOR'); n = 2
+    case ('TILE_GROW', 'TILE_SIZE');                                              n = 1
     case default
        n = merge(2, 0, topo_code(op) > 0)
     end select

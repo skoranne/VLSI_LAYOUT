@@ -1,0 +1,36 @@
+magic
+tech sky130A
+timestamp 0
+<< and12 >>
+KLBIN o1_and12.bin
+<< or12 >>
+KLBIN o1_or12.bin
+<< xor12 >>
+KLBIN o1_xor12.bin
+<< not12 >>
+KLBIN o1_not12.bin
+<< bnot12 >>
+KLBIN o1_bnot12.bin
+<< not21 >>
+KLBIN o1_not21.bin
+<< v_m1 >>
+KLBIN o1_v_m1.bin
+<< v_or >>
+KLBIN o1_v_or.bin
+<< v_xor >>
+KLBIN o1_v_xor.bin
+<< v_not >>
+KLBIN o1_v_not.bin
+<< vm12 >>
+KLBIN o1_vm12.bin
+<< xorand >>
+KLBIN o1_xorand.bin
+<< onlyv >>
+KLBIN o1_onlyv.bin
+<< id_or >>
+KLBIN o1_id_or.bin
+<< id_xor >>
+KLBIN o1_id_xor.bin
+<< id_not >>
+KLBIN o1_id_not.bin
+<< end >>

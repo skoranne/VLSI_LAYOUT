@@ -17,6 +17,15 @@
 !
 ! Used only when MAGPARSER_COMPACT_LAYERS=1 and the inputs exceed 2 bands' worth of boxes;
 ! MAGPARSER_BAND_BOXES=0 disables it.
+!
+! Tile manager API. BandedRun is the local composition of five steps, which are public so
+! that the cluster (rpc_server.f90 TILESPLIT / TILEOP / TILEMERGE, driven by
+! cluster/mp/mpcoord.jl) can run the same tiles on other machines:
+!   TilePlan     band edges at equal-count y quantiles of the inputs
+!   TileExtract  whole input boxes meeting [lo-halo, hi+halo]
+!   TileApply    the operation on one tile (GPU kernels, Boost, heal, ... unchanged)
+!   TileClip     the tile result clipped to [lo, hi] (exact for region operations)
+!   TileCommit   per-tile compact parts merged into the output layer
 module BandExecModule
   use iso_fortran_env, only: int32, int64, real64
   use iso_c_binding, only: c_int
@@ -28,6 +37,7 @@ module BandExecModule
   implicit none
   private
   public :: BandedEligible, BandedRun, LayerBoxCount, BandSetTarget
+  public :: TilePlan, TileExtract, TileApply, TileClip, TileCommit, TileOpCode
   public :: K_BAND_OR, K_BAND_AND, K_BAND_NOT, K_BAND_FRAMENOT, K_BAND_BOOSTNOT, K_BAND_XOR, &
        K_BAND_GROW, K_BAND_SIZE, K_BAND_INTERACT, LayerIsHealed
 
@@ -165,10 +175,12 @@ contains
   integer(int64) function n_samples(L)
     type(Layer), intent(in), target :: L
     integer :: ip
+    type(CompactLayer), pointer :: cp
     if (L%is_compact) then
        n_samples = 0
        do ip = 1, n_parts(L)
-          n_samples = n_samples + part_of(L, ip)%nblk
+          cp => part_of(L, ip)                 !> gfortran: no component ref on a function result
+          n_samples = n_samples + cp%nblk
        end do
     else
        n_samples = (L%n_used + K_CL_BLOCK - 1) / K_CL_BLOCK
@@ -259,7 +271,167 @@ contains
     if (healed .and. T%n_used > 0) T%layerState = LAYER_STATE_HEAL
   end subroutine extract_window
 
-  !> C = op(A [, B]) band by band (see module header). ivar: GROW amounts (E N W S);
+  !> Band operation code for an RPC/CTR operation name (0 when the op cannot be tiled).
+  integer function TileOpCode(name) result(op)
+    character(len=*), intent(in) :: name
+    select case (trim(name))
+    case ('OR');       op = K_BAND_OR
+    case ('AND');      op = K_BAND_AND
+    case ('NOT');      op = K_BAND_NOT
+    case ('FRAMENOT'); op = K_BAND_FRAMENOT
+    case ('BOOSTNOT'); op = K_BAND_BOOSTNOT
+    case ('XOR');      op = K_BAND_XOR
+    case ('GROW');     op = K_BAND_GROW
+    case ('SIZE');     op = K_BAND_SIZE
+    case ('INTERACT'); op = K_BAND_INTERACT
+    case default;      op = 0
+    end select
+  end function TileOpCode
+
+  !> Tile boundaries for C = op(A [, B]): nb bands at equal-count quantiles of the inputs'
+  !> y samples. edges(0) = -huge, edges(nb) = +huge; a band k is [edges(k-1), edges(k)].
+  subroutine TilePlan(A, B, nb, edges)
+    type(Layer), intent(in), target :: A
+    type(Layer), intent(in), target, optional :: B
+    integer(int64), intent(in) :: nb
+    integer(int64), allocatable, intent(out) :: edges(:)
+    integer(int64), allocatable :: ys(:)
+    integer(int64) :: ns, k
+    logical :: use_b
+    use_b = present(B)
+    if (use_b) use_b = .not. associated(layer_ptr(A), layer_ptr(B))
+    ns = n_samples(A)
+    if (use_b) ns = ns + n_samples(B)
+    allocate(ys(max(1_int64, ns)))
+    ns = 0
+    call add_samples(A, ys, ns)
+    if (use_b) call add_samples(B, ys, ns)
+    call CompactSortU64(ys, ns)
+    allocate(edges(0:max(1_int64, nb)))
+    edges(0) = -K_HUGE_COORD
+    do k = 1, nb - 1
+       if (ns > 0) then
+          edges(k) = ys(max(1_int64, min(ns, (k * ns) / nb))) - K_HUGE_COORD
+       else
+          edges(k) = edges(k - 1)
+       end if
+    end do
+    edges(max(1_int64, nb)) = K_HUGE_COORD
+  end subroutine TilePlan
+
+  !> Input of one tile: the boxes of L meeting y in [lo - halo, hi + halo], whole.
+  subroutine TileExtract(L, lo, hi, halo, T)
+    type(Layer), intent(in), target :: L
+    integer(int64), intent(in) :: lo, hi, halo
+    type(Layer), intent(inout) :: T
+    call extract_window(L, sat_coord(lo - halo), sat_coord(hi + halo), T)
+  end subroutine TileExtract
+
+  !> tC = op(tA [, tB]) on one tile. use_b: tB is a real second operand (SIZE then sizes
+  !> tA against tB; without it SIZE sizes tA alone). Returns .false. with tC cleared when the
+  !> tile is trivially empty for this op (e.g. AND with an empty operand).
+  logical function TileApply(op, tA, tB, tC, use_b, ivar, cval) result(ran)
+    integer, intent(in) :: op
+    type(Layer), intent(inout) :: tA, tB, tC
+    logical, intent(in) :: use_b
+    integer(K_COORDINATE_KIND), intent(in), optional :: ivar(4)
+    integer(int64), intent(in), optional :: cval
+    call ClearLayer(tC)
+    ran = .not. tile_is_empty(op, tA%n_used, tB%n_used)
+    if (.not. ran) return
+    select case (op)
+    case (K_BAND_OR)
+       call CalculateBoostOperation(tA, tB, tC, K_BOOST_CONTROL_OR, 0_int64)
+    case (K_BAND_AND)
+       call CalculateAND(tA, tB, tC)
+    case (K_BAND_NOT)
+       call CalculateNOT(tA, tB, tC)
+    case (K_BAND_FRAMENOT)
+       call CalculateFrameNOT(tA, tB, tC)
+    case (K_BAND_BOOSTNOT)
+       call CalculateBoostOperation(tA, tB, tC, K_BOOST_CONTROL_NOT, 0_int64)
+    case (K_BAND_XOR)
+       call CalculateBoostOperation(tA, tB, tC, K_BOOST_CONTROL_XOR, 0_int64)
+    case (K_BAND_GROW)
+       call CalculateGROWLayer(tA, tC, ivar)
+    case (K_BAND_INTERACT)
+       call CalculateTopologicalSelect(tA, tB, tC, K_TOPO_INTERACT)
+    case (K_BAND_SIZE)
+       if (use_b) then
+          call CalculateBoostOperation(tA, tB, tC, K_BOOST_CONTROL_SIZE, cval)
+       else
+          call CalculateBoostOperation(tA, tA, tC, K_BOOST_CONTROL_SIZE, cval)
+       end if
+    case default
+       error stop 'TileApply: unsupported operation'
+    end select
+  end function TileApply
+
+  !> Clip a tile result to its band [lo, hi] in place (disjoint band results stay disjoint)
+  !> and keep positive-area pieces; tC%n_used becomes the kept count. Box-level selections
+  !> (INTERACT) keep whole boxes: clip = .false.
+  subroutine TileClip(tC, lo, hi, clip)
+    type(Layer), intent(inout) :: tC
+    integer(int64), intent(in) :: lo, hi
+    logical, intent(in) :: clip
+    integer(int64) :: i, j
+    j = 0
+    do i = 1, tC%n_used
+       associate (b => tC%layer_boxes(i))
+         if (clip) then
+            if (int(b%y1, int64) < lo) b%y1 = int(lo, K_COORDINATE_KIND)
+            if (int(b%y2, int64) > hi) b%y2 = int(hi, K_COORDINATE_KIND)
+         end if
+         if (b%y2 <= b%y1 .or. b%x2 <= b%x1) cycle
+         j = j + 1
+         tC%layer_boxes(j) = b
+       end associate
+    end do
+    tC%n_used = j
+  end subroutine TileClip
+
+  !> Merge the per-tile compact parts into C (C is overwritten only here, so it may be the
+  !> same object as an input). Large outputs stay multi-part (see merge_max). Returns the
+  !> number of output parts.
+  integer function TileCommit(parts, np, C, op, all_healed) result(nparts_out)
+    type(CompactLayer), intent(inout) :: parts(:)
+    integer, intent(in) :: np, op
+    type(Layer), intent(inout) :: C
+    logical, intent(in) :: all_healed
+    integer(int64) :: nout_tot
+    integer :: i, st
+    logical :: healed
+    healed = all_healed
+    call ClearLayer(C)
+    C%layerState = LAYER_STATE_NONE
+    nparts_out = 0
+    if (np <= 0) return
+    nout_tot = 0
+    do i = 1, np
+       nout_tot = nout_tot + parts(i)%n
+    end do
+    if (np == 1 .or. nout_tot <= merge_max()) then
+       call CompactMergeParts(parts, np, C%compact, st)
+       if (st == 2) error stop 'TileCommit: merged output exceeds 31-bit coordinates'
+       call CompactPack(C%compact)
+       nparts_out = 1
+    else
+       ! keep the band parts: merging would need a 12 B/box key transient
+       call CompactMove(parts(1), C%compact)
+       allocate(C%cextra(np - 1))
+       do i = 2, np
+          call CompactMove(parts(i), C%cextra(i - 1))
+       end do
+       nparts_out = np
+       if (op == K_BAND_INTERACT) healed = .false.   ! whole boxes may repeat across parts
+    end if
+    C%is_compact = .true.
+    C%compact_state = LAYER_STATE_NONE
+    if (healed) C%compact_state = LAYER_STATE_HEAL
+  end function TileCommit
+
+  !> C = op(A [, B]) band by band (see module header): TilePlan, then per band TileExtract,
+  !> TileApply, TileClip and compact encoding, then TileCommit. ivar: GROW amounts (E N W S);
   !> cval: SIZE amount. A, B and C may be the same layer object: C is written only at the end.
   subroutine BandedRun(A, B, C, op, halo, ivar, cval)
     type(Layer), intent(inout), target :: A
@@ -269,104 +441,49 @@ contains
     integer(int64), intent(in) :: halo
     integer(K_COORDINATE_KIND), intent(in), optional :: ivar(4)
     integer(int64), intent(in), optional :: cval
-    integer(int64), allocatable :: ys(:), edges(:)
-    integer(int64) :: ns, ntot, nb, k, lo, hi, i, j, nin_max
+    integer(int64), allocatable :: edges(:)
+    integer(int64) :: ntot, nb, k, lo, hi, nin_max
     type(Layer) :: tA, tB, tC
     type(CompactLayer), allocatable :: parts(:)
-    integer :: st, np
+    integer :: st, np, nparts_out
     real(real64) :: tp, tband
-    logical :: same_ab, all_healed, clip
-    integer(int64) :: nout_tot
-    integer :: nparts_out
+    logical :: same_ab, all_healed
 
     tp = PhaseBegin('band.total')
     same_ab = .false.
-    if (present(B)) same_ab = associated(ptr_of(A), ptr_of(B))
-
-    ! band boundaries at equal-count quantiles of the inputs' y samples
-    ns = n_samples(A)
-    if (present(B) .and. .not. same_ab) ns = ns + n_samples(B)
-    allocate(ys(max(1_int64, ns)))
-    ns = 0
-    call add_samples(A, ys, ns)
-    if (present(B) .and. .not. same_ab) call add_samples(B, ys, ns)
-    call CompactSortU64(ys, ns)
+    if (present(B)) same_ab = associated(layer_ptr(A), layer_ptr(B))
     ntot = LayerBoxCount(A)
     if (present(B) .and. .not. same_ab) ntot = ntot + LayerBoxCount(B)
     nb = max(1_int64, (ntot + band_target() - 1) / band_target())
-    allocate(edges(0:nb))
-    edges(0) = -K_HUGE_COORD
-    do k = 1, nb - 1
-       edges(k) = ys(max(1_int64, min(ns, (k * ns) / nb))) - K_HUGE_COORD
-    end do
-    edges(nb) = K_HUGE_COORD
-    deallocate(ys)
+    call TilePlan(A, B, nb, edges)
     allocate(parts(nb))
     np = 0
     nin_max = 0
     all_healed = .true.
     ! Box-level selections keep whole A boxes (A must be healed: its decomposition is then
     ! the same in every band); an A box selected in several bands is de-duplicated by the merge.
-    clip = (op /= K_BAND_INTERACT)
 
     do k = 1, nb
        lo = edges(k - 1); hi = edges(k)
        if (hi <= lo) cycle                            ! empty band (repeated quantile)
        tband = PhaseBegin('band.extract')
-       call extract_window(A, sat(lo - halo), sat(hi + halo), tA)
-       if (present(B) .and. .not. same_ab) call extract_window(B, sat(lo - halo), sat(hi + halo), tB)
+       call TileExtract(A, lo, hi, halo, tA)
+       ! A op A: the second operand is the same window (an empty B would make A ^ A = A)
+       if (present(B)) call TileExtract(B, lo, hi, halo, tB)
        call PhaseEnd('band.extract', tband, tA%n_used + tB%n_used)
        nin_max = max(nin_max, tA%n_used + tB%n_used)
-       if (band_is_empty(op, tA%n_used, tB%n_used)) then
+       if (.not. TileApply(op, tA, tB, tC, present(B), ivar, cval)) then
           call ClearLayer(tA)
           call ClearLayer(tB)
           cycle
        end if
-       select case (op)
-       case (K_BAND_OR)
-          call CalculateBoostOperation(tA, tB, tC, K_BOOST_CONTROL_OR, 0_int64)
-       case (K_BAND_AND)
-          call CalculateAND(tA, tB, tC)
-       case (K_BAND_NOT)
-          call CalculateNOT(tA, tB, tC)
-       case (K_BAND_FRAMENOT)
-          call CalculateFrameNOT(tA, tB, tC)
-       case (K_BAND_BOOSTNOT)
-          call CalculateBoostOperation(tA, tB, tC, K_BOOST_CONTROL_NOT, 0_int64)
-       case (K_BAND_XOR)
-          call CalculateBoostOperation(tA, tB, tC, K_BOOST_CONTROL_XOR, 0_int64)
-       case (K_BAND_GROW)
-          call CalculateGROWLayer(tA, tC, ivar)
-       case (K_BAND_INTERACT)
-          call CalculateTopologicalSelect(tA, tB, tC, K_TOPO_INTERACT)
-       case (K_BAND_SIZE)
-          if (same_ab .or. .not. present(B)) then
-             call CalculateBoostOperation(tA, tA, tC, K_BOOST_CONTROL_SIZE, cval)
-          else
-             call CalculateBoostOperation(tA, tB, tC, K_BOOST_CONTROL_SIZE, cval)
-          end if
-       case default
-          error stop 'BandedRun: unsupported operation'
-       end select
        call ClearLayer(tA)
        call ClearLayer(tB)
        if (tC%n_used > 0 .and. .not. tC%has(LAYER_STATE_HEAL)) all_healed = .false.
-       ! clip to the band (disjoint band results stay disjoint); keep positive-height pieces
-       j = 0
-       do i = 1, tC%n_used
-          associate (b => tC%layer_boxes(i))
-            if (clip) then
-               if (int(b%y1, int64) < lo) b%y1 = int(lo, K_COORDINATE_KIND)
-               if (int(b%y2, int64) > hi) b%y2 = int(hi, K_COORDINATE_KIND)
-            end if
-            if (b%y2 <= b%y1 .or. b%x2 <= b%x1) cycle
-            j = j + 1
-            tC%layer_boxes(j) = b
-          end associate
-       end do
-       if (j > 0) then
+       call TileClip(tC, lo, hi, op /= K_BAND_INTERACT)
+       if (tC%n_used > 0) then
           np = np + 1
-          call CompactEncode(tC%layer_boxes(1:j), j, parts(np), st)
+          call CompactEncode(tC%layer_boxes(1:tC%n_used), tC%n_used, parts(np), st)
           if (st /= 0) then
              write(*,'(A,I0,A)') 'ERROR: banded output cannot be encoded compactly (status ', st, &
                   '); rerun with MAGPARSER_BAND_BOXES=0'
@@ -378,58 +495,34 @@ contains
     end do
 
     ! commit: only now is C (possibly the same object as A or B) overwritten
-    call ClearLayer(C)
-    C%layerState = LAYER_STATE_NONE
-    nparts_out = 0
-    if (np > 0) then
-       nout_tot = 0
-       do i = 1, np
-          nout_tot = nout_tot + parts(i)%n
-       end do
-       if (np == 1 .or. nout_tot <= merge_max()) then
-          call CompactMergeParts(parts, np, C%compact, st)
-          if (st == 2) error stop 'BandedRun: merged output exceeds 31-bit coordinates'
-          call CompactPack(C%compact)
-          nparts_out = 1
-       else
-          ! keep the band parts: merging would need a 12 B/box key transient
-          call CompactMove(parts(1), C%compact)
-          allocate(C%cextra(np - 1))
-          do i = 2, np
-             call CompactMove(parts(i), C%cextra(i - 1))
-          end do
-          nparts_out = np
-          if (op == K_BAND_INTERACT) all_healed = .false.   ! whole boxes may repeat across parts
-       end if
-       C%is_compact = .true.
-       C%compact_state = LAYER_STATE_NONE
-       if (all_healed) C%compact_state = LAYER_STATE_HEAL
-    end if
+    nparts_out = TileCommit(parts, np, C, op, all_healed .and. np > 0)
     write(*,'(A,I0,A,I0,A,I0,A,I0,A,L1)') 'INFO: banded op bands=', nb, ' max_band_inputs=', nin_max, &
          ' parts=', nparts_out, ' output_boxes=', LayerBoxCount(C), ' healed=', all_healed .and. np > 0
     call PhaseEnd('band.total', tp, LayerBoxCount(C))
-  contains
-    pure logical function band_is_empty(opc, na, nbb)
-      integer, intent(in) :: opc
-      integer(int64), intent(in) :: na, nbb
-      select case (opc)
-      case (K_BAND_OR, K_BAND_XOR)
-         band_is_empty = (na == 0 .and. nbb == 0)
-      case (K_BAND_AND)
-         band_is_empty = (na == 0 .or. nbb == 0)
-      case default
-         band_is_empty = (na == 0)
-      end select
-    end function band_is_empty
-    pure integer(int64) function sat(v)
-      integer(int64), intent(in) :: v
-      sat = max(-K_HUGE_COORD, min(K_HUGE_COORD, v))
-    end function sat
-    function ptr_of(L) result(pl)
-      type(Layer), intent(in), target :: L
-      type(Layer), pointer :: pl
-      pl => L
-    end function ptr_of
   end subroutine BandedRun
+
+  pure logical function tile_is_empty(opc, na, nbb)
+    integer, intent(in) :: opc
+    integer(int64), intent(in) :: na, nbb
+    select case (opc)
+    case (K_BAND_OR, K_BAND_XOR)
+       tile_is_empty = (na == 0 .and. nbb == 0)
+    case (K_BAND_AND)
+       tile_is_empty = (na == 0 .or. nbb == 0)
+    case default
+       tile_is_empty = (na == 0)
+    end select
+  end function tile_is_empty
+
+  pure integer(int64) function sat_coord(v)
+    integer(int64), intent(in) :: v
+    sat_coord = max(-K_HUGE_COORD, min(K_HUGE_COORD, v))
+  end function sat_coord
+
+  function layer_ptr(L) result(pl)
+    type(Layer), intent(in), target :: L
+    type(Layer), pointer :: pl
+    pl => L
+  end function layer_ptr
 
 end module BandExecModule

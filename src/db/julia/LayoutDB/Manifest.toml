@@ -1,0 +1,10 @@
+# This file is machine-generated - editing it directly is not advised
+
+julia_version = "1.13.4"
+manifest_format = "2.1"
+project_hash = "b0db27276f03faa4efd34e967c7d858491275e55"
+
+[[deps.LayoutDB]]
+path = "."
+uuid = "6ecfbc3f-b1ff-4456-9b7d-eb0db9a266e9"
+version = "0.1.0"

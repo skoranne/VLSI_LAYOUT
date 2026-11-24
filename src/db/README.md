@@ -10,7 +10,7 @@ Planned components:
 
 Build notes: integrate with `src/` makefiles/toolchains as needed; avoid hardcoding local paths.
 
-## bin2oas: KLBIN layer sets to compact OASIS
+## bin2oas: KLBIN layer sets to compact, strict-mode OASIS
 
 `bin2oas in.mag out.oas` (or `bin2oas out.oas L:D file.bin ...`) writes the KLBIN files
 named in a Magic `.mag` (`KLBIN .../X_L<layer>_D<datatype>.bin`) as one flat OASIS cell.
@@ -18,10 +18,37 @@ Each layer is sorted by shape (w,h), then row and x. RECTANGLE records use modal
 width, height and layer with XYRELATIVE deltas, so most records carry only an x delta.
 The stream is deflated in CBLOCKs (`--cblock-mb`, default 8). Measured sizes:
 SMALL_SDT went from 176 MB to 12.6 MB, and SDT16 (456M boxes) from 30 GB to 110 MB
-(0.24 B/box). Options are `--grid N` (grid steps per micron in START, default 1000),
-`--dedup` (drop exact duplicate boxes) and `--cell NAME`. CTRs reference the layers as
-`d1:L66_D20` (or `66:20`). `src/regress/gpu_study/to_oas.sh` rewrites a KLBIN-based
-CTR to use them.
+(0.24 B/box). CTRs reference the layers as `d1:L66_D20` (or `66:20`).
+`src/regress/gpu_study/to_oas.sh` rewrites a KLBIN-based CTR to use them.
+
+Output is **strict mode** by default (`--no-strict` gives the old layout):
+- START has offset-flag 1 and END holds the table offsets.
+- The CELL is written by reference number.
+- A strict CELLNAME table after the geometry carries `S_CELL_OFFSET` (byte offset of the
+  CELL record) and `S_BOUNDING_BOX`. The file property `S_TOP_CELL` follows START.
+- A strict LAYERNAME table names each layer after its `.mag` section (`li1` for 67/20);
+  generic sections such as `L66_D15` keep their number.
+- Every CBLOCK holds one layer and starts with XYABSOLUTE and a fully specified
+  RECTANGLE, so a CBLOCK decodes without the modal state of the one before it.
+
+Other options:
+- `--grid N`: grid steps per micron in START (default 1000).
+- `--dedup`: drop exact duplicate boxes.
+- `--cell NAME`: cell name.
+- `--largest K`: keep the K layers with the most boxes.
+- `--tile NXxNY` and `--tile-gap G`: write NX x NY translated copies of the layer set.
+  The input is sorted once, and the copies never exist in memory.
+- `--bin B`: order geometry in B x B database-unit bins along a Morton curve, each bin sorted
+  by shape then row. CBLOCKs then cover compact regions, at some cost in size: 200 um bins
+  made SMALL_SDT 9% larger.
+
+`db_oasinfo [--verify-strict] file.oas` reads only the tables (`db/oasis_tables.cpp`,
+C API `ldb_oas_info_*` in `layoutdb.h`): unit, top cell, LAYERNAMEs, and each cell's
+`S_CELL_OFFSET` and `S_BOUNDING_BOX`. It also checks that every offset points at its CELL
+record. Tables stored inside a CBLOCK are supported, and properties may be named inline or
+by reference. Reading the tables takes about 0.1 ms at any file size; KLayout-written strict
+files read as well. `regressions/oasis_layer_summary.rb` prints per-layer counts, areas and
+names with the system KLayout, for checking writer output.
 
 ## Compact layers, banded operations and MAGVIEWER
 
@@ -44,12 +71,55 @@ that keeps the shape ids in a separate stream.
 - To check banded results against unbanded ones: `src/regress/gpu_study/run_band_checks.sh`.
 - `MAGPARSER_COMPACT_FORCE_WIDE=1` forces the wide layout, for testing.
 
-**MAGVIEWER** builds its quantized R-tree index directly from the compact blocks
+**MAGVIEWER** (plan: `src/MAGVIEWER_TODO.md`; build `make -f Makefile.nvf MAGVIEWER.exe`)
+builds its quantized R-tree index directly from the compact blocks
 (`CompressedSpatialIndex%build_from_compact`). SDT16 (422M unique boxes) loads into a
 1.56 GB index with a 4.5 GB peak. `MAGVIEWER_COMPACT=0` selects the legacy BoxCodec/zstd
 chunks, whose multi-threaded encoder has a known race. To test load and pan/zoom queries
 without a display: `test_viewer_index.exe file.oas [max_layers] [windows] [frac]`
 (`TVI_VERIFY=1` adds a brute-force oracle).
+
+## Sidecar index (.mvi), parser header, and language front ends
+
+**Parser header.** `oasis_parser.hpp` holds the OASIS record parser (`namespace oasis_parse`), shared by:
+- `oasis.cpp` (whole-file model and `ldb_stream_boxes`);
+- `oasis_sidecar.cpp`.
+
+For speculative decoding, the parser has three extra modes:
+- **Tracking** (`Parser::track`): the first use of an undefined modal variable throws `Parser::Dependent`.
+- **Skip** (`Parser::skip`): drops boxes that have already been emitted.
+- **Top-level hook:** a callback at each record outside CBLOCKs.
+
+**Sidecar.** `oasis_sidecar.cpp` (`ldb_mvi_*` in `layoutdb.h`) builds and reads `<file>.oas.mvi` for flat OASIS. It records:
+- units (CBLOCKs and inline runs);
+- per (unit, layer) counts and bboxes;
+- modal snapshots;
+- a per-layer density pyramid.
+
+`ldb_mvi_decode` decodes any set of units in parallel (`LDB_THREADS`). Hierarchical files return 2. Plan and numbers: `src/MAGVIEWER_TODO.md` §0.
+
+```
+db_mvi build file.oas [out.mvi] [--grid N]   # MW_8x8_10L (4.1 B boxes): 11 s, 94 MB
+db_mvi info  file.oas                        # units, dependent units, per-layer counts/coverage
+db_mvi check file.oas                        # every layer: sidecar decode == streaming parser
+db_mvi bench file.oas [frac] [n]             # random windows: units touched, decode time
+```
+
+**Fortran** (`src/layout_files.f90`, `LayoutFilesModule`, part of `libmagparser.a`): OO wrappers that own the C handles.
+- `LayoutFile`: GDSII/OASIS model, extent, top cells, properties, boxes, write.
+- `OasisTables`: strict tables, layer names, cell offsets and bboxes.
+- `LayoutSidecar`: density levels as zero-copy array views, units in a window, parallel decode into `Box` arrays.
+
+`src/viewer_tiles.f90` (`TiledLayout`) builds the viewer's tile LRU and density images on top of these wrappers. Test: `test_layout_files.exe file.oas`.
+
+**Julia** (`julia/LayoutDB`, over `liblayoutdb.so`; `make liblayoutdb.so`):
+- `LayoutFile`, `boxes`, `polygons`, `properties`, `cell_extents`, `write_oasis`/`write_gds`;
+- `stream_boxes`;
+- `OasisTables`;
+- `Sidecar` with `density` (zero-copy), `units_in` and `decode`;
+- `dbu_per_micron`.
+
+Run the tests with `julia --project=julia/LayoutDB -e 'using Pkg; Pkg.test()'`. Set `LAYOUTDB_TEST_OAS=flat_strict.oas` to add a real design. JuliaXLS uses this package through `bsc_julia/src/PhysicalImplementation/layout_io.jl`. `ENV["LAYOUTDB_LIB"]` overrides the library path.
 
 ## MPW_MERGE: multi-project-wafer shuttle assembly
 

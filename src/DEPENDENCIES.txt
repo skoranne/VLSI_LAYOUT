@@ -6,7 +6,7 @@ LIB_OBJS = commonmodule.o device_registry.o compact_layer.o systeminfo.o systemi
 	   boost_polygon_apif.o boost_polygon_api.o boxbytestream.o box_compression.o\
 	   snappy_api.o snappy_apif.o layout_statistics.o box_codec.o serialization.o\
 	   diskdesign_impl.o gridlayer.o utilities.o event_sorter_apif.o event_sorter.o\
-	   gpu_morton.o layoutdb_f_api.o compressed_spatial_index.o layoutdb_loader.o profiler.o trs_optimizer.o \
+	   gpu_morton.o layoutdb_f_api.o layout_files.o compressed_spatial_index.o layoutdb_loader.o profiler.o trs_optimizer.o \
            rpc_socket.o compact_wire.o rpc_server.o property_table.o fascl.o prop_oasis.o
 
 
@@ -42,6 +42,7 @@ magparser.o: prop_oasis.o polygon_fracture.o design.o morton.o kldata.o diskdesi
 mainmagparser.o: magparser.o controlparser.o rpc_server.o
 controlparser.o: fascl.o prop_oasis.o design.o band_exec.o layoutdb_loader.o trs_optimizer.o
 compressed_spatial_index.o: commonmodule.o geometry.o morton.o box_codec.o snappy_apif.o compact_layer.o
+layout_files.o: geometry.o
 layoutdb_loader.o: layoutdb_f_api.o design.o geometry.o commonmodule.o hashtable.o compressed_spatial_index.o
 systeminfo_gpu.o: systeminfo.o
 interaction.o: gpu_morton_sort.o utilities.o device_registry.o
@@ -55,7 +56,7 @@ band_exec.o: design.o compact_layer.o geometry.o commonmodule.o profiler.o
 
 # cluster RPC server (cluster/mp)
 compact_wire.o: compact_layer.o geometry.o commonmodule.o
-rpc_server.o: compact_wire.o compact_layer.o design.o version_mod.o rpc_socket.o
+rpc_server.o: compact_wire.o compact_layer.o design.o version_mod.o rpc_socket.o band_exec.o
 test_compact_wire.o: compact_wire.o compact_layer.o geometry.o
 property_table.o: geometry.o datastructures.o compact_layer.o
 fascl.o: design.o property_table.o pnummerge.o

@@ -40,6 +40,7 @@ module DesignModule
   public :: DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY
   public :: NeedsSorting, NeedsRTree, NeedsPNum, NeedsHealing
   public :: LayerCompact, LayerExpand, LayerDropCompact, LayerExpandedBytes, CompactLayersEnabled
+  public :: LayerAppendPart, LayerFinishParts
   public :: push_box, ClearLayer, CopyLayer, AssignFromBox, swap_layer, FinalizeLayer, DeleteDesign
   public :: LayerDeviceEnsure, LayerDeviceRelease, LayerTreeBuilt, LayerDeviceTouch, LayerDeviceDone
   public :: assignment(=)
@@ -116,6 +117,7 @@ module DesignModule
      !> Very large banded outputs stay as several parts (compact = part 1, cextra = the rest)
      !> instead of paying the merge's 12 B/box transient; banded ops and LayerExpand read all parts.
      type(CompactLayer), allocatable :: cextra(:)
+     logical                :: parts_failed = .false.   !> streaming compaction gave up (31-bit limit)
      integer(kind=int64)    :: shadow_n = 0, shadow_hash = 0
      !> Per-polygon properties (FASCL, property_table.f90); allocated on first use.
      !> Columns are keyed by canonical polygon ordinal and carry the geometry signature
@@ -477,9 +479,12 @@ contains
     type(Layer), intent(inout), target :: output_layer
     type(Layer), intent(in), target :: input_layer_A
     integer(kind=int64) :: n
+    type(c_ptr) :: p_out, p_in
     !> Self-copy (e.g. `X = X COPY nothing`, or `X = X NOT Y` with empty Y via CalculateNOT):
     !> the deallocations below would free the input before it is read.
-    if( c_associated( c_loc(output_layer), c_loc(input_layer_A) ) ) return
+    !> (two temporaries: gfortran rejects c_loc() results passed straight to c_associated here)
+    p_out = c_loc(output_layer); p_in = c_loc(input_layer_A)
+    if( c_associated( p_out, p_in ) ) return
     n = input_layer_A%n_used
     if( n == 0 ) then
        call ClearLayer( output_layer )
@@ -1157,6 +1162,83 @@ contains
   end subroutine LayerDropCompact
 
   !> Free the Box form (boxes, tree, pnum table, device copies) of a layer being compacted.
+  !> Streaming compaction: encode the buffered boxes L%layer_boxes(1:n_used) as one more compact
+  !> part of L (part 1 is L%compact, later parts go to L%cextra) and empty the buffer while
+  !> keeping its allocation for reuse. A layer read this way never exists as one Box array, so
+  !> the load peak is one buffer (e.g. 32M boxes, 512 MB) plus the compact parts.
+  !> If a part cannot be encoded (coordinates beyond 31 bits) the parts so far are expanded
+  !> back to Boxes and the layer continues as a plain Box layer.
+  subroutine LayerAppendPart( L )
+    type(Layer), intent(inout), target :: L
+    type(CompactLayer) :: part
+    type(CompactLayer), allocatable :: grown(:)
+    type(Box), allocatable :: pend(:)
+    integer :: status, ip, np
+    integer(kind=int64) :: n
+    real(kind=real64) :: tp
+    if( L%n_used <= 0 ) return
+    if( L%parts_failed ) return
+    if( L%compact_shadow ) then                          !> a shadow is not a part
+       call CompactRelease( L%compact )
+       L%compact_shadow = .false.
+    end if
+    tp = PhaseBegin('compact.encode')
+    call CompactEncode( L%layer_boxes(1:L%n_used), L%n_used, part, status )
+    if( status /= 0 ) then
+       call CompactRelease( part )
+       call PhaseEnd('compact.encode', tp, 0_int64)
+       L%parts_failed = .true.
+       if( L%is_compact ) then                           !> fold the parts back into Boxes
+          n = L%n_used
+          allocate( pend(n) )
+          pend = L%layer_boxes(1:n)
+          call LayerExpand( L, build_tree=.false. )
+          call release_tree_only( L )
+          block
+            type(Box), allocatable :: all(:)
+            allocate( all(L%n_used + n) )
+            all(1:L%n_used) = L%layer_boxes(1:L%n_used)
+            all(L%n_used+1:) = pend
+            call move_alloc( all, L%layer_boxes )
+          end block
+          L%n_used = L%n_used + n
+          L%n_alloc = L%n_used
+       end if
+       return
+    end if
+    call CompactPack( part )
+    if( .not. L%is_compact ) then
+       call CompactMove( part, L%compact )
+       L%is_compact = .true.
+       L%compact_state = LAYER_STATE_NONE
+    else
+       np = 0
+       if( allocated( L%cextra ) ) np = size( L%cextra )
+       allocate( grown(np + 1) )
+       do ip = 1, np
+          call CompactMove( L%cextra(ip), grown(ip) )
+       end do
+       call CompactMove( part, grown(np + 1) )
+       if( allocated( L%cextra ) ) deallocate( L%cextra )
+       call move_alloc( grown, L%cextra )
+    end if
+    L%n_used = 0                                         !> keep the buffer for the next part
+    L%layerState = LAYER_STATE_NONE
+    call PhaseEnd('compact.encode', tp, 0_int64)
+  end subroutine LayerAppendPart
+
+  !> End of a streamed layer: flush the remaining boxes as a part and free the buffer.
+  subroutine LayerFinishParts( L )
+    type(Layer), intent(inout), target :: L
+    call LayerAppendPart( L )
+    if( L%is_compact .and. .not. L%parts_failed ) call release_expanded( L )
+  end subroutine LayerFinishParts
+
+  subroutine release_tree_only( L )
+    type(Layer), intent(inout), target :: L
+    call drop_rtree( L )
+  end subroutine release_tree_only
+
   subroutine release_expanded( L )
     type(Layer), intent(inout), target :: L
     call LayerDeviceRelease( L )         !> device copies of the boxes/tree are now stale

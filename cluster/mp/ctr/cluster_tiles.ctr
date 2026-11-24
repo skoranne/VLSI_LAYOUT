@@ -1,0 +1,46 @@
+# cluster_tiles.ctr -- CLUSTER-mode tiles plus the remaining CTR ops (cluster/mp/mpcoord.jl --ctr).
+# Runs unchanged in plain MAGPARSER.exe, which gives the ground truth (tools/compare_klbin.jl).
+# Inputs: julia ../tools/genmag.jl cluster_bool_in.mag 200000 ; copy cluster_tiles_out.mag (the
+# KLBIN output template) into the run directory.
+# cluster_tile_boxes is lowered from its 10 million default so that this 200k-box/layer test
+# splits every op whose inputs exceed 100k boxes into y-band tiles spread over the nodes.
+program cluster_tiles
+systeminfo
+var debug_verbosity 0
+var cluster_tile_boxes 100000
+decl design d1 = cluster_bool_in.mag
+decl output o1 = cluster_tiles_out.mag
+decl memory m1 = nothing
+exec init m1:nothing
+
+# --- tiled: AND OR XOR NOT (frame and Boost) FRAMENOT on 400k input boxes ---
+exec run o1:t_and  = d1:metal1 * d1:metal2
+exec run o1:t_or   = d1:metal1 + d1:metal2
+exec run o1:t_xor  = d1:metal1 ^ d1:metal2
+exec run o1:t_not  = d1:metal1 @ d1:metal2
+exec run o1:t_bnot = d1:metal1 ! d1:metal2
+exec run o1:t_fnot = d1:metal1 ~ d1:metal2
+exec run o1:w_not  = d1:via1 NOT d1:metal1
+exec run o1:w_xor  = d1:via1 XOR d1:metal2
+# --- tiled with a halo (the grow/size distance) ---
+exec run o1:t_grow = d1:metal1 GROW nothing 0.05 0.02 0.05 0.02
+exec run o1:t_size = d1:metal2 SIZE nothing 0.03
+
+# --- the remaining ops, whole-layer on one node (word AND = merge and EXTENT are supported too,
+#     but plain MAGPARSER cannot run them after the layers were used, so no ground truth here) ---
+exec run o1:or2    = d1:via1 OR2 d1:metal1
+exec run o1:and2   = d1:via1 AND2 d1:metal1
+exec run o1:shr    = o1:t_or SHRINK nothing 0.01
+exec run o1:inter  = d1:via1 INTERACT d1:metal1
+exec run o1:ninter = d1:via1 NOT INTERACT d1:metal1
+exec run o1:inside = d1:via1 INSIDE d1:metal1
+exec run o1:cpy    = d1:via1 COPY nothing
+
+# --- identity on tiled results (must be empty; the cluster verifies it as a task) ---
+exec run m1:id_not = o1:t_not ^ o1:t_bnot
+# negative check: t_and is not empty, so ASSERT_ZERO must report a failure in both MAGPARSER
+# and CLUSTER mode (abort_on_assert_zero is 0, so the run goes on). Plain MAGPARSER cannot
+# read an empty layer back as an input, so the identity above is not asserted here.
+exec run m1:z1     = o1:t_and ASSERT_ZERO nothing
+flush
+end
