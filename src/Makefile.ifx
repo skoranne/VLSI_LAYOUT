@@ -88,7 +88,7 @@ version_mod.f90: ../.git/HEAD ../.git/index
 
 unit_test: test_contour.exe test_morton.exe CONVERT.exe test_boxmerge.exe \
 	   test_skiplist.exe test_compact_layer.exe test_viewer_index.exe \
-	   test_wide_int.exe test_predicates.exe
+	   test_wide_int.exe test_predicates.exe test_measure.exe
 
 clean:
 	rm -f *.o *.mod *.a *.exe
@@ -179,3 +179,6 @@ test_wide_int.exe: test_wide_int.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_predicates.exe: test_predicates.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_measure.exe: test_measure.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)

@@ -33,7 +33,12 @@ module LayoutDBLoaderModule
      ! Open-addressed integer hash table: (layer_num, datatype) -> layer_idx
      integer(c_int) :: tab_layer(0:K_LD_CACHE_SIZE-1) = 0_c_int
      integer(c_int) :: tab_dtype(0:K_LD_CACHE_SIZE-1) = 0_c_int
-     integer        :: tab_idx(0:K_LD_CACHE_SIZE-1)   = 0
+     integer        :: tab_idx(0:K_LD_CACHE_SIZE-1)   = 0     !> -1: layer skipped (max_layers)
+     ! Layers dropped because the design already holds max_layers layers
+     integer        :: n_skipped = 0
+     integer(int64) :: skipped_boxes = 0_int64
+     integer(c_int) :: skip_layer(32) = 0_c_int
+     integer(c_int) :: skip_dtype(32) = 0_c_int
   end type ldb_load_ctx
 
 contains
@@ -89,7 +94,21 @@ contains
 
        ! 3. Cold path: first time seeing this (layer_num, datatype)
        if (layer_idx == 0) then
-          if (ctx%num_unique_layers >= ctx%max_layers) return
+          if (ctx%num_unique_layers >= ctx%max_layers) then
+             ! Remember the skipped layer so it is reported and later boxes hit the table.
+             ctx%n_skipped = ctx%n_skipped + 1
+             if (ctx%n_skipped <= size(ctx%skip_layer)) then
+                ctx%skip_layer(ctx%n_skipped) = layer_num
+                ctx%skip_dtype(ctx%n_skipped) = datatype
+             end if
+             if (ctx%tab_idx(slot) == 0) then
+                ctx%tab_layer(slot) = layer_num
+                ctx%tab_dtype(slot) = datatype
+                ctx%tab_idx(slot)   = -1
+             end if
+             ctx%skipped_boxes = ctx%skipped_boxes + 1_int64
+             return
+          end if
           ctx%num_unique_layers = ctx%num_unique_layers + 1
           layer_idx = ctx%num_unique_layers
 
@@ -119,6 +138,10 @@ contains
           end block
        end if
 
+       if (layer_idx < 0) then
+          ctx%skipped_boxes = ctx%skipped_boxes + 1_int64
+          return
+       end if
        if (ctx%compact .and. ctx%part_boxes > 0_int64) then
           if (ctx%last_layer_idx > 0 .and. ctx%last_layer_idx /= layer_idx) &
                call LayerFinishParts(ctx%design%layers(ctx%last_layer_idx))
@@ -288,6 +311,24 @@ contains
     stream_enabled = .not. (evstat == 0 .and. evlen > 0 .and. ev(1:1) == '0')
   end function stream_enabled
 
+  !> Warn about layers dropped because the design already held max_layers layers.
+  subroutine report_skipped_layers(ctx)
+    type(ldb_load_ctx), intent(in) :: ctx
+    integer :: k
+    character(len=:), allocatable :: lst
+    character(len=32) :: one
+    if (ctx%n_skipped == 0) return
+    lst = ''
+    do k = 1, min(ctx%n_skipped, size(ctx%skip_layer))
+       write(one, '(I0,":",I0)') ctx%skip_layer(k), ctx%skip_dtype(k)
+       lst = lst // ' ' // trim(one)
+    end do
+    if (ctx%n_skipped > size(ctx%skip_layer)) lst = lst // ' ...'
+    write(*,'(A,I0,A,I0,A,I0,A)') 'WARNING: ', ctx%n_skipped, ' layer(s) not loaded (max_layers=', &
+         ctx%max_layers, ', ', ctx%skipped_boxes, ' boxes dropped; raise the max_layers argument):'
+    write(*,'(A,A)') 'WARNING:  ', lst
+  end subroutine report_skipped_layers
+
   subroutine trim_design_layers(d, n_layers)
     type(Design), intent(inout) :: d
     integer, intent(in)         :: n_layers
@@ -360,7 +401,15 @@ contains
        call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
        if (.not. c_associated(fh)) return
        if (present(compact)) ctx%compact = compact
-       rc = ldb_iterate_boxes_c(fh, cb, c_loc(ctx))
+       ! Flatten from the top cell(s): every placement (SREF/AREF, OASIS PLACEMENT with
+       ! repetitions, rotation, mirroring) is expanded. Iterating each cell's local boxes
+       ! (ldb_iterate_boxes) would drop all instantiated geometry and leave the child cells'
+       ! shapes untransformed at their origin. For a flat file both give the same boxes.
+       block
+         character(kind=c_char) :: topc(1)
+         topc(1) = c_null_char
+         rc = ldb_iterate_boxes_hier_c(fh, topc, -1_c_int, cb, c_loc(ctx))
+       end block
        call ldb_close_c(fh)
     end if
     if (ctx%compact .and. ctx%part_boxes > 0_int64) then
@@ -371,6 +420,7 @@ contains
     call trim_design_layers(load_design, ctx%num_unique_layers)
     if (ctx%compact .and. ctx%last_layer_idx > 0) call LayerCompact(load_design%layers(ctx%last_layer_idx))
     write(*,'(A,I0,A,A)') 'INFO: Loaded ', ctx%num_unique_layers, ' unique layers from ', trim(load_design%fileName)
+    call report_skipped_layers(ctx)
     do i = 1, ctx%num_unique_layers
        write(*,'(A,I0,A,A,A,I0,A)') '  Layer ', i, ': ', trim(load_design%layerNames(i)), &
             ' (', load_design%layers(i)%n_used + load_design%layers(i)%compact%n, ' boxes)'
@@ -399,6 +449,7 @@ contains
     if (ctx%compact .and. ctx%last_layer_idx > 0) call LayerCompact(load_design%layers(ctx%last_layer_idx))
     write(*,'(A,I0,A,A)') 'INFO: Hierarchically loaded ', ctx%num_unique_layers, &
          ' unique layers from ', trim(load_design%fileName)
+    call report_skipped_layers(ctx)
     do i = 1, ctx%num_unique_layers
        write(*,'(A,I0,A,A,A,I0,A)') '  Layer ', i, ': ', trim(load_design%layerNames(i)), &
             ' (', load_design%layers(i)%n_used + load_design%layers(i)%compact%n, ' boxes)'

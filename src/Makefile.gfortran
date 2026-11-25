@@ -81,8 +81,11 @@ gpu_morton.o: gpu_morton.cu
 
 # Any-angle exact kernel unit tests
 .PHONY: unit_test_anyangle
-unit_test_anyangle: test_wide_int.exe test_predicates.exe
+unit_test_anyangle: test_wide_int.exe test_predicates.exe test_measure.exe
 test_wide_int.exe: test_wide_int.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_predicates.exe: test_predicates.o $(LIBRARY)
 	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_measure.exe: test_measure.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)

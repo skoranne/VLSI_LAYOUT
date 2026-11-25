@@ -1,0 +1,21 @@
+# Rotation-invariance regression (regress/rotation/run_rotation.sh fills @FILE@ @TAG@ @TMP@).
+# Every quantity measured here is invariant under rotation of the input, so the run of a
+# rotated copy must reproduce the run of the unrotated design (exactly at multiples of
+# 90 degrees; within grid-snapping tolerance otherwise).
+# SkyWater 130 layers: diff 65/20, poly 66/20, li1 67/20, met1 68/20, met2 69/20,
+#                      licon 66/44, mcon 67/44
+# GROW/SIZE are omitted: their Manhattan corners are not rotation invariant.
+program ROT_@TAG@
+var temp_folder @TMP@/
+var temporary_layers 2
+decl design d1_input = @FILE@
+decl memory t1 = nothing
+exec init t1:nothing
+exec measure d1_input:65:20 d1_input:66:20 d1_input:67:20 d1_input:68:20 d1_input:69:20 d1_input:66:44 d1_input:67:44
+exec run t1:gate = d1_input:66:20 * d1_input:65:20
+exec run t1:sd = d1_input:65:20 ! d1_input:66:20
+exec run t1:polyli = d1_input:66:20 + d1_input:67:20
+exec run t1:pdxor = d1_input:66:20 ^ d1_input:65:20
+exec run t1:m1m2 = d1_input:68:20 * d1_input:69:20
+exec measure t1:gate t1:sd t1:polyli t1:pdxor t1:m1m2
+end

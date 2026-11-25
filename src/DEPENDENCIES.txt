@@ -1,4 +1,4 @@
-LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o device_registry.o compact_layer.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o \
+LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o device_registry.o compact_layer.o measure.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
 	   polygon_fracture.o boxmerge.o kldata.o design_impl.o design_boolean_impl.o design_topo_impl.o design_device_impl.o gpu_morton_sort.o\
@@ -40,7 +40,7 @@ device_registry.o: gpu_morton.o
 diskdesign_impl.o: design.o serialization.o box_codec.o snappy_apif.o utilities.o
 magparser.o: polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
 mainmagparser.o: magparser.o controlparser.o rpc_server.o
-controlparser.o: design.o band_exec.o layoutdb_loader.o trs_optimizer.o
+controlparser.o: design.o band_exec.o layoutdb_loader.o trs_optimizer.o measure.o
 compressed_spatial_index.o: commonmodule.o geometry.o morton.o box_codec.o snappy_apif.o compact_layer.o
 layout_files.o: geometry.o
 layoutdb_loader.o: layoutdb_f_api.o design.o geometry.o commonmodule.o hashtable.o compressed_spatial_index.o
@@ -63,3 +63,6 @@ test_compact_wire.o: compact_wire.o compact_layer.o geometry.o
 exact_predicates.o: wide_int.o
 test_wide_int.o: wide_int.o
 test_predicates.o: wide_int.o exact_predicates.o
+# Rotation-invariant layer measurements (exec measure)
+measure.o: geometry.o compact_layer.o
+test_measure.o: measure.o geometry.o

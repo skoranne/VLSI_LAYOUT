@@ -99,7 +99,7 @@ version_mod.f90: ../.git/HEAD ../.git/index
 
 unit_test: test_contour.exe test_morton.exe test_polygonfracture.exe test_boxmerge.exe \
 	   test_skiplist.exe test_compact_layer.exe test_viewer_index.exe \
-	   test_wide_int.exe test_predicates.exe
+	   test_wide_int.exe test_predicates.exe test_measure.exe
 
 clean:
 	rm -f *.o *.mod *.a *.exe
@@ -220,4 +220,7 @@ MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o viewer_tiles.o
 test_wide_int.exe: test_wide_int.o $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 test_predicates.exe: test_predicates.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_measure.exe: test_measure.o $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
