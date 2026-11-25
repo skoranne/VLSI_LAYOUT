@@ -256,3 +256,149 @@ extern "C" const char* ldb_top_cell_name(ldb_file_t* fh, int i){
     if(n==0 && i>=0 && i<(int)f->cells.size()) return f->cells[i].name.c_str();
     return nullptr;
 }
+
+// ---------------------------------------------------------------- cell view / layer summary
+extern "C" int ldb_is_hierarchical(ldb_file_t* fh){
+    auto* f=(LdbFile*)fh; if(!f) return 0;
+    for(auto& c: f->cells) if(!c.instances.empty()) return 1;
+    return 0;
+}
+
+static std::string resolve_cell(ldb_file_t* fh, const char* cell){
+    if(cell && cell[0]) return std::string(cell);
+    const char* t = ldb_top_cell_name(fh, 0);
+    return t ? std::string(t) : std::string();
+}
+
+extern "C" int64_t ldb_cell_placements(ldb_file_t* fh, const char* cell){
+    auto* f=(LdbFile*)fh; if(!f) return 0;
+    auto it = f->cell_index.find(resolve_cell(fh, cell));
+    if(it == f->cell_index.end()) return 0;
+    int64_t n = 0;
+    for(auto& in: f->cells[it->second].instances) n += std::max<int64_t>(1,in.tr.cols) * std::max<int64_t>(1,in.tr.rows);
+    return n;
+}
+
+extern "C" int ldb_iterate_cell_view(ldb_file_t* fh, const char* cell, ldb_box_cb cb, void* ud){
+    auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
+    std::string name = resolve_cell(fh, cell);
+    auto it = f->cell_index.find(name);
+    if(it == f->cell_index.end()) return -2;
+    auto& c = f->cells[it->second];
+    {
+        std::vector<LdbBoxElem> scratch;
+        for(auto& b : cell_boxes(c, scratch)) if(b.kind <= 2) cb(ud, name.c_str(), b.layer, b.datatype, b.kind, b.x1,b.y1,b.x2,b.y2);
+    }
+    std::unordered_map<std::string, ldb_extent_t> memo;
+    for(auto& in : c.instances){
+        ldb_extent_t e{0,0,0,0,0};
+        std::set<std::string> visiting;
+        if(!cell_extent_flat(f, in.ref_name, memo, visiting, e)) continue;
+        int64_t cols = std::max<int64_t>(1,in.tr.cols), rows = std::max<int64_t>(1,in.tr.rows);
+        for(int64_t r=0; r<rows; ++r) for(int64_t k=0; k<cols; ++k){
+            LdbTransform tr = in.tr; tr.cols=1; tr.rows=1;
+            tr.ox = in.tr.ox + k*in.tr.dx + r*in.tr.row_dx;
+            tr.oy = in.tr.oy + k*in.tr.dy + r*in.tr.row_dy;
+            int64_t x1,y1,x2,y2;
+            transform_bbox(tr, e.xmin,e.ymin,e.xmax,e.ymax, x1,y1,x2,y2);
+            cb(ud, in.ref_name.c_str(), LDB_INSTANCE_LAYER, 0, 3, x1,y1,x2,y2);
+        }
+    }
+    return 0;
+}
+
+typedef std::map<std::pair<int,int>, int64_t> LayerCount;
+static const LayerCount& flat_counts(LdbFile* f, const std::string& cname,
+                                     std::unordered_map<std::string, LayerCount>& memo,
+                                     std::set<std::string>& visiting){
+    static const LayerCount empty;
+    auto m = memo.find(cname);
+    if(m != memo.end()) return m->second;
+    auto it = f->cell_index.find(cname);
+    if(it == f->cell_index.end() || visiting.count(cname)) return empty;
+    visiting.insert(cname);
+    LayerCount cnt;
+    auto& c = f->cells[it->second];
+    {
+        std::vector<LdbBoxElem> scratch;
+        for(auto& b : cell_boxes(c, scratch)) if(b.kind <= 2) ++cnt[{b.layer,b.datatype}];
+    }
+    for(auto& in : c.instances){
+        int64_t mult = std::max<int64_t>(1,in.tr.cols) * std::max<int64_t>(1,in.tr.rows);
+        const LayerCount& ch = flat_counts(f, in.ref_name, memo, visiting);
+        for(auto& kv : ch) cnt[kv.first] += mult * kv.second;
+    }
+    visiting.erase(cname);
+    return memo[cname] = std::move(cnt);
+}
+
+extern "C" int ldb_layer_summary_hier(ldb_file_t* fh, const char* cell, ldb_layer_summary_cb cb, void* ud){
+    auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
+    std::string name = resolve_cell(fh, cell);
+    auto it = f->cell_index.find(name);
+    if(it == f->cell_index.end()) return -2;
+    std::unordered_map<std::string, LayerCount> memo;
+    std::set<std::string> visiting;
+    LayerCount flat = flat_counts(f, name, memo, visiting);
+    // own counts and the set of cells below `name`
+    LayerCount own;
+    {
+        std::vector<LdbBoxElem> scratch;
+        for(auto& b : cell_boxes(f->cells[it->second], scratch)) if(b.kind <= 2) ++own[{b.layer,b.datatype}];
+    }
+    std::set<std::string> below; std::vector<std::string> stack{name};
+    while(!stack.empty()){
+        std::string n = stack.back(); stack.pop_back();
+        if(!below.insert(n).second) continue;
+        auto ci = f->cell_index.find(n);
+        if(ci == f->cell_index.end()) continue;
+        for(auto& in : f->cells[ci->second].instances) stack.push_back(in.ref_name);
+    }
+    LayerCount ncells;
+    for(auto& n : below){
+        auto ci = f->cell_index.find(n);
+        if(ci == f->cell_index.end()) continue;
+        auto& lc = f->cells[ci->second];
+        for(auto& kv : lc.layer_ext) if(kv.second.valid) ++ncells[kv.first];
+    }
+    for(auto& kv : flat){
+        auto o = own.find(kv.first); auto nc = ncells.find(kv.first);
+        cb(ud, kv.first.first, kv.first.second, o==own.end()?0:o->second, kv.second, nc==ncells.end()?0:nc->second);
+    }
+    return 0;
+}
+
+extern "C" int ldb_iterate_placements(ldb_file_t* fh, const char* cell, ldb_placement_cb cb, void* ud){
+    auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
+    std::string name = resolve_cell(fh, cell);
+    auto it = f->cell_index.find(name);
+    if(it == f->cell_index.end()) return -2;
+    auto& c = f->cells[it->second];
+    std::unordered_map<std::string, ldb_extent_t> memo;
+    for(auto& in : c.instances){
+        ldb_extent_t e{0,0,0,0,0};
+        std::set<std::string> visiting;
+        if(!cell_extent_flat(f, in.ref_name, memo, visiting, e)) e = ldb_extent_t{0,0,0,0,1};
+        int64_t cols = std::max<int64_t>(1,in.tr.cols), rows = std::max<int64_t>(1,in.tr.rows);
+        for(int64_t r=0; r<rows; ++r) for(int64_t k=0; k<cols; ++k){
+            LdbTransform tr = in.tr; tr.cols=1; tr.rows=1;
+            tr.ox = in.tr.ox + k*in.tr.dx + r*in.tr.row_dx;
+            tr.oy = in.tr.oy + k*in.tr.dy + r*in.tr.row_dy;
+            int64_t x1,y1,x2,y2;
+            transform_bbox(tr, e.xmin,e.ymin,e.xmax,e.ymax, x1,y1,x2,y2);
+            cb(ud, in.ref_name.c_str(), in.name.c_str(), tr.ox, tr.oy, tr.angle_deg, tr.mirror_x, tr.mag,
+               e.xmin,e.ymin,e.xmax,e.ymax, x1,y1,x2,y2);
+        }
+    }
+    return 0;
+}
+
+extern "C" int ldb_placement_properties(ldb_file_t* fh, const char* cell, int64_t index, ldb_kv_cb cb, void* ud){
+    auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
+    auto it = f->cell_index.find(resolve_cell(fh, cell));
+    if(it == f->cell_index.end()) return -2;
+    auto& c = f->cells[it->second];
+    if(index < 0 || index >= (int64_t)c.instances.size()) return -3;
+    for(auto& kv : c.instances[(size_t)index].props) cb(ud, kv.first.c_str(), kv.second.c_str());
+    return 0;
+}

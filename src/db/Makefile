@@ -19,7 +19,7 @@ LDFLAGS += $(NVCOMP_LDLIBS) $(NVCOMP_CUDART) -pthread
 CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp gdsii.cpp oasis.cpp oasis_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp oasis_tables.cpp oasis_sidecar.cpp prop_oasis_writer.cpp def_probe.cpp
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
 
-TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent bin2oas db_oasinfo db_mvi
+TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent bin2oas db_oasinfo db_mvi db_defcheck db_def2oas
 
 all: $(TESTS) liblayoutdb.a liblayoutdb.so
 
@@ -35,6 +35,13 @@ liblayoutdb.so: $(CORE_OBJS)
 
 db_mvi: db_mvi.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+# DEF/DEF.gz (+ LEF) vs layout cross-check (regressions/defcheck_mkALU.sh)
+db_defcheck: db_defcheck.cpp def_reader.hpp $(CORE_OBJS)
+	$(CXX) $(CXXFLAGS) $(filter %.cpp %.o %.a,$^) -o $@ $(LDFLAGS)
+
+db_def2oas: db_def2oas.cpp def_reader.hpp oasis_codec.hpp $(CORE_OBJS)
+	$(CXX) $(CXXFLAGS) $(filter %.cpp %.o %.a,$^) -o $@ $(LDFLAGS)
 
 db_oasinfo: db_oasinfo.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)

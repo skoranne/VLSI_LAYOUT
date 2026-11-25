@@ -121,6 +121,66 @@ db_mvi bench file.oas [frac] [n]             # random windows: units touched, de
 
 Run the tests with `julia --project=julia/LayoutDB -e 'using Pkg; Pkg.test()'`. Set `LAYOUTDB_TEST_OAS=flat_strict.oas` to add a real design. JuliaXLS uses this package through `bsc_julia/src/PhysicalImplementation/layout_io.jl`. `ENV["LAYOUTDB_LIB"]` overrides the library path.
 
+## db_defcheck: layout vs DEF (+ LEF) cross-check
+
+`db_defcheck [--lef F]... [--stack SPEC] [--top CELL] design.def[.gz] layout.{oas,gds}`
+
+This tool checks that a layout really is the DEF it was generated from. It reads the DEF
+through zlib (`gzopen`/`gzread`), so a `.def.gz` is read as it stands and plain files work
+the same way. It keeps only the COMPONENTS list in memory; it turns every routing shape into
+probes and rectangles as it reads.
+
+- **DIE**: DIEAREA must equal the top cell's boundary (`--boundary`, default 235/4).
+- **COMPONENTS**: each placed component must match a top-cell instance with the same cell,
+  lower-left corner of the LEF SIZE box and orientation (N/S/E/W/FN/FS/FE/FW map to GDS
+  mirror + rotation). The comparison runs in both directions. The check is skipped when the
+  cell sizes are unknown.
+- **ROUTING**: every wire (end points, mid point, inset corners), via (rectangles from DEF
+  VIAS, which can be generated from a VIARULE, or from a LEF VIA; otherwise the stack rule),
+  RECT, `+ RECT`/`+ POLYGON` and PIN shape must land on top-cell geometry of its layer.
+- **XOR**: the DEF geometry, rebuilt from the tech LEF wire widths, is XORed per layer with
+  the top cell using a union-area sweep over 50 µm tiles. Differing tiles are refined to
+  windows of about 1 µm for the report.
+- **LEF**: every PIN/OBS RECT of each LEF macro the layout uses must be covered by that
+  cell's own geometry on the drawing datatype.
+
+The layer stack defaults to SKY130 (`li1:67/20:67/16 mcon:67/44 met1:68/20:68/16 ... met5:72/20:72/16`).
+On mkALU (301k cells, 2.4 M DEF lines) it takes about 19 s and 0.9 GB with an OASIS input.
+Regression: `regressions/defcheck_mkALU.sh`.
+
+## db_def2oas: DEF -> OASIS keeping names and DEF properties
+
+`db_def2oas [--lef F]... [--cells lib.{oas,gds}]... [--stack SPEC] [--boundary L/D] [--no-net-props] [--no-conns] [--no-cblock] design.def[.gz] out.oas`
+
+The tool shares its DEF/LEF reader (`def_reader.hpp`) with db_defcheck. It writes a
+hierarchical OASIS. Standard cells are copied from `--cells`; macros missing there get a LEF
+abstract (boundary plus PIN/OBS rectangles). The top cell holds one PLACEMENT per component,
+plus the routing, vias, RECTs and pins as rectangles, plus DIEAREA on the boundary layer.
+The OASIS keeps the following names and properties, and KLayout reads all of them:
+
+- **Placements**:
+  - `S_GDS_PROPERTY` (61, component name): the attribute KLayout and Magic use for
+    instance names. MAGVIEWER's hover line shows it.
+  - `DEF_STATUS` FIXED/COVER.
+  - `DEF_ATTR` (SOURCE, WEIGHT, HALO, ... clauses).
+  - `DEF_PROPERTY` (name, value pairs).
+- **Shapes**: `DEF_NET` on every routing, via, RECT and pin shape; `DEF_PIN` on pin shapes. Pin
+  names are also written as TEXT on the pin datatype. Shapes are grouped by layer, then net,
+  so a repeated net name costs one byte (PROPERTY-REPEAT).
+- **Top cell**:
+  - `DEF_NET_INFO`: one tab-separated value per net (name, SPECIAL/REGULAR, `+` clauses,
+    connections), including nets that have no routing.
+  - `DEF_PIN_INFO`.
+  - `DEF_ROW`, `DEF_TRACKS`, `DEF_GCELLGRID`, `DEF_PROPERTYDEFINITIONS`, `DEF_VERSION`, ...
+  - Sections that are not modelled (REGIONS, GROUPS, BLOCKAGES, FILLS, ...), verbatim.
+  - `DEF_UNITS`.
+
+On mkALU (301k components, 91k nets) the conversion takes 8 s and 0.9 GB and writes 26 MB.
+The result passes db_defcheck, including a 0 XOR on all 15 layers. A KLayout XOR against
+the OpenLane `mkALU.oas` is 0 on every layer except 81/14: that is a marker box the P&R
+flow adds and is not in the DEF.
+Regression: `regressions/def2oas_mkALU.sh [--klayout-xor]`.
+
 ## MPW_MERGE: multi-project-wafer shuttle assembly
 
 `MPW_MERGE` combines the per-slot OASIS files of an MPW shuttle into one OASIS

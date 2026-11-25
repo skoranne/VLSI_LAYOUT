@@ -27,6 +27,12 @@
 !  nothing is loaded up front; zoomed out the view is drawn from the density pyramid, zoomed
 !  in from CBLOCKs decoded on demand (viewer_tiles.f90).
 !  Headless load/query check without a display: test_viewer_index.exe, or --headless.
+!  Hierarchical files (OASIS/GDS with placements) open in CELL VIEW: the top cell's own shapes,
+!  each placement as an outline (layer INSTANCES) with a right-triangle marker at its origin
+!  whose legs show the transform (R0..R270, MX..), and a hover line with the placement's
+!  instance name (S_GDS_PROPERTY 61, e.g. the DEF component from db_def2oas), cell, origin and
+!  orientation ('i' prints it). Layers that only occur inside cells are listed "(in cells)".
+!  CLI: --flatten (expand the hierarchy while reading), --cell NAME (view another cell).
 
 module DrawUsingOpenGL
   use, intrinsic :: iso_fortran_env, only: int8, int32, int64, real64
@@ -37,8 +43,14 @@ module DrawUsingOpenGL
   use SystemInformationModule,      only: ReadProcessMemoryUsage
   use ViewerFontModule,             only: FONT_BITS, FONT_W, FONT_H
   use ViewerTileSourceModule,       only: TiledLayout
+  use LayoutDBLoaderModule,         only: LayoutPlacements, PlacementAt, OrientName
   implicit none
   private
+
+  !> Cell view of a hierarchical file: the viewed cell's placements (orientation markers,
+  !> hover); null otherwise. hover = placement under the cursor (0: none).
+  type(LayoutPlacements), pointer, public :: placements => null()
+  integer(int64) :: hover = 0_int64
 
   !> Sidecar-backed geometry source (flat OASIS); null when layers come from indices.
   type(TiledLayout), pointer, public :: tiled => null()
@@ -256,6 +268,8 @@ module DrawUsingOpenGL
   integer(c_int), parameter :: GL_COLOR_BUFFER_BIT    = int(z'00004000', c_int)
   integer(c_int), parameter :: GL_QUADS               = int(z'00000007', c_int)
   integer(c_int), parameter :: GL_LINES               = int(z'00000001', c_int)
+  integer(c_int), parameter :: GL_LINE_LOOP           = int(z'00000002', c_int)
+  integer(c_int), parameter :: GL_TRIANGLES           = int(z'00000004', c_int)
   integer(c_int), parameter :: GL_PROJECTION          = int(z'1701', c_int)
   integer(c_int), parameter :: GL_MODELVIEW           = int(z'1700', c_int)
   integer(c_int), parameter :: GL_VERTEX_ARRAY        = int(z'8074', c_int)
@@ -281,6 +295,7 @@ module DrawUsingOpenGL
   integer(c_int), parameter :: GLFW_KEY_F             = 70_c_int
   integer(c_int), parameter :: GLFW_KEY_G             = 71_c_int
   integer(c_int), parameter :: GLFW_KEY_H             = 72_c_int
+  integer(c_int), parameter :: GLFW_KEY_I             = 73_c_int
   integer(c_int), parameter :: GLFW_KEY_O             = 79_c_int
   integer(c_int), parameter :: GLFW_KEY_P             = 80_c_int
   integer(c_int), parameter :: GLFW_KEY_Q             = 81_c_int
@@ -303,7 +318,7 @@ module DrawUsingOpenGL
   integer(c_int), parameter :: K_HEADER_H  = 22_c_int
   integer(c_int), parameter :: K_STATUS_H  = 18_c_int
 
-  integer, parameter :: K_NHELP = 27
+  integer, parameter :: K_NHELP = 29
   character(len=80), parameter :: HELP_LINES(K_NHELP) = [character(len=80) :: &
        'MAGVIEWER keys', &
        '  arrows                 pan (hold)', &
@@ -321,6 +336,7 @@ module DrawUsingOpenGL
        '  g                      performance HUD on / off', &
        '  p                      print performance report to the terminal', &
        '  /                      print cursor position (um and database units)', &
+       '  i                      print the placement under the cursor (cell view)', &
        '  h                      key map overlay on / off', &
        '  ?                      print this key map to the terminal', &
        '  q or Esc               quit', &
@@ -331,6 +347,7 @@ module DrawUsingOpenGL
        'Env: MAGVIEWER_SIZE=WxH  MAGVIEWER_SCREENSHOT=f.ppm  MAGVIEWER_BENCH=1', &
        '     MAGVIEWER_COMPACT=0 (legacy chunks)', &
        'Layer names: OASIS LAYERNAME table when present, else layer/datatype.', &
+       'Cell view: triangle at each placement origin, long leg = +x, short = +y.', &
        '']
 
   type :: Point2D
@@ -368,6 +385,7 @@ module DrawUsingOpenGL
      integer                                :: vbo_count   = 0
      logical                                :: cache_valid = .false.
      logical                                :: density     = .false.  ! drawn from the density image
+     logical                                :: outline_only = .false. ! placement outlines (cell view)
    contains
      procedure :: destroy => drawn_layer_destroy
   end type DrawnLayer
@@ -389,6 +407,7 @@ module DrawUsingOpenGL
      real(real64)       :: frame_ms(K_RING) = 0.0_real64, query_ms(K_RING) = 0.0_real64, &
                            draw_ms(K_RING) = 0.0_real64
      integer(int64)     :: boxes_drawn = 0
+     character(len=128) :: view = ''   ! hierarchical files: 'CELL <name>' or 'FLAT <name>'
   end type ViewerStats
   type(ViewerStats), public :: vstats
 
@@ -727,6 +746,12 @@ contains
 
        call glVertexPointer(2_c_int, GL_INT, 0_c_int, c_loc(layers(i)%vbo_verts(1)))
 
+       if (layers(i)%outline_only .and. .not. tree_mode) then
+          call glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+          call glColor4f(layers(i)%color(1), layers(i)%color(2), layers(i)%color(3), 0.9_c_float)
+          call glDrawArrays(GL_QUADS, 0_c_int, int(layers(i)%vbo_count * 4, c_int))
+          cycle
+       end if
        call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
        if (tree_mode) then
           call glColor4f(layers(i)%color(1), layers(i)%color(2), layers(i)%color(3), 0.75_c_float)
@@ -753,7 +778,100 @@ contains
     end do
     call glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
     call glDisableClientState(GL_VERTEX_ARRAY)
+    if (associated(placements)) then
+       if (any(layers(1:n_layers)%outline_only .and. layers(1:n_layers)%visible)) call RenderPlacementMarkers(cam)
+    end if
   end subroutine RenderMainViewport
+
+  !> Placement (0,0) markers: a right triangle in the placed cell's coordinates with the long
+  !> leg on +x and the short leg on +y, transformed with the placement, so R90 / MX / ... can
+  !> be read off it. Drawn when the marker is at least 4 pixels; the hovered placement is
+  !> outlined.
+  subroutine RenderPlacementMarkers(cam)
+    type(CameraState), intent(in) :: cam
+    type(Box) :: v
+    integer(int64) :: gx0, gx1, gy0, gy1, gx, gy, b, k, i, bxi, byi, drawn
+    real(c_double) :: a
+    real(c_float) :: px(3), py(3)
+    integer :: o
+    integer, parameter :: K_MAX_MARKERS = 200000
+    v = cam%to_view_box()
+    associate(pl => placements)
+      if (pl%n <= 0_int64) return
+      gx0 = max(0_int64, (int(v%x1, int64) - pl%gx0) / pl%gs)
+      gy0 = max(0_int64, (int(v%y1, int64) - pl%gy0) / pl%gs)
+      gx1 = min(int(pl%gnx - 1, int64), (int(v%x2, int64) - pl%gx0) / pl%gs)
+      gy1 = min(int(pl%gny - 1, int64), (int(v%y2, int64) - pl%gy0) / pl%gs)
+      drawn = 0
+      call glColor4f(1.0_c_float, 0.85_c_float, 0.2_c_float, 0.55_c_float)
+      call glBegin(GL_TRIANGLES)
+      outer: do gy = gy0, gy1
+         do gx = gx0, gx1
+            b = gy * pl%gnx + gx + 1
+            do k = pl%gstart(b), pl%gstart(b + 1) - 1
+               i = pl%gitems(k)
+               ! a placement spans several buckets: draw it from the first one in view only
+               bxi = max(gx0, (pl%bx1(i) - pl%gx0) / pl%gs)
+               byi = max(gy0, (pl%by1(i) - pl%gy0) / pl%gs)
+               if (bxi /= gx .or. byi /= gy) cycle
+               a = real(pl%tri(i), c_double)
+               if (a < 4.0_c_double * cam%zoom) cycle
+               o = int(pl%orient(i))
+               if (o < 0) cycle
+               call marker_xy(o, 0.0_c_double, 0.0_c_double, px(1), py(1))
+               call marker_xy(o, a, 0.0_c_double, px(2), py(2))
+               call marker_xy(o, 0.0_c_double, 0.5_c_double * a, px(3), py(3))
+               px = px + real(pl%ox(i), c_float); py = py + real(pl%oy(i), c_float)
+               call glVertex2f(px(1), py(1)); call glVertex2f(px(2), py(2)); call glVertex2f(px(3), py(3))
+               drawn = drawn + 1
+               if (drawn >= K_MAX_MARKERS) exit outer
+            end do
+         end do
+      end do outer
+      call glEnd()
+      if (hover > 0_int64 .and. hover <= pl%n) then
+         i = hover
+         call glLineWidth(2.0_c_float)
+         call glColor4f(0.3_c_float, 1.0_c_float, 1.0_c_float, 1.0_c_float)
+         call glBegin(GL_LINE_LOOP)
+         call glVertex2f(real(pl%bx1(i), c_float), real(pl%by1(i), c_float))
+         call glVertex2f(real(pl%bx2(i), c_float), real(pl%by1(i), c_float))
+         call glVertex2f(real(pl%bx2(i), c_float), real(pl%by2(i), c_float))
+         call glVertex2f(real(pl%bx1(i), c_float), real(pl%by2(i), c_float))
+         call glEnd()
+         call glLineWidth(1.0_c_float)
+      end if
+    end associate
+  contains
+    !> (x, y) in the placed cell -> offset in the parent: mirror about x first, then rotate.
+    subroutine marker_xy(code, x, y, ox, oy)
+      integer, intent(in) :: code
+      real(c_double), intent(in) :: x, y
+      real(c_float), intent(out) :: ox, oy
+      real(c_double) :: yy
+      yy = merge(-y, y, code >= 4)
+      select case (mod(code, 4))
+      case (0); ox = real(x, c_float);   oy = real(yy, c_float)
+      case (1); ox = real(-yy, c_float); oy = real(x, c_float)
+      case (2); ox = real(-x, c_float);  oy = real(-yy, c_float)
+      case default; ox = real(yy, c_float); oy = real(-x, c_float)
+      end select
+    end subroutine marker_xy
+  end subroutine RenderPlacementMarkers
+
+  !> One line describing placement i (hover line, 'i' key).
+  function placement_line(i) result(line)
+    integer(int64), intent(in) :: i
+    character(len=320) :: line
+    character(len=64) :: nm
+    associate(pl => placements)
+      nm = pl%inst(i)
+      if (len_trim(nm) == 0) nm = '(unnamed)'
+      write(line, '(A,A,A,A,A,F0.3,A,F0.3,A,A)') 'placement ', trim(nm), '  cell ', &
+           trim(pl%cell_names(pl%cell(i))), '  at (', real(pl%ox(i), real64) / vstats%unit_per_um, ', ', &
+           real(pl%oy(i), real64) / vstats%unit_per_um, ') um  ', trim(OrientName(int(pl%orient(i))))
+    end associate
+  end function placement_line
 
   !> 'D' density, 'G' geometry (sidecar mode), 'I' index.
   character(len=1) function bench_mode()
@@ -935,8 +1053,15 @@ contains
     if (associated(tiled)) then
        if (.not. tiled%geometry) line = trim(line) // ' | density'
     end if
+    if (len_trim(vstats%view) > 0) line = trim(line) // ' | ' // trim(vstats%view)
     call glColor3f(0.9_c_float, 0.9_c_float, 0.6_c_float)
     call draw_text(6.0, 3.0, trim(adjustl(line)))
+    if (associated(placements) .and. hover > 0_int64 .and. in_view) then
+       call glColor4f(0.0_c_float, 0.0_c_float, 0.0_c_float, 0.70_c_float)
+       call fill_rect(0.0, real(K_STATUS_H), real(main_width), real(2 * K_STATUS_H))
+       call glColor3f(0.4_c_float, 1.0_c_float, 1.0_c_float)
+       call draw_text(6.0, real(K_STATUS_H) + 3.0, trim(placement_line(hover)))
+    end if
 
     if (show_hud) then
        call ring_stats(vstats%frame_ms, vstats%frames, fa, fp)
@@ -1112,6 +1237,7 @@ contains
        layers(idx)%color(1) = 0.55_c_float + 0.45_c_float * sin(real(idx, c_float) * 2.39996_c_float)
        layers(idx)%color(2) = 0.55_c_float + 0.45_c_float * sin(real(idx, c_float) * 2.39996_c_float + 2.09_c_float)
        layers(idx)%color(3) = 0.55_c_float + 0.45_c_float * sin(real(idx, c_float) * 2.39996_c_float + 4.18_c_float)
+       if (layers(idx)%outline_only) layers(idx)%color = [0.80_c_float, 0.80_c_float, 0.80_c_float]
        layers(idx)%visible     = .true.
        layers(idx)%cache_valid = .false.
        call layers(idx)%chunk_cache%init(K_CSI_DEFAULT_CACHE)
@@ -1121,7 +1247,8 @@ contains
     if (glfwInit() == 0_c_int) error stop 'Error whilst initialising GLFW (is DISPLAY set?)'
     call viewer_context_hints()
 
-    window = glfwCreateWindow(win_w0, win_h0, 'MAGVIEWER - ' // trim(vstats%file) // c_null_char, &
+    window = glfwCreateWindow(win_w0, win_h0, 'MAGVIEWER - ' // trim(vstats%file) // &
+         trim(merge(' - ' // vstats%view, repeat(' ', len(vstats%view) + 3), len_trim(vstats%view) > 0)) // c_null_char, &
          c_null_ptr, c_null_ptr)
     if (.not. c_associated(window)) then
        call glfwTerminate()
@@ -1240,6 +1367,12 @@ contains
                 show_hud = .not. show_hud
              case (GLFW_KEY_H)
                 show_help = .not. show_help
+             case (GLFW_KEY_I)
+                if (associated(placements) .and. hover > 0_int64) then
+                   write(*,'(A,A)') 'MAGVIEWER: ', trim(placement_line(hover))
+                else
+                   write(*,'(A)') 'MAGVIEWER: no placement under the cursor'
+                end if
              case (GLFW_KEY_P)
                 call PrintPerfReport(n_layers, layers)
              case (GLFW_KEY_PAGE_UP)
@@ -1315,6 +1448,9 @@ contains
        if (cam%zoom > max_zoom) cam%zoom = max_zoom
        call cam%update_bounds()
        call cam%screen_to_world(msv, mouse_world)
+       hover = 0_int64
+       if (associated(placements) .and. in_view) &
+            hover = PlacementAt(placements, int(mouse_world%x, int64), int(mouse_world%y, int64))
 
        ! --- query (index -> vertex buffers) ---
        tq0 = wall_seconds()
@@ -1395,11 +1531,12 @@ program magviewer
   use, intrinsic :: iso_fortran_env, only: int64, real64
   use, intrinsic :: iso_c_binding,   only: c_int
   use DrawUsingOpenGL,              only: DrawnLayer, SimpleWindow, UpdateVisibleLayerCaches, K_MAX_OPENGL_CAPACITY, &
-                                          vstats, PrintKeyMap, wall_seconds, tiled
+                                          vstats, PrintKeyMap, wall_seconds, tiled, placements
   use LayoutFilesModule,            only: OasisTables, SidecarLayer
   use ViewerTileSourceModule,       only: TiledLayout
   use CompressedSpatialIndexModule, only: CompressedSpatialIndex, K_CSI_DEFAULT_CACHE
-  use LayoutDBLoaderModule,         only: LoadLayoutDBToCompressedIndex, viewer_last_read_s, viewer_last_index_s
+  use LayoutDBLoaderModule,         only: LoadLayoutDBToCompressedIndex, viewer_last_read_s, viewer_last_index_s, &
+                                          LayoutViewInfo, PrintLayoutViewInfo, LayoutPlacements
   use DesignModule,                 only: Design, Layer, DESIGN_DIRECTION_INPUT, RestoreSnapToLayer, &
                                           ClearLayer, DeleteDesign
   use GeometryModule,               only: Box
@@ -1431,6 +1568,12 @@ program magviewer
   character(len=64), allocatable :: layer_names(:)
   type(DrawnLayer), allocatable  :: drawn_layers(:)
   type(Box) :: global_mbr, zoom_view
+  type(LayoutViewInfo) :: vinfo
+  type(LayoutPlacements), target :: pls
+  character(len=256)   :: view_cell
+  integer, allocatable :: order(:)
+  type(CompressedSpatialIndex), allocatable, target :: empty_idx(:)
+  integer :: n_extra, n_total, ia, ib
   integer(K_COORDINATE_KIND) :: cx, cy, qw, qh, min_span
 
   call system_clock(count_rate=clock_rate)
@@ -1439,7 +1582,11 @@ program magviewer
   narg = command_argument_count()
   if (narg < 1) then
      write(*,'(A)') 'Usage: MAGVIEWER.exe <layout.mag|layout.gds|layout.oas|layer.bin|layer.snap> ' // &
-          '[max_layers] [--hier] [--info|--headless] [--keys]'
+          '[max_layers] [--flatten] [--cell NAME] [--info|--headless] [--keys]'
+     write(*,'(A)') '  GDS/OASIS with placements open as a cell view of the top cell (its own shapes,' // &
+          ' placements as outlines);'
+     write(*,'(A)') '  --flatten (alias --hier, -H) expands the hierarchy while reading; --cell NAME' // &
+          ' views (or flattens from) another cell.'
      stop 1
   end if
 
@@ -1447,13 +1594,27 @@ program magviewer
   max_layers    = 256
   use_hier      = .false.
   headless_info = .false.
+  view_cell     = ''
 
-  do iarg = 1, narg
+  iarg = 0
+  do while (iarg < narg)
+     iarg = iarg + 1
      call get_command_argument(iarg, arg, status=ios)
      if (ios /= 0) cycle
+     if (arg(1:7) == '--cell=') then
+        view_cell = arg(8:)
+        cycle
+     end if
      select case (trim(arg))
-     case ('--hier', '-H')
+     case ('--flatten', '-flatten', '--flat', '--hier', '-H')
         use_hier = .true.
+     case ('--cell', '-cell')
+        iarg = iarg + 1
+        call get_command_argument(iarg, view_cell, status=ios)
+        if (ios /= 0 .or. len_trim(view_cell) == 0) then
+           write(*,'(A)') 'ERROR: --cell needs a cell name'
+           stop 2
+        end if
      case ('--info', '--headless')
         headless_info = .true.
      case ('--keys', '-?', '--help')
@@ -1513,7 +1674,7 @@ program magviewer
   call global_mbr%reset_to_infinity()
 
   ! Flat OASIS: open through the sidecar index (density pyramid + on-demand CBLOCK decode).
-  use_sidecar = vstats%format == 'OASIS' .and. .not. use_hier
+  use_sidecar = vstats%format == 'OASIS' .and. .not. use_hier .and. len_trim(view_cell) == 0
   call get_environment_variable('MAGVIEWER_SIDECAR', envv, envl, envs)
   if (envs == 0 .and. envl > 0) use_sidecar = use_sidecar .and. envv(1:1) /= '0'
   if (use_sidecar) then
@@ -1555,12 +1716,21 @@ program magviewer
      call ClearLayer(single_layer)
   else if (is_layoutdb) then
      if (use_hier) then
-        write(*,'(A,A)') 'INFO: MAGVIEWER loading GDS/OASIS (hierarchical compressed index): ', trim(filename)
+        write(*,'(A,A)') 'INFO: MAGVIEWER loading GDS/OASIS (flattening the hierarchy): ', trim(filename)
      else
         write(*,'(A,A)') 'INFO: MAGVIEWER loading GDS/OASIS (native compressed index): ', trim(filename)
      end if
      call LoadLayoutDBToCompressedIndex(trim(filename), max_layers, use_hier, &
-          indices, layer_names, num_layers, global_mbr)
+          indices, layer_names, num_layers, global_mbr, view_cell=view_cell, info=vinfo, placements=pls)
+     if (pls%n > 0_int64) placements => pls
+     call PrintLayoutViewInfo(vinfo)
+     if (vinfo%hierarchical) then
+        if (vinfo%flattened) then
+           vstats%view = 'FLAT ' // trim(vinfo%cell)
+        else
+           vstats%view = 'CELL ' // trim(vinfo%cell) // ' (placements as outlines, --flatten to expand)'
+        end if
+     end if
      vstats%read_s  = viewer_last_read_s
      vstats%index_s = viewer_last_index_s
   else
@@ -1595,30 +1765,55 @@ program magviewer
   total_uncomp_b = 0_int64
   call global_mbr%reset_to_infinity()
 
-  allocate(drawn_layers(max(1, num_layers)))
-  do i = 1, num_layers
-     drawn_layers(i)%name    = trim(layer_names(i))
-     drawn_layers(i)%label   = trim(layer_names(i))
-     ! Layer label: OASIS LAYERNAME when present, else layer/datatype (from names like L67_D20).
-     if (parse_ld(layer_names(i), ll, dd)) then
+  ! Cell view of a hierarchical file: layers that occur only inside placed cells get an
+  ! (empty) row, so the list shows every layer of the design, marked "in cells".
+  n_extra = 0
+  n_total = num_layers
+  if (vinfo%hierarchical .and. .not. vinfo%flattened .and. .not. associated(tiled)) then
+     j = 0      ! counted aside: layer_index_of bounds its search by n_total - n_extra
+     do k = 1, vinfo%n
+        if (layer_index_of(vinfo%layer(k), vinfo%dtype(k)) == 0) j = j + 1
+     end do
+     n_extra = j
+  end if
+  n_total = num_layers + n_extra
+  allocate(empty_idx(max(1, n_extra)), order(max(1, n_total)))
+  ! rows in layer/datatype order (INSTANCES last); the sidecar keeps its own order
+  do i = 1, n_total
+     order(i) = i
+  end do
+  if (.not. associated(tiled)) then
+     do i = 2, n_total
+        j = order(i)
+        k = i - 1
+        do while (k >= 1)
+           if (.not. row_before(j, order(k))) exit
+           order(k + 1) = order(k)
+           k = k - 1
+        end do
+        order(k + 1) = j
+     end do
+  end if
+
+  allocate(drawn_layers(max(1, n_total)))
+  do ia = 1, n_total
+     ib = order(ia)
+     if (ib > num_layers) then
+        call extra_layer(ib - num_layers, ll, dd)
+        write(drawn_layers(ia)%name, '(A,I0,A,I0)') 'L', ll, '_D', dd
         lname = tables%layer_name(int(ll, int64), int(dd, int64))
-        write(drawn_layers(i)%label, '(I0,A,I0)') ll, '/', dd
-        if (len_trim(lname) > 0) drawn_layers(i)%label = trim(lname) // '  ' // trim(drawn_layers(i)%label)
-     end if
-     drawn_layers(i)%index   => indices(i)
-     drawn_layers(i)%visible = .true.
-     if (associated(tiled)) then
-        sl = tiled%layer(i)
-        total_boxes = total_boxes + sl%count
-     else if (.not. indices(i)%is_empty()) then
-        total_boxes    = total_boxes    + indices(i)%n_boxes
-        total_tree_b   = total_tree_b   + indices(i)%tree_bytes()
-        total_chunk_b  = total_chunk_b  + indices(i)%chunk_bytes()
-        total_comp_b   = total_comp_b   + indices(i)%memory_bytes()
-        total_uncomp_b = total_uncomp_b + indices(i)%uncompressed_bytes()
-        global_mbr     = global_mbr     + indices(i)%layer_mbr
+        write(drawn_layers(ia)%label, '(I0,A,I0,A)') ll, '/', dd, '  (in cells)'
+        if (len_trim(lname) > 0) drawn_layers(ia)%label = trim(lname) // '  ' // trim(drawn_layers(ia)%label)
+        drawn_layers(ia)%index => empty_idx(ib - num_layers)
+        drawn_layers(ia)%visible = .true.
      end if
   end do
+  do ia = 1, n_total
+     i = order(ia)
+     if (i > num_layers) cycle
+     call fill_row(ia, i)
+  end do
+  num_layers = n_total
 
   if (associated(tiled)) global_mbr = tiled%mbr()
   if (total_comp_b > 0_int64) then
@@ -1640,6 +1835,10 @@ program magviewer
   write(*,'(A,F8.2,A,F8.2,A)') 'INFO: Process Memory: VmSize=', real(vm_kb, real64) / 1024.0_real64, &
        ' MB | VmRSS=', real(rss_kb, real64) / 1024.0_real64, ' MB'
 
+  write(*,'(A)') 'INFO: layer list (as shown in the viewer):'
+  do i = 1, num_layers
+     write(*,'(A,I4,2X,A)') '  ', i, trim(drawn_layers(i)%label)
+  end do
   if (headless_info) then
      do i = 1, num_layers
         call drawn_layers(i)%chunk_cache%init(K_CSI_DEFAULT_CACHE)
@@ -1701,7 +1900,7 @@ program magviewer
 
      do i = 1, num_layers
         call drawn_layers(i)%destroy()
-        call indices(i)%destroy()
+        if (i <= size(indices)) call indices(i)%destroy()
      end do
      stop 0
   end if
@@ -1711,18 +1910,94 @@ program magviewer
   if (vstats%read_s <= 0.0_real64) vstats%read_s = t_load_s
   vstats%total_boxes = total_boxes
   vstats%index_mb = real(total_comp_b, real64) / 1048576.0_real64
-  write(*,'(A)') 'INFO: layers:'
-  do i = 1, num_layers
-     write(*,'(A,I4,2X,A)') '  ', i, trim(drawn_layers(i)%label)
-  end do
 
   call SimpleWindow(num_layers, drawn_layers, 1600.0, 900.0)
 
-  do i = 1, num_layers
+  do i = 1, size(indices)
      call indices(i)%destroy()
   end do
 
 contains
+
+  !> One loaded layer (loader index i) into layer-list row ia.
+  subroutine fill_row(ia, i)
+    integer, intent(in) :: ia, i
+    drawn_layers(ia)%name    = trim(layer_names(i))
+    drawn_layers(ia)%label   = trim(layer_names(i))
+    ! Layer label: OASIS LAYERNAME when present, else layer/datatype (from names like L67_D20).
+    if (parse_ld(layer_names(i), ll, dd)) then
+       lname = tables%layer_name(int(ll, int64), int(dd, int64))
+       write(drawn_layers(ia)%label, '(I0,A,I0)') ll, '/', dd
+       if (len_trim(lname) > 0) drawn_layers(ia)%label = trim(lname) // '  ' // trim(drawn_layers(ia)%label)
+    else if (trim(layer_names(i)) == 'INSTANCES') then
+       drawn_layers(ia)%label = 'placements (outlines)'
+       drawn_layers(ia)%outline_only = .true.
+    end if
+    drawn_layers(ia)%index   => indices(i)
+    drawn_layers(ia)%visible = .true.
+    if (associated(tiled)) then
+       sl = tiled%layer(i)
+       total_boxes = total_boxes + sl%count
+    else if (.not. indices(i)%is_empty()) then
+       total_boxes    = total_boxes    + indices(i)%n_boxes
+       total_tree_b   = total_tree_b   + indices(i)%tree_bytes()
+       total_chunk_b  = total_chunk_b  + indices(i)%chunk_bytes()
+       total_comp_b   = total_comp_b   + indices(i)%memory_bytes()
+       total_uncomp_b = total_uncomp_b + indices(i)%uncompressed_bytes()
+       global_mbr     = global_mbr     + indices(i)%layer_mbr
+    end if
+  end subroutine fill_row
+
+  !> Loader index of layer l/d, 0 when it was not loaded.
+  integer function layer_index_of(l, d)
+    integer, intent(in) :: l, d
+    integer :: m, l2, d2
+    layer_index_of = 0
+    do m = 1, n_total - n_extra
+       if (m > size(layer_names)) exit
+       if (parse_ld(layer_names(m), l2, d2)) then
+          if (l2 == l .and. d2 == d) then
+             layer_index_of = m
+             return
+          end if
+       end if
+    end do
+  end function layer_index_of
+
+  !> The m-th summary layer that has no loaded layer (hierarchy-only layer).
+  subroutine extra_layer(m, l, d)
+    integer, intent(in)  :: m
+    integer, intent(out) :: l, d
+    integer :: q, c
+    c = 0; l = -1; d = -1
+    do q = 1, vinfo%n
+       if (layer_index_of(vinfo%layer(q), vinfo%dtype(q)) /= 0) cycle
+       c = c + 1
+       if (c == m) then
+          l = vinfo%layer(q); d = vinfo%dtype(q)
+          return
+       end if
+    end do
+  end subroutine extra_layer
+
+  !> Sort key of a row candidate: loaded layers 1..n_loaded, extras after.
+  subroutine row_key(r, l, d)
+    integer, intent(in)  :: r
+    integer, intent(out) :: l, d
+    if (r > n_total - n_extra) then
+       call extra_layer(r - (n_total - n_extra), l, d)
+    else if (.not. parse_ld(layer_names(r), l, d)) then
+       l = huge(1); d = huge(1)          ! INSTANCES and unnamed layers last
+    end if
+  end subroutine row_key
+
+  logical function row_before(ra, rb)
+    integer, intent(in) :: ra, rb
+    integer :: la, da, lb, db
+    call row_key(ra, la, da)
+    call row_key(rb, lb, db)
+    row_before = la < lb .or. (la == lb .and. da < db)
+  end function row_before
 
   !> Layer and datatype from a loader layer name such as "L67_D20" (or "67/20", "67:20").
   logical function parse_ld(nm, l, d)

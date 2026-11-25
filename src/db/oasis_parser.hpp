@@ -36,8 +36,12 @@ using ldbgeom::is_manhattan; using ldbgeom::fracture_manhattan; using ldbgeom::f
 struct CellRef { bool by_number = false; uint64_t number = 0; std::string name; };
 struct PInst { CellRef ref; LdbTransform tr; };
 struct PCell { CellRef id; LdbCell cell; std::vector<PInst> insts; };
+struct PVal { bool by_number = false; uint64_t number = 0; std::string s; };
+// A PROPERTY applies to the record before it: the file (before any cell), the cell (right
+// after CELL), a placement (inst_lo..inst_hi: the instances that PLACEMENT made) or a shape.
+enum PTarget { PT_CELL = 0, PT_INST = 1, PT_SHAPE = 2 };
 struct PProp { long cell; bool name_by_number; uint64_t name_number; std::string name;
-               bool value_by_number; uint64_t value_number; std::string value; };
+               std::vector<PVal> values; int target = PT_CELL; size_t inst_lo = 0, inst_hi = 0; };
 
 struct NameTable {
     std::map<uint64_t, std::string> names; uint64_t next_implicit = 0;
@@ -58,7 +62,7 @@ struct Modal {
     Repetition rep;
     std::vector<Pt> polygon_pts, path_pts;
     bool prop_by_number = false; uint64_t prop_number = 0; std::string prop_name;
-    bool value_by_number = false; uint64_t value_number = 0; std::string value;
+    std::vector<PVal> values;
     void reset_for_cell() { relative = false; place_x = place_y = geom_x = geom_y = text_x = text_y = 0; }
 };
 
@@ -190,6 +194,8 @@ struct Parser {
     db::NvcompStatus nvst;
     size_t cblocks = 0, approximated = 0;
     bool saw_end = false, want_props = false;
+    int last_target = PT_CELL;               // what a following PROPERTY applies to
+    size_t last_inst_lo = 0, last_inst_hi = 0;
     std::vector<Rect> rects;                 // scratch
     std::vector<Pt> verts;             // scratch
     // Streaming mode (ldb_stream_boxes): boxes go straight to the callback, nothing is stored.
@@ -295,6 +301,7 @@ struct Parser {
     void start_cell(const CellRef& id) {
         PCell pc; pc.id = id; cells.push_back(std::move(pc));
         cur = (long)cells.size() - 1; m.reset_for_cell(); set(D_CELL_RESET);
+        last_target = PT_CELL;
     }
 
     void placement(Reader& s, bool general) {
@@ -315,6 +322,9 @@ struct Parser {
         const Repetition* rep = &single();
         if (info & 0x08) { read_rep_into(s); rep = &m.rep; }
         if (scan_only) return;
+        last_target = PT_INST;
+        last_inst_lo = cells[(size_t)cur].insts.size();
+        struct SetHi { Parser* p; ~SetHi() { p->last_inst_hi = p->cells[(size_t)p->cur].insts.size(); } } set_hi{ this };
         PInst pi; pi.ref = m.place_cell;
         pi.tr.mag = mag; pi.tr.angle_deg = angle; pi.tr.mirror_x = (info & 0x01) ? 1 : 0;
         auto& insts = cells[(size_t)cur].insts;
@@ -494,7 +504,7 @@ struct Parser {
         }
         if (!(info & 0x08)) {
             uint64_t count = info >> 4; if (count == 15) count = s.uint_();
-            m.value_by_number = false; m.value.clear();
+            m.values.clear();
             for (uint64_t i = 0; i < count; ++i) {
                 uint64_t t = s.uint_();
                 bool by_number = false; uint64_t number = 0; std::string v;
@@ -505,14 +515,17 @@ struct Parser {
                 else if (t <= 12) v = s.str();
                 else if (t <= 15) { by_number = true; number = s.uint_(); }
                 else s.fail("invalid property value type " + std::to_string(t));
-                if (i == 0) { m.value_by_number = by_number; m.value_number = number; m.value = v; }
+                m.values.push_back(PVal{ by_number, number, v });
             }
         }
         record_property();
     }
     void record_property() {
-        if (!want_props) return;
-        props.push_back({ cur, m.prop_by_number, m.prop_number, m.prop_name, m.value_by_number, m.value_number, m.value });
+        // placement properties (names) are always kept; file/cell/shape ones on request
+        if (!want_props && last_target != PT_INST) return;
+        if (scan_only) return;
+        PProp pp{ cur, m.prop_by_number, m.prop_number, m.prop_name, m.values, last_target, last_inst_lo, last_inst_hi };
+        props.push_back(std::move(pp));
     }
 
     static void skip_interval(Reader& s) { oasis_codec::skip_interval(s); }
@@ -582,19 +595,19 @@ struct Parser {
             case 16: m.relative = true; set(D_REL); break;
             case 17: placement(s, false); break;
             case 18: placement(s, true); break;
-            case 19: text(s); break;
-            case 20: rectangle(s); break;
-            case 21: polygon(s); break;
-            case 22: path(s); break;
-            case 23: case 24: case 25: trapezoid(s, id); break;
-            case 26: ctrapezoid(s); break;
-            case 27: circle(s); break;
+            case 19: last_target = PT_SHAPE; text(s); break;
+            case 20: last_target = PT_SHAPE; rectangle(s); break;
+            case 21: last_target = PT_SHAPE; polygon(s); break;
+            case 22: last_target = PT_SHAPE; path(s); break;
+            case 23: case 24: case 25: last_target = PT_SHAPE; trapezoid(s, id); break;
+            case 26: last_target = PT_SHAPE; ctrapezoid(s); break;
+            case 27: last_target = PT_SHAPE; circle(s); break;
             case 28: property(s); break;
             case 29: record_property(); break;                          // repeat last property
             case 30: s.uint_(); s.skip_str(); break;                    // XNAME
             case 31: s.uint_(); s.skip_str(); s.uint_(); break;
             case 32: s.uint_(); s.skip_str(); break;                    // XELEMENT
-            case 33: {                                                  // XGEOMETRY
+            case 33: { last_target = PT_SHAPE;                          // XGEOMETRY
                 uint8_t info = s.u8(); s.uint_();
                 read_layer(s, info); s.skip_str();
                 read_xy(s, info, m.geom_x, m.geom_y); (void)read_rep(s, info);
@@ -633,12 +646,26 @@ struct Parser {
                 const std::string* nm = propnames.find(pp.name_number);
                 lp.name = nm ? *nm : "prop#" + std::to_string(pp.name_number);
             } else lp.name = pp.name;
-            if (pp.value_by_number) {
-                const std::string* v = propstrings.find(pp.value_number);
-                lp.value = v ? *v : "propstring#" + std::to_string(pp.value_number);
-            } else lp.value = pp.value;
-            if (pp.cell < 0) { lp.target_kind = 0; f->file_properties.push_back(std::move(lp)); }
-            else { lp.target_kind = 1; lp.cell = f->cells[(size_t)pp.cell].name; f->cells[(size_t)pp.cell].properties.push_back(std::move(lp)); }
+            // values joined by a space (S_GDS_PROPERTY: "<attr> <string>")
+            std::vector<std::string> vals;
+            for (auto& v : pp.values) {
+                if (v.by_number) { const std::string* ps = propstrings.find(v.number); vals.push_back(ps ? *ps : "propstring#" + std::to_string(v.number)); }
+                else vals.push_back(v.s);
+            }
+            for (size_t i = 0; i < vals.size(); ++i) { if (i) lp.value += ' '; lp.value += vals[i]; }
+            if (pp.cell < 0) { lp.target_kind = 0; f->file_properties.push_back(std::move(lp)); continue; }
+            LdbCell& c = f->cells[(size_t)pp.cell];
+            if (pp.target == PT_INST) {
+                const std::string nm = ldb_instance_name_from_property(lp.name, vals);
+                for (size_t k = pp.inst_lo; k < pp.inst_hi && k < c.instances.size(); ++k) {
+                    if (!nm.empty() && c.instances[k].name.empty()) c.instances[k].name = nm;
+                    c.instances[k].props.push_back({ lp.name, lp.value });
+                }
+                continue;
+            }
+            lp.target_kind = pp.target == PT_SHAPE ? 2 : 1;
+            lp.cell = c.name;
+            c.properties.push_back(std::move(lp));
         }
     }
 };

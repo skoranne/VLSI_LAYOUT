@@ -37,7 +37,18 @@ struct LdbTransform {
 struct LdbInstance {
     std::string ref_name;
     LdbTransform tr;
+    std::string name;    // placement (DEF component) name from its properties, if any
+    std::vector<std::pair<std::string, std::string>> props;   // (property name, values joined by ' ')
 };
+
+// Placement name carried by a property: GDS/Magic attribute 61 (OASIS S_GDS_PROPERTY "61 name")
+// or an explicit DEF_COMPONENT / INST_NAME property.
+inline std::string ldb_instance_name_from_property(const std::string& name, const std::vector<std::string>& vals) {
+    if (vals.empty()) return std::string();
+    if (name == "S_GDS_PROPERTY") return (vals.size() >= 2 && vals[0] == "61") ? vals[1] : std::string();
+    if (name == "DEF_COMPONENT" || name == "INST_NAME" || name == "inst_name" || name == "instance_name") return vals[0];
+    return std::string();
+}
 
 struct LdbProperty {
     int target_kind = 0; // 0=file,1=cell,2=element,3=instance

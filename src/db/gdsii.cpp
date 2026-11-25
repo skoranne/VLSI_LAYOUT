@@ -48,6 +48,8 @@ bool parse_gdsii(LdbFile* f) {
     double mag=1.0, angle=0.0;
     int16_t cols=0, rows=0;
     std::vector<std::pair<int64_t,int64_t>> xypts;
+    // PROPATTR/PROPVALUE pairs of the current element (attached to SREF/AREF at ENDEL)
+    std::vector<std::pair<int,std::string>> elem_props; int prop_attr = -1;
     // per-element state for PATH
     int64_t width=0, bgn_extn=0, end_extn=0; int pathtype=0;
     std::vector<ldbgeom::Pt> verts; std::vector<ldbgeom::Rect> rects;
@@ -55,7 +57,7 @@ bool parse_gdsii(LdbFile* f) {
     auto reset_elem = [&](){
         in_elem=false; cur_layer=0; cur_dtype=0; elem_type=0;
         sname.clear(); has_strans=false; strans_mirror=false; has_mag=false; has_angle=false;
-        mag=1.0; angle=0.0; cols=0; rows=0; xypts.clear();
+        mag=1.0; angle=0.0; cols=0; rows=0; xypts.clear(); elem_props.clear(); prop_attr=-1;
         width=0; bgn_extn=0; end_extn=0; pathtype=0;
     };
 
@@ -99,6 +101,12 @@ bool parse_gdsii(LdbFile* f) {
                         inst.tr.dx = (xypts[1].first - xypts[0].first);
                         inst.tr.dy = (xypts[1].second - xypts[0].second);
                     }
+                }
+                for(auto& pv : elem_props){
+                    std::vector<std::string> vals{std::to_string(pv.first), pv.second};
+                    std::string nm = ldb_instance_name_from_property("S_GDS_PROPERTY", vals);
+                    if(!nm.empty() && inst.name.empty()) inst.name = nm;
+                    inst.props.push_back({"S_GDS_PROPERTY", vals[0] + " " + pv.second});
                 }
                 cur->instances.push_back(inst);
             }
@@ -169,7 +177,12 @@ bool parse_gdsii(LdbFile* f) {
             cols = be16s(data); rows = be16s(data+2);
         } else if (rtype==PROPATTR && dlen>=2) {
             int id = be16s(data); if (!f->propnames.count(id)) f->propnames[id]="";
+            prop_attr = id;
         } else if (rtype==PROPVALUE && dlen>0) {
+            if (in_elem && prop_attr >= 0) {
+                std::string v((const char*)data,(const char*)data+dlen); while(!v.empty()&&v.back()==0) v.pop_back();
+                elem_props.push_back({prop_attr, v}); prop_attr = -1;
+            }
             for (auto it=f->propnames.rbegin(); it!=f->propnames.rend(); ++it) {
                 if (it->second.empty()) { it->second.assign((const char*)data,(const char*)data+dlen); while(!it->second.empty()&&it->second.back()==0) it->second.pop_back(); break; }
             }
