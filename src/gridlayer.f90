@@ -28,7 +28,7 @@ contains
     ! 1. Initialize Grid dimensions
     this%rows = n_rows
     this%cols = n_cols
-    call CreateGrid( base_layer, grid, rows, cols, 0) !> create over
+    call CreateGrid( base_layer, grid, int(n_rows), int(n_cols), 0) !> create over (was uninitialized rows/cols)
     ! 2. Allocate the internal 2D array of layers
     if (allocated(this%sub_layers)) deallocate(this%sub_layers)
     allocate(this%sub_layers(n_rows, n_cols))

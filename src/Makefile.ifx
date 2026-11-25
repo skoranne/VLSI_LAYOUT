@@ -115,7 +115,10 @@ $(LIBRARY): $(LIB_OBJS)
 
 # --- Executable Builds ---
 # By linking against the library, we don't have to list out all objects again.
-MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a
+omp_target_stubs.o: omp_target_stubs.c
+	$(CC) -O2 -c $< -o $@
+
+MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a omp_target_stubs.o
 	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)

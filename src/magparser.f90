@@ -152,6 +152,7 @@ contains
     fileName = load_design%fileName
     line_number = 0
     layer_count = 1
+    found_section = .false.
     current_layer_id = 1
     NUM_LAYERS = 0
     call system_clock(count_rate=clock_rate)
@@ -214,6 +215,14 @@ contains
           section_name = trim(section_name)
           if( section_name == "labels" ) cycle
           if( section_name == "end" ) cycle
+          !> More sections than max_layers: skip this section (and its rects) instead of
+          !> indexing layers/layerNames out of bounds.
+          if( layer_count > MAX_LAYERS ) then
+             write(*,*) 'WARNING: layer section ', trim(section_name), ' skipped (exceeds max_layers=', &
+                  MAX_LAYERS, '; raise max_layers)'
+             found_section = .false.
+             cycle
+          end if
           write (*,'(3A10,I5)') 'Layer = ', section_name, ' = id: ', layer_count
           call hash_put( ht, section_name, layer_count, ins )
           if( .not. ins ) write (*,*) 'Duplicate layer seen: ', section_name

@@ -229,6 +229,12 @@ contains
          error stop "CreateGrid: rows and cols must be positive"
       end if
 
+      !> Empty input (e.g. "X GRID nothing" on an empty layer): the grid is empty too.
+      if (input_layer%n_used == 0) then
+         call ClearLayer( output_layer )
+         return
+      end if
+
       if (.not. input_box%is_valid()) then
          error stop "CreateGrid: input_box is not a valid rectangle"
       end if
@@ -319,15 +325,22 @@ contains
    module subroutine CreateEXTENT( input_layer, output_layer )
       type(Layer),      intent(in)    :: input_layer
       type(Layer),      intent(inout) :: output_layer
-      if( allocated( output_layer%layer_boxes ) ) then
-         if( size( output_layer%layer_boxes ) /= 0 ) error stop "|LB| /= 0"
-         if( output_layer%n_used /= 0  ) error stop "|NU| /= 0"
-         if( output_layer%n_alloc /= 0 ) error stop "|NA| /= 0"
-         deallocate( output_layer%layer_boxes ) !> we checked n_alloc and size are both 0
+      type(Box) :: mbr
+      !> EXTENT of an empty layer is empty (its MBR is not a valid box).
+      if( input_layer%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
       end if
+      !> Compute the MBR before touching the output (output may alias the input).
+      mbr = mbr_of_array( input_layer%layer_boxes, input_layer%n_used )
+      if( .not. mbr%is_valid() ) error stop "CreateEXTENT: invalid MBR"
+      !> The output is overwritten. Layers of an output/file db arrive pre-allocated
+      !> (parseMagicLayoutFile reserves INIT_ALLOC boxes with n_used=0), so do not
+      !> require an unallocated output: clear it like CopyLayer does.
+      call ClearLayer( output_layer )
       allocate( output_layer%layer_boxes(1) )
-      output_layer%layer_boxes(1) = mbr_of_array( input_layer%layer_boxes, input_layer%n_used )
-      if( .not. output_layer%layer_boxes(1)%is_valid() ) error stop
+      output_layer%layer_boxes(1) = mbr
+      output_layer%n_alloc = 1
       output_layer%n_used = 1
       output_layer%layerState = LAYER_STATE_HEAL
       call output_layer%mark( LAYER_STATE_SORT )
@@ -778,7 +791,8 @@ contains
       integer(kind=int64), allocatable :: grid_layer_counts(:,:,:)
       integer,parameter :: A_IN_GRID=1, B_IN_GRID=2, TRACKER_GRID=3, TEMP_LAYER_GRID=4, OUTPUT_LAYER_GRID=5
       number_tree_nodes = CalculateTotalNodes( max( input_layer_A%n_used, input_layer_B%n_used ), K_LEAF_CAPACITY )
-      K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
+      !> max(1,..): an empty input gives 0 nodes -> K_GRID 0 -> CreateGrid error stop
+      K_GRID = max( 1, int( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
       !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
 
       allocate( grids(K_GRID, K_GRID) )
@@ -1264,7 +1278,8 @@ contains
       type(CGArgument) :: local_arg
       if (profiling_enabled) t_start = get_cpu_time()
       number_tree_nodes = CalculateTotalNodes( max( input_layer_A%n_used, input_layer_B%n_used ), K_LEAF_CAPACITY )
-      K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
+      !> max(1,..): an empty input gives 0 nodes -> K_GRID 0 -> CreateGrid error stop
+      K_GRID = max( 1, int( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
       !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
 
       allocate( grids(K_GRID, K_GRID) )
@@ -1394,6 +1409,14 @@ contains
      type(Layer), intent(inout) :: input_layer_A, input_layer_B
      type(Layer), intent(inout) :: output_layer
 #if defined(__APPLE__) && defined(__INTEL_COMPILER)
+     !> The frame grid is built over A's MBR: handle empty operands up front.
+     if( input_layer_A%n_used == 0 ) then
+        call ClearLayer( output_layer )
+        return
+     else if( input_layer_B%n_used == 0 ) then
+        call CopyLayer( output_layer, input_layer_A )
+        return
+     end if
      !> CalculateNOT falls back to the scanline formulation on this platform
      !> (see design_boolean_impl.f90), which fractures far more; keep Boost here.
      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_NOT, 0_int64 )
@@ -1410,6 +1433,17 @@ contains
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout) :: output_layer
 
+      !> The frame grid is built over A's MBR, so an empty operand must not reach it.
+      if( input_layer_A%n_used == 0 .and. input_layer_B%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
+      else if( input_layer_A%n_used == 0 ) then
+         call CopyLayer( output_layer, input_layer_B )
+         return
+      else if( input_layer_B%n_used == 0 ) then
+         call CopyLayer( output_layer, input_layer_A )
+         return
+      end if
       call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_XOR, 0_int64 )
       output_layer%layerState = LAYER_STATE_HEAL
       call PreprocessLayer( output_layer )
@@ -1419,6 +1453,11 @@ contains
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout) :: output_layer
 
+      !> Empty operand: result is empty (and the frame grid over A's MBR would error stop).
+      if( input_layer_A%n_used == 0 .or. input_layer_B%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
+      end if
       call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_AND, 0_int64 )
       output_layer%layerState = LAYER_STATE_HEAL
       call PreprocessLayer( output_layer )
@@ -1449,8 +1488,13 @@ contains
       integer(kind=int64), allocatable :: grid_layer_counts(:,:,:)
       integer,parameter :: A_IN_GRID=1, B_IN_GRID=2, TRACKER_GRID=3, TEMP_LAYER_GRID=4, OUTPUT_LAYER_GRID=5
       type(CGArgument) :: local_arg
+      if( input_layer_A%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
+      end if
       number_tree_nodes = CalculateTotalNodes( input_layer_A%n_used, K_LEAF_CAPACITY )
-      K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
+      !> max(1,..): an empty input gives 0 nodes -> K_GRID 0 -> CreateGrid error stop
+      K_GRID = max( 1, int( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
       !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
 
       allocate( grids(K_GRID, K_GRID) )

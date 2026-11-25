@@ -134,7 +134,7 @@ exec run m:ie_exc3z = m:ie_exc3 ASSERT_ZERO nothing
 
 # --- More layer-pair coverage for perf/GPU study ---
 exec run o:li1_not_met1 = d:li1 @ d:met1
-exec run m:self_lm = d:met1 * (d:li1 @ d:met1)
+exec run m:self_lm = d:met1 * o:li1_not_met1
 exec run m:az_self_lm = m:self_lm ASSERT_ZERO nothing
 exec run m:met1_ti = d:met1 INTERACT d:met2
 exec run m:met1_tni = d:met1 NOT_INTERACT d:met2

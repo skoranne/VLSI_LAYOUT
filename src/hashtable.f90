@@ -72,6 +72,10 @@ contains
     integer                  :: i, c
     integer(kind=8)          :: hh
 
+    if (nbuckets <= 0) then
+       h = 0
+       return
+    end if
     hh = 5381_8
     do i = 1, len_trim(key)
        c = iachar(key(i:i))
@@ -95,6 +99,10 @@ contains
     integer               :: bucket_idx
     type(node_type), pointer :: cur, prev
 
+    if (ht%nbuckets <= 0 .or. .not. associated(ht%bucket)) then
+       if (present(status)) status = .false.
+       return
+    end if
     bucket_idx = hash_fun (key, ht%nbuckets) + 1   ! fortran arrays are 1‑based
 
     cur => ht%bucket(bucket_idx)%next
@@ -138,6 +146,11 @@ contains
     integer               :: bucket_idx
     type(node_type), pointer :: cur
 
+    val = -1
+    if (ht%nbuckets <= 0 .or. .not. associated(ht%bucket)) then
+       found = .false.
+       return
+    end if
     bucket_idx = hash_fun (key, ht%nbuckets) + 1
     cur => ht%bucket(bucket_idx)%next
 
@@ -166,6 +179,10 @@ contains
     integer               :: bucket_idx
     type(node_type), pointer :: cur, prev
 
+    if (ht%nbuckets <= 0 .or. .not. associated(ht%bucket)) then
+       removed = .false.
+       return
+    end if
     bucket_idx = hash_fun (key, ht%nbuckets) + 1
     cur => ht%bucket(bucket_idx)%next
     prev => null()
