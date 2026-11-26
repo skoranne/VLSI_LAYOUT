@@ -1094,6 +1094,9 @@ contains
                               call AnyAngleBoolean( rhs1_layer, rhs1_layer, lhs_layer, aa_op, aa_status )
                            end if
                            banded_done = .true.
+                        else if( AnyAngleTopoCode( primary_operator ) > 0 .and. associated( rhs2_layer ) ) then
+                           call AnyAngleTopo( rhs1_layer, rhs2_layer, lhs_layer, AnyAngleTopoCode( primary_operator ), aa_status )
+                           banded_done = .true.
                         else if( aa_any .and. primary_operator == 'COPY' ) then
                            call CopyLayer( lhs_layer, rhs1_layer )
                            banded_done = .true.

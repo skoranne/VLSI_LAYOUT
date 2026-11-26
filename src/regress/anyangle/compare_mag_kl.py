@@ -33,7 +33,9 @@ for lay in sorted(kl):
               abs(a["perimeter"] - b["perimeter"]) <= 5e-4 * max(1, b["perimeter"])
         cnt_kl = a["polygons"] == b["polygons"] and a["holes"] == b["holes"]
         r = ref.get(lay)
-        cnt_ref = r is not None and a["polygons"] == r["polygons"] and a["holes"] == r["holes"]
+        # each count equal to KLayout's or to the exact unrotated count (holes created by the
+        # rotation of the input itself are counted by both engines, KLayout's merge drops others)
+        cnt_ref = r is not None and all(a[f] in (b[f], r[f]) for f in ("polygons", "holes"))
         ok = geo and (cnt_kl or cnt_ref)
         st = ("PASS" if cnt_kl else "PASS-INV") if ok else "FAIL"; npass += ok; nfail += not ok
     print("MAGKL %s %-10s %s polys %d/%d holes %d/%d verts %d/%d area %d/%d (%.2e) perim %d/%d" % (

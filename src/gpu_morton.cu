@@ -548,7 +548,7 @@ extern "C"
 }
 // Sort plain uint64 keys on the device (CompactLayerModule: Morton/shape keys). Radix sort;
 // reuses the cached key scratch buffer. Returns 0 on success (caller falls back to CPU).
-extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
+static int32_t thrust_sort_u64_dev(uint64_t *h_keys, int64_t n)
 {
     if (n <= 1)
         return 0;
@@ -583,7 +583,7 @@ extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
 
 // Lexicographic (key, value) sort on the device: stable sort by value, then stable sort by
 // key (two-pass LSD), so equal keys stay ordered by value. Wide compact layers only.
-extern "C" int32_t thrust_sort_u64_i32_host(uint64_t *h_keys, int32_t *h_vals, int64_t n)
+static int32_t thrust_sort_u64_i32_dev(uint64_t *h_keys, int32_t *h_vals, int64_t n)
 {
     if (n <= 1)
         return 0;
@@ -618,6 +618,38 @@ extern "C" int32_t thrust_sort_u64_i32_host(uint64_t *h_keys, int32_t *h_vals, i
     if (e1 != cudaSuccess || e2 != cudaSuccess)
         return 4;
     return (serr == cudaSuccess) ? 0 : 5;
+}
+
+// Public sorts: device first; when the device cannot serve the call (no memory, busy, any
+// CUDA/Thrust error) the same sort runs on the host, so callers never see a failure for a
+// resource problem (GB10: device memory is shared with concurrent host jobs).
+extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
+{
+    if (n <= 1)
+        return 0;
+    if (thrust_sort_u64_dev(h_keys, n) == 0)
+        return 0;
+    cudaGetLastError();
+    std::sort(h_keys, h_keys + n);
+    return 0;
+}
+extern "C" int32_t thrust_sort_u64_i32_host(uint64_t *h_keys, int32_t *h_vals, int64_t n)
+{
+    if (n <= 1)
+        return 0;
+    if (thrust_sort_u64_i32_dev(h_keys, h_vals, n) == 0)
+        return 0;
+    cudaGetLastError();
+    std::vector<std::pair<uint64_t, int32_t>> v((size_t)n);
+    for (int64_t i = 0; i < n; ++i)
+        v[(size_t)i] = std::make_pair(h_keys[i], h_vals[i]);
+    std::sort(v.begin(), v.end());
+    for (int64_t i = 0; i < n; ++i)
+    {
+        h_keys[i] = v[(size_t)i].first;
+        h_vals[i] = v[(size_t)i].second;
+    }
+    return 0;
 }
 
 // NVTX range shims for the Fortran phase timers (ProfilerModule): header-only NVTX3,

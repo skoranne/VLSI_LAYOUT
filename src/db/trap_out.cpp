@@ -250,7 +250,142 @@ struct GroupPoly {
             chi += a2 > 0 ? 1 : -1;
             loops++;
         }
-        holes = 1 - chi;
+        (void)chi;
+        holes = count_holes(st);
+    }
+
+    // Holes of the closed region = bounded components of its complement. (1) Boundary segments
+    // are split at every lattice vertex lying in their interior (a vertex of one part touching a
+    // side of another: such T contacts are not vertices of the side segments built from the
+    // trapezoids). Segments are found by line: for every vertex and every direction present,
+    // the line through the vertex is looked up in a hash of the segments' lines. (2) Incoming and
+    // outgoing segments are paired by the sharpest right turn, which follows the complement face
+    // on the right of the boundary, so every complement face is traced as one cycle (the
+    // complement faces of a connected set are simply connected). (3) Bounded faces are the cycles
+    // with negative orientation (region on the left).
+    struct LKey { int64_t dx, dy; i128 c; bool operator==(const LKey& o) const { return dx == o.dx && dy == o.dy && c == o.c; } };
+    struct LHash { size_t operator()(const LKey& k) const {
+        uint64_t h = (uint64_t)k.dx * 0x9E3779B97F4A7C15ull ^ (uint64_t)k.dy * 0xBF58476D1CE4E5B9ull ^
+                     (uint64_t)k.c * 0x94D049BB133111EBull ^ (uint64_t)(k.c >> 64) * 0xD6E8FEB86659FD93ull;
+        return (size_t)(h ^ (h >> 31)); } };
+    std::vector<std::pair<int,int>> splits;            // (segment, vertex)
+    std::vector<Seg> seg2;
+    std::vector<int> os2, ol2, nx2;
+    std::vector<char> seen2;
+
+    int64_t count_holes(Stats& st) {
+        const int ns = (int)seg.size(), nv = (int)vk.size();
+        auto norm = [](int64_t dx, int64_t dy, int64_t& ndx, int64_t& ndy) {
+            int64_t g = std::gcd(dx < 0 ? -dx : dx, dy < 0 ? -dy : dy); if (g == 0) g = 1;
+            ndx = dx / g; ndy = dy / g;
+            if (ndy < 0 || (ndy == 0 && ndx < 0)) { ndx = -ndx; ndy = -ndy; }
+        };
+        std::unordered_map<LKey, std::vector<int>, LHash> lines;
+        std::vector<std::pair<int64_t,int64_t>> dirs;
+        auto vx_is_int = [&](int v) { return vk[(size_t)v].n % vk[(size_t)v].d == 0; };
+        for (int i = 0; i < ns; ++i) {
+            const Seg& sg = seg[(size_t)i];
+            int64_t ndx, ndy; norm(sg.dx, sg.dy, ndx, ndy);
+            // line through endpoint a: ndy*x - ndx*y = c, with x = n/d -> c*d = ndy*n - ndx*y*d
+            const VKey& a = vk[(size_t)sg.a];
+            const i128 cn = (i128)ndy * a.n - (i128)ndx * a.y * a.d;   // c * a.d (exact for lattice lines)
+            if (cn % a.d != 0) continue;               // not a lattice line: cannot hold a lattice vertex
+            const i128 c = cn / a.d;
+            lines[{ ndx, ndy, c }].push_back(i);
+            dirs.push_back({ ndx, ndy });
+        }
+        std::sort(dirs.begin(), dirs.end()); dirs.erase(std::unique(dirs.begin(), dirs.end()), dirs.end());
+        splits.clear();
+        for (int v = 0; v < nv; ++v) {
+            if (!vx_is_int(v)) continue;
+            const int64_t x = (int64_t)(vk[(size_t)v].n / vk[(size_t)v].d), y = vk[(size_t)v].y;
+            for (auto& d : dirs) {
+                const i128 c = (i128)d.second * x - (i128)d.first * y;
+                auto it = lines.find({ d.first, d.second, c });
+                if (it == lines.end()) continue;
+                for (int i : it->second) {
+                    const Seg& sg = seg[(size_t)i];
+                    if (sg.a == v || sg.b == v) continue;
+                    const VKey& a = vk[(size_t)sg.a]; const VKey& b = vk[(size_t)sg.b];
+                    bool inside;
+                    if (sg.dy == 0) {                  // horizontal: x strictly between (exact rationals)
+                        const int ca = ((i128)x * a.d > a.n) - ((i128)x * a.d < a.n);
+                        const int cb = ((i128)x * b.d > b.n) - ((i128)x * b.d < b.n);
+                        inside = ca * cb < 0;
+                    } else {
+                        inside = (y > std::min(a.y, b.y)) && (y < std::max(a.y, b.y));
+                    }
+                    if (inside) splits.push_back({ i, v });
+                }
+            }
+        }
+        // rebuild the segment list with the split points
+        std::sort(splits.begin(), splits.end());
+        seg2.clear();
+        size_t q = 0;
+        std::vector<std::pair<long double,int>> pts;
+        for (int i = 0; i < ns; ++i) {
+            const Seg& sg = seg[(size_t)i];
+            if (q < splits.size() && splits[q].first == i) {
+                pts.clear();
+                const VKey& a = vk[(size_t)sg.a];
+                const long double ax = (long double)a.n / (long double)a.d;
+                while (q < splits.size() && splits[q].first == i) {
+                    const VKey& p = vk[(size_t)splits[q].second];
+                    const long double t = sg.dy != 0 ? (long double)(p.y - a.y) / (long double)sg.dy
+                                                     : ((long double)p.n / (long double)p.d - ax) / (long double)sg.dx;
+                    pts.push_back({ t, splits[q].second });
+                    ++q;
+                }
+                std::sort(pts.begin(), pts.end());
+                int prev = sg.a;
+                for (auto& pp : pts) { if (pp.second != prev) { seg2.push_back({ prev, pp.second, sg.dx, sg.dy }); prev = pp.second; } }
+                seg2.push_back({ prev, sg.b, sg.dx, sg.dy });
+            } else {
+                seg2.push_back(sg);
+            }
+        }
+        // sharpest right turn pairing
+        const int n2 = (int)seg2.size();
+        os2.assign((size_t)nv + 1, 0); ol2.assign((size_t)n2, 0);
+        for (auto& sg : seg2) os2[(size_t)sg.a + 1]++;
+        for (int v = 0; v < nv; ++v) os2[(size_t)v + 1] += os2[(size_t)v];
+        { std::vector<int> pos(os2.begin(), os2.end() - 1);
+          for (int i = 0; i < n2; ++i) ol2[(size_t)pos[(size_t)seg2[(size_t)i].a]++] = i; }
+        nx2.assign((size_t)n2, -1);
+        std::vector<char> used2((size_t)n2, 0);
+        for (int i = 0; i < n2; ++i) {
+            const Seg& sg = seg2[(size_t)i];
+            const int64_t rx = -sg.dx, ry = -sg.dy;
+            int best = -1;
+            for (int p = os2[(size_t)sg.b]; p < os2[(size_t)sg.b + 1]; ++p) {
+                const int o = ol2[(size_t)p];
+                if (best < 0) { best = o; continue; }
+                const Seg& a = seg2[(size_t)o]; const Seg& b = seg2[(size_t)best];
+                if (rel_less(rx, ry, a.dx, a.dy, b.dx, b.dy)) best = o;      // smallest ccw angle
+            }
+            if (best < 0 || used2[(size_t)best]) { st.anomalies++; return -1; }
+            used2[(size_t)best] = 1;
+            nx2[(size_t)i] = best;
+        }
+        seen2.assign((size_t)n2, 0);
+        int64_t neg = 0, pos = 0;
+        for (int i = 0; i < n2; ++i) {
+            if (seen2[(size_t)i]) continue;
+            long double a2 = 0;
+            int s0 = i;
+            while (!seen2[(size_t)s0]) {
+                seen2[(size_t)s0] = 1;
+                const VKey& p = vk[(size_t)seg2[(size_t)s0].a]; const VKey& r = vk[(size_t)seg2[(size_t)s0].b];
+                const long double px = (long double)p.n / (long double)p.d, rx = (long double)r.n / (long double)r.d;
+                a2 += px * (long double)r.y - rx * (long double)p.y;
+                s0 = nx2[(size_t)s0];
+            }
+            if (s0 != i) { st.anomalies++; return -1; }
+            if (a2 > 0) pos++; else neg++;
+        }
+        if (pos != 1) st.anomalies++;
+        return neg;
     }
 
     void trace_emit(const int* M, int nm, ChunkOut& out) {

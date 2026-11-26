@@ -28,11 +28,13 @@ module AnyAngleOpsModule
   use TrapezoidModule
   use TrapMergeModule
   use TrapPNumModule
+  use TrapTopoModule
   implicit none
   private
 
   public :: AnyAngleEnabled, AnyAngleForce, AnyAngleSetEnabled, LoadAnyAngleLayers
   public :: TOP_OR, TOP_AND, TOP_NOT, TOP_XOR, TOP_BNOTA, TOP_SELF2
+  public :: AnyAngleTopo, AnyAngleTopoCode
   public :: AnyAngleBoolean, AnyAngleMeasure, AnyAngleDigest, AnyAngleOpFromChar, AnyAngleOpFromName
 
   logical, save :: anyangle_on = .false., anyangle_env_read = .false.
@@ -378,6 +380,111 @@ contains
        deallocate(tpo, tx, ty)
     end if
   end subroutine layer_polys
+
+  ! ------------------------------------------------------------------ topologicals
+
+  !> CTR topological operator -> K_TOPO_* code (commonmodule), -1 when not handled on any-angle
+  !> layers (the *_EDGE variants).
+  integer(int64) function AnyAngleTopoCode(w) result(c)
+    character(len=*), intent(in) :: w
+    select case (w)
+    case ('INTERACT');      c = 101
+    case ('NOT_INTERACT');  c = 102
+    case ('CUT');           c = 103
+    case ('NOT_CUT');       c = 104
+    case ('TOUCH');         c = 105
+    case ('NOT_TOUCH');     c = 106
+    case ('INSIDE');        c = 107
+    case ('NOT_INSIDE');    c = 108
+    case ('OUTSIDE');       c = 109
+    case ('NOT_OUTSIDE');   c = 110
+    case ('EQUAL');         c = 119
+    case ('NOT_EQUAL');     c = 120
+    case ('DISJOINT');      c = 121
+    case ('NOT_DISJOINT');  c = 122
+    case ('MEET');          c = 123
+    case ('NOT_MEET');      c = 124
+    case ('OVERLAPS');      c = 125
+    case ('NOT_OVERLAPS');  c = 126
+    case ('COVERS');        c = 127
+    case ('NOT_COVERS');    c = 128
+    case ('COVEREDBY');     c = 129
+    case ('NOT_COVEREDBY'); c = 130
+    case ('CONTAINS');      c = 131
+    case ('NOT_CONTAINS');  c = 132
+    case default;           c = -1
+    end select
+  end function AnyAngleTopoCode
+
+  !> out = the PNUM polygons of A selected by their relation with B (TrapTopoModule; exact).
+  subroutine AnyAngleTopo(A, B, out, code, status)
+    type(Layer), intent(inout), target :: A, B, out
+    integer(int64), intent(in) :: code
+    integer, intent(out) :: status
+    type(Trapezoid), allocatable :: tA(:), tB(:), sel(:)
+    integer(int64) :: nA, nB, nsel
+    type(TrapTopoStats) :: st
+    status = 0
+    call layer_traps(A, tA, nA, status); if (status /= 0) return
+    call layer_traps(B, tB, nB, status); if (status /= 0) return
+    call TrapTopoSelect(tA, nA, tB, nB, code, sel, nsel, st)
+    if (st%anomalies /= 0) then
+       write(*, '(A,I0)') 'ERROR: anyangle topological select anomalies=', st%anomalies
+       status = 3
+    end if
+    call store_traps(out, sel, nsel)
+    write(*, '(A,I0,A,I0,A,I0,A,I0,A,I0,4(A,F0.3))') 'INFO: anyangle topo op=', code, ' polygons A=', st%polys_a, &
+         ' B=', st%polys_b, ' selected=', st%selected, ' pairs=', st%pairs, ' t_pnum=', st%t_pnum, &
+         ' t_pairs=', st%t_pairs, ' t_cover=', st%t_cover, ' t_total=', st%t_total
+  end subroutine AnyAngleTopo
+
+  !> Canonical trapezoids of a layer: its own (any-angle) or its boxes merged exactly.
+  subroutine layer_traps(L, t, n, status)
+    type(Layer), intent(inout), target :: L
+    type(Trapezoid), allocatable, intent(out) :: t(:)
+    integer(int64), intent(out) :: n
+    integer, intent(out) :: status
+    integer(int64) :: np
+    integer(int64), allocatable :: poff(:), px(:), py(:)
+    type(TrapMergeStats) :: st
+    status = 0
+    if (L%n_traps > 0) then
+       n = L%n_traps
+       allocate(t(n)); t(1:n) = L%traps(1:n)
+       return
+    end if
+    if (L%n_used == 0 .and. .not. L%is_compact) then
+       n = 0; allocate(t(1)); return
+    end if
+    call LayerExpand(L)
+    np = L%n_used
+    allocate(poff(np + 1), px(max(4*np, 1_int64)), py(max(4*np, 1_int64)))
+    call box_polys(L, np, poff, px, py)
+    st = TrapMergeStats()
+    call TrapMergePolygons(np, poff, px, py, t, n, st, status)
+    if (status /= 0 .or. st%anomalies /= 0) then
+       write(*, '(A,I0,A,I0)') 'ERROR: anyangle: box layer merge failed: status=', status, ' anomalies=', st%anomalies
+       if (status == 0) status = 3
+    end if
+  end subroutine layer_traps
+
+  subroutine box_polys(L, nb, poff, px, py)
+    type(Layer), intent(in) :: L
+    integer(int64), intent(in) :: nb
+    integer(int64), intent(inout) :: poff(:), px(:), py(:)
+    integer(int64) :: i, b0
+    !$omp parallel do private(b0)
+    do i = 1, nb
+       b0 = 4*(i - 1)
+       poff(i) = b0 + 1
+       px(b0 + 1) = L%layer_boxes(i)%x1; py(b0 + 1) = L%layer_boxes(i)%y1
+       px(b0 + 2) = L%layer_boxes(i)%x2; py(b0 + 2) = L%layer_boxes(i)%y1
+       px(b0 + 3) = L%layer_boxes(i)%x2; py(b0 + 3) = L%layer_boxes(i)%y2
+       px(b0 + 4) = L%layer_boxes(i)%x1; py(b0 + 4) = L%layer_boxes(i)%y2
+    end do
+    !$omp end parallel do
+    poff(nb + 1) = 4*nb + 1
+  end subroutine box_polys
 
   ! ------------------------------------------------------------------ measure / digest
 

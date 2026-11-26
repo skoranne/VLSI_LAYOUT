@@ -1,4 +1,4 @@
-LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o trapezoid.o trap_merge.o trap_pnum.o device_registry.o compact_layer.o measure.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o anyangle_ops.o \
+LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o trapezoid.o trap_merge.o trap_pnum.o trap_topo.o device_registry.o compact_layer.o measure.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o anyangle_ops.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
 	   polygon_fracture.o boxmerge.o kldata.o design_impl.o design_boolean_impl.o design_topo_impl.o design_device_impl.o gpu_morton_sort.o\
@@ -78,5 +78,6 @@ test_predicates.o: wide_int.o exact_predicates.o
 # Rotation-invariant layer measurements (exec measure)
 measure.o: geometry.o compact_layer.o
 test_measure.o: measure.o geometry.o
-anyangle_ops.o: design.o measure.o trap_merge.o trap_pnum.o trapezoid.o wide_int.o
+anyangle_ops.o: design.o measure.o trap_merge.o trap_pnum.o trap_topo.o trapezoid.o wide_int.o
 test_trapoverlap.o: trapezoid.o
+trap_topo.o: trapezoid.o trap_pnum.o

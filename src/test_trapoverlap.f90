@@ -8,7 +8,8 @@ program test_trapoverlap
   use, intrinsic :: iso_fortran_env, only: int32, int64, real64
   use TrapezoidModule
   implicit none
-  integer(int64) :: ncases, ic, nov, nfail, ntouch
+  integer(int64) :: ncases, ic, nov, nfail, ntouch, ncont(0:3)
+  integer :: kc, kr
   integer :: seed, ln, st
   character(len=32) :: arg
   type(Trapezoid) :: a, b
@@ -18,7 +19,7 @@ program test_trapoverlap
   call get_command_argument(1, arg, ln, st); if (st == 0 .and. ln > 0) read(arg, *) ncases
   call get_command_argument(2, arg, ln, st); if (st == 0 .and. ln > 0) read(arg, *) seed
   call rng_seed(seed)
-  nov = 0; nfail = 0; ntouch = 0
+  nov = 0; nfail = 0; ntouch = 0; ncont = 0
   do ic = 1, ncases
      call random_trap(a)
      if (mod(ic, 3_int64) == 0) then
@@ -34,6 +35,15 @@ program test_trapoverlap
         nfail = nfail + 1
         if (nfail <= 5) write(*, '(a,i0,a,l1,a,es12.4)') 'FAIL case ', ic, ' exact=', ex, ' clip_area=', ar
      end if
+     kc = trap_contact(a, b)
+     kr = ref_contact(a, b, ar)
+     if (kc /= kr .or. trap_contact(b, a) /= kc) then
+        nfail = nfail + 1
+        if (nfail <= 8) write(*, '(a,*(1x,i0))') 'FAILC', ic, kc, kr, a%y1, a%y2, &
+             a%l%ax, a%l%k, a%l%dx, a%l%dy, a%r%ax, a%r%k, a%r%dx, a%r%dy, b%y1, b%y2, &
+             b%l%ax, b%l%k, b%l%dx, b%l%dy, b%r%ax, b%r%k, b%r%dx, b%r%dy, trap_contact(b, a)
+     end if
+     ncont(kc) = ncont(kc) + 1
      if (trap_overlap_positive(b, a) .neqv. ex) then
         nfail = nfail + 1
         if (nfail <= 5) write(*, '(a,i0)') 'FAIL asymmetric case ', ic
@@ -41,6 +51,7 @@ program test_trapoverlap
   end do
   write(*, '(a,i0,a,i0,a,i0,a,i0)') 'test_trapoverlap cases=', ncases, ' overlapping=', nov, &
        ' touching=', ntouch, ' failures=', nfail
+  write(*, '(a,4(1x,i0))') 'test_trapoverlap contact kinds (none point segment overlap):', ncont
   if (nfail == 0) then
      write(*, '(a)') 'test_trapoverlap PASS'
   else
@@ -118,6 +129,8 @@ contains
        if (r%y2 <= r%y1) cycle
        if (xat(r%l, r%y1, int(r%y1, int64)) > xat(r%r, r%y1, int(r%y1, int64)) + 1e-12_real64) cycle
        if (xat(r%l, r%y1, int(r%y2, int64)) > xat(r%r, r%y1, int(r%y2, int64)) + 1e-12_real64) cycle
+       if (xat(r%r, r%y1, int(r%y1, int64)) - xat(r%l, r%y1, int(r%y1, int64)) + &
+           xat(r%r, r%y1, int(r%y2, int64)) - xat(r%l, r%y1, int(r%y2, int64)) < 1e-9_real64) cycle   ! zero area
        exit
     end do
     t = r
@@ -167,6 +180,55 @@ contains
     ar = 0.5_real64 * ar
     if (ar < 0) ar = 0
   end function clip_area
+
+  !> Reference contact kind: overlap from the exact-area clip; else the closed intersection by a
+  !> tolerant clip (1e-9), whose diameter tells a point from a segment.
+  integer function ref_contact(a, b, ar) result(k)
+    type(Trapezoid), intent(in) :: a, b
+    real(real64), intent(in) :: ar
+    real(real64) :: px(32), py(32), qx(32), qy(32), cx(4), cy(4), ex, ey, s1, s2, t, d, el
+    integer :: n, m, e, i, j, i2
+    if (ar > 1.0e-7_real64) then
+       k = 3; return
+    end if
+    call corners(a, px, py); n = 4
+    call corners(b, cx, cy)
+    do e = 1, 4
+       j = mod(e, 4) + 1
+       ex = cx(j) - cx(e); ey = cy(j) - cy(e)
+       el = sqrt(ex * ex + ey * ey)
+       if (el == 0) cycle
+       m = 0
+       do i = 1, n
+          i2 = mod(i, n) + 1
+          s1 = (ex * (py(i) - cy(e)) - ey * (px(i) - cx(e))) / el
+          s2 = (ex * (py(i2) - cy(e)) - ey * (px(i2) - cx(e))) / el
+          if (s1 >= -1.0e-9_real64) then
+             m = m + 1; qx(m) = px(i); qy(m) = py(i)
+          end if
+          if ((s1 >= -1.0e-9_real64) .neqv. (s2 >= -1.0e-9_real64)) then
+             t = (s1 + 1.0e-9_real64) / (s1 - s2)
+             m = m + 1
+             qx(m) = px(i) + t * (px(i2) - px(i)); qy(m) = py(i) + t * (py(i2) - py(i))
+          end if
+       end do
+       n = m; px(1:n) = qx(1:n); py(1:n) = qy(1:n)
+       if (n == 0) then
+          k = 0; return
+       end if
+    end do
+    d = 0
+    do i = 1, n
+       do j = 1, n
+          d = max(d, (px(i) - px(j))**2 + (py(i) - py(j))**2)
+       end do
+    end do
+    if (d > 1.0e-10_real64) then
+       k = 2
+    else
+       k = 1
+    end if
+  end function ref_contact
 
   subroutine corners(t, x, y)
     type(Trapezoid), intent(in) :: t

@@ -45,7 +45,7 @@ module TrapezoidModule
   public :: side_vertical, side_from_points, side_reanchor, side_x_num, side_x_floor, side_x_ceil
   public :: side_x_cmp, side_equal
   public :: trap_make, trap_from_box_coords, trap_is_box, trap_mbr, trap_clip_y, trap_valid
-  public :: trap_less, trap_equal, trap_hash, trap_area2, trap_sort, trap_overlap_positive
+  public :: trap_less, trap_equal, trap_hash, trap_area2, trap_sort, trap_overlap_positive, trap_contact
   public :: SlopeTab, stab_init, stab_add, slope_key
 
   !> Slope -> accumulated numerator table (trap_area2).
@@ -326,6 +326,128 @@ contains
     if (outside_side(b%r, b%y1, a, .false.)) return
     ov = .true.
   end function trap_overlap_positive
+
+  !> Contact of two trapezoids: 0 disjoint, 1 they meet in a single point, 2 they meet along a
+  !> segment of positive length (interiors disjoint), 3 interiors intersect. With disjoint
+  !> interiors the closed intersection lies on a closed separating line L (an edge line of one of
+  !> them); each trapezoid meets L in the span of its vertices on L, and the contact is the
+  !> overlap of the two spans. All decisions exact.
+  elemental pure integer function trap_contact(a, b) result(k)
+    !$omp declare target
+    type(Trapezoid), intent(in) :: a, b
+    integer :: c
+    k = 0
+    if (b%y1 > a%y2 .or. b%y2 < a%y1) return
+    if (trap_overlap_positive(a, b)) then
+       k = 3; return
+    end if
+    if (strict_out(a%l, a%y1, b, .true.) .or. strict_out(a%r, a%y1, b, .false.) .or. &
+        strict_out(b%l, b%y1, a, .true.) .or. strict_out(b%r, b%y1, a, .false.)) return
+    if (b%y1 == a%y2 .or. b%y2 == a%y1) then                 ! contact on one row
+       if (b%y1 == a%y2) then
+          k = row_contact(a, b, a%y2)
+       else
+          k = row_contact(a, b, a%y1)
+       end if
+       return
+    end if
+    ! y ranges overlap with positive length: a closed separating side line exists
+    if (outside_side(a%l, a%y1, b, .true.)) then
+       k = line_contact(a%l, a%y1, a, b); return
+    end if
+    if (outside_side(a%r, a%y1, b, .false.)) then
+       k = line_contact(a%r, a%y1, a, b); return
+    end if
+    if (outside_side(b%l, b%y1, a, .true.)) then
+       k = line_contact(b%l, b%y1, a, b); return
+    end if
+    if (outside_side(b%r, b%y1, a, .false.)) then
+       k = line_contact(b%r, b%y1, a, b); return
+    end if
+    c = 0
+    k = 1                                                     ! unreachable for valid input
+  end function trap_contact
+
+  !> a's row y (top or bottom) against b's row y: overlap of the two closed x intervals.
+  pure integer function row_contact(a, b, y) result(k)
+    !$omp declare target
+    type(Trapezoid), intent(in) :: a, b
+    integer(int32), intent(in) :: y
+    integer :: c1, c2, c3
+    integer(int64) :: y8
+    y8 = y
+    ! lo = max(a.l, b.l), hi = min(a.r, b.r) at y; positive length iff lo < hi
+    c1 = side_x_cmp(a%l, int(a%y1, int64), b%r, int(b%y1, int64), y8)    ! a.l vs b.r
+    c2 = side_x_cmp(b%l, int(b%y1, int64), a%r, int(a%y1, int64), y8)    ! b.l vs a.r
+    if (c1 > 0 .or. c2 > 0) then
+       k = 0; return
+    end if
+    c3 = 0
+    if (c1 == 0 .or. c2 == 0) then
+       k = 1
+    else
+       k = 2
+    end if
+    ! a or b may be zero-width at y (triangle apex): then a point at most
+    if (side_x_cmp(a%l, int(a%y1, int64), a%r, int(a%y1, int64), y8) == 0 .or. &
+        side_x_cmp(b%l, int(b%y1, int64), b%r, int(b%y1, int64), y8) == 0) k = min(k, 1)
+  end function row_contact
+
+  !> Contact of a and b along the line of side s (anchored at row sy1): y spans of the vertices
+  !> of each trapezoid lying on the line, then their overlap.
+  pure integer function line_contact(s, sy1, a, b) result(k)
+    !$omp declare target
+    type(TrapSide), intent(in) :: s
+    integer(int32), intent(in) :: sy1
+    type(Trapezoid), intent(in) :: a, b
+    integer(int32) :: alo, ahi, blo, bhi
+    logical :: fa, fb
+    call on_line_span(s, sy1, a, alo, ahi, fa)
+    call on_line_span(s, sy1, b, blo, bhi, fb)
+    k = 0
+    if (.not. (fa .and. fb)) return
+    if (max(alo, blo) > min(ahi, bhi)) return
+    if (max(alo, blo) == min(ahi, bhi)) then
+       k = 1
+    else
+       k = 2
+    end if
+  end function line_contact
+
+  pure subroutine on_line_span(s, sy1, t, lo, hi, found)
+    !$omp declare target
+    type(TrapSide), intent(in) :: s
+    integer(int32), intent(in) :: sy1
+    type(Trapezoid), intent(in) :: t
+    integer(int32), intent(out) :: lo, hi
+    logical, intent(out) :: found
+    lo = huge(lo); hi = -huge(hi); found = .false.
+    if (orient(s, sy1, t%l, t%y1, t%y1) == 0 .or. orient(s, sy1, t%r, t%y1, t%y1) == 0) then
+       lo = min(lo, t%y1); hi = max(hi, t%y1); found = .true.
+    end if
+    if (orient(s, sy1, t%l, t%y1, t%y2) == 0 .or. orient(s, sy1, t%r, t%y1, t%y2) == 0) then
+       lo = min(lo, t%y2); hi = max(hi, t%y2); found = .true.
+    end if
+  end subroutine on_line_span
+
+  !> All four vertices of t strictly on the outer side of side s.
+  pure logical function strict_out(s, sy1, t, is_left) result(out)
+    !$omp declare target
+    type(TrapSide), intent(in) :: s
+    integer(int32), intent(in) :: sy1
+    type(Trapezoid), intent(in) :: t
+    logical, intent(in) :: is_left
+    integer :: c1, c2, c3, c4
+    c1 = orient(s, sy1, t%l, t%y1, t%y1)
+    c2 = orient(s, sy1, t%r, t%y1, t%y1)
+    c3 = orient(s, sy1, t%l, t%y1, t%y2)
+    c4 = orient(s, sy1, t%r, t%y1, t%y2)
+    if (is_left) then
+       out = c1 > 0 .and. c2 > 0 .and. c3 > 0 .and. c4 > 0
+    else
+       out = c1 < 0 .and. c2 < 0 .and. c3 < 0 .and. c4 < 0
+    end if
+  end function strict_out
 
   !> All four vertices of t on the closed outer side of side s (of a trapezoid starting at row
   !> sy1): left of (or on) a left side, right of (or on) a right side, directed upward.
