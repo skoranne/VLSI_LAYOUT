@@ -320,9 +320,13 @@ contains
       integer, intent(in) :: k
       character(len=*), intent(in) :: s
       type(Token), allocatable :: tmp(:)
+      integer :: j2
       if( p%ntok == size(p%toks) ) then
          allocate( tmp( 2*size(p%toks) ) )
-         tmp(1:p%ntok) = p%toks(1:p%ntok)
+         do j2 = 1, p%ntok                      ! element-wise (deferred-length component)
+            tmp(j2)%kind = p%toks(j2)%kind; tmp(j2)%iv = p%toks(j2)%iv; tmp(j2)%rv = p%toks(j2)%rv
+            if( allocated( p%toks(j2)%s ) ) tmp(j2)%s = p%toks(j2)%s
+         end do
          call move_alloc( tmp, p%toks )
       end if
       p%ntok = p%ntok + 1
@@ -459,8 +463,7 @@ contains
       character(len=*), intent(in) :: s
       type(PropString), allocatable :: tmp(:)
       if( lam%nparams == size(lam%params) ) then
-         allocate( tmp( 2*size(lam%params) ) ); tmp(1:lam%nparams) = lam%params(1:lam%nparams)
-         call move_alloc( tmp, lam%params )
+         call PropStringsGrow( lam%params, 2*size(lam%params), lam%nparams )
       end if
       lam%nparams = lam%nparams + 1
       lam%params(lam%nparams)%s = s
@@ -478,8 +481,7 @@ contains
       slot_of = 0
       if( .not. create ) return
       if( lam%nslots == size(lam%slots) ) then
-         allocate( tmp( 2*size(lam%slots) ) ); tmp(1:lam%nslots) = lam%slots(1:lam%nslots)
-         call move_alloc( tmp, lam%slots )
+         call PropStringsGrow( lam%slots, 2*size(lam%slots), lam%nslots )
       end if
       lam%nslots = lam%nslots + 1
       lam%slots(lam%nslots)%s = s
@@ -514,6 +516,18 @@ contains
     lam%nodes(lam%nnodes)%op = op
     new_node = lam%nnodes
   end function new_node
+
+  !> Append a name (explicit grow + element copy; an array constructor of PropString with a
+  !> deferred-length component drops the strings with gfortran / nvfortran).
+  subroutine push_name( v, s )
+    type(PropString), allocatable, intent(inout) :: v(:)
+    character(len=*), intent(in) :: s
+    integer :: n
+    n = 0
+    if( allocated(v) ) n = size(v)
+    call PropStringsGrow( v, n+1, n )
+    v(n+1)%s = s
+  end subroutine push_name
 
   integer function bin_node( lam, code, a, b ) result(k)
     type(Lambda), intent(inout) :: lam
@@ -686,7 +700,7 @@ contains
              if( p%toks(p%pos)%kind /= T_ID ) then
                 p%status = 1; p%msg = 'STRUCT field name expected'; return
              end if
-             fnames = [ fnames, PropString( p%toks(p%pos)%s ) ]
+             call push_name( fnames, p%toks(p%pos)%s )
              p%pos = p%pos + 1
              call expect( p, '=' )
              call parse_expr( p, lam, t, a )
@@ -696,7 +710,12 @@ contains
           call expect( p, ')' )
           e = new_node( lam, N_STRUCT )
           lam%nodes(e)%args = args
-          lam%nodes(e)%names = fnames
+          ! element-wise copy: whole-array assignment of a type with a deferred-length
+          ! character component loses the strings with gfortran 13 / nvfortran 26.1
+          allocate( lam%nodes(e)%names( size(fnames) ) )
+          do k = 1, size(fnames)
+             lam%nodes(e)%names(k)%s = fnames(k)%s
+          end do
           return
        end if
        ! NAME.field(id) : field of an existing STRUCT property
@@ -881,23 +900,24 @@ contains
   recursive function eval( lam, k, ids, locals, t ) result(v)
     type(Lambda), intent(in) :: lam
     integer, intent(in) :: k
-    integer(int64), intent(in) :: ids(:)
+    integer(int64), intent(in) :: ids(*)   ! assumed size: nvfortran 26.1 lost the assumed-shape descriptor in this recursion
     type(PropValue), intent(in) :: locals(:)
     type(PropertyTable), intent(in) :: t
     type(PropValue) :: v, a, b, c
     integer(int64) :: ord
     integer :: j
-    associate( nd => lam%nodes(k) )
-      select case( nd%op )
-      case( N_INT );   v = ival( nd%iv )
-      case( N_FLT );   v = rval( nd%rv )
-      case( N_STR );   v%kind = PV_STRING; v%s = nd%sv
-      case( N_PARAM ); v = ival( ids(nd%slot) )
+    ! no associate here: nvfortran 26.1 keeps the associate name of a recursive function in
+    ! static storage, so nested calls overwrote it (wrong operands after the first recursion)
+      select case( lam%nodes(k)%op )
+      case( N_INT );   v = ival( lam%nodes(k)%iv )
+      case( N_FLT );   v = rval( lam%nodes(k)%rv )
+      case( N_STR );   v%kind = PV_STRING; v%s = lam%nodes(k)%sv
+      case( N_PARAM ); v = ival( ids(lam%nodes(k)%slot) )
       case( N_LOCAL )
-         v = locals( nd%slot )
-         if( v%kind == PV_NONE ) v = err( lam%slots(nd%slot)%s//' used before it is assigned' )
+         v = locals( lam%nodes(k)%slot )
+         if( v%kind == PV_NONE ) v = err( lam%slots(lam%nodes(k)%slot)%s//' used before it is assigned' )
       case( N_NEG )
-         a = eval( lam, nd%a, ids, locals, t )
+         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
          select case( a%kind )
          case( PV_INT );   v = ival( -a%i )
          case( PV_FLOAT ); v = rval( -a%r )
@@ -905,25 +925,25 @@ contains
          case default;     v = err( 'unary - needs a number' )
          end select
       case( N_NOT )
-         a = eval( lam, nd%a, ids, locals, t )
+         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
          if( a%kind == PV_ERROR ) then
             v = a
          else
             v = ival( merge( 0_int64, 1_int64, truthy( a ) ) )
          end if
       case( N_BIN )
-         if( nd%fn == B_AND .or. nd%fn == B_OR ) then
-            a = eval( lam, nd%a, ids, locals, t )
+         if( lam%nodes(k)%fn == B_AND .or. lam%nodes(k)%fn == B_OR ) then
+            a = eval( lam, lam%nodes(k)%a, ids, locals, t )
             if( a%kind == PV_ERROR ) then
                v = a; return
             end if
-            if( nd%fn == B_AND .and. .not. truthy( a ) ) then
+            if( lam%nodes(k)%fn == B_AND .and. .not. truthy( a ) ) then
                v = ival( 0_int64 ); return
             end if
-            if( nd%fn == B_OR .and. truthy( a ) ) then
+            if( lam%nodes(k)%fn == B_OR .and. truthy( a ) ) then
                v = ival( 1_int64 ); return
             end if
-            b = eval( lam, nd%b, ids, locals, t )
+            b = eval( lam, lam%nodes(k)%b, ids, locals, t )
             if( b%kind == PV_ERROR ) then
                v = b
             else
@@ -931,28 +951,28 @@ contains
             end if
             return
          end if
-         a = eval( lam, nd%a, ids, locals, t )
+         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
          if( a%kind == PV_ERROR ) then
             v = a; return
          end if
-         b = eval( lam, nd%b, ids, locals, t )
+         b = eval( lam, lam%nodes(k)%b, ids, locals, t )
          if( b%kind == PV_ERROR ) then
             v = b; return
          end if
-         v = binop( nd%fn, a, b )
+         v = binop( lam%nodes(k)%fn, a, b )
       case( N_STRUCT )
          v = eval_struct( lam, k, ids, locals, t )
       case( N_FIELD )
-         a = eval( lam, nd%a, ids, locals, t )
+         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
          if( a%kind == PV_ERROR ) then
             v = a; return
          end if
          if( a%kind /= PV_STRUCT ) then
-            v = err( '.'//nd%sv//' applied to a non-STRUCT value' ); return
+            v = err( '.'//lam%nodes(k)%sv//' applied to a non-STRUCT value' ); return
          end if
-         v = err( 'STRUCT has no field '//nd%sv )
+         v = err( 'STRUCT has no field '//lam%nodes(k)%sv )
          do j = 1, size( a%f )
-            if( a%f(j)%name == nd%sv ) then
+            if( a%f(j)%name == lam%nodes(k)%sv ) then
                v = PropValue()
                v%kind = a%f(j)%kind; v%i = a%f(j)%i; v%r = a%f(j)%r
                if( allocated( a%f(j)%s ) ) v%s = a%f(j)%s
@@ -960,7 +980,7 @@ contains
             end if
          end do
       case( N_PROP, N_PROPF )
-         a = eval( lam, nd%a, ids, locals, t )
+         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
          if( a%kind == PV_ERROR ) then
             v = a; return
          end if
@@ -969,18 +989,17 @@ contains
          if( c%kind == PV_ERROR ) then
             v = c; return
          end if
-         if( nd%op == N_PROP ) then
-            v = PropGetValue( t, nd%col, ord )
+         if( lam%nodes(k)%op == N_PROP ) then
+            v = PropGetValue( t, lam%nodes(k)%col, ord )
          else
-            v = PropGetField( t, nd%col, nd%sv, ord )
+            v = PropGetField( t, lam%nodes(k)%col, lam%nodes(k)%sv, ord )
          end if
-         if( v%kind == PV_NONE ) v = err( 'property '//t%cols(nd%col)%name//' has no value on this polygon' )
+         if( v%kind == PV_NONE ) v = err( 'property '//t%cols(lam%nodes(k)%col)%name//' has no value on this polygon' )
       case( N_CALL )
-         v = call_builtin( lam, nd, ids, locals, t )
+         v = call_builtin( lam, lam%nodes(k), ids, locals, t )
       case default
          v = err( 'internal: bad node' )
       end select
-    end associate
   end function eval
 
   ! STRUCT constructor, outside eval's associate block (nvfortran 26.1 ICE: "args$sd1 is an
@@ -988,7 +1007,7 @@ contains
   recursive function eval_struct( lam, k, ids, locals, t ) result(v)
     type(Lambda), intent(in) :: lam
     integer, intent(in) :: k
-    integer(int64), intent(in) :: ids(:)
+    integer(int64), intent(in) :: ids(*)   ! assumed size: nvfortran 26.1 lost the assumed-shape descriptor in this recursion
     type(PropValue), intent(in) :: locals(:)
     type(PropertyTable), intent(in) :: t
     type(PropValue) :: v, a
@@ -1100,7 +1119,7 @@ contains
   recursive function call_builtin( lam, nd, ids, locals, t ) result(v)
     type(Lambda), intent(in) :: lam
     type(Node), intent(in) :: nd
-    integer(int64), intent(in) :: ids(:)
+    integer(int64), intent(in) :: ids(*)   ! assumed size: nvfortran 26.1 lost the assumed-shape descriptor in this recursion
     type(PropValue), intent(in) :: locals(:)
     type(PropertyTable), intent(in) :: t
     type(PropValue) :: v, a, b, e

@@ -89,6 +89,15 @@ module FASCLConnectModule
 
 contains
 
+  subroutine copy_record( a, b )
+    type(ConnectRecord), intent(in) :: a
+    type(ConnectRecord), intent(inout) :: b
+    b%live = a%live; b%n_nets = a%n_nets; b%n_contacts = a%n_contacts
+    b%n_polygons = a%n_polygons; b%tech = a%tech
+    if( allocated( a%specs ) ) call PropStringsAssign( b%specs, a%specs )
+    if( allocated( a%defn ) )  call PropStringsAssign( b%defn, a%defn )
+  end subroutine copy_record
+
   !> Check the operand list: routing cut routing [cut routing ...], distinct layers.
   subroutine ConnectValidate( specs, Ls, status, msg )
     type(PropString), intent(in) :: specs(:)
@@ -129,12 +138,14 @@ contains
     if( .not. allocated( connect_records ) ) allocate( connect_records(4) )
     if( n_connect_records == size( connect_records ) ) then
        allocate( tmp( 2*n_connect_records ) )
-       tmp(1:n_connect_records) = connect_records(1:n_connect_records)
+       do i = 1, n_connect_records                 ! element-wise (PropString arrays inside)
+          call copy_record( connect_records(i), tmp(i) )
+       end do
        call move_alloc( tmp, connect_records )
     end if
     n_connect_records = n_connect_records + 1
     rec = n_connect_records
-    connect_records(rec)%specs = specs
+    call PropStringsAssign( connect_records(rec)%specs, specs )
     connect_records(rec)%live = .true.
     do i = 1, size(Ls)
        if( .not. allocated( Ls(i)%p%props ) ) cycle

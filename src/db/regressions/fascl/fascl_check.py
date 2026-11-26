@@ -20,6 +20,16 @@ import sys
 import csv as csvmod
 
 errors = []
+
+def shape_props(ly, sh):
+    """Property dict of a shape: Shape.properties() (KLayout 0.30+) or, on older versions,
+    Layout.properties(prop_id) as a list of [name, value] pairs."""
+    if hasattr(sh, "properties"):
+        return sh.properties()
+    if sh.prop_id == 0:
+        return {}
+    return {k: v for k, v in ly.properties(sh.prop_id)}
+
 def fail(msg):
     errors.append(msg)
     if len(errors) < 40:
@@ -51,7 +61,7 @@ def layer_polys(ly, l, d, with_props):
         while not it.at_end():
             sh = it.shape()
             if sh.is_box() or sh.is_polygon() or sh.is_path():
-                res.append((sh.polygon.transformed(it.trans()), sh.properties() if with_props else {}))
+                res.append((sh.polygon.transformed(it.trans()), shape_props(ly, sh) if with_props else {}))
             it.next()
     return res
 

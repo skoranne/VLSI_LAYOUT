@@ -28,6 +28,8 @@ module PropertyTableModule
   integer, parameter, public :: PV_NONE = 0, PV_INT = 1, PV_FLOAT = 2, PV_STRING = 3, &
        PV_STRUCT = 4, PV_ERROR = 5
 
+  public :: PropStringsGrow, PropStringsAssign
+
   type, public :: PropString
      character(len=:), allocatable :: s
   end type PropString
@@ -109,6 +111,35 @@ module PropertyTableModule
   public :: PropNetNamesSet, PropNetNamesDrop, PropNetName, PropNetNamesHave
 
 contains
+
+  !> Resize v to newsize keeping v(1:n). Arrays of PropString are copied element by element:
+  !> whole-array assignment / array constructors of a type with a deferred-length character
+  !> component lose the strings with nvfortran 26.1 (and some gfortran versions).
+  subroutine PropStringsGrow( v, newsize, n )
+    type(PropString), allocatable, intent(inout) :: v(:)
+    integer, intent(in) :: newsize, n
+    type(PropString), allocatable :: tmp(:)
+    integer :: j
+    allocate( tmp(newsize) )
+    if( allocated(v) ) then
+       do j = 1, min( n, size(v), newsize )
+          if( allocated( v(j)%s ) ) tmp(j)%s = v(j)%s
+       end do
+    end if
+    call move_alloc( tmp, v )
+  end subroutine PropStringsGrow
+
+  !> dst = src (fresh allocation, element-wise copy; see PropStringsGrow).
+  subroutine PropStringsAssign( dst, src )
+    type(PropString), allocatable, intent(inout) :: dst(:)
+    type(PropString), intent(in) :: src(:)
+    integer :: j
+    if( allocated(dst) ) deallocate(dst)
+    allocate( dst( size(src) ) )
+    do j = 1, size(src)
+       if( allocated( src(j)%s ) ) dst(j)%s = src(j)%s
+    end do
+  end subroutine PropStringsAssign
 
   !=================================================================
   ! Index: polygons of the current geometry, canonical ordinals, stats.
@@ -490,9 +521,7 @@ contains
              if( idx == 0 ) then
                 nf = nf + 1
                 if( nf > size(fnames) ) then
-                   allocate( tmpn( 2*size(fnames) ) )
-                   tmpn(1:nf-1) = fnames(1:nf-1)
-                   call move_alloc( tmpn, fnames )
+                   call PropStringsGrow( fnames, 2*size(fnames), nf-1 )
                 end if
                 fnames(nf)%s = vals(p)%f(k)%name
              end if

@@ -1402,7 +1402,7 @@ contains
     do while( len_trim(rest) > 0 )
        k = index( rest, ' ' )
        if( n == size(specs) ) then
-          allocate( tmp(2*n) ); tmp(1:n) = specs(1:n); call move_alloc( tmp, specs )
+          call PropStringsGrow( specs, 2*n, n )
        end if
        n = n + 1
        if( k == 0 ) then
@@ -1411,7 +1411,7 @@ contains
           specs(n)%s = rest(1:k-1); rest = trim(adjustl(rest(k+1:)))
        end if
     end do
-    specs = specs(1:n)
+    call PropStringsGrow( specs, n, n )
     status = 0
     msg = ''
     stack_tech = ''
