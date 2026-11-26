@@ -130,4 +130,46 @@ inline bool path_to_rects(const std::vector<Pt>& v, int64_t hw, int64_t ext_star
     return true;
 }
 
+// Bounding box of a path outline of any direction: each segment is a rectangle of half-width
+// hw around the centreline, the first/last segment extended by ext_start/ext_end along its
+// direction, and interior joints mitred (edges extended to meet; 27.10 leaves joints to the
+// application, this is the common GDSII/KLayout reading). The miter is limited to 1/cos(80 deg)
+// times hw for very sharp turns. Coordinates are rounded outward. false if v has no segment.
+inline bool path_bbox(const std::vector<Pt>& v0, int64_t hw, int64_t ext_start, int64_t ext_end,
+                      int64_t& x1, int64_t& y1, int64_t& x2, int64_t& y2) {
+    std::vector<Pt> v;
+    for (auto& q : v0) if (v.empty() || v.back().x != q.x || v.back().y != q.y) v.push_back(q);
+    if (v.size() < 2) return false;
+    double bx1 = 1e300, by1 = 1e300, bx2 = -1e300, by2 = -1e300;
+    auto add = [&](double x, double y) { bx1 = std::min(bx1, x); by1 = std::min(by1, y); bx2 = std::max(bx2, x); by2 = std::max(by2, y); };
+    const size_t ns = v.size() - 1;
+    const double w = (double)hw;
+    std::vector<double> ux(ns), uy(ns);
+    for (size_t i = 0; i < ns; ++i) {
+        const double dx = (double)(v[i + 1].x - v[i].x), dy = (double)(v[i + 1].y - v[i].y), l = std::sqrt(dx * dx + dy * dy);
+        ux[i] = dx / l; uy[i] = dy / l;
+    }
+    for (size_t i = 0; i < ns; ++i) {
+        double ax = (double)v[i].x, ay = (double)v[i].y, bx = (double)v[i + 1].x, by = (double)v[i + 1].y;
+        if (i == 0) { ax -= ux[i] * (double)ext_start; ay -= uy[i] * (double)ext_start; }
+        if (i + 1 == ns) { bx += ux[i] * (double)ext_end; by += uy[i] * (double)ext_end; }
+        const double nx = -uy[i] * w, ny = ux[i] * w;
+        add(ax + nx, ay + ny); add(ax - nx, ay - ny); add(bx + nx, by + ny); add(bx - nx, by - ny);
+    }
+    for (size_t i = 1; i < ns; ++i) {                         // miter points at joint v[i]
+        const double c = ux[i - 1] * ux[i] + uy[i - 1] * uy[i]; // cos of the turn
+        const double half = std::sqrt(std::max(0.0, (1.0 + c) / 2.0));   // cos(turn/2)
+        const double f = 1.0 / std::max(half, std::cos(80.0 * M_PI / 180.0));
+        double mx = -uy[i - 1] - uy[i], my = ux[i - 1] + ux[i];  // sum of the two left normals
+        const double ml = std::sqrt(mx * mx + my * my);
+        if (ml < 1e-12) continue;
+        mx = mx / ml * w * f; my = my / ml * w * f;
+        add((double)v[i].x + mx, (double)v[i].y + my); add((double)v[i].x - mx, (double)v[i].y - my);
+    }
+    const double eps = 1e-9;
+    x1 = (int64_t)std::floor(bx1 + eps); y1 = (int64_t)std::floor(by1 + eps);
+    x2 = (int64_t)std::ceil(bx2 - eps); y2 = (int64_t)std::ceil(by2 - eps);
+    return true;
+}
+
 } // namespace ldbgeom

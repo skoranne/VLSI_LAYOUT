@@ -31,6 +31,7 @@ module ControlModule
   use MagicVLSILayoutParser
   use LayoutDBLoaderModule
   use TRSOptimizerModule
+  use LayerMeasureModule, only: LayerMeasures, MeasureDisjointBoxes, MeasuresToString
   use PropertyTableModule
   use FASCLModule
   use FASCLConnectModule
@@ -238,6 +239,43 @@ contains
     write(*,'(A,I0,A,A,A,I0,A,I0,A,I0,A,I0)') 'LAYER_DIGEST line=', line_no, ' layer=', lname, &
          ' n=', n, ' area=', area, ' hsum=', hsum, ' hxor=', hxor
   end subroutine PrintLayerDigest
+
+  !> `exec measure` of one db:layer reference: heal (PreprocessLayer) when needed, then print
+  !> MEASURE line=<n> layer=<ref> boxes= polygons= holes= vertices= area= perimeter= time=
+  subroutine MeasureLayerRef( ref, line_no, design_dbs, ht )
+    character(len=*), intent(in) :: ref
+    integer, intent(in) :: line_no
+    type(Design), intent(inout), target :: design_dbs(:)
+    type(hash_type), intent(inout) :: ht
+    integer :: c, dbi, li
+    logical :: found
+    type(LayerMeasures) :: m
+    real(kind=real64) :: t0, t1
+    c = index(ref, ':')
+    if( c == 0 ) then
+       write(*,'(A,A)') 'ERROR: exec measure: expected db:layer, got ', ref
+       return
+    end if
+    call hash_get( ht, ref(1:c-1), dbi, found )
+    if( .not. found ) then
+       write(*,'(A,A)') 'ERROR: exec measure: unknown design ', ref(1:c-1)
+       return
+    end if
+    call hash_get( design_dbs(dbi)%ht, ref(c+1:), li, found )
+    if( .not. found ) then
+       write(*,'(A,I0,A,A,A)') 'MEASURE line=', line_no, ' layer=', ref, ' missing'
+       return
+    end if
+    call cpu_time(t0)
+    associate( L => design_dbs(dbi)%layers(li) )
+      if( L%is_compact ) call LayerExpand( L )
+      if( L%n_used > 0 .and. NeedsHealing( L ) ) call PreprocessLayer( L )
+      call MeasureDisjointBoxes( L%layer_boxes, L%n_used, m )
+    end associate
+    call cpu_time(t1)
+    write(*,'(A,I0,A,A,A,A,A,F0.2)') 'MEASURE line=', line_no, ' layer=', ref, ' ', MeasuresToString(m), &
+         ' time=', t1 - t0
+  end subroutine MeasureLayerRef
 
   subroutine ParseControlFile( fileName, MAX_LAYERS )
     character(len=*), intent(in) :: fileName
@@ -650,6 +688,17 @@ contains
                    write(*,*) 'ERROR: hierinfo unknown db: ', trim(rest)
                 end if
              end if
+             cycle read_loop
+          else if( trim(rest(1:pos-1)) == 'measure' ) then
+             !> exec measure d1:LAYER [d1:LAYER ...]: rotation-invariant measurements of the
+             !> merged layer (measure.f90). The layer is healed in place if it is not already.
+             rest = adjustl(rest(pos+1:))
+             do while( len_trim(rest) > 0 )
+                pos = index(rest, ' ')
+                if (pos == 0) pos = len_trim(rest)+1
+                call MeasureLayerRef( trim(rest(1:pos-1)), line_number, design_dbs, ht )
+                rest = adjustl(rest(pos:))
+             end do
              cycle read_loop
           else if( trim(rest(1:pos-1)) == 'init' ) then
              rest = adjustl(rest(pos+1:))             

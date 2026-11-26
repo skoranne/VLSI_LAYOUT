@@ -1,5 +1,7 @@
 #include "layoutdb_internal.hpp"
 #include "layoutdb_hier.h"
+#include "flat_xform.hpp"
+#include <cstdio>
 #include <cmath>
 #include <functional>
 #include <set>
@@ -30,18 +32,6 @@ static void transform_point(const LdbTransform& t, int64_t ix, int64_t iy, int64
     oy = t.oy + (int64_t)llround(ry);
 }
 
-// Unit magnification and a multiple of 90 degrees: exact integer arithmetic.
-static bool orthogonal_matrix(const LdbTransform& t, int64_t m[4]){
-    if(t.mag != 1.0) return false;
-    double q = t.angle_deg / 90.0;
-    if(q != std::floor(q)) return false;
-    int k = (int)(((long long)q % 4 + 4) % 4);
-    static const int64_t c4[4] = {1,0,-1,0}, s4[4] = {0,1,0,-1};
-    int64_t my = t.mirror_x ? -1 : 1;
-    m[0] = c4[k]; m[1] = -s4[k]*my; m[2] = s4[k]; m[3] = c4[k]*my;
-    return true;
-}
-
 static void transform_bbox(const LdbTransform& t, int64_t x1,int64_t y1,int64_t x2,int64_t y2,
                            int64_t& ox1,int64_t& oy1,int64_t& ox2,int64_t& oy2){
     int64_t px[4], py[4];
@@ -51,18 +41,6 @@ static void transform_bbox(const LdbTransform& t, int64_t x1,int64_t y1,int64_t 
     transform_point(t, x1,y2, px[3],py[3]);
     ox1=ox2=px[0]; oy1=oy2=py[0];
     for(int i=1;i<4;i++){ if(px[i]<ox1)ox1=px[i]; if(px[i]>ox2)ox2=px[i]; if(py[i]<oy1)oy1=py[i]; if(py[i]>oy2)oy2=py[i]; }
-}
-
-// Placement `inst` seen through its parent's transform:
-//   P(I(p)) = Rp Mp sp (Ri Mi si p + oi) + op,  and  Mp Ri = R(-ai) Mp.
-// Array expansion is handled by the caller.
-static void compose_transform(const LdbTransform& parent, const LdbTransform& inst, LdbTransform& out){
-    out = inst;
-    transform_point(parent, inst.ox, inst.oy, out.ox, out.oy);
-    out.mag = parent.mag * inst.mag;
-    out.angle_deg = parent.angle_deg + (parent.mirror_x ? -inst.angle_deg : inst.angle_deg);
-    out.mirror_x = parent.mirror_x ^ inst.mirror_x;
-    out.cols = 1; out.rows = 1; out.dx=out.dy=out.row_dx=out.row_dy=0;
 }
 
 // Compute bbox of an axis-aligned repetition array given one element's bbox and repetition params.
@@ -133,10 +111,13 @@ static bool cell_extent_flat(LdbFile* f, const std::string& cname,
     return ext.valid;
 }
 
-// For hierarchical iteration, emit boxes. Use repetition expansion but avoid per-call overhead where possible.
-static void hier_iter_cell(LdbFile* f, const std::string& cname, const LdbTransform& cur_tr,
+// For hierarchical iteration, emit boxes. `cur_tr` is the composed map of the cell into the
+// top cell (ldbflat::Affine, rounded once per emitted point). Orthogonal maps are exact; a
+// non-orthogonal map (any-angle placement) turns each box into rectangle strips of the
+// rotated rectangle, an approximation counted in `approx` (exact shapes: polygon iterator).
+static void hier_iter_cell(LdbFile* f, const std::string& cname, const ldbflat::Affine& cur_tr,
                            int depth, int max_depth, ldb_box_cb cb, void* ud,
-                           std::set<std::string>& visiting){
+                           std::set<std::string>& visiting, int64_t& approx){
     auto it = f->cell_index.find(cname);
     if(it == f->cell_index.end()) return;
     if(visiting.count(cname)) return; // cycle guard
@@ -146,20 +127,21 @@ static void hier_iter_cell(LdbFile* f, const std::string& cname, const LdbTransf
     {
         std::vector<LdbBoxElem> scratch;
         const std::vector<LdbBoxElem>& boxes = cell_boxes(cell, scratch);
-        int64_t m[4];
-        if(orthogonal_matrix(cur_tr, m)){
+        int64_t m[4], tx, ty;
+        if(cur_tr.orthogonal(m, tx, ty)){
             for(auto& b : boxes){
                 int64_t ax = m[0]*b.x1 + m[1]*b.y1, ay = m[2]*b.x1 + m[3]*b.y1;
                 int64_t bx = m[0]*b.x2 + m[1]*b.y2, by = m[2]*b.x2 + m[3]*b.y2;
                 cb(ud, cname.c_str(), b.layer, b.datatype, b.kind,
-                   cur_tr.ox + std::min(ax,bx), cur_tr.oy + std::min(ay,by),
-                   cur_tr.ox + std::max(ax,bx), cur_tr.oy + std::max(ay,by));
+                   tx + std::min(ax,bx), ty + std::min(ay,by),
+                   tx + std::max(ax,bx), ty + std::max(ay,by));
             }
         } else {
+            std::vector<ldbgeom::Rect> strips;
             for(auto& b : boxes){
-                int64_t x1,y1,x2,y2;
-                transform_bbox(cur_tr, b.x1,b.y1,b.x2,b.y2, x1,y1,x2,y2);
-                cb(ud, cname.c_str(), b.layer, b.datatype, b.kind, x1,y1,x2,y2);
+                ldbflat::rotated_box_strips(cur_tr, b.x1,b.y1,b.x2,b.y2, strips);
+                ++approx;
+                for(auto& r : strips) cb(ud, cname.c_str(), b.layer, b.datatype, b.kind, r[0],r[1],r[2],r[3]);
             }
         }
     }
@@ -171,13 +153,8 @@ static void hier_iter_cell(LdbFile* f, const std::string& cname, const LdbTransf
             int64_t rows = inst.tr.rows < 1 ? 1 : inst.tr.rows;
             for(int64_t r=0; r<rows; ++r){
                 for(int64_t c=0; c<cols; ++c){
-                    LdbTransform tr = inst.tr;
-                    tr.cols = 1; tr.rows = 1;
-                    tr.ox = inst.tr.ox + c*inst.tr.dx + r*inst.tr.row_dx;
-                    tr.oy = inst.tr.oy + c*inst.tr.dy + r*inst.tr.row_dy;
-                    LdbTransform child;
-                    compose_transform(cur_tr, tr, child);
-                    hier_iter_cell(f, inst.ref_name, child, depth+1, max_depth, cb, ud, visiting);
+                    ldbflat::Affine child = ldbflat::compose(cur_tr, ldbflat::from_placement(inst.tr, c, r));
+                    hier_iter_cell(f, inst.ref_name, child, depth+1, max_depth, cb, ud, visiting, approx);
                 }
             }
         }
@@ -185,13 +162,21 @@ static void hier_iter_cell(LdbFile* f, const std::string& cname, const LdbTransf
     visiting.erase(cname);
 }
 
+static void report_approx(const char* who, int64_t approx){
+    if(approx > 0)
+        fprintf(stderr, "WARNING: %s: %lld boxes under non-orthogonal placements approximated by "
+                "rectangle strips (LDB_SLANT_STRIPS); use the polygon iterator for exact shapes\n",
+                who, (long long)approx);
+}
+
 extern "C" int ldb_iterate_boxes_hier(ldb_file_t* fh, const char* top_cell, int max_depth, ldb_box_cb cb, void* ud){
     auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
     std::string top = (top_cell && top_cell[0]) ? std::string(top_cell) : std::string();
-    LdbTransform idtr{};
+    ldbflat::Affine idtr; int64_t approx = 0;
     std::set<std::string> visiting;
     if(!top.empty()){
-        hier_iter_cell(f, top, idtr, 0, max_depth, cb, ud, visiting);
+        hier_iter_cell(f, top, idtr, 0, max_depth, cb, ud, visiting, approx);
+        report_approx("ldb_iterate_boxes_hier", approx);
         return 0;
     }
     // auto-detect tops: indegree 0
@@ -199,9 +184,10 @@ extern "C" int ldb_iterate_boxes_hier(ldb_file_t* fh, const char* top_cell, int 
     for(auto& c: f->cells){ indeg[c.name]; for(auto& r: c.refs) indeg[r]++; for(auto& ins: c.instances) indeg[ins.ref_name]++; }
     bool any=false;
     for(auto& c: f->cells){
-        if(indeg[c.name]==0){ any=true; visiting.clear(); hier_iter_cell(f, c.name, idtr, 0, max_depth, cb, ud, visiting); }
+        if(indeg[c.name]==0){ any=true; visiting.clear(); hier_iter_cell(f, c.name, idtr, 0, max_depth, cb, ud, visiting, approx); }
     }
-    if(!any){ for(auto& c: f->cells){ visiting.clear(); hier_iter_cell(f, c.name, idtr, 0, max_depth, cb, ud, visiting); } }
+    if(!any){ for(auto& c: f->cells){ visiting.clear(); hier_iter_cell(f, c.name, idtr, 0, max_depth, cb, ud, visiting, approx); } }
+    report_approx("ldb_iterate_boxes_hier", approx);
     return 0;
 }
 

@@ -22,6 +22,15 @@ struct LdbPoint { int64_t x=0, y=0; };
 struct LdbPolyElem {
     int layer=0, datatype=0, kind=0; // kind: 0=boundary/polygon,1=path,2=box/rect
     std::vector<LdbPoint> pts; // vertices in DBU, may be closed or open per source
+    // paths (kind 1): full width and resolved end extensions (GDSII PATHTYPE 0/2/4; 1 = round,
+    // kept as pathtype and approximated by half-width extensions)
+    int64_t width=0, ext_begin=0, ext_end=0; int pathtype=0;
+};
+
+struct LdbTextElem {
+    int layer=0, texttype=0;
+    int64_t x=0, y=0;
+    std::string str;
 };
 
 struct LdbTransform {
@@ -67,12 +76,18 @@ struct LdbCell {
     std::string boxes_spill_path;       // low-memory mode: disk-backed compact box storage
     bool boxes_on_disk = false;
     std::vector<LdbPolyElem> polys; // polygon/path vertices (local), optional
+    // false: when polys is non-empty it holds every shape of the cell (GDSII);
+    // true:  polys holds the non-rectangle shapes only, and the boxes of kind 2 are the
+    //        rectangles (OASIS: RECTANGLE and axis-parallel TRAPEZOID/CTRAPEZOID).
+    bool polys_extra = false;
+    std::vector<LdbTextElem> texts;   // TEXT elements (not in low-memory mode)
     std::vector<LdbInstance> instances; // hierarchical placements (repeated layout preserved)
     std::vector<LdbProperty> properties;
 };
 
 struct LdbFile {
     int format = 0;
+    double dbu_per_micron = 0;  // OASIS START unit; GDSII 1e-6 / (meters per database unit); 0 = unknown
     void* map = nullptr;
     size_t size = 0;
     int fd = -1;

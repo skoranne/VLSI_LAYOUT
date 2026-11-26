@@ -1,3 +1,5 @@
+#include "flat_xform.hpp"
+#include <unordered_set>
 #include "layoutdb_internal.hpp"
 #include "compact_boxes.hpp"
 #include <sys/mman.h>
@@ -315,9 +317,18 @@ extern "C" size_t ldb_memory_bytes(const ldb_file_t* fh){
     return s;
 }
 
+bool write_gdsii_model(const LdbFile* f, const char* path, std::string& err);   // gdsii.cpp
+
+extern "C" double ldb_dbu_per_micron(const ldb_file_t* fh){ return fh ? ((const LdbFile*)fh)->dbu_per_micron : 0.0; }
+
 extern "C" int ldb_write_gdsii(const ldb_file_t* fh, const char* out_path, char* errbuf, size_t errbuf_sz){
     auto* f=(const LdbFile*)fh; if(errbuf&&errbuf_sz) errbuf[0]='\0';
-    if(!f || f->format!=1 || f->gds_records.empty()){ if(errbuf) snprintf(errbuf,errbuf_sz,"no GDSII record stream loaded"); return -1; }
+    if(!f){ if(errbuf) snprintf(errbuf,errbuf_sz,"null"); return -1; }
+    if(f->format!=1 || f->gds_records.empty()){
+        std::string err;
+        if(!write_gdsii_model(f, out_path, err)){ if(errbuf) snprintf(errbuf,errbuf_sz,"%s",err.c_str()); return -1; }
+        return 0;
+    }
     FILE* fp=fopen(out_path,"wb"); if(!fp){ if(errbuf) snprintf(errbuf,errbuf_sz,"open for write failed"); return -1; }
     for(auto& r: f->gds_records){ if(fwrite(r.bytes.data(),1,r.bytes.size(),fp)!=r.bytes.size()){ fclose(fp); if(errbuf) snprintf(errbuf,errbuf_sz,"write failed"); return -1; } }
     fclose(fp); return 0;
@@ -337,109 +348,67 @@ extern "C" int ldb_iterate_boxes(ldb_file_t* fh, ldb_box_cb cb, void* ud){
     return 0;
 }
 
-static inline void ldb_xform_point(const LdbTransform& t, int64_t col, int64_t row,
-                                   int64_t x, int64_t y, int64_t& ox, int64_t& oy){
-    double px = (double)x, py = (double)y;
-    if(t.mirror_x) py = -py;
-    double ang = t.angle_deg * M_PI / 180.0;
-    double ca = std::cos(ang), sa = std::sin(ang);
-    double rx = ca*px - sa*py;
-    double ry = sa*px + ca*py;
-    rx *= t.mag; ry *= t.mag;
-    rx += (double)t.ox + (double)col * (double)t.dx + (double)row * (double)t.row_dx;
-    ry += (double)t.oy + (double)col * (double)t.dy + (double)row * (double)t.row_dy;
-    ox = (int64_t)std::llround(rx);
-    oy = (int64_t)std::llround(ry);
+// Top cells (indegree 0) of the file; all cells when there is none (a cycle).
+static std::vector<size_t> ldb_flat_roots(LdbFile* f){
+    std::unordered_set<std::string> referenced;
+    for(auto& c: f->cells){ for(auto& r: c.refs) referenced.insert(r); for(auto& i: c.instances) referenced.insert(i.ref_name); }
+    std::vector<size_t> roots;
+    for(size_t ci=0; ci<f->cells.size(); ci++) if(!referenced.count(f->cells[ci].name)) roots.push_back(ci);
+    if(roots.empty()) for(size_t ci=0; ci<f->cells.size(); ci++) roots.push_back(ci);
+    return roots;
 }
 
+// Walk the hierarchy below `ci` with the composed map `acc` (see flat_xform.hpp): `leaf` is
+// called for every cell reached, with the map of that cell into the root.
+template <class Leaf>
+static void ldb_flat_walk(LdbFile* f, size_t ci, const ldbflat::Affine& acc, std::vector<char>& on_stack, Leaf& leaf){
+    if(ci >= f->cells.size() || on_stack[ci]) return;      // cycle guard
+    on_stack[ci] = 1;
+    auto& c = f->cells[ci];
+    leaf(c, acc);
+    for(const auto& inst: c.instances){
+        auto it = f->cell_index.find(inst.ref_name);
+        if(it == f->cell_index.end()) continue;
+        for(int64_t row=0; row<std::max<int64_t>(1,inst.tr.rows); row++)
+            for(int64_t col=0; col<std::max<int64_t>(1,inst.tr.cols); col++)
+                ldb_flat_walk(f, it->second, ldbflat::compose(acc, ldbflat::from_placement(inst.tr, col, row)), on_stack, leaf);
+    }
+    on_stack[ci] = 0;
+}
+
+// Flattened boxes from the top cell(s), labelled with the top cell name. Orthogonal
+// placements are exact; under a non-orthogonal one a box becomes rectangle strips of the
+// rotated rectangle (approximation; ldb_iterate_polygons_flat gives the exact outline).
 extern "C" int ldb_iterate_boxes_flat(ldb_file_t* fh, ldb_box_cb cb, void* ud){
     auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
-    std::function<void(size_t,const char*,int64_t,int64_t,double,double,int,bool,
-                       int64_t,int64_t,int64_t,int64_t,int,std::set<size_t>&)> emit;
-    // Simplified: expand with accumulated transform by recursive walk
-    std::function<void(size_t,const LdbTransform&,const char*,std::set<size_t>&)> walk;
-    walk = [&](size_t ci, const LdbTransform& acc, const char* top_cell, std::set<size_t>& stack){
-        if(ci >= f->cells.size()) return;
-        if(stack.count(ci)) return; // cycle guard
-        stack.insert(ci);
-        auto& c = f->cells[ci];
-        // emit local boxes transformed by acc
-        auto emit_boxes = [&](const std::vector<LdbBoxElem>& bs){
-            for(const auto& b: bs){
-                // transform all 4 corners to get bbox
-                int64_t xs[4], ys[4];
-                ldb_xform_point(acc,0,0,b.x1,b.y1,xs[0],ys[0]);
-                ldb_xform_point(acc,0,0,b.x2,b.y1,xs[1],ys[1]);
-                ldb_xform_point(acc,0,0,b.x2,b.y2,xs[2],ys[2]);
-                ldb_xform_point(acc,0,0,b.x1,b.y2,xs[3],ys[3]);
-                int64_t x1=xs[0],x2=xs[0],y1=ys[0],y2=ys[0];
-                for(int k=1;k<4;k++){ if(xs[k]<x1)x1=xs[k]; if(xs[k]>x2)x2=xs[k]; if(ys[k]<y1)y1=ys[k]; if(ys[k]>y2)y2=ys[k]; }
-                cb(ud, top_cell, b.layer, b.datatype, b.kind, x1,y1,x2,y2);
-            }
-        };
-        if(!c.boxes.empty()) emit_boxes(c.boxes);
-        else if(!c.boxes_compact.empty() || c.boxes_on_disk) emit_boxes(ldb_load_boxes_on_demand(c));
-        // recurse into instances
-        for(const auto& inst: c.instances){
-            auto it = f->cell_index.find(inst.ref_name);
-            if(it == f->cell_index.end()) continue;
-            for(int64_t row=0; row<inst.tr.rows; row++){
-                for(int64_t col=0; col<inst.tr.cols; col++){
-                    // compose acc then inst.tr at (col,row)
-                    LdbTransform t2;
-                    // point p in child -> inst.tr applied at col,row -> acc applied at 0,0
-                    // We do it by transforming child points through inst.tr(col,row) then acc(0,0).
-                    // So create a combined transform by emitting via wrapper: easier to just build combined.
-                    // Combined: mirror/rot/mag of inst then translate, then acc.
-                    double px0=0,py0=0;
-                    // compose as: apply inst (with col,row offset) then acc
-                    // We'll compute combined by transforming a test basis; simpler: create lambda.
-                    LdbTransform comb = acc;
-                    // compute combined origin: inst origin at col,row transformed by acc
-                    int64_t iox,ioy;
-                    ldb_xform_point(inst.tr,col,row,0,0,iox,ioy);
-                    ldb_xform_point(acc,0,0,iox,ioy,comb.ox,comb.oy);
-                    // combined mag/angle/mirror: approximate for general case
-                    comb.mag = acc.mag * inst.tr.mag;
-                    bool acc_m = acc.mirror_x!=0;
-                    bool inst_m = inst.tr.mirror_x!=0;
-                    comb.mirror_x = (acc_m ^ inst_m) ? 1 : 0;
-                    comb.angle_deg = acc.angle_deg + (acc.mirror_x ? -inst.tr.angle_deg : inst.tr.angle_deg);
-                    comb.cols=1; comb.rows=1; comb.dx=0; comb.dy=0; comb.row_dx=0; comb.row_dy=0;
-                    walk(it->second, comb, top_cell, stack);
+    int64_t approx = 0;
+    std::vector<char> on_stack(f->cells.size(), 0);
+    std::vector<ldbgeom::Rect> strips;
+    for(size_t root: ldb_flat_roots(f)){
+        const char* top_cell = f->cells[root].name.c_str();
+        auto leaf = [&](LdbCell& c, const ldbflat::Affine& acc){
+            std::vector<LdbBoxElem> decoded;
+            const std::vector<LdbBoxElem>* bs = &c.boxes;
+            if(c.boxes.empty() && (!c.boxes_compact.empty() || c.boxes_on_disk)){ decoded = ldb_load_boxes_on_demand(c); bs = &decoded; }
+            int64_t m[4], tx, ty;
+            const bool ortho = acc.orthogonal(m, tx, ty);
+            for(const auto& b: *bs){
+                if(ortho){
+                    const int64_t ax = m[0]*b.x1 + m[1]*b.y1, ay = m[2]*b.x1 + m[3]*b.y1;
+                    const int64_t bx = m[0]*b.x2 + m[1]*b.y2, by = m[2]*b.x2 + m[3]*b.y2;
+                    cb(ud, top_cell, b.layer, b.datatype, b.kind, tx + std::min(ax,bx), ty + std::min(ay,by),
+                       tx + std::max(ax,bx), ty + std::max(ay,by));
+                } else {
+                    ldbflat::rotated_box_strips(acc, b.x1,b.y1,b.x2,b.y2, strips); ++approx;
+                    for(auto& r: strips) cb(ud, top_cell, b.layer, b.datatype, b.kind, r[0],r[1],r[2],r[3]);
                 }
             }
-        }
-        stack.erase(ci);
-    };
-    // flatten from each top-level cell? or from all cells; better flatten all, emitting as top cell name
-    // But iterate_boxes gives local boxes with their cell name. For flat, emit with root cell context.
-    // Simple: walk every cell as root with identity transform.
-    LdbTransform id; id.mag=1.0; id.angle_deg=0; id.mirror_x=0; id.ox=0; id.oy=0; id.cols=1; id.rows=1;
-    for(size_t ci=0; ci<f->cells.size(); ci++){
-        std::set<size_t> stack;
-        // emit only local boxes of this cell? No, flat should include descendants.
-        // We want all geometry flattened. Emit once per top cell? Better: emit each cell's flattened content labeled with that cell.
-        // But that duplicates geometry. Alternatively, only emit top cells (not referenced).
-        // Find top cells: not in any refs.
-        bool referenced=false;
-        for(auto& c2: f->cells){ if(c2.refs.count(f->cells[ci].name)) { referenced=true; break; } }
-        if(referenced) continue;
-        walk(ci, id, f->cells[ci].name.c_str(), stack);
+        };
+        ldb_flat_walk(f, root, ldbflat::Affine(), on_stack, leaf);
     }
-    // If no top cells found, fall back to all
-    bool any=false;
-    for(size_t ci=0; ci<f->cells.size(); ci++){
-        bool referenced=false;
-        for(auto& c2: f->cells){ if(c2.refs.count(f->cells[ci].name)) { referenced=true; break; } }
-        if(!referenced) { any=true; break; }
-    }
-    if(!any){
-        for(size_t ci=0; ci<f->cells.size(); ci++){
-            std::set<size_t> stack;
-            walk(ci, id, f->cells[ci].name.c_str(), stack);
-        }
-    }
+    if(approx > 0)
+        fprintf(stderr, "WARNING: ldb_iterate_boxes_flat: %lld boxes under non-orthogonal placements "
+                "approximated by rectangle strips\n", (long long)approx);
     return 0;
 }
 
@@ -462,6 +431,8 @@ extern "C" int ldb_iterate_polygons(ldb_file_t* fh, ldb_poly_cb cb, void* ud){
                 for(auto& pt: p.pts){ xs.push_back(pt.x); ys.push_back(pt.y); }
                 cb(ud, c.name.c_str(), p.layer, p.datatype, p.kind, (int)xs.size(), xs.data(), ys.data());
             }
+            if(c.polys_extra)
+                for(auto& b: c.boxes) if(b.kind==2) ldb_emit_poly_as_rect(cb,ud,c.name.c_str(),b.layer,b.datatype,b.kind,b.x1,b.y1,b.x2,b.y2);
         } else if(!c.boxes.empty()){
             for(auto& b: c.boxes){ ldb_emit_poly_as_rect(cb,ud,c.name.c_str(),b.layer,b.datatype,b.kind,b.x1,b.y1,b.x2,b.y2); }
         } else if(!c.boxes_compact.empty() || c.boxes_on_disk){
@@ -472,61 +443,44 @@ extern "C" int ldb_iterate_polygons(ldb_file_t* fh, ldb_poly_cb cb, void* ud){
     return 0;
 }
 
+// Flattened exact shapes from the top cell(s), labelled with the top cell name. Every vertex
+// is mapped by the composed placement map and rounded once (flat_xform.hpp), so rotated,
+// mirrored and magnified placements give the exact transformed outline. Paths (kind 1) are
+// emitted as their outline polygons (ldbflat::path_outline), not as centrelines.
 extern "C" int ldb_iterate_polygons_flat(ldb_file_t* fh, ldb_poly_cb cb, void* ud){
     auto* f=(LdbFile*)fh; if(!f||!cb) return -1;
-    std::function<void(size_t,const LdbTransform&,const char*,std::set<size_t>&)> walk;
-    walk = [&](size_t ci, const LdbTransform& acc, const char* top_cell, std::set<size_t>& stack){
-        if(ci >= f->cells.size()) return;
-        if(stack.count(ci)) return;
-        stack.insert(ci);
-        auto& c = f->cells[ci];
-        auto emit_poly_pts = [&](int layer,int datatype,int kind,const std::vector<LdbPoint>& pts){
-            std::vector<int64_t> xs(pts.size()), ys(pts.size());
-            for(size_t i=0;i<pts.size();i++) ldb_xform_point(acc,0,0,pts[i].x,pts[i].y,xs[i],ys[i]);
+    std::vector<char> on_stack(f->cells.size(), 0);
+    std::vector<int64_t> xs, ys;
+    std::vector<std::vector<LdbPoint>> outl;
+    for(size_t root: ldb_flat_roots(f)){
+        const char* top_cell = f->cells[root].name.c_str();
+        auto emit_pts = [&](const ldbflat::Affine& acc, int layer, int datatype, int kind, const std::vector<LdbPoint>& pts){
+            xs.resize(pts.size()); ys.resize(pts.size());
+            for(size_t i=0;i<pts.size();i++) acc.apply(pts[i].x, pts[i].y, xs[i], ys[i]);
             cb(ud, top_cell, layer, datatype, kind, (int)xs.size(), xs.data(), ys.data());
         };
-        auto emit_box = [&](const LdbBoxElem& b){
-            LdbPoint p1{b.x1,b.y1}, p2{b.x2,b.y1}, p3{b.x2,b.y2}, p4{b.x1,b.y2};
-            std::vector<LdbPoint> pts={p1,p2,p3,p4};
-            emit_poly_pts(b.layer,b.datatype,b.kind,pts);
+        auto emit_box = [&](const ldbflat::Affine& acc, const LdbBoxElem& b){
+            const std::vector<LdbPoint> pts = { {b.x1,b.y1}, {b.x2,b.y1}, {b.x2,b.y2}, {b.x1,b.y2} };
+            emit_pts(acc, b.layer, b.datatype, b.kind, pts);
         };
-        if(!c.polys.empty()){
-            for(auto& p: c.polys) emit_poly_pts(p.layer,p.datatype,p.kind,p.pts);
-        } else if(!c.boxes.empty()){
-            for(auto& b: c.boxes) emit_box(b);
-        } else if(!c.boxes_compact.empty() || c.boxes_on_disk){
-            auto decoded = ldb_load_boxes_on_demand(c);
-            for(auto& b: decoded) emit_box(b);
-        }
-        for(const auto& inst: c.instances){
-            auto it = f->cell_index.find(inst.ref_name);
-            if(it == f->cell_index.end()) continue;
-            for(int64_t row=0; row<inst.tr.rows; row++){
-                for(int64_t col=0; col<inst.tr.cols; col++){
-                    LdbTransform comb = acc;
-                    int64_t iox,ioy;
-                    ldb_xform_point(inst.tr,col,row,0,0,iox,ioy);
-                    ldb_xform_point(acc,0,0,iox,ioy,comb.ox,comb.oy);
-                    comb.mag = acc.mag * inst.tr.mag;
-                    bool acc_m = acc.mirror_x!=0;
-                    bool inst_m = inst.tr.mirror_x!=0;
-                    comb.mirror_x = (acc_m ^ inst_m) ? 1 : 0;
-                    comb.angle_deg = acc.angle_deg + (acc.mirror_x ? -inst.tr.angle_deg : inst.tr.angle_deg);
-                    comb.cols=1; comb.rows=1; comb.dx=0; comb.dy=0; comb.row_dx=0; comb.row_dy=0;
-                    walk(it->second, comb, top_cell, stack);
+        auto leaf = [&](LdbCell& c, const ldbflat::Affine& acc){
+            if(!c.polys.empty()){
+                for(auto& p: c.polys){
+                    if(p.pts.empty()) continue;
+                    if(p.kind == 1){
+                        outl.clear(); ldbflat::path_outline(p, outl);
+                        for(auto& o: outl) emit_pts(acc, p.layer, p.datatype, 1, o);
+                    } else emit_pts(acc, p.layer, p.datatype, p.kind, p.pts);
                 }
+                if(c.polys_extra) for(auto& b: c.boxes) if(b.kind==2) emit_box(acc, b);
+            } else if(!c.boxes.empty()){
+                for(auto& b: c.boxes) emit_box(acc, b);
+            } else if(!c.boxes_compact.empty() || c.boxes_on_disk){
+                for(auto& b: ldb_load_boxes_on_demand(c)) emit_box(acc, b);
             }
-        }
-        stack.erase(ci);
-    };
-    LdbTransform id; id.mag=1.0; id.angle_deg=0; id.mirror_x=0; id.ox=0; id.oy=0; id.cols=1; id.rows=1;
-    bool any=false;
-    for(size_t ci=0; ci<f->cells.size(); ci++){
-        bool referenced=false;
-        for(auto& c2: f->cells){ if(c2.refs.count(f->cells[ci].name)) { referenced=true; break; } }
-        if(!referenced){ any=true; std::set<size_t> st; walk(ci,id,f->cells[ci].name.c_str(),st); }
+        };
+        ldb_flat_walk(f, root, ldbflat::Affine(), on_stack, leaf);
     }
-    if(!any){ for(size_t ci=0; ci<f->cells.size(); ci++){ std::set<size_t> st; walk(ci,id,f->cells[ci].name.c_str(),st); } }
     return 0;
 }
 

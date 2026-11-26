@@ -1,6 +1,8 @@
 #include "layoutdb_internal.hpp"
 #include <cstring>
 #include <cmath>
+#include <ctime>
+#include <cstdio>
 #include "fracture.hpp"
 
 // GDSII stream parser: records [2-byte len][1-byte type][1-byte dtype][data]
@@ -12,11 +14,11 @@
 
 namespace {
 enum : uint8_t {
-    ENDLIB = 0x04, BGNSTR = 0x05, STRNAME = 0x06, ENDSTR = 0x07, BOUNDARY = 0x08, PATH = 0x09,
+    HEADER = 0x00, BGNLIB = 0x01, LIBNAME = 0x02, UNITS = 0x03, ENDLIB = 0x04, BGNSTR = 0x05, STRNAME = 0x06, ENDSTR = 0x07, BOUNDARY = 0x08, PATH = 0x09,
     SREF = 0x0A, AREF = 0x0B, TEXT = 0x0C, LAYER = 0x0D, DATATYPE = 0x0E, WIDTH = 0x0F, XY = 0x10,
     ENDEL = 0x11, SNAME = 0x12, COLROW = 0x13, NODE = 0x15, STRANS = 0x1A, MAG = 0x1B, ANGLE = 0x1C,
     PATHTYPE = 0x21, PROPATTR = 0x2B, PROPVALUE = 0x2C, BOX = 0x2D, BOXTYPE = 0x2E,
-    BGNEXTN = 0x30, ENDEXTN = 0x31
+    BGNEXTN = 0x30, ENDEXTN = 0x31, TEXTTYPE = 0x16, PRESENTATION = 0x17, STRING = 0x19
 };
 }
 
@@ -52,6 +54,9 @@ bool parse_gdsii(LdbFile* f) {
     std::vector<std::pair<int,std::string>> elem_props; int prop_attr = -1;
     // per-element state for PATH
     int64_t width=0, bgn_extn=0, end_extn=0; int pathtype=0;
+    // TEXT (kept in the model unless low-memory)
+    int texttype=0; std::string text_str;
+    const bool keep_texts = (f->open_flags & LDB_OPEN_LOW_MEMORY) == 0;
     std::vector<ldbgeom::Pt> verts; std::vector<ldbgeom::Rect> rects;
 
     auto reset_elem = [&](){
@@ -59,6 +64,7 @@ bool parse_gdsii(LdbFile* f) {
         sname.clear(); has_strans=false; strans_mirror=false; has_mag=false; has_angle=false;
         mag=1.0; angle=0.0; cols=0; rows=0; xypts.clear(); elem_props.clear(); prop_attr=-1;
         width=0; bgn_extn=0; end_extn=0; pathtype=0;
+        texttype=0; text_str.clear();
     };
 
     while (off+4 <= n) {
@@ -78,6 +84,10 @@ bool parse_gdsii(LdbFile* f) {
             reset_elem();
         } else if (rtype==ENDEL) {
             // finalize element
+            if(cur && in_elem && elem_type==TEXT && keep_texts && !xypts.empty()){
+                LdbTextElem t; t.layer=cur_layer; t.texttype=texttype; t.x=xypts[0].first; t.y=xypts[0].second; t.str=text_str;
+                cur->texts.push_back(std::move(t));
+            }
             if(cur && in_elem && (elem_type==SREF || elem_type==AREF) && !sname.empty() && !xypts.empty()){
                 LdbInstance inst; inst.ref_name = sname;
                 inst.tr.ox = xypts[0].first; inst.tr.oy = xypts[0].second;
@@ -115,6 +125,10 @@ bool parse_gdsii(LdbFile* f) {
             in_elem=true; elem_type=rtype;
         } else if (rtype==LAYER && dlen>=2) { cur_layer = be16s(data);
         } else if ((rtype==DATATYPE || rtype==BOXTYPE) && dlen>=2) { cur_dtype = be16s(data);
+        } else if (rtype==TEXTTYPE && dlen>=2) { texttype = be16s(data);
+        } else if (rtype==STRING) {
+            text_str.assign((const char*)data,(const char*)data+dlen);
+            while(!text_str.empty() && text_str.back()==0) text_str.pop_back();
         } else if (rtype==WIDTH && dlen>=4) { width = be32s(data); if(width<0) width=-width;
         } else if (rtype==PATHTYPE && dlen>=2) { pathtype = be16s(data);
         } else if (rtype==BGNEXTN && dlen>=4) { bgn_extn = be32s(data);
@@ -133,9 +147,8 @@ bool parse_gdsii(LdbFile* f) {
                         const int64_t e0 = (pathtype==4) ? bgn_extn : (pathtype==0 ? 0 : hw);
                         const int64_t e1 = (pathtype==4) ? end_extn : (pathtype==0 ? 0 : hw);
                         if(hw>0 && verts.size()>=2 && !ldbgeom::path_to_rects(verts, hw, e0, e1, rects)){
-                            int64_t x1=verts[0].x,x2=x1,y1=verts[0].y,y2=y1;
-                            for(auto& q: verts){ x1=std::min(x1,q.x); x2=std::max(x2,q.x); y1=std::min(y1,q.y); y2=std::max(y2,q.y); }
-                            rects.push_back({x1-hw,y1-hw,x2+hw,y2+hw});
+                            int64_t x1,y1,x2,y2;                   // any-angle: box of the mitred outline
+                            if(ldbgeom::path_bbox(verts, hw, e0, e1, x1, y1, x2, y2)) rects.push_back({x1,y1,x2,y2});
                         }
                     } else {
                         if(verts.size()>1 && verts.front().x==verts.back().x && verts.front().y==verts.back().y) verts.pop_back();
@@ -153,6 +166,12 @@ bool parse_gdsii(LdbFile* f) {
                     }
                     {
                         LdbPolyElem pe; pe.layer=cur_layer; pe.datatype=cur_dtype; pe.kind=kind;
+                        if(elem_type==PATH){
+                            pe.width=width; pe.pathtype=pathtype;
+                            const int64_t hw=width/2;
+                            pe.ext_begin=(pathtype==4)?bgn_extn:(pathtype==0?0:hw);
+                            pe.ext_end  =(pathtype==4)?end_extn:(pathtype==0?0:hw);
+                        }
                         pe.pts.reserve(xypts.size());
                         for(auto& pxy: xypts) pe.pts.push_back({pxy.first, pxy.second});
                         if(!pe.pts.empty()) cur->polys.push_back(std::move(pe));
@@ -186,6 +205,15 @@ bool parse_gdsii(LdbFile* f) {
             for (auto it=f->propnames.rbegin(); it!=f->propnames.rend(); ++it) {
                 if (it->second.empty()) { it->second.assign((const char*)data,(const char*)data+dlen); while(!it->second.empty()&&it->second.back()==0) it->second.pop_back(); break; }
             }
+        } else if (rtype==UNITS && dlen>=16) {
+            // user units per database unit, meters per database unit
+            const double m = be_real8(data+8);
+            if (m > 0) {
+                double d = 1e-6 / m;
+                const double r = std::round(d);
+                if (r > 0 && std::fabs(d - r) <= 1e-9 * r) d = r;
+                f->dbu_per_micron = d;
+            }
         } else if (rtype==ENDLIB) {
             off += reclen; break;
         }
@@ -195,4 +223,175 @@ bool parse_gdsii(LdbFile* f) {
     f->mem_bytes_extra = f->gds_records.size()*sizeof(LdbRawRecord);
     for(auto& r: f->gds_records) f->mem_bytes_extra += r.bytes.capacity();
     return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// GDSII writer from the format-neutral model (used when the model was not read from
+// GDSII). Polygons/paths are written as BOUNDARY/PATH when the source kept them, else every
+// box as a 5-point BOUNDARY; placements as SREF, arrays as AREF. Limits of the format
+// (16-bit layers and datatypes, 32-bit coordinates, 8191 points per XY record, 32767
+// columns/rows) are checked and reported, never silently wrapped.
+// ---------------------------------------------------------------------------
+namespace {
+
+void real8(double v, uint8_t* out) {
+    std::memset(out, 0, 8);
+    if (v == 0 || !std::isfinite(v)) return;
+    uint8_t sign = 0;
+    if (v < 0) { sign = 0x80; v = -v; }
+    int e = 0;
+    while (v >= 1.0) { v /= 16.0; ++e; }
+    while (v < 1.0 / 16.0) { v *= 16.0; --e; }
+    uint64_t mant = (uint64_t)std::llround(std::ldexp(v, 56));
+    if (mant >= (1ull << 56)) { mant >>= 4; ++e; }
+    if (e + 64 < 0) return;                                  // underflow: zero
+    if (e + 64 > 127) { e = 63; mant = (1ull << 56) - 1; }    // overflow: largest value
+    out[0] = (uint8_t)(sign | (e + 64));
+    for (int i = 7; i >= 1; --i) { out[i] = (uint8_t)(mant & 0xff); mant >>= 8; }
+}
+
+struct GdsOut {
+    FILE* fp; std::string err; std::vector<uint8_t> b;
+    void rec(uint8_t type, uint8_t dt, const uint8_t* data, size_t n) {
+        if (!err.empty()) return;
+        if (n + 4 > 65534) { err = "GDSII record too long"; return; }
+        const size_t len = 4 + n + (n & 1);
+        b.clear();
+        b.push_back((uint8_t)(len >> 8)); b.push_back((uint8_t)len); b.push_back(type); b.push_back(dt);
+        b.insert(b.end(), data, data + n);
+        if (n & 1) b.push_back(0);
+        if (fwrite(b.data(), 1, b.size(), fp) != b.size()) err = "write failed";
+    }
+    void none(uint8_t type) { rec(type, 0, nullptr, 0); }
+    void i16(uint8_t type, const std::vector<int64_t>& v) {
+        std::vector<uint8_t> d;
+        for (int64_t x : v) {
+            // signed 2-byte integer, as every GDSII reader (this one included: be16s) decodes it;
+            // layer, datatype and texttype must also be non-negative
+            const bool layerlike = type == LAYER || type == DATATYPE || type == TEXTTYPE;
+            if (x < (layerlike ? 0 : -32768) || x > 32767) {
+                err = "value " + std::to_string(x) + " does not fit a GDSII 2-byte integer field"; return;
+            }
+            d.push_back((uint8_t)((uint64_t)x >> 8)); d.push_back((uint8_t)x);
+        }
+        rec(type, 2, d.data(), d.size());
+    }
+    void i32(uint8_t type, const std::vector<int64_t>& v) {
+        std::vector<uint8_t> d;
+        for (int64_t x : v) {
+            if (x < INT32_MIN || x > INT32_MAX) { err = "coordinate " + std::to_string(x) + " does not fit a GDSII 4-byte integer"; return; }
+            const uint32_t u = (uint32_t)(int32_t)x;
+            d.push_back((uint8_t)(u >> 24)); d.push_back((uint8_t)(u >> 16)); d.push_back((uint8_t)(u >> 8)); d.push_back((uint8_t)u);
+        }
+        rec(type, 3, d.data(), d.size());
+    }
+    void r8(uint8_t type, const std::vector<double>& v) {
+        std::vector<uint8_t> d(8 * v.size());
+        for (size_t i = 0; i < v.size(); ++i) real8(v[i], d.data() + 8 * i);
+        rec(type, 5, d.data(), d.size());
+    }
+    void str(uint8_t type, const std::string& s) { rec(type, 6, (const uint8_t*)s.data(), s.size()); }
+    void bits(uint8_t type, uint16_t v) { const uint8_t d[2] = { (uint8_t)(v >> 8), (uint8_t)v }; rec(type, 1, d, 2); }   // bit array
+};
+
+enum : uint8_t { W_STRANS = 0x1A, W_ENDSTR = 0x07 };
+
+} // namespace
+
+bool write_gdsii_model(const LdbFile* f, const char* path, std::string& err) {
+    FILE* fp = fopen(path, "wb");
+    if (!fp) { err = "open for write failed"; return false; }
+    GdsOut o{ fp, "", {} };
+    const double dbu = f->dbu_per_micron > 0 ? f->dbu_per_micron : 1000.0;
+    std::time_t now = std::time(nullptr);
+    std::tm tmv{}; localtime_r(&now, &tmv);
+    const std::vector<int64_t> stamp = { tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday, tmv.tm_hour, tmv.tm_min, tmv.tm_sec };
+    std::vector<int64_t> two = stamp; two.insert(two.end(), stamp.begin(), stamp.end());
+    o.i16(HEADER, { 600 });
+    o.i16(BGNLIB, two);
+    o.str(LIBNAME, "LIB");
+    o.r8(UNITS, { 1.0 / dbu, 1e-6 / dbu });               // user unit = 1 micron
+    size_t skipped = 0, truncated_texts = 0;
+    auto xy_closed = [&](const std::vector<LdbPoint>& pts) {
+        std::vector<int64_t> v;
+        for (auto& q : pts) { v.push_back(q.x); v.push_back(q.y); }
+        if (!pts.empty() && (pts.front().x != pts.back().x || pts.front().y != pts.back().y)) { v.push_back(pts[0].x); v.push_back(pts[0].y); }
+        return v;
+    };
+    for (const auto& c : f->cells) {
+        o.i16(BGNSTR, two);
+        o.str(STRNAME, c.name);
+        for (const auto& inst : c.instances) {
+            const LdbTransform& t = inst.tr;
+            const bool aref = t.cols * t.rows > 1;
+            o.none(aref ? AREF : SREF);
+            o.str(SNAME, inst.ref_name);
+            if (t.mirror_x || t.mag != 1.0 || t.angle_deg != 0.0) {
+                o.bits(W_STRANS, t.mirror_x ? 0x8000 : 0);
+                if (t.mag != 1.0) o.r8(MAG, { t.mag });
+                if (t.angle_deg != 0.0) o.r8(ANGLE, { t.angle_deg });
+            }
+            if (aref) {
+                if (t.cols > 32767 || t.rows > 32767) { o.err = "array of " + std::to_string(t.cols) + " x " + std::to_string(t.rows) + " exceeds GDSII COLROW"; break; }
+                o.i16(COLROW, { t.cols, t.rows });
+                o.i32(XY, { t.ox, t.oy, t.ox + t.cols * t.dx, t.oy + t.cols * t.dy, t.ox + t.rows * t.row_dx, t.oy + t.rows * t.row_dy });
+            } else o.i32(XY, { t.ox, t.oy });
+            o.none(ENDEL);
+        }
+        if (!c.polys.empty()) {
+            for (const auto& p : c.polys) {
+                if (p.kind == 1) {
+                    if (p.pts.size() > 8191) { ++skipped; continue; }
+                    o.none(PATH);
+                    o.i16(LAYER, { p.layer }); o.i16(DATATYPE, { p.datatype });
+                    o.i16(PATHTYPE, { p.pathtype });
+                    if (p.width) o.i32(WIDTH, { p.width });
+                    if (p.pathtype == 4) { o.i32(BGNEXTN, { p.ext_begin }); o.i32(ENDEXTN, { p.ext_end }); }
+                    std::vector<int64_t> v;
+                    for (auto& q : p.pts) { v.push_back(q.x); v.push_back(q.y); }
+                    o.i32(XY, v);
+                } else {
+                    std::vector<int64_t> v = xy_closed(p.pts);
+                    if (v.size() / 2 > 8191 || v.size() / 2 < 4) { ++skipped; continue; }
+                    o.none(BOUNDARY);
+                    o.i16(LAYER, { p.layer }); o.i16(DATATYPE, { p.datatype });
+                    o.i32(XY, v);
+                }
+                o.none(ENDEL);
+            }
+        }
+        if (c.polys.empty() || c.polys_extra) {
+            std::vector<LdbBoxElem> decoded;
+            const std::vector<LdbBoxElem>* boxes = &c.boxes;
+            if (boxes->empty() && (!c.boxes_compact.empty() || c.boxes_on_disk)) {
+                extern std::vector<LdbBoxElem> ldb_load_boxes_on_demand(LdbCell& c);
+                decoded = ldb_load_boxes_on_demand(const_cast<LdbCell&>(c)); boxes = &decoded;
+            }
+            for (const auto& b : *boxes) {
+                if (c.polys_extra && b.kind != 2) continue;
+                o.none(BOUNDARY);
+                o.i16(LAYER, { b.layer }); o.i16(DATATYPE, { b.datatype });
+                o.i32(XY, { b.x1, b.y1, b.x2, b.y1, b.x2, b.y2, b.x1, b.y2, b.x1, b.y1 });
+                o.none(ENDEL);
+            }
+        }
+        for (const auto& t : c.texts) {
+            o.none(TEXT);
+            o.i16(LAYER, { t.layer }); o.i16(TEXTTYPE, { t.texttype });
+            o.i32(XY, { t.x, t.y });
+            if (t.str.size() > 512) { ++truncated_texts; o.str(STRING, t.str.substr(0, 512)); }    // GDSII limit 512 characters
+            else o.str(STRING, t.str);
+            o.none(ENDEL);
+        }
+        o.none(W_ENDSTR);
+        if (!o.err.empty()) break;
+    }
+    o.none(ENDLIB);
+    if (fclose(fp) != 0 && o.err.empty()) o.err = "write failed";
+    if (o.err.empty() && skipped) o.err = std::to_string(skipped) + " polygon/path(s) with more than 8191 points (or fewer than 3) not written";
+    if (truncated_texts)                             // written (truncated): a warning, not a failure
+        fprintf(stderr, "ldb_write_gdsii: %zu text string(s) longer than 512 characters truncated\n", truncated_texts);
+    err = o.err;
+    return err.empty();
 }

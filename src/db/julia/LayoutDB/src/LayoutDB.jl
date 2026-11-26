@@ -74,16 +74,19 @@ end
 
 # ============================================================================ LayoutFile
 """
-    LayoutFile(path; properties=false, strict=false)
+    LayoutFile(path; properties=false, strict=false, shapes=false)
 
-Open a GDSII or OASIS file (whole model in memory). `properties=true` keeps PROPERTY records
+Open a GDSII or OASIS file (whole model in memory). `shapes=true` (LDB_OPEN_SHAPES) also keeps the
+exact polygons, paths and texts, so `write_gds`/`write_oasis` re-encode them losslessly instead of
+writing the fractured boxes. `properties=true` keeps PROPERTY records
 (net ids and names, metrology tags, ...). Closed by `close(f)` or the finalizer.
 """
 mutable struct LayoutFile
     h::Ptr{Cvoid}
     path::String
-    function LayoutFile(path::AbstractString; properties::Bool = false, strict::Bool = false)
-        o = Ref(COpenOpts(UInt32((strict ? 1 : 0) | (properties ? 2 : 0)), 0))
+    function LayoutFile(path::AbstractString; properties::Bool = false, strict::Bool = false,
+                        shapes::Bool = false)
+        o = Ref(COpenOpts(UInt32((strict ? 1 : 0) | (properties ? 2 : 0) | (shapes ? 8 : 0)), 0))
         e = errbuf()
         h = ccall(sym(:ldb_open_opts), Ptr{Cvoid}, (Cstring, Ref{COpenOpts}, Ptr{UInt8}, Csize_t),
                   path, o, e, ERRN)
@@ -255,11 +258,12 @@ end
 """
     write_gds(f, path)
 
-Lossless rewrite of a file that was read as GDSII (its record stream is kept). Files read as
-OASIS cannot be written as GDSII (the library has no GDSII writer for the cell model).
+Write GDSII. A file read as GDSII is rewritten losslessly (its record stream is kept); any
+other model is written from the cell model (HEADER 600, UNITS from the database unit,
+SREF/AREF, BOUNDARY, PATH, TEXT). Values that do not fit GDSII raise an error.
 """
 write_gds(f::LayoutFile, path::AbstractString) = _write(f, :ldb_write_gdsii, path)
-"Write the cell model as OASIS (any source format)."
+"Write the cell model as strict-mode OASIS with CBLOCKs and repetitions (any source format); an OASIS source is copied byte for byte."
 write_oasis(f::LayoutFile, path::AbstractString) = _write(f, :ldb_write_oasis, path)
 
 """

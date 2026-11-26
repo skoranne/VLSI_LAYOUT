@@ -7,6 +7,7 @@ module layoutdb_f_api
   integer(c_int), parameter :: LDB_OPEN_STRICT_F     = 1
   integer(c_int), parameter :: LDB_OPEN_PROPERTY_F   = 2
   integer(c_int), parameter :: LDB_OPEN_LOW_MEMORY_F = 4
+  integer(c_int), parameter :: LDB_OPEN_SHAPES_F     = 8
 
   type, bind(C) :: ldb_extent_c
      integer(c_int64_t) :: xmin, ymin, xmax, ymax

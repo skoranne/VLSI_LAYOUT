@@ -87,7 +87,8 @@ version_mod.f90: ../.git/HEAD ../.git/index
 	@echo "end module version_mod" >> $@
 
 unit_test: test_contour.exe test_morton.exe CONVERT.exe test_boxmerge.exe \
-	   test_skiplist.exe test_compact_layer.exe test_viewer_index.exe
+	   test_skiplist.exe test_compact_layer.exe test_viewer_index.exe \
+	   test_wide_int.exe test_predicates.exe test_measure.exe test_trapmerge.exe
 
 clean:
 	rm -f *.o *.mod *.a *.exe
@@ -187,3 +188,18 @@ MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o viewer_tiles.o
 	$(LINKER_FC) $(FCFLAGS) magviewer.f90 viewer_font.o viewer_tiles.o $(LIBRARY) viewer_gl.o omp_target_stubs.o -L$(GLFW_LIBDIR) -Wl,-rpath,$(GLFW_LIBDIR) -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
        
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe MAGVIEWER.exe
+
+# Any-angle exact kernel unit tests
+test_wide_int.exe: test_wide_int.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_predicates.exe: test_predicates.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_measure.exe: test_measure.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapmerge.exe: test_trapmerge.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+TRAPMERGE.exe: trapmerge_main.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) trapmerge_main.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)

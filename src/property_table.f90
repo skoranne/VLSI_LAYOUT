@@ -122,7 +122,7 @@ contains
     logical, intent(out), optional     :: dropped
     integer(int64), allocatable :: root(:), amin(:), perm(:), fill(:)
     integer(int64), allocatable :: kx1(:), ky1(:), kx2(:), ky2(:)
-    integer(int64) :: i, r, p, np, h, nr, nid
+    integer(int64) :: i, r, p, np, h, nr, nid, bi
     logical :: have_uf
 
     if( present(dropped) ) dropped = .false.
@@ -223,16 +223,16 @@ contains
     deallocate( fill, root, amin )
 
     allocate( t%bbox(np), t%area(np) )
-    !$omp parallel do private(i) schedule(dynamic,256)
+    ! no associate inside the parallel loop: nvfortran 26.1 outlines it with a bad descriptor (SIGSEGV)
+    !$omp parallel do private(i, bi) schedule(dynamic,256)
     do p = 1, np
        t%bbox(p) = boxes( t%poly_boxes( t%poly_start(p) ) )
        t%area(p) = 0
        do i = t%poly_start(p), t%poly_start(p+1) - 1
-          associate( b => boxes( t%poly_boxes(i) ) )
-            t%bbox(p)%x1 = min( t%bbox(p)%x1, b%x1 ); t%bbox(p)%y1 = min( t%bbox(p)%y1, b%y1 )
-            t%bbox(p)%x2 = max( t%bbox(p)%x2, b%x2 ); t%bbox(p)%y2 = max( t%bbox(p)%y2, b%y2 )
-            t%area(p) = t%area(p) + int( b%x2 - b%x1, int64 ) * int( b%y2 - b%y1, int64 )
-          end associate
+          bi = t%poly_boxes(i)
+          t%bbox(p)%x1 = min( t%bbox(p)%x1, boxes(bi)%x1 ); t%bbox(p)%y1 = min( t%bbox(p)%y1, boxes(bi)%y1 )
+          t%bbox(p)%x2 = max( t%bbox(p)%x2, boxes(bi)%x2 ); t%bbox(p)%y2 = max( t%bbox(p)%y2, boxes(bi)%y2 )
+          t%area(p) = t%area(p) + int( boxes(bi)%x2 - boxes(bi)%x1, int64 ) * int( boxes(bi)%y2 - boxes(bi)%y1, int64 )
        end do
     end do
     !$omp end parallel do

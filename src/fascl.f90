@@ -178,7 +178,7 @@ contains
     i = 1
     do while( i <= len(rhs) )
        if( in_str ) then
-          if( rhs(i:i) == '\' ) then
+          if( rhs(i:i) == achar(92) ) then
              i = i + 1
           else if( rhs(i:i) == '"' ) then
              in_str = .false.
@@ -291,7 +291,7 @@ contains
              if( j > n ) then
                 p%status = 1; p%msg = 'unterminated string'; return
              end if
-             if( src(j:j) == '\' .and. j < n ) then
+             if( src(j:j) == achar(92) .and. j < n ) then
                 buf = buf // src(j+1:j+1); j = j + 2; cycle
              end if
              if( src(j:j) == '"' ) exit
@@ -941,20 +941,7 @@ contains
          end if
          v = binop( nd%fn, a, b )
       case( N_STRUCT )
-         v%kind = PV_STRUCT
-         allocate( v%f( size(nd%args) ) )
-         do j = 1, size( nd%args )
-            a = eval( lam, nd%args(j), ids, locals, t )
-            if( a%kind == PV_ERROR ) then
-               v = a; return
-            end if
-            if( a%kind == PV_STRUCT ) then
-               v = err( 'STRUCT fields must be INT, FLOAT or STRING (no nesting)' ); return
-            end if
-            v%f(j)%name = nd%names(j)%s
-            v%f(j)%kind = a%kind; v%f(j)%i = a%i; v%f(j)%r = a%r
-            if( allocated( a%s ) ) v%f(j)%s = a%s
-         end do
+         v = eval_struct( lam, k, ids, locals, t )
       case( N_FIELD )
          a = eval( lam, nd%a, ids, locals, t )
          if( a%kind == PV_ERROR ) then
@@ -995,6 +982,34 @@ contains
       end select
     end associate
   end function eval
+
+  ! STRUCT constructor, outside eval's associate block (nvfortran 26.1 ICE: "args$sd1 is an
+  ! inconsistent array descriptor" on an allocatable component through the associate name).
+  recursive function eval_struct( lam, k, ids, locals, t ) result(v)
+    type(Lambda), intent(in) :: lam
+    integer, intent(in) :: k
+    integer(int64), intent(in) :: ids(:)
+    type(PropValue), intent(in) :: locals(:)
+    type(PropertyTable), intent(in) :: t
+    type(PropValue) :: v, a
+    integer, allocatable :: args(:)
+    integer :: j
+    args = lam%nodes(k)%args
+    v%kind = PV_STRUCT
+    allocate( v%f( size(args) ) )
+    do j = 1, size( args )
+       a = eval( lam, args(j), ids, locals, t )
+       if( a%kind == PV_ERROR ) then
+          v = a; return
+       end if
+       if( a%kind == PV_STRUCT ) then
+          v = err( 'STRUCT fields must be INT, FLOAT or STRING (no nesting)' ); return
+       end if
+       v%f(j)%name = lam%nodes(k)%names(j)%s
+       v%f(j)%kind = a%kind; v%f(j)%i = a%i; v%f(j)%r = a%r
+       if( allocated( a%s ) ) v%f(j)%s = a%s
+    end do
+  end function eval_struct
 
   function binop( code, a, b ) result(v)
     integer, intent(in) :: code
@@ -1383,11 +1398,9 @@ contains
     type(Lambda) :: lam
     type(ValueColumn), allocatable :: outs(:)
     integer, allocatable :: out_slot(:)
-    type(PropValue), allocatable :: locals(:)
-    type(PropValue) :: errv, first_err
-    integer(int64) :: ord, np, err_ord, nskip
+    type(PropValue) :: first_err
+    integer(int64) :: np, err_ord, nskip
     integer :: k, j
-    logical :: skipped
     real(real64) :: t0, t1
 
     call LayerEnsureProperties( L, lname )
@@ -1421,7 +1434,42 @@ contains
     err_ord = huge(err_ord)
     nskip = 0
     call cpu_time( t0 )
-    !$omp parallel private(locals, errv, skipped, k, ord)
+    !$omp parallel
+    call run_lambda_worker( lam, L, np, outs, out_slot, err_ord, first_err, nskip )
+    !$omp end parallel
+    call cpu_time( t1 )
+    if( err_ord /= huge(err_ord) ) then
+       status = 1
+       write(msg,'(A)') ''
+       msg = 'FASCL runtime error on polygon #'//i8toa(err_ord)//' (id '// &
+            i8toa(L%props%poly_id(err_ord))//'): '//first_err%s
+       return
+    end if
+    do k = 1, size(names)
+       call PropCommitColumn( L%props, names(k)%s, outs(k)%v, status, msg )
+       if( status /= 0 ) return
+    end do
+    write(*,'(A,A,A,I0,A,I0,A,F10.3,A)') 'FASCL: ', lname, ' polygons=', np, ' skipped(WHEN)=', nskip, &
+         ' cpu=', t1 - t0, ' s'
+    status = 0
+    msg = ''
+  end subroutine FASCLRunLambda
+
+  ! Body of FASCLRunLambda's parallel region, called by every thread (outlined: nvfortran 26.1
+  ! ICE "mk_mem_ptr_shape: lwb not sdsc" on a private allocatable array of PropValue).
+  subroutine run_lambda_worker( lam, L, np, outs, out_slot, err_ord, first_err, nskip )
+    type(Lambda), intent(in) :: lam
+    type(Layer), intent(inout), target :: L
+    integer(int64), intent(in) :: np
+    type(ValueColumn), intent(inout) :: outs(:)
+    integer, intent(in) :: out_slot(:)
+    integer(int64), intent(inout) :: err_ord, nskip
+    type(PropValue), intent(inout) :: first_err
+    type(PropValue), allocatable :: locals(:)
+    type(PropValue) :: errv
+    integer(int64) :: ord
+    integer :: k
+    logical :: skipped
     allocate( locals( lam%nslots ) )
     !$omp do schedule(dynamic, 512) reduction(+:nskip)
     do ord = 1, np
@@ -1449,24 +1497,7 @@ contains
     end do
     !$omp end do
     deallocate( locals )
-    !$omp end parallel
-    call cpu_time( t1 )
-    if( err_ord /= huge(err_ord) ) then
-       status = 1
-       write(msg,'(A)') ''
-       msg = 'FASCL runtime error on polygon #'//i8toa(err_ord)//' (id '// &
-            i8toa(L%props%poly_id(err_ord))//'): '//first_err%s
-       return
-    end if
-    do k = 1, size(names)
-       call PropCommitColumn( L%props, names(k)%s, outs(k)%v, status, msg )
-       if( status /= 0 ) return
-    end do
-    write(*,'(A,A,A,I0,A,I0,A,F10.3,A)') 'FASCL: ', lname, ' polygons=', np, ' skipped(WHEN)=', nskip, &
-         ' cpu=', t1 - t0, ' s'
-    status = 0
-    msg = ''
-  end subroutine FASCLRunLambda
+  end subroutine run_lambda_worker
 
   pure function i8toa( i ) result(s)
     integer(int64), intent(in) :: i
