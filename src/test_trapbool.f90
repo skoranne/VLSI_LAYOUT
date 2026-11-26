@@ -19,6 +19,7 @@ program test_trapbool
   use ExactPredicatesModule
   use TrapezoidModule
   use TrapMergeModule
+  use TrapPNumModule
   implicit none
   integer, parameter :: NOP = 7
   integer(int32), parameter :: OPS(NOP) = [TOP_OR, TOP_AND, TOP_NOT, TOP_XOR, TOP_BNOTA, TOP_A, TOP_B]
@@ -40,6 +41,7 @@ program test_trapbool
   logical :: big
   integer(int64), parameter :: gsizes(5) = [8_int64, 16_int64, 40_int64, 200_int64, 3000_int64]
   integer(int64) :: tot_traps(NOP), tot_inexact, tot_samples, tot_mismatch_unsnapped
+  integer(int64) :: tot_polys = 0, tot_contacts = 0, tot_brute = 0
 
   ncase = 2000; seed = 4242
   if (command_argument_count() >= 1) then
@@ -105,6 +107,7 @@ program test_trapbool
         ar(iop) = nint(i128_to_real64(a2), int64)
         tot_traps(iop) = tot_traps(iop) + ntrap1
         if (.not. big) call check_samples(OPS(iop), OPN(iop))
+        call check_pnum(OPN(iop))
         if (mode == 0 .and. G <= 200 .and. offset == 0 .and. .not. big) then
            area2_int = ar(iop)
            if (area2_int /= 2*manhattan_cells_op(OPS(iop))) call fail('Manhattan area mismatch '//OPN(iop))
@@ -125,6 +128,8 @@ program test_trapbool
        ' inexact_crossings=', tot_inexact, ' samples=', tot_samples, &
        ' snapped_vs_exact_near_boundary=', tot_mismatch_unsnapped
   write(*, '(a,7(1x,a,"=",i0))') ' traps:', (trim(OPN(k)), tot_traps(k), k = 1, NOP)
+  write(*, '(a,i0,a,i0,a,i0)') ' pnum: polygons=', tot_polys, ' contacts=', tot_contacts, &
+       ' brute_force_checked=', tot_brute
   if (nfail > 0) then
      write(*, '(a)') 'FAIL'; error stop 1
   end if
@@ -229,6 +234,93 @@ contains
        end if
     end do
   end subroutine check_samples
+
+  !> PNUM of t1 vs the k-band result (canonical: identical), vs brute-force contacts over all
+  !> pairs, and the area/piece sums.
+  subroutine check_pnum(nm)
+    character(len=*), intent(in) :: nm
+    type(TrapPolys) :: P1, Pk
+    integer(int64), allocatable :: par(:), ck(:), bl(:)
+    integer(int64) :: i, j, r, s2, m, tot2
+    integer :: kk
+    call TrapPNum(t1, ntrap1, P1)
+    call TrapPNum(tk, ntrapk, Pk)
+    if (P1%anomalies /= 0) call fail('pnum anomalies '//nm)
+    tot_polys = tot_polys + P1%np; tot_contacts = tot_contacts + P1%contacts
+    if (P1%np /= Pk%np) then
+       call fail('pnum: band count changes the polygon count '//nm); return
+    end if
+    do i = 1, P1%np
+       if (P1%vx(i) /= Pk%vx(i) .or. P1%vy(i) /= Pk%vy(i) .or. P1%area2(i) /= Pk%area2(i) .or. &
+           P1%x1(i) /= Pk%x1(i) .or. P1%x2(i) /= Pk%x2(i) .or. P1%y1(i) /= Pk%y1(i) .or. &
+           P1%y2(i) /= Pk%y2(i)) then
+          call fail('pnum: band count changes polygon data '//nm); return
+       end if
+    end do
+    tot2 = 0
+    do i = 1, P1%np
+       tot2 = tot2 + P1%area2(i)
+    end do
+    if (tot2 /= ar(iop)) call fail('pnum: polygon areas do not sum to the layer area '//nm)
+    if (sum(P1%npieces(1:P1%np)) /= ntrap1 .and. ntrap1 > 0) call fail('pnum: piece count '//nm)
+    if (big .or. ntrap1 > 3000) return
+    ! brute force: every pair, both rows of either piece
+    tot_brute = tot_brute + 1
+    allocate(par(max(ntrap1, 1_int64)))
+    do i = 1, ntrap1
+       par(i) = i
+    end do
+    do i = 1, ntrap1
+       do j = i + 1, ntrap1
+          do kk = 1, 4
+             select case (kk)
+             case (1); r = t1(i)%y1
+             case (2); r = t1(i)%y2
+             case (3); r = t1(j)%y1
+             case default; r = t1(j)%y2
+             end select
+             if (r < max(t1(i)%y1, t1(j)%y1) .or. r > min(t1(i)%y2, t1(j)%y2)) cycle
+             if (traps_touch(t1(i), t1(j), r)) then
+                call bunion(par, i, j); exit
+             end if
+          end do
+       end do
+    end do
+    ! same partition: pieces i, j share a brute root <=> same label
+    allocate(bl(max(P1%np, 1_int64)), ck(max(ntrap1, 1_int64)))
+    bl = 0
+    do i = 1, ntrap1
+       r = bfind(par, i)
+       ! all pieces with the same brute root must have the same label, and labels map 1-1 to roots
+       if (bl(P1%lab(i)) == 0) then
+          bl(P1%lab(i)) = r
+       else if (bl(P1%lab(i)) /= r) then
+          call fail('pnum: grid contacts differ from brute force (split) '//nm); return
+       end if
+    end do
+    m = 0
+    do i = 1, ntrap1
+       if (bfind(par, i) == i) m = m + 1
+    end do
+    if (m /= P1%np) call fail('pnum: grid contacts differ from brute force (count) '//nm)
+  end subroutine check_pnum
+
+  integer(int64) function bfind(par, x0) result(x)
+    integer(int64), intent(inout) :: par(:)
+    integer(int64), intent(in) :: x0
+    x = x0
+    do while (par(x) /= x)
+       x = par(x)
+    end do
+  end function bfind
+
+  subroutine bunion(par, a, b)
+    integer(int64), intent(inout) :: par(:)
+    integer(int64), intent(in) :: a, b
+    integer(int64) :: ra, rb
+    ra = bfind(par, a); rb = bfind(par, b)
+    if (ra /= rb) par(max(ra, rb)) = min(ra, rb)
+  end subroutine bunion
 
   integer(int64) function manhattan_cells_op(op) result(cnt)
     integer(int32), intent(in) :: op

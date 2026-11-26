@@ -5,6 +5,7 @@
 !          sweep per op), timing breakdown, exact OASIS output (db/trap_out.cpp).
 !
 !   TRAPBOOL.exe IN OUT.oas LA/DA LB/DB [-ops OR,AND,NOT,XOR,BNOTA,A,B] [-b NBANDS] [-out L]
+!                [-pnum PREFIX]   (PNUM polygons per op -> PREFIX_<op>.csv: ord,vx,vy,area2,x1,y1,x2,y2,pieces)
 !
 ! Result of op k goes to layer L+k-1 (default L = 1000), datatype 0, in the order of -ops
 ! (default OR,AND,NOT,XOR). Lines:
@@ -18,6 +19,7 @@ program trapbool_main
   use WideIntModule
   use TrapezoidModule
   use TrapMergeModule
+  use TrapPNumModule
   implicit none
 
   interface
@@ -90,7 +92,9 @@ program trapbool_main
      end function ldb_ow_close
   end interface
 
-  character(len=4096) :: fin, fout, arg, opsarg
+  character(len=4096) :: fin, fout, arg, opsarg, pnumpfx
+  type(TrapPolys) :: PP
+  integer :: u
   character(kind=c_char) :: err(1024)
   integer :: nargs, i, k, nbands, ios, slash, nops, outbase, p0, p1, rc
   integer(c_int) :: lay(2), dt(2)
@@ -115,7 +119,7 @@ program trapbool_main
      stop 1
   end if
   call get_command_argument(1, fin); call get_command_argument(2, fout)
-  nbands = 0; outbase = 1000; opsarg = 'OR,AND,NOT,XOR'; nin = 0
+  nbands = 0; outbase = 1000; opsarg = 'OR,AND,NOT,XOR'; nin = 0; pnumpfx = ''
   i = 3
   do while (i <= nargs)
      call get_command_argument(i, arg)
@@ -123,6 +127,8 @@ program trapbool_main
         i = i + 1; call get_command_argument(i, arg); read(arg, *) nbands
      else if (trim(arg) == '-out') then
         i = i + 1; call get_command_argument(i, arg); read(arg, *) outbase
+     else if (trim(arg) == '-pnum') then
+        i = i + 1; call get_command_argument(i, pnumpfx)
      else if (trim(arg) == '-ops') then
         i = i + 1; call get_command_argument(i, opsarg)
      else
@@ -215,6 +221,21 @@ program trapbool_main
           ' out_trap_records=', ost(1), ' out_polygons=', ost(2), ' out_anomalies=', ost(7), &
           ' t_sweep=', res(k)%t_sweep, ' t_stitch=', res(k)%t_stitch, ' t_write=', twrite(k)
   end do
+  if (len_trim(pnumpfx) > 0) then
+     do k = 1, nops
+        call TrapPNum(res(k)%t, res(k)%n, PP)
+        write(*, '(a,a,a,i0,a,i0,a,i0,4(a,f0.3))') 'TRAPBOOL pnum op=', trim(opn(k)), ' polygons=', PP%np, &
+             ' contacts=', PP%contacts, ' anomalies=', PP%anomalies, ' t_grid=', PP%t_grid, &
+             ' t_contacts=', PP%t_contacts, ' t_union=', PP%t_union, ' t_props=', PP%t_props
+        open(newunit=u, file=trim(pnumpfx)//'_'//trim(opn(k))//'.csv', status='replace', action='write')
+        write(u, '(a)') 'ord,vx,vy,area2,x1,y1,x2,y2,pieces'
+        do j = 1, PP%np
+           write(u, '(i0,8(",",i0))') j, PP%vx(j), PP%vy(j), PP%area2(j), PP%x1(j), PP%y1(j), &
+                PP%x2(j), PP%y2(j), PP%npieces(j)
+        end do
+        close(u)
+     end do
+  end if
   call ldb_ow_end_cell(hw)
   if (ldb_ow_close(hw, wst) /= 0) stop 1
   write(*, '(6(a,i0))') 'TRAPBOOL out: rectangles=', wst(1), ' trapezoids=', wst(2), &

@@ -72,3 +72,18 @@ Unit fuzz test: `src/test_trapbool.exe [ncases] [seed] [offset] [npmax]`. It che
 brute-force winding pairs (snapped: exact; unsnapped: within 0.75 dbu), 1 band vs k bands, the
 identities, and exact Manhattan cell counts. B is built partly from exact and shifted copies of A,
 so the operands share edges and vertices.
+
+# Any-angle PNUM (polygon numbering)
+
+`trap_pnum.f90` (`TrapPNum`) numbers the polygons of a canonical trapezoid set. A polygon is a
+connected component of the closed region: pieces touching along an edge or at a single corner
+belong to the same polygon (the box-PNUM rule, and KLayout's `merged()`). Ordinal 1..N follows the
+lowest-then-leftmost vertex, so the numbering does not depend on how the region was cut into
+pieces, the band count or the thread count. Per polygon it reports that vertex, exact 2A, the
+bounding box and the piece count. Contacts between two canonical pieces always lie on a bottom or
+top row of one of them, so all tests are exact integer-row comparisons (cell grid + union-find).
+
+`TRAPBOOL.exe ... -pnum PREFIX` writes `PREFIX_<op>.csv`. `kl_pnum_check.py` compares it with
+KLayout's merge of the output, polygon by polygon (key = lowest-leftmost vertex: count, 2A, bbox).
+SDT16S poly x diff, OR/AND/NOT/XOR at R000 and R030: 332800 / 924876 / 1410031 / 332800 polygons,
+identical at both angles, and every polygon identical to KLayout's.

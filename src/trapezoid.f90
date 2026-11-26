@@ -46,6 +46,7 @@ module TrapezoidModule
   public :: side_x_cmp, side_equal
   public :: trap_make, trap_from_box_coords, trap_is_box, trap_mbr, trap_clip_y, trap_valid
   public :: trap_less, trap_equal, trap_hash, trap_area2, trap_sort
+  public :: SlopeTab, stab_init, stab_add, slope_key
 
   !> Slope -> accumulated numerator table (trap_area2).
   type :: SlopeTab
