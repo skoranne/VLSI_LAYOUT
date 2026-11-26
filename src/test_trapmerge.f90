@@ -260,7 +260,7 @@ contains
   subroutine winding(S, X, Y, wsum, on)
     type(FragSet), intent(in) :: S
     integer(int64), intent(in) :: X, Y
-    integer, intent(out) :: wsum
+    integer(int64), intent(out) :: wsum
     logical, intent(out) :: on
     integer(int64) :: a
     integer :: c
@@ -292,7 +292,8 @@ contains
 
   subroutine check_samples()
     integer(int64) :: X, Y, ax, ay
-    integer :: s, wsnap, worig, nin, c1, c2
+    integer :: s, nin, c1, c2
+    integer(int64) :: wsnap, worig
     logical :: on1, on2, onb
     integer(int64) :: i
     do s = 1, 400
@@ -332,7 +333,7 @@ contains
   !> unit cells (i+1/2, j+1/2) inside the input union (Manhattan cases)
   integer(int64) function manhattan_cells() result(cnt)
     integer(int64) :: x, y
-    integer :: w
+    integer(int64) :: w
     logical :: on
     cnt = 0
     if (G > 200) then

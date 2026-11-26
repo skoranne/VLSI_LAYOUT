@@ -46,12 +46,17 @@ module TrapMergeModule
 
   integer(int64), parameter :: KB = 1073741824_int64        ! 2**30, key bias
   integer(int64), parameter :: K31 = 2147483648_int64       ! 2**31
+  !> Region predicates of the sweep on the packed winding pair (WA, WB) of the snapped operands.
+  !> TOP_NONZERO is the single-operand merge (W /= 0, any packing).
+  integer(int32), parameter, public :: TOP_NONZERO = 0, TOP_OR = 1, TOP_AND = 2, TOP_NOT = 3, &
+       TOP_XOR = 4, TOP_BNOTA = 5, TOP_SELF2 = 6, TOP_A = 7, TOP_B = 8
+  integer(int64), parameter :: K32 = 4294967296_int64       ! 2**32, operand B weight
 
   !> Edges or fragments (SoA). Non-horizontal: y1 < y2. Horizontal: y1 == y2, x1 < x2, w = 0.
   type, public :: FragSet
      integer(int64) :: n = 0
      integer(int64), allocatable :: x1(:), y1(:), x2(:), y2(:)
-     integer(int32), allocatable :: w(:)
+     integer(int64), allocatable :: w(:)          !> packed winding pair wA + 2**32 wB (wpack)
   end type FragSet
 
   type, public :: TrapMergeStats
@@ -62,6 +67,15 @@ module TrapMergeModule
      real(real64) :: t_edges = 0, t_grid = 0, t_cross = 0, t_hot = 0, t_hits = 0, t_frag = 0
      real(real64) :: t_sweep = 0, t_stitch = 0, t_total = 0
   end type TrapMergeStats
+
+  !> One Boolean result (canonical trapezoids).
+  type, public :: TrapList
+     integer(int32) :: op = 0
+     integer(int64) :: n = 0
+     type(Trapezoid), allocatable :: t(:)
+     real(real64) :: t_sweep = 0, t_stitch = 0
+     integer(int64) :: traps_raw = 0, boxes = 0, anomalies = 0
+  end type TrapList
 
   type :: I64Buf
      integer(int64) :: n = 0
@@ -80,7 +94,9 @@ module TrapMergeModule
      integer(int64) :: atype(8) = 0
      integer(int32) :: rng = -1831433054_int32
      integer(int64), allocatable :: x1(:), y1(:), x2(:), y2(:), dx(:), dy(:), rec_y(:)
-     integer(int32), allocatable :: w(:), lc(:), rc(:), par(:), pri(:), sw(:), slb(:), srb(:)
+     integer(int32) :: op = TOP_NONZERO
+     integer(int64), allocatable :: w(:), sw(:)
+     integer(int32), allocatable :: lc(:), rc(:), par(:), pri(:), slb(:), srb(:)
      integer(int32), allocatable :: rec_r(:)
      integer(int64), allocatable :: gid(:)
      integer(int8), allocatable :: flb(:), frb(:)
@@ -96,7 +112,9 @@ module TrapMergeModule
   end type Sweep
 
   public :: TrapMergePolygons, TrapBuildEdges, TrapSnapRound, TrapSweepUnion
-  public :: TrapMergeStatsLine
+  public :: TrapBooleanPolygons
+  public :: TrapMergeStatsLine, TrapConcatEdges, TrapInside, wpack, wunpack, free_set
+
 
 contains
 
@@ -132,6 +150,63 @@ contains
     st%t_total = omp_get_wtime() - t0
   end subroutine TrapMergePolygons
 
+  !> Two-operand Booleans on any-angle polygons. A and B are snapped together (one joint snap
+  !> rounding: every hot pixel is shared, coincident edges of A and B become identical fragments),
+  !> then one predicate sweep per requested op (TOP_*; see TrapInside) on the same fragments, so
+  !> all results are exact set operations on the same snapped operands A' and B':
+  !> area(OR) + area(AND) = area(A') + area(B'), XOR = OR - AND, NOT = A' - AND, ...
+  !> res(k) receives ops(k). st collects the shared stages; per-op sweep data is in res(k).
+  subroutine TrapBooleanPolygons(npA, poffA, pxA, pyA, npB, poffB, pxB, pyB, nops, ops, res, &
+                                 st, status, nbands)
+    integer(int64), intent(in) :: npA, poffA(:), pxA(:), pyA(:)
+    integer(int64), intent(in) :: npB, poffB(:), pxB(:), pyB(:)
+    integer, intent(in) :: nops
+    integer(int32), intent(in) :: ops(:)
+    type(TrapList), intent(inout) :: res(:)
+    type(TrapMergeStats), intent(inout) :: st
+    integer, intent(out) :: status
+    integer, intent(in), optional :: nbands
+    type(FragSet) :: EA, EB, E, F
+    type(TrapMergeStats) :: sk
+    real(real64) :: t0, t1
+    integer :: nb, k, st2
+    nb = 0
+    if (present(nbands)) nb = nbands
+    t0 = omp_get_wtime()
+    st%polygons = npA + npB
+    call TrapBuildEdges(npA, poffA, pxA, pyA, EA, status)
+    call TrapBuildEdges(npB, poffB, pxB, pyB, EB, st2)
+    status = max(status, st2)
+    do k = 1, nops
+       res(k)%op = ops(k); res(k)%n = 0
+       if (allocated(res(k)%t)) deallocate(res(k)%t)
+    end do
+    if (status /= 0) then
+       do k = 1, nops
+          allocate(res(k)%t(0))
+       end do
+       return
+    end if
+    call TrapConcatEdges(EA, EB, E)
+    call free_set(EA); call free_set(EB)
+    t1 = omp_get_wtime(); st%t_edges = t1 - t0
+    st%edges = E%n
+    call TrapSnapRound(E, F, st)
+    call free_set(E)
+    do k = 1, nops
+       sk = TrapMergeStats()
+       call TrapSweepUnion(F, nb, res(k)%t, res(k)%n, sk, ops(k))
+       res(k)%t_sweep = sk%t_sweep; res(k)%t_stitch = sk%t_stitch
+       res(k)%traps_raw = sk%traps_raw; res(k)%boxes = sk%boxes; res(k)%anomalies = sk%anomalies
+       st%anomalies = st%anomalies + sk%anomalies
+       st%t_sweep = st%t_sweep + sk%t_sweep; st%t_stitch = st%t_stitch + sk%t_stitch
+       st%bands = sk%bands
+       st%traps = st%traps + res(k)%n
+    end do
+    call free_set(F)
+    st%t_total = omp_get_wtime() - t0
+  end subroutine TrapBooleanPolygons
+
   function TrapMergeStatsLine(st) result(s)
     type(TrapMergeStats), intent(in) :: st
     character(len=1024) :: s
@@ -142,6 +217,66 @@ contains
          ' cells=', st%cells, ' max_cell=', st%max_cell, ' traps_raw=', st%traps_raw, &
          ' traps=', st%traps, ' bands=', st%bands, ' anomalies=', st%anomalies
   end function TrapMergeStatsLine
+
+
+  !> Packed winding: wA + 2**32 wB. Exact (and additive) while |wA|, |wB| < 2**31.
+  pure integer(int64) function wpack(wa, wb) result(w)
+    integer(int64), intent(in) :: wa, wb
+    w = wa + K32*wb
+  end function wpack
+
+  pure subroutine wunpack(w, wa, wb)
+    integer(int64), intent(in) :: w
+    integer(int64), intent(out) :: wa, wb
+    integer(int64) :: t
+    t = w + K31                                     ! wb = floor((w + 2**31) / 2**32)
+    if (t >= 0) then
+       wb = t / K32
+    else
+       wb = -((-t + K32 - 1) / K32)
+    end if
+    wa = w - K32*wb
+  end subroutine wunpack
+
+  !> Is the point with packed winding W inside the result of op?
+  pure logical function TrapInside(op, W) result(r)
+    integer(int32), intent(in) :: op
+    integer(int64), intent(in) :: W
+    integer(int64) :: wa, wb
+    if (op == TOP_NONZERO .or. op == TOP_OR) then
+       r = W /= 0; return
+    end if
+    call wunpack(W, wa, wb)
+    select case (op)
+    case (TOP_AND);   r = wa /= 0 .and. wb /= 0
+    case (TOP_NOT);   r = wa /= 0 .and. wb == 0
+    case (TOP_XOR);   r = (wa /= 0) .neqv. (wb /= 0)
+    case (TOP_BNOTA); r = wb /= 0 .and. wa == 0
+    case (TOP_SELF2); r = abs(wa) >= 2
+    case (TOP_A);     r = wa /= 0
+    case (TOP_B);     r = wb /= 0
+    case default;     r = .false.
+    end select
+  end function TrapInside
+
+  !> E = A followed by B, B's windings moved to the second operand (wA -> wB).
+  subroutine TrapConcatEdges(A, B, E)
+    type(FragSet), intent(in) :: A, B
+    type(FragSet), intent(inout) :: E
+    integer(int64) :: i
+    call alloc_set(E, A%n + B%n)
+    !$omp parallel do
+    do i = 1, A%n
+       E%x1(i) = A%x1(i); E%y1(i) = A%y1(i); E%x2(i) = A%x2(i); E%y2(i) = A%y2(i); E%w(i) = A%w(i)
+    end do
+    !$omp end parallel do
+    !$omp parallel do
+    do i = 1, B%n
+       E%x1(A%n + i) = B%x1(i); E%y1(A%n + i) = B%y1(i); E%x2(A%n + i) = B%x2(i)
+       E%y2(A%n + i) = B%y2(i); E%w(A%n + i) = K32*B%w(i)
+    end do
+    !$omp end parallel do
+  end subroutine TrapConcatEdges
 
   subroutine free_set(S)
     type(FragSet), intent(inout) :: S
@@ -734,12 +869,14 @@ contains
     end do
   end subroutine radix_sort_pairs
 
-  subroutine TrapSweepUnion(F, nbands_req, traps, ntrap, st)
+  !> op (default TOP_NONZERO) selects the region: see TrapInside.
+  subroutine TrapSweepUnion(F, nbands_req, traps, ntrap, st, op)
     type(FragSet), intent(in) :: F
     integer, intent(in) :: nbands_req
     type(Trapezoid), allocatable, intent(out) :: traps(:)
     integer(int64), intent(out) :: ntrap
     type(TrapMergeStats), intent(inout) :: st
+    integer(int32), intent(in), optional :: op
     integer(int64), parameter :: NBIN = 65536
     integer(int64) :: ymin, ymax, i, nnh, tot, acc, b, nb, b0, b1, j, span
     integer(int64), allocatable :: hist(:), ybnd(:), bcnt(:), boff(:), bids(:), bpos(:)
@@ -818,6 +955,7 @@ contains
        end if
     end do
     allocate(sw(0:nb - 1))
+    if (present(op)) sw(:)%op = op
     !$omp parallel do schedule(dynamic, 1)
     do b = 0, nb - 1
        call sweep_band(F, bids(boff(b) + 1:boff(b + 1)), bcnt(b), ybnd(b), ybnd(b + 1), sw(b))
@@ -1087,7 +1225,7 @@ contains
   end function tr_first_gt
 
   !> Sum of w over all nodes up to and including n.
-  integer(int32) function tr_prefix_w(S, n0) result(tot)
+  integer(int64) function tr_prefix_w(S, n0) result(tot)
     type(Sweep), intent(in) :: S
     integer(int32), intent(in) :: n0
     integer(int32) :: n, p
@@ -1290,15 +1428,17 @@ contains
   !> or the right boundary B at or after R). wend = winding just left of R.
   subroutine build_iv(S, W0, L, R, IL, IR, ILin, IRin, ni, wend)
     type(Sweep), intent(inout) :: S
-    integer(int32), intent(in) :: W0, L, R
+    integer(int64), intent(in) :: W0
+    integer(int32), intent(in) :: L, R
     integer(int32), intent(inout) :: IL(:), IR(:)
     logical, intent(inout) :: ILin(:), IRin(:)
     integer, intent(out) :: ni
-    integer(int32), intent(out) :: wend
-    integer(int32) :: W, n, curL, A, B
+    integer(int64), intent(out) :: wend
+    integer(int64) :: W
+    integer(int32) :: n, curL, A, B
     logical :: prev, now, curLin
     integer :: k
-    ni = 0; W = W0; prev = W0 /= 0
+    ni = 0; W = W0; prev = TrapInside(S%op, W0)
     curL = 0; curLin = .false.
     if (prev) then
        A = 0
@@ -1311,7 +1451,7 @@ contains
     do k = 1, S%nseq
        n = S%seq(k)
        W = W + S%w(n)
-       now = W /= 0
+       now = TrapInside(S%op, W)
        if (prev .and. .not. now) then
           ni = ni + 1; IL(ni) = curL; IR(ni) = n; ILin(ni) = curLin; IRin(ni) = .true.
        else if (.not. prev .and. now) then
@@ -1335,7 +1475,8 @@ contains
     integer(int64), intent(in) :: xa, xb
     integer(int32), intent(in) :: ends(:), starts(:)
     integer(int64), intent(in) :: e0, e1, s0, s1
-    integer(int32) :: L, R, W0, wold, wnew, n
+    integer(int32) :: L, R, n
+    integer(int64) :: W0, wold, wnew
     integer :: nold, nnew, k, j
     integer(int64) :: i
     L = tr_last_lt(S, xa)
@@ -1403,7 +1544,8 @@ contains
     integer(int64), allocatable :: sk(:), sv(:), ek(:), ev(:), hk(:), hv(:), iv(:)
     integer(int64), allocatable :: ca(:), cb(:), ce0(:), cs0(:), ce1(:), cs1(:)
     integer(int32), allocatable :: starts(:), ends(:)
-    integer(int32) :: n, W, curL, R
+    integer(int32) :: n, curL, R
+    integer(int64) :: W
     logical :: prev, now
     integer(int64), parameter :: BIG = huge(1_int64)
 
@@ -1460,7 +1602,7 @@ contains
     W = 0; prev = .false.; curL = 0
     n = tr_first(S)
     do while (n /= 0)
-       W = W + S%w(n); now = W /= 0
+       W = W + S%w(n); now = TrapInside(S%op, W)
        if (.not. prev .and. now) then
           curL = n
        else if (prev .and. .not. now) then
