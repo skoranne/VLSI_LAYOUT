@@ -129,6 +129,9 @@ contains
 
     msg = ''
     status = 0
+    if( LayerIsAnyAngle( L ) ) then
+       status = 1; msg = 'oasout: any-angle layer '//lname//' is not supported yet'; return
+    end if
     call LayerEnsureProperties( L, lname )
     np = L%props%n_poly
     nb = L%n_used

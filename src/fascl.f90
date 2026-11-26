@@ -36,6 +36,8 @@ module FASCLModule
   use DesignModule
   use PNumMergeModule
   use PropertyTableModule
+  use TrapezoidModule, only: trap_hash
+  use TrapPNumModule, only: TrapPolys, TrapPNum, TrapPolyOutline
   use CommonModule, only: K_LEAF_CAPACITY
   implicit none
   private
@@ -1186,6 +1188,12 @@ contains
              else
                 v = ival( t%nvert(ord) )
              end if
+          case( F_LEW, F_LELEN, F_LEDIR )
+             if( t%anyangle ) then
+                v = err( 'LINE_END_*: not defined for any-angle polygons' ); return
+             end if
+          end select
+          select case( nd%fn )
           case( F_LEW );   v = ival( t%le_w(ord) )
           case( F_LELEN ); v = ival( t%le_len(ord) )
           case( F_LEDIR )
@@ -1340,6 +1348,10 @@ contains
     character(len=*), intent(in) :: lname
     logical :: dropped
     real(kind=real64) :: oa, op
+    if( LayerIsAnyAngle( L ) ) then
+       call ensure_props_anyangle( L, lname )
+       return
+    end if
     call LayerExpand( L )
     if( L%n_used > 0 ) then
        if( NeedsHealing( L ) .or. NeedsPNum( L ) ) call PreprocessLayer( L )
@@ -1359,6 +1371,46 @@ contains
     if( dropped ) write(*,'(A,A,A)') 'WARNING: layer ', lname, &
          ' changed since its properties were computed; stale properties dropped'
   end subroutine LayerEnsureProperties
+
+  !> Any-angle layer: polygons are the closed-set components of the canonical trapezoid set
+  !> (TrapPNum; id = ordinal of the lowest-then-leftmost vertex), exact 2A, outline measures
+  !> from the exact boundary trace (PERIMETER rounded to dbu, VERTICES per boundary visit).
+  !> LINE_END_* are Manhattan notions and report an error on these polygons.
+  subroutine ensure_props_anyangle( L, lname )
+    type(Layer), intent(inout), target :: L
+    character(len=*), intent(in) :: lname
+    type(TrapPolys) :: P
+    integer(int64) :: h, i
+    logical :: dropped
+    h = 0
+    !$omp parallel do reduction(+:h)
+    do i = 1, L%n_traps
+       h = h + trap_hash( L%traps(i) )
+    end do
+    !$omp end parallel do
+    if( .not. allocated( L%props ) ) allocate( L%props )
+    if( L%props%anyangle .and. L%props%geom_n == L%n_traps .and. L%props%geom_hash == h ) return
+    call TrapPNum( L%traps, L%n_traps, P )
+    if( P%anomalies /= 0 ) write(*,'(A,A,A,I0)') 'ERROR: any-angle PNUM of ', lname, ' anomalies=', P%anomalies
+    call PropTableIndexPieces( L%props, L%n_traps, P%lab, P%np, P%x1, P%y1, P%x2, P%y2, P%area2, h, dropped )
+    if( dropped ) write(*,'(A,A,A)') 'WARNING: layer ', lname, &
+         ' changed since its properties were computed; stale properties dropped'
+    call TrapPolyOutline( L%traps, L%n_traps, P )
+    associate( t => L%props )
+      call PropDropOutline( t )
+      allocate( t%perim(t%n_poly), t%nvert(t%n_poly), t%le_w(t%n_poly), t%le_len(t%n_poly), &
+           t%le_dir(t%n_poly) )
+      do i = 1, t%n_poly
+         t%perim(i) = nint( P%perim(i), int64 )
+         t%nvert(i) = P%nvert(i)
+      end do
+      t%le_w = -1; t%le_len = -1; t%le_dir = -1_int8
+      t%n_outline_fail = P%outline_anomalies
+      t%have_outline = .true.
+    end associate
+    write(*,'(A,A,A,I0,A,I0,A,F0.3,A)') 'INFO: any-angle PNUM ', lname, ': polygons=', P%np, &
+         ' trapezoids=', L%n_traps, ' (', P%t_grid + P%t_contacts + P%t_union + P%t_props + P%t_outline, ' s)'
+  end subroutine ensure_props_anyangle
 
   !> Compile and run `lam_text` over every polygon of L, defining properties `names`.
   !> True if the compiled lambda calls any of the given builtins.

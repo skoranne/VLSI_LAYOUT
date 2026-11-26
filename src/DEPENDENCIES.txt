@@ -59,7 +59,7 @@ compact_wire.o: compact_layer.o geometry.o commonmodule.o
 rpc_server.o: compact_wire.o compact_layer.o design.o version_mod.o rpc_socket.o band_exec.o
 test_compact_wire.o: compact_wire.o compact_layer.o geometry.o
 property_table.o: geometry.o datastructures.o compact_layer.o
-fascl.o: design.o property_table.o pnummerge.o
+fascl.o: design.o property_table.o pnummerge.o trap_pnum.o trapezoid.o
 fascl_connect.o: fascl.o design.o property_table.o tech_stacks.o commonmodule.o
 prop_oasis.o: fascl.o design.o property_table.o
 tech_stacks.o: hashtable.o

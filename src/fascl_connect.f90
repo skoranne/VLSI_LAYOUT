@@ -178,6 +178,13 @@ contains
     call PropNetNamesDrop( rec )            !> net numbers change: DEF names are stale
     !> Every member: healed, PNum'd, indexed, with an R-tree that matches the box order.
     do k = 1, n
+       if( LayerIsAnyAngle( Ls(k)%p ) ) then
+          status = 1
+          msg = 'CONNECT: any-angle layer '//connect_records(rec)%specs(k)%s//' is not supported yet'
+          return
+       end if
+    end do
+    do k = 1, n
        associate( L => Ls(k)%p )
          call LayerEnsureProperties( L, connect_records(rec)%specs(k)%s )   !> expands, heals, PNums
          !> BuildTree may re-sort the boxes: polygon numbers and the index are rebuilt after it.
