@@ -71,7 +71,7 @@ for a in $ANGLES; do
   fi
   if [ "${SKIP_MAG:-0}" != 1 ] && { [ "${MAG_ORTHO_ONLY:-0}" != 1 ] || [ $((a % 90)) -eq 0 ]; }; then
     sed -e "s|@FILE@|$F|" -e "s|@TAG@|${TAG}_R$A|" -e "s|@TMP@|$D/tmp|" "$HERE/rot_ops.ctr.in" > "$D/rot_ops.ctr"
-    ( cd "$D" && guarded "$D/mag.log" env MAGPARSER_LAYER_DIGEST=1 OMP_PROC_BIND=TRUE OMP_PLACES=cores \
+    ( cd "$D" && guarded "$D/mag.log" env MAGPARSER_LAYER_DIGEST=1 LDB_SLANT_STRIPS=${LDB_SLANT_STRIPS:-1} OMP_PROC_BIND=TRUE OMP_PLACES=cores \
         NVCOMPILER_ACC_MEM_MANAGE=0 "$SRC/MAGPARSER.exe" "$D/rot_ops.ctr" 256 )
   fi
   if [ "${SKIP_KL:-0}" != 1 ]; then

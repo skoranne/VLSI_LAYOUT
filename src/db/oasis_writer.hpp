@@ -82,7 +82,7 @@ struct Transform { int64_t x = 0, y = 0; double mag = 1.0, angle = 0.0; bool mir
 
 struct Stats {
     uint64_t bytes = 0, record_bytes = 0, cblocks = 0;
-    uint64_t cells = 0, rectangles = 0, polygons = 0, paths = 0, circles = 0, texts = 0;
+    uint64_t cells = 0, rectangles = 0, polygons = 0, trapezoids = 0, ctrapezoids = 0, paths = 0, circles = 0, texts = 0;
     uint64_t placements = 0, properties = 0, repetitions = 0, shapes_in_repetitions = 0;
     uint64_t degenerate = 0;           // polygons with < 3 distinct vertices, dropped
     uint64_t top_cells = 0;
@@ -113,6 +113,10 @@ public:
                    const Repetition* rep = nullptr);
     // Closed polygon; the closing vertex may be repeated. Rectangles become RECTANGLE.
     void polygon(uint64_t layer, uint64_t datatype, const Pt* pts, size_t n, const Repetition* rep = nullptr);
+    // Horizontal trapezoid with integer corners: bottom side at y1 from xbl to xbr, top side at
+    // y2 from xtl to xtr. Written as RECTANGLE, CTRAPEZOID (45-degree shapes) or TRAPEZOID.
+    void trapezoid_h(uint64_t layer, uint64_t datatype, int64_t y1, int64_t y2, int64_t xbl, int64_t xbr,
+                     int64_t xtl, int64_t xtr, const Repetition* rep = nullptr);
     // Path centreline with half-width and start/end extensions (database units).
     void path(uint64_t layer, uint64_t datatype, const Pt* pts, size_t n, int64_t half_width,
               int64_t ext_start, int64_t ext_end, const Repetition* rep = nullptr);

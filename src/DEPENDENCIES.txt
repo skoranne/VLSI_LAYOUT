@@ -1,4 +1,4 @@
-LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o device_registry.o compact_layer.o measure.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o \
+LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o trapezoid.o trap_merge.o device_registry.o compact_layer.o measure.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
 	   polygon_fracture.o boxmerge.o kldata.o design_impl.o design_boolean_impl.o design_topo_impl.o design_device_impl.o gpu_morton_sort.o\
@@ -61,6 +61,10 @@ test_compact_wire.o: compact_wire.o compact_layer.o geometry.o
 
 # Any-angle exact kernel (wide_int: portable int128; exact_predicates: orientation, hot pixels)
 exact_predicates.o: wide_int.o
+trapezoid.o: wide_int.o exact_predicates.o
+trap_merge.o: wide_int.o exact_predicates.o trapezoid.o compact_layer.o
+test_trapmerge.o: trap_merge.o trapezoid.o
+trapmerge_main.o: trap_merge.o trapezoid.o
 test_wide_int.o: wide_int.o
 test_predicates.o: wide_int.o exact_predicates.o
 # Rotation-invariant layer measurements (exec measure)

@@ -2,6 +2,7 @@
 // repetition finder. Self-contained (zlib only): bin2oas links it directly; the C API that
 // writes the in-memory model is in oasis_model_writer.cpp.
 
+#include <cstdlib>
 #include "oasis_writer.hpp"
 #include <zlib.h>
 #include <algorithm>
@@ -27,7 +28,7 @@ enum : uint8_t {
     R_PAD = 0, R_START = 1, R_END = 2, R_CELLNAME = 3, R_TEXTSTRING = 5, R_PROPNAME = 7, R_PROPSTRING = 9,
     R_LAYERNAME = 11, R_LAYERNAME_TEXT = 12, R_CELL_REF = 13, R_CELL_NAME = 14, R_XYABSOLUTE = 15,
     R_XYRELATIVE = 16, R_PLACEMENT = 17, R_PLACEMENT_X = 18, R_TEXT = 19, R_RECTANGLE = 20, R_POLYGON = 21,
-    R_PATH = 22, R_CIRCLE = 27, R_PROPERTY = 28, R_PROPERTY_REPEAT = 29, R_CBLOCK = 34
+    R_PATH = 22, R_TRAPEZOID = 23, R_TRAPEZOID_A = 24, R_TRAPEZOID_B = 25, R_CTRAPEZOID = 26, R_CIRCLE = 27, R_PROPERTY = 28, R_PROPERTY_REPEAT = 29, R_CBLOCK = 34
 };
 
 size_t uint_len(uint64_t v) { size_t n = 1; while (v >= 0x80) { v >>= 7; ++n; } return n; }
@@ -133,9 +134,9 @@ struct Writer::Impl {
     std::vector<FileProp> file_props;
     // modal state (10.1)
     struct Modal {
-        bool layer_k, dt_k, tl_k, tt_k, w_k, h_k, g_k, p_k, t_k, pcell_k, tstr_k, rep_k, ppl_k, hpl_k, hw_k, es_k, ee_k, rad_k, pn_k, pv_k;
+        bool ct_k, layer_k, dt_k, tl_k, tt_k, w_k, h_k, g_k, p_k, t_k, pcell_k, tstr_k, rep_k, ppl_k, hpl_k, hw_k, es_k, ee_k, rad_k, pn_k, pv_k;
         int xy;                              // 0 absolute, 1 relative, -1 unknown
-        uint64_t layer, dt, tl, tt, pcell, tstr, pn;
+        uint64_t layer, dt, tl, tt, pcell, tstr, pn, ct;
         std::string pcell_s, tstr_s, pn_s;
         int64_t w, h, gx, gy, px, py, tx, ty, hw, es, ee, rad;
         Repetition rep;
@@ -144,7 +145,7 @@ struct Writer::Impl {
         bool pn_std;
         void unknown() {
             layer_k = dt_k = tl_k = tt_k = w_k = h_k = g_k = p_k = t_k = pcell_k = tstr_k = rep_k = ppl_k = hpl_k = false;
-            hw_k = es_k = ee_k = rad_k = pn_k = pv_k = false;
+            hw_k = es_k = ee_k = rad_k = pn_k = pv_k = ct_k = false;
             xy = -1;
         }
         void cell_start() {                  // 21.2: absolute mode, positions 0
@@ -574,6 +575,87 @@ void Writer::polygon(uint64_t layer, uint64_t datatype, const Pt* pts, size_t n,
     for (auto& q : v) { x1 = std::min(x1, q.x); y1 = std::min(y1, q.y); x2 = std::max(x2, q.x); y2 = std::max(y2, q.y); }
     c.bbox_add(x1 + ox, y1 + oy, x2 + ox, y2 + oy, has_rep ? &r : nullptr);
     st_.polygons++;
+    c.end();
+}
+
+// CTRAPEZOID type (0-23) whose figure is the horizontal trapezoid with corners (bl,0) (br,0)
+// (tr,h) (tl,h) inside the box w x h, or -1.
+static int ctrap_match(int64_t bl, int64_t br, int64_t tl, int64_t tr, int64_t w, int64_t h) {
+    std::vector<std::pair<int64_t, int64_t>> a = { {bl, 0}, {br, 0}, {tr, h}, {tl, h} };
+    std::sort(a.begin(), a.end());
+    a.erase(std::unique(a.begin(), a.end()), a.end());
+    for (int t = 0; t < 24; ++t) {
+        const oasis_codec::CtrapRule cr = oasis_codec::ctrap_rule((uint64_t)t);
+        if (cr.no_h && h != ((t == 22 || t == 23) ? 2 * w : w)) continue;
+        if (cr.no_w && w != 2 * h) continue;
+        if (!oasis_codec::ctrap_consistent((uint64_t)t, w, h)) continue;
+        int64_t V[4][2];
+        oasis_codec::ctrap_vertices((uint64_t)t, w, h, V);
+        std::vector<std::pair<int64_t, int64_t>> b;
+        for (int i = 0; i < 4; ++i) b.push_back({V[i][0], V[i][1]});
+        std::sort(b.begin(), b.end());
+        b.erase(std::unique(b.begin(), b.end()), b.end());
+        if (a == b) return t;
+    }
+    return -1;
+}
+
+void Writer::trapezoid_h(uint64_t layer, uint64_t datatype, int64_t y1, int64_t y2, int64_t xbl, int64_t xbr,
+                         int64_t xtl, int64_t xtr, const Repetition* rp) {
+    if (!ok()) return;
+    if (!d_->in_cell) { err_ = "TRAPEZOID outside a cell"; return; }
+    if (y2 < y1) { std::swap(y1, y2); std::swap(xbl, xtl); std::swap(xbr, xtr); }
+    if (y2 == y1 || xbr < xbl || xtr < xtl || (xbr == xbl && xtr == xtl)) { st_.degenerate++; return; }
+    if (xbl == xtl && xbr == xtr) { rectangle(layer, datatype, xbl, y1, xbr - xbl, y2 - y1, rp); return; }
+    const int64_t x = std::min(xbl, xtl), w = std::max(xbr, xtr) - x, h = y2 - y1;
+    static const bool no_ctrap = std::getenv("LDB_NO_CTRAP") != nullptr;   // debugging: TRAPEZOID only
+    const int t = no_ctrap ? -1 : ctrap_match(xbl - x, xbr - x, xtl - x, xtr - x, w, h);
+    Impl& I = *d_; CTX;
+    Repetition r; int64_t ox = 0, oy = 0;
+    const bool has_rep = rp && normalize(*rp, r, ox, oy);
+    const int64_t px = x + ox, py = y1 + oy;
+    c.begin();
+    const auto p = c.xy(px, py, I.m.g_k, I.m.gx, I.m.gy);
+    uint8_t info = c.ld_bits(layer, datatype);
+    Encoder& E = c.e();
+    if (t >= 0) {                                          // 29: CTRAPEZOID
+        const oasis_codec::CtrapRule cr = oasis_codec::ctrap_rule((uint64_t)t);
+        if (!I.m.ct_k || I.m.ct != (uint64_t)t) info |= 0x80;
+        if (!cr.no_w && (!I.m.w_k || I.m.w != w)) info |= 0x40;
+        if (!cr.no_h && (!I.m.h_k || I.m.h != h)) info |= 0x20;
+        if (p.X) info |= 0x10;
+        if (p.Y) info |= 0x08;
+        if (has_rep) info |= 0x04;
+        E.u8(R_CTRAPEZOID); E.u8(info);
+        c.put_ld(info, layer, datatype);
+        if (info & 0x80) E.uint_((uint64_t)t);
+        if (info & 0x40) E.uint_((uint64_t)w);
+        if (info & 0x20) E.uint_((uint64_t)h);
+        I.m.ct = (uint64_t)t; I.m.ct_k = true;
+        st_.ctrapezoids++;
+        // An implied w or h (types 16-25) leaves the modal value in doubt: 29.7 makes it the
+        // bounding box, KLayout keeps the previous value. Forget it, so the next record writes it.
+        I.m.w = w; I.m.h = h; I.m.w_k = !cr.no_w; I.m.h_k = !cr.no_h;
+    } else {                                               // 28: TRAPEZOID, horizontal
+        const int64_t da = xtl - xbl, db = xtr - xbr;      // x(top) - x(bottom), left and right
+        const uint8_t id = db == 0 ? R_TRAPEZOID_A : (da == 0 ? R_TRAPEZOID_B : R_TRAPEZOID);
+        if (!I.m.w_k || I.m.w != w) info |= 0x40;
+        if (!I.m.h_k || I.m.h != h) info |= 0x20;
+        if (p.X) info |= 0x10;
+        if (p.Y) info |= 0x08;
+        if (has_rep) info |= 0x04;
+        E.u8(id); E.u8(info);
+        c.put_ld(info, layer, datatype);
+        if (info & 0x40) E.uint_((uint64_t)w);
+        if (info & 0x20) E.uint_((uint64_t)h);
+        if (id != R_TRAPEZOID_B) E.sint(da);
+        if (id != R_TRAPEZOID_A) E.sint(db);
+        st_.trapezoids++;
+        I.m.w = w; I.m.h = h; I.m.w_k = I.m.h_k = true;    // geometry-w/h = bounding box (29.7)
+    }
+    c.put_xy(p);
+    if (has_rep) c.rep(r);
+    c.bbox_add(px, py, px + w, py + h, has_rep ? &r : nullptr);
     c.end();
 }
 

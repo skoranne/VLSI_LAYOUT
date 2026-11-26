@@ -78,8 +78,8 @@ inline Affine compose(const Affine& p, const Affine& ch) {
 }
 
 // Outline of a path (kind 1 LdbPolyElem) in its own coordinates, as one or more polygons.
-// Manhattan paths: the disjoint rectangles of path_to_rects (exact). Slanted paths: one
-// quadrilateral per segment (ends extended, interior joints not filled), rounded to the grid.
+// Manhattan paths: the disjoint rectangles of path_to_rects (exact). Slanted paths: one mitred
+// outline polygon built like KLayout's Path::polygon (rounded offsets, rounded miter points).
 // Zero-width paths have no area and give nothing.
 inline void path_outline(const LdbPolyElem& p, std::vector<std::vector<LdbPoint>>& out) {
     const int64_t hw = p.width / 2;
@@ -92,17 +92,46 @@ inline void path_outline(const LdbPolyElem& p, std::vector<std::vector<LdbPoint>
         for (auto& r : rects) out.push_back({ { r[0], r[1] }, { r[2], r[1] }, { r[2], r[3] }, { r[0], r[3] } });
         return;
     }
-    for (size_t i = 0; i + 1 < v.size(); ++i) {
-        const double dx = (double)(v[i + 1].x - v[i].x), dy = (double)(v[i + 1].y - v[i].y);
-        const double l = std::sqrt(dx * dx + dy * dy), ux = dx / l, uy = dy / l;
-        const double e0 = (i == 0) ? (double)p.ext_begin : 0.0;
-        const double e1 = (i + 2 == v.size()) ? (double)p.ext_end : 0.0;
-        const double ax = (double)v[i].x - ux * e0, ay = (double)v[i].y - uy * e0;
-        const double bx = (double)v[i + 1].x + ux * e1, by = (double)v[i + 1].y + uy * e1;
-        const double nx = -uy * (double)hw, ny = ux * (double)hw;
-        auto P = [](double x, double y) { return LdbPoint{ (int64_t)std::llround(x), (int64_t)std::llround(y) }; };
-        out.push_back({ P(ax - nx, ay - ny), P(bx - nx, by - ny), P(bx + nx, by + ny), P(ax + nx, ay + ny) });
+    // One outline polygon, KLayout's construction: every segment's offset vector w*n is rounded
+    // to integers, the offset lines of adjacent segments are intersected (miter) and the
+    // intersection rounded; turns sharper than 160 degrees are bevelled. Ends are extended along
+    // the end segments by the rounded extension vector.
+    const size_t ns = v.size() - 1;
+    const double w = (double)hw;
+    std::vector<int64_t> ox(ns), oy(ns), ddx(ns), ddy(ns);
+    std::vector<double> ux(ns), uy(ns);
+    for (size_t i = 0; i < ns; ++i) {
+        ddx[i] = v[i + 1].x - v[i].x; ddy[i] = v[i + 1].y - v[i].y;
+        const double l = std::sqrt((double)ddx[i] * ddx[i] + (double)ddy[i] * ddy[i]);
+        ux[i] = ddx[i] / l; uy[i] = ddy[i] / l;
+        ox[i] = std::llround(-uy[i] * w); oy[i] = std::llround(ux[i] * w);
     }
+    std::vector<LdbPoint> left, right;
+    auto side = [&](int64_t sgn, std::vector<LdbPoint>& o) {
+        const int64_t ebx = std::llround(ux[0] * (double)p.ext_begin), eby = std::llround(uy[0] * (double)p.ext_begin);
+        o.push_back({ v[0].x - ebx + sgn * ox[0], v[0].y - eby + sgn * oy[0] });
+        for (size_t i = 1; i < ns; ++i) {
+            const double c = ux[i - 1] * ux[i] + uy[i - 1] * uy[i];
+            const int64_t ax = v[i].x + sgn * ox[i - 1], ay = v[i].y + sgn * oy[i - 1];
+            const int64_t bx = v[i].x + sgn * ox[i], by = v[i].y + sgn * oy[i];
+            const long double den = (long double)ddx[i - 1] * ddy[i] - (long double)ddy[i - 1] * ddx[i];
+            if (den != 0 && 1.0 + c > 2.0 * std::pow(std::cos(80.0 * M_PI / 180.0), 2)) {
+                const long double t = ((long double)(bx - ax) * ddy[i] - (long double)(by - ay) * ddx[i]) / den;
+                o.push_back({ (int64_t)std::llround((long double)ax + t * ddx[i - 1]), (int64_t)std::llround((long double)ay + t * ddy[i - 1]) });
+            } else if (den == 0 && c > 0) {
+                o.push_back({ ax, ay });                                   // collinear joint
+            } else {
+                o.push_back({ ax, ay }); o.push_back({ bx, by });
+            }
+        }
+        const size_t k = ns - 1;
+        const int64_t eex = std::llround(ux[k] * (double)p.ext_end), eey = std::llround(uy[k] * (double)p.ext_end);
+        o.push_back({ v[ns].x + eex + sgn * ox[k], v[ns].y + eey + sgn * oy[k] });
+    };
+    side(+1, left); side(-1, right);
+    std::vector<LdbPoint> poly(left);
+    for (size_t i = right.size(); i-- > 0;) poly.push_back(right[i]);
+    out.push_back(std::move(poly));
 }
 
 // Box (x1,y1,x2,y2) under a map that is not orthogonal: the rotated rectangle as rectangle

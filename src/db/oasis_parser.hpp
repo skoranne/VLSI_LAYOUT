@@ -488,37 +488,11 @@ struct Parser {
         if (!oasis_codec::ctrap_consistent(t, w, h))
             s.fail("CTRAPEZOID type " + std::to_string(t) + " with inconsistent width/height");
         if (t == 24 || t == 25) { emit(s, rep, 2, x, y, x + w, y + h); return; }    // rectangle / square
-        // Vertices of the 24 compact shapes, relative to (x, y); every slanted
-        // side is at 45 degrees.  Triangles repeat their last vertex.
-        const int64_t V[24][4][2] = {
-            { {0,0}, {w,0},   {w-h,h}, {0,h}   },   //  0  horizontal, right side slanted, top short
-            { {0,0}, {w-h,0}, {w,h},   {0,h}   },   //  1  right side slanted, bottom short
-            { {0,0}, {w,0},   {w,h},   {h,h}   },   //  2  left side slanted, top short
-            { {h,0}, {w,0},   {w,h},   {0,h}   },   //  3  left side slanted, bottom short
-            { {0,0}, {w,0},   {w-h,h}, {h,h}   },   //  4  both slanted, top short
-            { {h,0}, {w-h,0}, {w,h},   {0,h}   },   //  5  both slanted, bottom short
-            { {0,0}, {w-h,0}, {w,h},   {h,h}   },   //  6  parallelogram leaning right
-            { {h,0}, {w,0},   {w-h,h}, {0,h}   },   //  7  parallelogram leaning left
-            { {0,0}, {w,0},   {w,h-w}, {0,h}   },   //  8  vertical, top slanted, right short
-            { {0,0}, {w,0},   {w,h},   {0,h-w} },   //  9  top slanted, left short
-            { {0,0}, {w,w},   {w,h},   {0,h}   },   // 10  bottom slanted, right short
-            { {0,w}, {w,0},   {w,h},   {0,h}   },   // 11  bottom slanted, left short
-            { {0,0}, {w,w},   {w,h-w}, {0,h}   },   // 12  both slanted, right short
-            { {0,w}, {w,0},   {w,h},   {0,h-w} },   // 13  both slanted, left short
-            { {0,0}, {w,w},   {w,h},   {0,h-w} },   // 14  parallelogram rising
-            { {0,w}, {w,0},   {w,h-w}, {0,h}   },   // 15  parallelogram falling
-            { {0,0}, {w,0},   {0,w},   {0,w}   },   // 16  triangle, right angle bottom left
-            { {0,0}, {w,w},   {0,w},   {0,w}   },   // 17  right angle top left
-            { {0,0}, {w,0},   {w,w},   {w,w}   },   // 18  right angle bottom right
-            { {0,w}, {w,0},   {w,w},   {w,w}   },   // 19  right angle top right
-            { {0,0}, {2*h,0}, {h,h},   {h,h}   },   // 20  apex up
-            { {0,h}, {h,0},   {2*h,h}, {2*h,h} },   // 21  apex down
-            { {0,0}, {w,w},   {0,2*w}, {0,2*w} },   // 22  apex right
-            { {0,w}, {w,0},   {w,2*w}, {w,2*w} },   // 23  apex left
-        };
+        int64_t V[4][2];
+        oasis_codec::ctrap_vertices(t, w, h, V);
         verts.clear();
         for (int i = 0; i < 4; ++i) {
-            const Pt q{ x + V[t][i][0], y + V[t][i][1] };
+            const Pt q{ x + V[i][0], y + V[i][1] };
             if (verts.empty() || verts.back().x != q.x || verts.back().y != q.y) verts.push_back(q);
         }
         emit_polygon(s, rep);

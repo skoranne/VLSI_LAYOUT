@@ -16,7 +16,7 @@ include $(dir $(lastword $(MAKEFILE_LIST)))nvcomp.mk
 CXXFLAGS += $(NVCOMP_CXXFLAGS)
 LDFLAGS += $(NVCOMP_LDLIBS) $(NVCOMP_CUDART) -pthread
 
-CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp gdsii.cpp oasis.cpp oasis_writer.cpp oasis_model_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp oasis_tables.cpp oasis_sidecar.cpp
+CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp anyangle_capi.cpp trap_out.cpp gdsii.cpp oasis.cpp oasis_writer.cpp oasis_model_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp oasis_tables.cpp oasis_sidecar.cpp
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
 
 TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent bin2oas db_oasinfo db_mvi db_oasis_selftest db_rotcheck

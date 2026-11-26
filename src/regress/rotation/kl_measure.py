@@ -43,10 +43,39 @@ for li in ly.layer_indexes():
     r.merged_semantics = True
     emit("%d/%d" % (info.layer, info.datatype), r.merged(False, 0), t1)
 
-# derived layers of rot_ops.ctr.in (-rd derived=1)
+# derived layers of rot_ops.ctr.in (-rd derived=1); same names as the CTR. Sizes in dbu.
 if globals().get("derived", "0") == "1":
-    diff, poly, li1, met1, met2 = region(65, 20), region(66, 20), region(67, 20), region(68, 20), region(69, 20)
-    for name, fn in (("gate", lambda: poly & diff), ("sd", lambda: diff - poly), ("polyli", lambda: poly + li1),
-                     ("pdxor", lambda: poly ^ diff), ("m1m2", lambda: met1 & met2)):
+    B, A, C, M1, M2 = region(65, 20), region(66, 20), region(67, 20), region(68, 20), region(69, 20)
+    li = ly.find_layer(67, 20)
+    Craw = pya.Region() if li is None else pya.Region(top.begin_shapes_rec(li))
+    g, d_shrink = int(round(0.05 / ly.dbu)), int(round(0.03 / ly.dbu))
+    R = {}
+    R["and"] = A & B
+    R["and2"] = R["and"]
+    R["not"] = B - A
+    R["not_at"] = R["not_tilde"] = R["framenot"] = R["not"]
+    R["or"] = A + C
+    R["or_ab"] = A + B
+    R["xor"] = A ^ B
+    R["xor_named"] = R["xor"]
+    R["m1m2"] = M1 & M2
+    R["selfand"] = Craw.merged(False, 1)            # covered by two or more input shapes
+    R["grow"] = M1.sized(g)
+    R["shrink"] = M1.sized(-d_shrink)
+    R["size_p"] = R["grow"]
+    R["size_n"] = R["shrink"]
+    R["close"] = R["grow"].sized(-g)
+    R["open"] = R["shrink"].sized(d_shrink)
+    R["id_xorself"] = A ^ A
+    R["id_sym"] = (R["or_ab"] - R["and"]) ^ R["xor"]
+    R["id_xornamed"] = R["id_and2"] = R["id_framenot"] = R["id_notat"] = R["id_nottilde"] = pya.Region()
+    R["id_notand"] = (B - R["and"]) ^ R["not"]
+    R["id_grow"] = M1 - R["grow"]
+    R["id_shrink"] = R["shrink"] - M1
+    R["id_close"] = M1 - R["close"]
+    R["id_open"] = R["open"] - M1
+    R["id_sizep"] = R["id_sizen"] = pya.Region()
+    for name, reg in R.items():
         t1 = time.time()
-        emit(name, fn().merged(False, 0), t1)
+        reg.merged_semantics = True
+        emit(name, reg.merged(False, 0), t1)

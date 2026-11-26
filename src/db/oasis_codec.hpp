@@ -252,4 +252,36 @@ inline bool ctrap_consistent(uint64_t t, int64_t w, int64_t h) {
              (((t >= 8 && t <= 11) || t == 14 || t == 15) && h < w) || ((t == 12 || t == 13) && h < 2 * w));
 }
 
+// 29.9: vertices of CTRAPEZOID types 0-23 relative to (x, y), every slanted side at 45 degrees;
+// triangles repeat their last vertex (types 24, 25 are rectangles and are not in the table).
+inline void ctrap_vertices(uint64_t t, int64_t w, int64_t h, int64_t V[4][2]) {
+    const int64_t T[24][4][2] = {
+        { {0,0}, {w,0},   {w-h,h}, {0,h}   },   //  0  horizontal, right side slanted, top short
+        { {0,0}, {w-h,0}, {w,h},   {0,h}   },   //  1  right side slanted, bottom short
+        { {0,0}, {w,0},   {w,h},   {h,h}   },   //  2  left side slanted, top short
+        { {h,0}, {w,0},   {w,h},   {0,h}   },   //  3  left side slanted, bottom short
+        { {0,0}, {w,0},   {w-h,h}, {h,h}   },   //  4  both slanted, top short
+        { {h,0}, {w-h,0}, {w,h},   {0,h}   },   //  5  both slanted, bottom short
+        { {0,0}, {w-h,0}, {w,h},   {h,h}   },   //  6  parallelogram leaning right
+        { {h,0}, {w,0},   {w-h,h}, {0,h}   },   //  7  parallelogram leaning left
+        { {0,0}, {w,0},   {w,h-w}, {0,h}   },   //  8  vertical, top slanted, right short
+        { {0,0}, {w,0},   {w,h},   {0,h-w} },   //  9  top slanted, left short
+        { {0,0}, {w,w},   {w,h},   {0,h}   },   // 10  bottom slanted, right short
+        { {0,w}, {w,0},   {w,h},   {0,h}   },   // 11  bottom slanted, left short
+        { {0,0}, {w,w},   {w,h-w}, {0,h}   },   // 12  both slanted, right short
+        { {0,w}, {w,0},   {w,h},   {0,h-w} },   // 13  both slanted, left short
+        { {0,0}, {w,w},   {w,h},   {0,h-w} },   // 14  parallelogram rising
+        { {0,w}, {w,0},   {w,h-w}, {0,h}   },   // 15  parallelogram falling
+        { {0,0}, {w,0},   {0,w},   {0,w}   },   // 16  triangle, right angle bottom left
+        { {0,0}, {w,w},   {0,w},   {0,w}   },   // 17  right angle top left
+        { {0,0}, {w,0},   {w,w},   {w,w}   },   // 18  right angle bottom right
+        { {0,w}, {w,0},   {w,w},   {w,w}   },   // 19  right angle top right
+        { {0,0}, {2*h,0}, {h,h},   {h,h}   },   // 20  apex up
+        { {0,h}, {h,0},   {2*h,h}, {2*h,h} },   // 21  apex down
+        { {0,0}, {w,w},   {0,2*w}, {0,2*w} },   // 22  apex right
+        { {0,w}, {w,0},   {w,2*w}, {w,2*w} },   // 23  apex left
+    };
+    for (int i = 0; i < 4; ++i) { V[i][0] = T[t][i][0]; V[i][1] = T[t][i][1]; }
+}
+
 } // namespace oasis_codec
