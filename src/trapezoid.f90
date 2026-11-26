@@ -45,7 +45,7 @@ module TrapezoidModule
   public :: side_vertical, side_from_points, side_reanchor, side_x_num, side_x_floor, side_x_ceil
   public :: side_x_cmp, side_equal
   public :: trap_make, trap_from_box_coords, trap_is_box, trap_mbr, trap_clip_y, trap_valid
-  public :: trap_less, trap_equal, trap_hash, trap_area2, trap_sort
+  public :: trap_less, trap_equal, trap_hash, trap_area2, trap_sort, trap_overlap_positive
   public :: SlopeTab, stab_init, stab_add, slope_key
 
   !> Slope -> accumulated numerator table (trap_area2).
@@ -309,6 +309,58 @@ contains
     end do
     h = ieor(h, ishft(h, -13))
   end function trap_hash
+
+  !> True iff the interiors of two trapezoids intersect (positive-area overlap; touching edges or
+  !> corners do not count). Trapezoids are convex, so by the separating-axis theorem the interiors
+  !> are disjoint iff some edge line of either one leaves the other on its outer closed side.
+  !> Edge lines: y = y1, y = y2, and the two lattice side lines. Every orientation is exact
+  !> (vertices are rationals x = num/dy at integer rows; products stay below 2**95).
+  elemental pure logical function trap_overlap_positive(a, b) result(ov)
+    !$omp declare target
+    type(Trapezoid), intent(in) :: a, b
+    ov = .false.
+    if (b%y2 <= a%y1 .or. b%y1 >= a%y2) return
+    if (outside_side(a%l, a%y1, b, .true.)) return
+    if (outside_side(a%r, a%y1, b, .false.)) return
+    if (outside_side(b%l, b%y1, a, .true.)) return
+    if (outside_side(b%r, b%y1, a, .false.)) return
+    ov = .true.
+  end function trap_overlap_positive
+
+  !> All four vertices of t on the closed outer side of side s (of a trapezoid starting at row
+  !> sy1): left of (or on) a left side, right of (or on) a right side, directed upward.
+  pure logical function outside_side(s, sy1, t, is_left) result(out)
+    !$omp declare target
+    type(TrapSide), intent(in) :: s
+    integer(int32), intent(in) :: sy1
+    type(Trapezoid), intent(in) :: t
+    logical, intent(in) :: is_left
+    integer :: c1, c2, c3, c4
+    c1 = orient(s, sy1, t%l, t%y1, t%y1)
+    c2 = orient(s, sy1, t%r, t%y1, t%y1)
+    c3 = orient(s, sy1, t%l, t%y1, t%y2)
+    c4 = orient(s, sy1, t%r, t%y1, t%y2)
+    if (is_left) then
+       out = c1 >= 0 .and. c2 >= 0 .and. c3 >= 0 .and. c4 >= 0
+    else
+       out = c1 <= 0 .and. c2 <= 0 .and. c3 <= 0 .and. c4 <= 0
+    end if
+  end function outside_side
+
+  !> Sign of cross(dir(s), p - P) for the point p of side q (trapezoid row ty1) at row y, where
+  !> P = (s%ax, sy1 - s%k) is the anchor of s: > 0 left of the upward line of s, < 0 right.
+  pure integer function orient(s, sy1, q, ty1, y) result(c)
+    !$omp declare target
+    type(TrapSide), intent(in) :: s, q
+    integer(int32), intent(in) :: sy1, ty1, y
+    type(i128) :: xn, t1, t2
+    integer(int64) :: py
+    xn = side_x_num(q, int(ty1, int64), int(y, int64))            ! x = xn / q%dy
+    py = int(sy1, int64) - s%k
+    t1 = i128_mul_i64(i128_mul64(int(s%dx, int64), int(y, int64) - py), int(q%dy, int64))
+    t2 = i128_mul_i64(i128_sub(xn, i128_mul64(int(s%ax, int64), int(q%dy, int64))), int(s%dy, int64))
+    c = i128_cmp(t1, t2)
+  end function orient
 
   ! ------------------------------------------------------------------ area
 

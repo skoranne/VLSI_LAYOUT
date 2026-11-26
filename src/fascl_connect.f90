@@ -13,7 +13,7 @@
 ! The result lives in each member layer's property table (props%net, props%net_rec); a layer
 ! belongs to at most one live CONNECT, a later CONNECT that lists it supersedes the earlier one.
 module FASCLConnectModule
-  use iso_fortran_env, only: int64, real64
+  use iso_fortran_env, only: int32, int64, real64
   use DesignModule
   use GeometryModule, only: Box
   use PropertyTableModule
@@ -21,8 +21,16 @@ module FASCLConnectModule
   use TechStackModule, only: TechDefNames, current_tech
   use CommonModule, only: GetPrecision
   use iso_c_binding, only: c_char, c_int32_t, c_int64_t, c_null_char
+  use TrapezoidModule, only: Trapezoid, trap_from_box_coords, trap_mbr, trap_overlap_positive
   implicit none
   private
+  !> Pieces of one CONNECT member for the any-angle path: trapezoids (boxes converted) with
+  !> their polygon ordinals and integer bounding boxes.
+  type :: PieceSet
+     integer(int64) :: n = 0
+     type(Trapezoid), allocatable :: t(:)
+     integer(int64), allocatable :: ord(:), x1(:), y1(:), x2(:), y2(:)
+  end type PieceSet
 
   type, public :: LayerPtr
      type(Layer), pointer :: p => null()
@@ -171,20 +179,31 @@ contains
     integer(int64), allocatable :: off(:), par(:), lab(:)
     integer(int64) :: total, ord, root, next, ncontacts
     real(real64) :: t0, t1
+    logical :: aa
+    type(PieceSet), allocatable :: P(:)
 
     status = 0; msg = ''
     call cpu_time( t0 )
     n = size(Ls)
     call PropNetNamesDrop( rec )            !> net numbers change: DEF names are stale
     !> Every member: healed, PNum'd, indexed, with an R-tree that matches the box order.
+    !> Any member any-angle: every member goes through the exact trapezoid path (boxes become
+    !> trapezoids); an all-Manhattan stack keeps the box / R-tree path below.
+    aa = .false.
     do k = 1, n
-       if( LayerIsAnyAngle( Ls(k)%p ) ) then
-          status = 1
-          msg = 'CONNECT: any-angle layer '//connect_records(rec)%specs(k)%s//' is not supported yet'
-          return
-       end if
+       aa = aa .or. LayerIsAnyAngle( Ls(k)%p )
     end do
+    block                                   !> MAGPARSER_FORCE_TRAP=1: trapezoid path (testing)
+      character(len=8) :: ev
+      integer :: ln, st
+      call get_environment_variable( 'MAGPARSER_FORCE_TRAP', ev, ln, st )
+      if( st == 0 .and. ln > 0 ) aa = aa .or. ev(1:1) /= '0'
+    end block
     do k = 1, n
+       if( aa ) then
+          call LayerEnsureProperties( Ls(k)%p, connect_records(rec)%specs(k)%s )
+          cycle
+       end if
        associate( L => Ls(k)%p )
          call LayerEnsureProperties( L, connect_records(rec)%specs(k)%s )   !> expands, heals, PNums
          !> BuildTree may re-sort the boxes: polygon numbers and the index are rebuilt after it.
@@ -217,11 +236,24 @@ contains
     end do
 
     ncontacts = 0
-    do c = 2, n - 1, 2
-       do r = c - 1, c + 1, 2
-          call collect_overlaps( Ls(c)%p, Ls(r)%p, off(c), off(r), par, ncontacts )
+    if( aa ) then
+       allocate( P(n) )
+       do k = 1, n
+          call layer_pieces( Ls(k)%p, P(k) )
        end do
-    end do
+       do c = 2, n - 1, 2
+          do r = c - 1, c + 1, 2
+             call collect_overlaps_traps( P(c), P(r), off(c), off(r), par, ncontacts )
+          end do
+       end do
+       deallocate( P )
+    else
+       do c = 2, n - 1, 2
+          do r = c - 1, c + 1, 2
+             call collect_overlaps( Ls(c)%p, Ls(r)%p, off(c), off(r), par, ncontacts )
+          end do
+       end do
+    end if
 
     !> canonical numbering: first appearance over (stack position, ordinal)
     allocate( lab(total) )
@@ -330,6 +362,132 @@ contains
     deallocate( pc, pr )
     !$omp end parallel
   end subroutine collect_overlaps
+
+  !> Pieces of a member (after LayerEnsureProperties): the canonical trapezoids of an any-angle
+  !> layer or the healed boxes of a Manhattan one, each with its polygon ordinal (props%box_ord).
+  subroutine layer_pieces( L, S )
+    type(Layer), intent(in) :: L
+    type(PieceSet), intent(out) :: S
+    integer(int64) :: i
+    if( LayerIsAnyAngle( L ) ) then
+       S%n = L%n_traps
+    else
+       S%n = L%n_used
+    end if
+    allocate( S%t(max(S%n,1_int64)), S%ord(max(S%n,1_int64)), S%x1(max(S%n,1_int64)), &
+         S%y1(max(S%n,1_int64)), S%x2(max(S%n,1_int64)), S%y2(max(S%n,1_int64)) )
+    !$omp parallel do
+    do i = 1, S%n
+       if( LayerIsAnyAngle( L ) ) then
+          S%t(i) = L%traps(i)
+       else
+          S%t(i) = trap_from_box_coords( int( L%layer_boxes(i)%x1, int32 ), int( L%layer_boxes(i)%y1, int32 ), &
+               int( L%layer_boxes(i)%x2, int32 ), int( L%layer_boxes(i)%y2, int32 ) )
+       end if
+       call trap_mbr( S%t(i), S%x1(i), S%y1(i), S%x2(i), S%y2(i) )
+       S%ord(i) = L%props%box_ord(i)
+    end do
+    !$omp end parallel do
+  end subroutine layer_pieces
+
+  !> Any-angle collect_overlaps: union the polygons of pieces of C and R whose interiors meet
+  !> (exact trap_overlap_positive). Candidates from a uniform grid over R's bounding boxes; a pair
+  !> is tested only in the lowest grid cell of the intersection of the two bounding boxes.
+  subroutine collect_overlaps_traps( C, R, offc, offr, par, ncontacts )
+    type(PieceSet), intent(in) :: C, R
+    integer(int64), intent(in) :: offc, offr
+    integer(int64), intent(inout) :: par(:)
+    integer(int64), intent(inout) :: ncontacts
+    integer(int64) :: gx0, gy0, gx1, gy1, cs, nx, ny, ncell, i, j, k, cx, cy, cxa, cxb, cya, cyb
+    integer(int64) :: oc, orr, np, sw, sh
+    integer(int64), allocatable :: cstart(:), cfill(:), citem(:), pc(:), pr(:), tmp(:)
+    if( C%n == 0 .or. R%n == 0 ) return
+    gx0 = minval( R%x1(1:R%n) ); gy0 = minval( R%y1(1:R%n) )
+    gx1 = maxval( R%x2(1:R%n) ); gy1 = maxval( R%y2(1:R%n) )
+    sw = 0; sh = 0
+    !$omp parallel do reduction(+:sw, sh)
+    do i = 1, R%n
+       sw = sw + ( R%x2(i) - R%x1(i) ); sh = sh + ( R%y2(i) - R%y1(i) )
+    end do
+    !$omp end parallel do
+    cs = max( 1_int64, 2 * max( sw, sh ) / R%n )
+    do
+       nx = ( gx1 - gx0 ) / cs + 1; ny = ( gy1 - gy0 ) / cs + 1
+       if( nx * ny <= 4 * R%n + 1024 ) exit
+       cs = cs * 2
+    end do
+    ncell = nx * ny
+    allocate( cstart(ncell + 1), cfill(ncell) )
+    cstart = 0
+    do i = 1, R%n
+       do cy = ( R%y1(i) - gy0 ) / cs, ( R%y2(i) - gy0 ) / cs
+          do cx = ( R%x1(i) - gx0 ) / cs, ( R%x2(i) - gx0 ) / cs
+             k = cy * nx + cx + 2
+             cstart(k) = cstart(k) + 1
+          end do
+       end do
+    end do
+    cstart(1) = 1
+    do k = 2, ncell + 1
+       cstart(k) = cstart(k) + cstart(k - 1)
+    end do
+    allocate( citem(max(cstart(ncell + 1) - 1, 1_int64)) )
+    cfill = cstart(1:ncell)
+    do i = 1, R%n
+       do cy = ( R%y1(i) - gy0 ) / cs, ( R%y2(i) - gy0 ) / cs
+          do cx = ( R%x1(i) - gx0 ) / cs, ( R%x2(i) - gx0 ) / cs
+             k = cy * nx + cx + 1
+             citem( cfill(k) ) = i
+             cfill(k) = cfill(k) + 1
+          end do
+       end do
+    end do
+    !$omp parallel private(pc, pr, tmp, np, i, j, k, cx, cy, cxa, cxb, cya, cyb, oc, orr)
+    allocate( pc(256), pr(256) )
+    np = 0
+    !$omp do schedule(dynamic, 1024)
+    do i = 1, C%n
+       if( C%x2(i) < gx0 .or. C%x1(i) > gx1 .or. C%y2(i) < gy0 .or. C%y1(i) > gy1 ) cycle
+       cxa = max( 0_int64, ( C%x1(i) - gx0 ) / cs ); cxb = min( nx - 1, ( C%x2(i) - gx0 ) / cs )
+       cya = max( 0_int64, ( C%y1(i) - gy0 ) / cs ); cyb = min( ny - 1, ( C%y2(i) - gy0 ) / cs )
+       oc = offc + C%ord(i)
+       do cy = cya, cyb
+          do cx = cxa, cxb
+             k = cy * nx + cx + 1
+             do j = cstart(k), cstart(k + 1) - 1
+                associate( q => citem(j) )
+                  if( max( C%x1(i), R%x1(q) ) >= min( C%x2(i), R%x2(q) ) ) cycle
+                  if( max( C%y1(i), R%y1(q) ) >= min( C%y2(i), R%y2(q) ) ) cycle
+                  !> test the pair once: in the cell holding the low corner of the bbox intersection
+                  if( ( max( C%x1(i), R%x1(q) ) - gx0 ) / cs /= cx ) cycle
+                  if( ( max( C%y1(i), R%y1(q) ) - gy0 ) / cs /= cy ) cycle
+                  if( .not. trap_overlap_positive( C%t(i), R%t(q) ) ) cycle
+                  orr = offr + R%ord(q)
+                end associate
+                if( np > 0 ) then
+                   if( pc(np) == oc .and. pr(np) == orr ) cycle
+                end if
+                if( np == size(pc, kind=int64) ) then
+                   allocate( tmp(2*np) ); tmp(1:np) = pc(1:np); call move_alloc( tmp, pc )
+                   allocate( tmp(2*np) ); tmp(1:np) = pr(1:np); call move_alloc( tmp, pr )
+                end if
+                np = np + 1
+                pc(np) = oc
+                pr(np) = orr
+             end do
+          end do
+       end do
+    end do
+    !$omp end do
+    !$omp critical (connect_union)
+    do k = 1, np
+       call unite( par, pc(k), pr(k) )
+    end do
+    ncontacts = ncontacts + np
+    !$omp end critical (connect_union)
+    deallocate( pc, pr )
+    !$omp end parallel
+  end subroutine collect_overlaps_traps
 
   integer(int64) function find( par, x0 ) result(x)
     integer(int64), intent(inout) :: par(:)
@@ -456,6 +614,12 @@ contains
     integer(int64) :: c0, c1, cr
 
     status = 0; msg = ''; stats = 0
+    do i = 1, size(Ls)
+       if( LayerIsAnyAngle( Ls(i)%p ) ) then
+          status = 1; msg = 'defcheck: any-angle layer '//connect_records(rec)%specs(i)%s//' is not supported yet'
+          return
+       end if
+    end do
     call cpu_time( t0 ); call system_clock( c0, cr )
     n = size(Ls)
     nr = ( n + 1 ) / 2

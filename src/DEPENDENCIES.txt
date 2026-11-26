@@ -60,7 +60,7 @@ rpc_server.o: compact_wire.o compact_layer.o design.o version_mod.o rpc_socket.o
 test_compact_wire.o: compact_wire.o compact_layer.o geometry.o
 property_table.o: geometry.o datastructures.o compact_layer.o
 fascl.o: design.o property_table.o pnummerge.o trap_pnum.o trapezoid.o
-fascl_connect.o: fascl.o design.o property_table.o tech_stacks.o commonmodule.o
+fascl_connect.o: fascl.o design.o property_table.o tech_stacks.o commonmodule.o trapezoid.o
 prop_oasis.o: fascl.o design.o property_table.o
 tech_stacks.o: hashtable.o
 
@@ -79,3 +79,4 @@ test_predicates.o: wide_int.o exact_predicates.o
 measure.o: geometry.o compact_layer.o
 test_measure.o: measure.o geometry.o
 anyangle_ops.o: design.o measure.o trap_merge.o trap_pnum.o trapezoid.o wide_int.o
+test_trapoverlap.o: trapezoid.o
