@@ -29,6 +29,7 @@ module DesignModule
   use RTreeBuilderGPU
   use CompactLayerModule
   use PropertyTableModule, only: PropertyTable
+  use TrapezoidModule, only: Trapezoid
   use iso_c_binding
   use iso_fortran_env, only : int32, int64, real64
   use omp_lib
@@ -47,6 +48,7 @@ module DesignModule
   public :: PerformUnion, PerformPolygonUnion, calculate_union_area_by_polygon, &
        PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
        BuildTree, MergeHealLayer, CertifyHealing, PerformMergeLayer, RemoveIdentical
+  public :: LayerIsAnyAngle
   public :: CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, CalculateXOR, &
        CalculateFrameAND, CalculateFrameNOT, CalculateBoostOperation, CalculateTopologicalSelect, &
        CalculateGROWLayer, CalculateSHRINKLayer, CalculateSHRINKDirectional, CalculateOverlapCount, &
@@ -123,6 +125,18 @@ module DesignModule
      !> Columns are keyed by canonical polygon ordinal and carry the geometry signature
      !> they were computed on, so a reordered layer keeps them and a rewritten one drops them.
      type(PropertyTable), allocatable :: props
+     !> Any-angle geometry (anyangle_ops.f90): when n_traps > 0 the layer's region is the canonical
+     !> trapezoid set traps(1:n_traps) (TrapMergeModule: exact, interior-disjoint, lattice-line
+     !> sides) and layer_boxes is empty. Only operations that dispatch on LayerIsAnyAngle accept it.
+     integer(kind=int64) :: n_traps = 0
+     type(Trapezoid), allocatable :: traps(:)
+     !> Source polygons of an any-angle layer read from a file (raw_off 1-based, n+1 entries;
+     !> int32 lattice coordinates). Booleans on loaded layers snap these, unmerged, jointly
+     !> (one rounding of the input, and self-overlap AND sees the input overlaps). Results and
+     !> copies of results have raw_np = 0 and are fed back as their exact trapezoid outlines.
+     integer(kind=int64) :: raw_np = 0
+     integer(kind=int64), allocatable :: raw_off(:)
+     integer(kind=int32), allocatable :: raw_x(:), raw_y(:)
    contains
      procedure :: has     => layer_has_state
      procedure :: mark    => layer_mark_state
@@ -459,6 +473,12 @@ contains
   !> Release the geometry and everything derived from it. The backing
   !> store (fileName, iunit) is left alone. An empty layer trivially has
   !> every property, so no preprocessing is triggered for it.
+  !> The layer holds any-angle geometry (canonical trapezoids instead of boxes).
+  pure logical function LayerIsAnyAngle( L )
+    type(Layer), intent(in) :: L
+    LayerIsAnyAngle = L%n_traps > 0
+  end function LayerIsAnyAngle
+
   subroutine ClearLayer( input_layer_A )
     type(Layer), intent(inout), target :: input_layer_A
     call LayerDeviceRelease( input_layer_A )
@@ -466,6 +486,11 @@ contains
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
     if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
     if( allocated( input_layer_A%props ) ) deallocate( input_layer_A%props )
+    if( allocated( input_layer_A%traps ) ) deallocate( input_layer_A%traps )
+    input_layer_A%n_traps = 0
+    if( allocated( input_layer_A%raw_off ) ) deallocate( input_layer_A%raw_off )
+    if( allocated( input_layer_A%raw_x ) ) deallocate( input_layer_A%raw_x, input_layer_A%raw_y )
+    input_layer_A%raw_np = 0
     call drop_rtree( input_layer_A )
     input_layer_A%n_used = 0
     input_layer_A%n_alloc = 0
@@ -486,6 +511,20 @@ contains
     p_out = c_loc(output_layer); p_in = c_loc(input_layer_A)
     if( c_associated( p_out, p_in ) ) return
     n = input_layer_A%n_used
+    if( input_layer_A%n_traps > 0 ) then          !> any-angle layer: the trapezoids are the geometry
+       call ClearLayer( output_layer )
+       allocate( output_layer%traps, source=input_layer_A%traps(1:input_layer_A%n_traps) )
+       output_layer%n_traps = input_layer_A%n_traps
+       if( input_layer_A%raw_np > 0 ) then
+          allocate( output_layer%raw_off, source=input_layer_A%raw_off )
+          allocate( output_layer%raw_x, source=input_layer_A%raw_x )
+          allocate( output_layer%raw_y, source=input_layer_A%raw_y )
+          output_layer%raw_np = input_layer_A%raw_np
+       end if
+       output_layer%layerState = LAYER_STATE_NONE
+       if( allocated( input_layer_A%props ) ) allocate( output_layer%props, source=input_layer_A%props )
+       return
+    end if
     if( n == 0 ) then
        call ClearLayer( output_layer )
        return
@@ -553,6 +592,20 @@ contains
     call move_alloc(a%props, temp_props)
     call move_alloc(b%props, a%props)
     call move_alloc(temp_props, b%props)
+
+    block
+      type(Trapezoid), allocatable :: temp_traps(:)
+      integer(kind=int64), allocatable :: t_off(:)
+      integer(kind=int32), allocatable :: t_c(:)
+      call swap_int64( a%n_traps, b%n_traps )
+      call move_alloc(a%traps, temp_traps)
+      call move_alloc(b%traps, a%traps)
+      call move_alloc(temp_traps, b%traps)
+      call swap_int64( a%raw_np, b%raw_np )
+      call move_alloc(a%raw_off, t_off); call move_alloc(b%raw_off, a%raw_off); call move_alloc(t_off, b%raw_off)
+      call move_alloc(a%raw_x, t_c); call move_alloc(b%raw_x, a%raw_x); call move_alloc(t_c, b%raw_x)
+      call move_alloc(a%raw_y, t_c); call move_alloc(b%raw_y, a%raw_y); call move_alloc(t_c, b%raw_y)
+    end block
 
     if( filename_as_well ) then
        call move_alloc(a%fileName, temp_fileName)

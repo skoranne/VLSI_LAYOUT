@@ -1,0 +1,415 @@
+! File   : anyangle_ops.f90
+! Author : Sandeep Koranne (C) 2026. All rights reserved.
+! Purpose: MAGPARSER integration of the any-angle engine (TrapMergeModule / TrapPNumModule).
+!
+!   * LoadAnyAngleLayers   after a design is loaded with `var anyangle 1` (or MAGPARSER_ANYANGLE=1):
+!                          every layer with a non-axis-parallel edge is re-read exactly (polygon
+!                          iterator, no strip approximation) and merged into its canonical
+!                          trapezoid set (Layer%traps). Manhattan layers keep their boxes.
+!   * AnyAngleBoolean      two-layer OR / AND / NOT / XOR and single-layer self-overlap AND on
+!                          any operands (boxes, trapezoids or both): one joint snap rounding of
+!                          A and B, one predicate sweep. A Manhattan result is stored as boxes
+!                          (every downstream operation works on it), anything else as trapezoids.
+!   * AnyAngleMeasure      `exec measure` of an any-angle layer: PNUM polygons, holes, vertices,
+!                          exact area, perimeter (same definitions as measure.f90).
+!   * AnyAngleDigest       content hash of an any-angle layer (MAGPARSER_LAYER_DIGEST).
+!
+! Operands that are any-angle layers are fed back to the engine as their exact lattice polygons
+! (db/trap_out.cpp, ldb_trapset_polys). MAGPARSER_FORCE_TRAP=1 (testing) sends Manhattan operands
+! through the engine as well.
+module AnyAngleOpsModule
+  use, intrinsic :: iso_fortran_env, only: int32, int64, real64
+  use, intrinsic :: iso_c_binding
+  use omp_lib
+  use GeometryModule, only: Box
+  use DesignModule
+  use LayerMeasureModule, only: LayerMeasures
+  use WideIntModule
+  use TrapezoidModule
+  use TrapMergeModule
+  use TrapPNumModule
+  implicit none
+  private
+
+  public :: AnyAngleEnabled, AnyAngleForce, AnyAngleSetEnabled, LoadAnyAngleLayers
+  public :: TOP_OR, TOP_AND, TOP_NOT, TOP_XOR, TOP_BNOTA, TOP_SELF2
+  public :: AnyAngleBoolean, AnyAngleMeasure, AnyAngleDigest, AnyAngleOpFromChar, AnyAngleOpFromName
+
+  logical, save :: anyangle_on = .false., anyangle_env_read = .false.
+
+  interface
+     function ldb_polys_load(path, nsel, layers, dts, err, errsz) result(h) bind(c, name='ldb_polys_load')
+       import :: c_ptr, c_char, c_int, c_size_t
+       character(kind=c_char), intent(in) :: path(*)
+       integer(c_int), value :: nsel
+       integer(c_int), intent(in) :: layers(*), dts(*)
+       character(kind=c_char), intent(inout) :: err(*)
+       integer(c_size_t), value :: errsz
+       type(c_ptr) :: h
+     end function ldb_polys_load
+     function ldb_polys_count(h, k, nvert) result(n) bind(c, name='ldb_polys_count')
+       import :: c_ptr, c_int, c_int64_t
+       type(c_ptr), value :: h
+       integer(c_int), value :: k
+       integer(c_int64_t), intent(out) :: nvert
+       integer(c_int64_t) :: n
+     end function ldb_polys_count
+     subroutine ldb_polys_get(h, k, poff, xs, ys) bind(c, name='ldb_polys_get')
+       import :: c_ptr, c_int, c_int64_t
+       type(c_ptr), value :: h
+       integer(c_int), value :: k
+       integer(c_int64_t), intent(out) :: poff(*), xs(*), ys(*)
+     end subroutine ldb_polys_get
+     subroutine ldb_polys_free(h) bind(c, name='ldb_polys_free')
+       import :: c_ptr
+       type(c_ptr), value :: h
+     end subroutine ldb_polys_free
+     function ldb_trapset_polys(n, rec, stats) result(h) bind(c, name='ldb_trapset_polys')
+       import :: c_ptr, c_int32_t, c_int64_t
+       integer(c_int64_t), value :: n
+       integer(c_int32_t), intent(in) :: rec(*)
+       integer(c_int64_t), intent(out) :: stats(*)
+       type(c_ptr) :: h
+     end function ldb_trapset_polys
+     function ldb_trapset_polys_count(h, nvert) result(n) bind(c, name='ldb_trapset_polys_count')
+       import :: c_ptr, c_int64_t
+       type(c_ptr), value :: h
+       integer(c_int64_t), intent(out) :: nvert
+       integer(c_int64_t) :: n
+     end function ldb_trapset_polys_count
+     subroutine ldb_trapset_polys_get(h, poff, xs, ys) bind(c, name='ldb_trapset_polys_get')
+       import :: c_ptr, c_int64_t
+       type(c_ptr), value :: h
+       integer(c_int64_t), intent(out) :: poff(*), xs(*), ys(*)
+     end subroutine ldb_trapset_polys_get
+     subroutine ldb_trapset_polys_free(h) bind(c, name='ldb_trapset_polys_free')
+       import :: c_ptr
+       type(c_ptr), value :: h
+     end subroutine ldb_trapset_polys_free
+  end interface
+
+contains
+
+  ! ------------------------------------------------------------------ switches
+
+  logical function AnyAngleEnabled()
+    character(len=16) :: v
+    integer :: ln, st
+    if (.not. anyangle_env_read) then
+       anyangle_env_read = .true.
+       call get_environment_variable('MAGPARSER_ANYANGLE', v, ln, st)
+       if (st == 0 .and. ln > 0) anyangle_on = v(1:1) /= '0'
+    end if
+    AnyAngleEnabled = anyangle_on
+  end function AnyAngleEnabled
+
+  subroutine AnyAngleSetEnabled(on)
+    logical, intent(in) :: on
+    anyangle_env_read = .true.
+    anyangle_on = on
+  end subroutine AnyAngleSetEnabled
+
+  !> MAGPARSER_FORCE_TRAP=1: run every supported Boolean through the engine (testing).
+  logical function AnyAngleForce()
+    character(len=16) :: v
+    integer :: ln, st
+    call get_environment_variable('MAGPARSER_FORCE_TRAP', v, ln, st)
+    AnyAngleForce = st == 0 .and. ln > 0 .and. v(1:1) /= '0'
+  end function AnyAngleForce
+
+  !> CTR operator character -> TOP_* (0: not a Boolean the engine handles).
+  integer(int32) function AnyAngleOpFromChar(c) result(op)
+    character(len=*), intent(in) :: c
+    select case (c)
+    case ('+');           op = TOP_OR
+    case ('*');           op = TOP_AND
+    case ('@', '!', '~'); op = TOP_NOT
+    case ('^');           op = TOP_XOR
+    case default;         op = -1
+    end select
+  end function AnyAngleOpFromChar
+
+  !> CTR operator word -> TOP_* (-1: not handled). Single-layer AND (B = nothing) is TOP_SELF2.
+  integer(int32) function AnyAngleOpFromName(w, single) result(op)
+    character(len=*), intent(in) :: w
+    logical, intent(in) :: single
+    select case (w)
+    case ('OR', 'OR2');            op = TOP_OR
+    case ('AND2', 'FRAMEAND');     op = TOP_AND
+    case ('NOT', 'FRAMENOT');      op = TOP_NOT
+    case ('XOR');                  op = TOP_XOR
+    case ('AND')                   !> MAGPARSER AND is the single-layer self-overlap (B ignored)
+       op = TOP_SELF2
+       if (single) op = TOP_SELF2
+    case default;                  op = -1
+    end select
+  end function AnyAngleOpFromName
+
+  ! ------------------------------------------------------------------ loading
+
+  !> Re-read the layers of d that have non-Manhattan shapes exactly, as canonical trapezoids.
+  subroutine LoadAnyAngleLayers(d, path)
+    type(Design), intent(inout), target :: d
+    character(len=*), intent(in) :: path
+    integer(c_int), allocatable :: lay(:), dt(:)
+    integer, allocatable :: idx(:)
+    integer :: i, nsel, ios, p, q
+    type(c_ptr) :: h
+    character(kind=c_char) :: err(1024)
+    character(kind=c_char), allocatable :: cpath(:)
+    integer(int64) :: npoly, nvert, ntrap, j, nslant
+    integer(int64), allocatable :: poff(:), px(:), py(:)
+    type(Trapezoid), allocatable :: traps(:)
+    type(TrapMergeStats) :: st
+    integer :: status
+    real(real64) :: t0
+    character(len=1024) :: nm
+    if (.not. allocated(d%layers)) return
+    allocate(lay(size(d%layers)), dt(size(d%layers)), idx(size(d%layers)))
+    nsel = 0
+    do i = 1, size(d%layers)
+       nm = d%layerNames(i)
+       if (nm(1:1) /= 'L') cycle
+       p = index(nm, '_D')
+       if (p == 0) cycle
+       nsel = nsel + 1
+       read(nm(2:p - 1), *, iostat=ios) lay(nsel)
+       read(nm(p + 2:), *, iostat=ios) dt(nsel)
+       idx(nsel) = i
+    end do
+    if (nsel == 0) return
+    t0 = omp_get_wtime()
+    allocate(cpath(len_trim(path) + 1))
+    do q = 1, len_trim(path)
+       cpath(q) = path(q:q)
+    end do
+    cpath(len_trim(path) + 1) = c_null_char
+    err = c_null_char
+    h = ldb_polys_load(cpath, int(nsel, c_int), lay, dt, err, int(size(err), c_size_t))
+    if (.not. c_associated(h)) then
+       write(*, '(A,A)') 'ERROR: anyangle: cannot re-read ', trim(path)
+       return
+    end if
+    do i = 1, nsel
+       npoly = ldb_polys_count(h, int(i - 1, c_int), nvert)
+       allocate(poff(npoly + 1), px(max(nvert, 1_int64)), py(max(nvert, 1_int64)))
+       call ldb_polys_get(h, int(i - 1, c_int), poff, px, py)
+       nslant = 0
+       !$omp parallel do reduction(+:nslant) schedule(dynamic, 4096)
+       do j = 1, npoly
+          if (poly_is_slanted(px, py, poff(j), poff(j + 1) - 1)) nslant = nslant + 1
+       end do
+       !$omp end parallel do
+       if (nslant > 0) then
+          st = TrapMergeStats()
+          call TrapMergePolygons(npoly, poff, px, py, traps, ntrap, st, status)
+          if (status /= 0 .or. st%anomalies /= 0) then
+             write(*, '(A,A,A,I0,A,I0)') 'ERROR: anyangle: merge of ', trim(d%layerNames(idx(i))), &
+                  ' failed: status=', status, ' anomalies=', st%anomalies
+          else
+             call store_traps(d%layers(idx(i)), traps, ntrap)
+             call store_raw(d%layers(idx(i)), npoly, poff, px, py)
+             write(*, '(A,A,A,I0,A,I0,A,I0,A,F0.3,A)') 'INFO: anyangle layer ', trim(d%layerNames(idx(i))), &
+                  ': polygons=', npoly, ' slanted=', nslant, ' trapezoids=', ntrap, ' (', st%t_total, ' s)'
+          end if
+          if (allocated(traps)) deallocate(traps)
+       end if
+       deallocate(poff, px, py)
+    end do
+    call ldb_polys_free(h)
+    write(*, '(A,F0.3,A)') 'INFO: anyangle load done (', omp_get_wtime() - t0, ' s)'
+  end subroutine LoadAnyAngleLayers
+
+  pure logical function poly_is_slanted(px, py, a, b) result(sl)
+    integer(int64), intent(in) :: px(:), py(:), a, b
+    integer(int64) :: j, k
+    sl = .false.
+    do j = a, b
+       k = j + 1
+       if (k > b) k = a
+       if (px(j) /= px(k) .and. py(j) /= py(k)) then
+          sl = .true.; return
+       end if
+    end do
+  end function poly_is_slanted
+
+  ! ------------------------------------------------------------------ Booleans
+
+  !> out = A op B (op: TOP_OR, TOP_AND, TOP_NOT, TOP_XOR, TOP_BNOTA, TOP_SELF2 (B ignored)).
+  subroutine AnyAngleBoolean(A, B, out, op, status)
+    type(Layer), intent(inout), target :: A, B, out
+    integer(int32), intent(in) :: op
+    integer, intent(out) :: status
+    integer(int64) :: npA, npB
+    integer(int64), allocatable :: poA(:), xA(:), yA(:), poB(:), xB(:), yB(:)
+    type(TrapList) :: res(1)
+    type(TrapMergeStats) :: st
+    integer(int32) :: ops(1)
+    real(real64) :: t0
+    t0 = omp_get_wtime()
+    status = 0
+    call layer_polys(A, npA, poA, xA, yA)
+    if (op == TOP_SELF2) then
+       npB = 0
+       allocate(poB(1), xB(1), yB(1)); poB(1) = 1
+    else
+       call layer_polys(B, npB, poB, xB, yB)
+    end if
+    ops(1) = op
+    st = TrapMergeStats()
+    call TrapBooleanPolygons(npA, poA, xA, yA, npB, poB, xB, yB, 1, ops, res, st, status)
+    deallocate(poA, xA, yA, poB, xB, yB)
+    if (status /= 0 .or. st%anomalies /= 0) then
+       write(*, '(A,I0,A,I0)') 'ERROR: anyangle Boolean failed: status=', status, ' anomalies=', st%anomalies
+       if (status == 0) status = 3
+       call ClearLayer(out)
+       return
+    end if
+    call store_traps(out, res(1)%t, res(1)%n)
+    write(*, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,F0.3,A)') 'INFO: anyangle op=', op, ' polygons=', st%polygons, &
+         ' crossings=', st%crossings, ' inexact=', st%crossings_inexact, ' trapezoids=', res(1)%n, &
+         ' (', omp_get_wtime() - t0, ' s)'
+  end subroutine AnyAngleBoolean
+
+  !> Store a canonical trapezoid set in L: all boxes -> box layer, else any-angle layer.
+  subroutine store_traps(L, t, n)
+    type(Layer), intent(inout), target :: L
+    type(Trapezoid), intent(in) :: t(:)
+    integer(int64), intent(in) :: n
+    integer(int64) :: i, nbox
+    nbox = 0
+    !$omp parallel do reduction(+:nbox)
+    do i = 1, n
+       if (trap_is_box(t(i))) nbox = nbox + 1
+    end do
+    !$omp end parallel do
+    call ClearLayer(L)
+    if (n == 0) return
+    if (nbox == n) then
+       allocate(L%layer_boxes(n))
+       !$omp parallel do
+       do i = 1, n
+          L%layer_boxes(i)%x1 = int(t(i)%l%ax, kind(L%layer_boxes(i)%x1))
+          L%layer_boxes(i)%x2 = int(t(i)%r%ax, kind(L%layer_boxes(i)%x2))
+          L%layer_boxes(i)%y1 = int(t(i)%y1, kind(L%layer_boxes(i)%y1))
+          L%layer_boxes(i)%y2 = int(t(i)%y2, kind(L%layer_boxes(i)%y2))
+       end do
+       !$omp end parallel do
+       L%n_used = n; L%n_alloc = n
+    else
+       allocate(L%traps(n))
+       L%traps(1:n) = t(1:n)
+       L%n_traps = n
+    end if
+    L%layerState = LAYER_STATE_NONE
+  end subroutine store_traps
+
+  subroutine store_raw(L, np, poff, px, py)
+    type(Layer), intent(inout) :: L
+    integer(int64), intent(in) :: np, poff(:), px(:), py(:)
+    integer(int64) :: nv, j
+    if (L%n_traps == 0) return                   !> demoted to boxes: nothing slanted left
+    nv = poff(np + 1) - 1
+    allocate(L%raw_off(np + 1), L%raw_x(max(nv, 1_int64)), L%raw_y(max(nv, 1_int64)))
+    L%raw_off(1:np + 1) = poff(1:np + 1)
+    !$omp parallel do
+    do j = 1, nv
+       L%raw_x(j) = int(px(j), int32); L%raw_y(j) = int(py(j), int32)
+    end do
+    !$omp end parallel do
+    L%raw_np = np
+  end subroutine store_raw
+
+  !> Exact polygons of a layer: boxes as rectangles, trapezoids as their lattice polygons.
+  subroutine layer_polys(L, np, poff, px, py)
+    type(Layer), intent(inout), target :: L
+    integer(int64), intent(out) :: np
+    integer(int64), allocatable, intent(out) :: poff(:), px(:), py(:)
+    integer(int64) :: nb, nt, ntv, i, b0, v0
+    integer(int64), allocatable :: tpo(:), tx(:), ty(:)
+    integer(int32), allocatable :: rec(:, :)
+    integer(c_int64_t) :: st(8)
+    type(c_ptr) :: h
+    if (L%raw_np > 0) then                       !> loaded any-angle layer: its source polygons
+       np = L%raw_np
+       ntv = L%raw_off(np + 1) - 1
+       allocate(poff(np + 1), px(max(ntv, 1_int64)), py(max(ntv, 1_int64)))
+       poff(1:np + 1) = L%raw_off(1:np + 1)
+       !$omp parallel do
+       do i = 1, ntv
+          px(i) = L%raw_x(i); py(i) = L%raw_y(i)
+       end do
+       !$omp end parallel do
+       return
+    end if
+    call LayerExpand(L)
+    nb = L%n_used
+    nt = 0; ntv = 0
+    if (L%n_traps > 0) then
+       call TrapRecords(L%traps, L%n_traps, rec)
+       st = 0
+       h = ldb_trapset_polys(L%n_traps, rec, st)
+       deallocate(rec)
+       if (st(7) /= 0) write(*, '(A,I0)') 'ERROR: anyangle: polygon export anomalies=', st(7)
+       nt = ldb_trapset_polys_count(h, ntv)
+       allocate(tpo(nt + 1), tx(max(ntv, 1_int64)), ty(max(ntv, 1_int64)))
+       call ldb_trapset_polys_get(h, tpo, tx, ty)
+       call ldb_trapset_polys_free(h)
+    end if
+    np = nb + nt
+    allocate(poff(np + 1), px(max(4*nb + ntv, 1_int64)), py(max(4*nb + ntv, 1_int64)))
+    !$omp parallel do private(b0)
+    do i = 1, nb
+       b0 = 4*(i - 1)
+       poff(i) = b0 + 1
+       px(b0 + 1) = L%layer_boxes(i)%x1; py(b0 + 1) = L%layer_boxes(i)%y1
+       px(b0 + 2) = L%layer_boxes(i)%x2; py(b0 + 2) = L%layer_boxes(i)%y1
+       px(b0 + 3) = L%layer_boxes(i)%x2; py(b0 + 3) = L%layer_boxes(i)%y2
+       px(b0 + 4) = L%layer_boxes(i)%x1; py(b0 + 4) = L%layer_boxes(i)%y2
+    end do
+    !$omp end parallel do
+    v0 = 4*nb
+    do i = 1, nt
+       poff(nb + i) = v0 + tpo(i)
+    end do
+    poff(np + 1) = v0 + ntv + 1
+    if (nt > 0) then
+       px(v0 + 1:v0 + ntv) = tx(1:ntv); py(v0 + 1:v0 + ntv) = ty(1:ntv)
+       deallocate(tpo, tx, ty)
+    end if
+  end subroutine layer_polys
+
+  ! ------------------------------------------------------------------ measure / digest
+
+  subroutine AnyAngleMeasure(L, m)
+    type(Layer), intent(inout), target :: L
+    type(LayerMeasures), intent(out) :: m
+    type(TrapPolys) :: P
+    integer(int64) :: a2
+    call TrapPNum(L%traps, L%n_traps, P)
+    call TrapPolyOutline(L%traps, L%n_traps, P)
+    m%boxes = L%n_traps
+    m%polygons = P%np
+    m%holes = sum(P%holes(1:P%np))
+    m%vertices = sum(P%nvert(1:P%np))
+    a2 = sum(P%area2(1:P%np))
+    m%area = a2 / 2
+    m%perimeter = nint(sum(P%perim(1:P%np)), int64)
+    m%euler4 = 4*(m%polygons - m%holes)
+    if (P%anomalies + P%outline_anomalies /= 0) write(*, '(A,I0)') 'ERROR: anyangle measure anomalies=', &
+         P%anomalies + P%outline_anomalies
+  end subroutine AnyAngleMeasure
+
+  !> Order-independent content hash of the trapezoid set (canonical, so equal regions hash equal).
+  integer(int64) function AnyAngleDigest(L) result(h)
+    type(Layer), intent(in) :: L
+    integer(int64) :: i
+    h = 0
+    !$omp parallel do reduction(+:h)
+    do i = 1, L%n_traps
+       h = h + trap_hash(L%traps(i))
+    end do
+    !$omp end parallel do
+  end function AnyAngleDigest
+
+end module AnyAngleOpsModule

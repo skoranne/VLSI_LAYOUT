@@ -37,6 +37,7 @@ module ControlModule
   use FASCLConnectModule
   use TechStackModule
   use PropOasisModule
+  use AnyAngleOpsModule
   use iso_fortran_env, only: int32, int64, real64
   implicit none
   public :: ParseControlFile, GetLayerFromDBName
@@ -61,6 +62,7 @@ contains
     if(lower_ext == 'gds' .or. lower_ext == 'gdsii' .or. lower_ext == 'oas' .or. lower_ext == 'oasis') then
        write(*,*) 'INFO: CTR loading GDSII/OASIS design: ', trim(fn)
        call LoadLayoutDBFile(load_design, MAX_LAYERS)
+       if( AnyAngleEnabled() ) call LoadAnyAngleLayers(load_design, fn)
     else
        call parseMagicLayoutFile(load_design, MAX_LAYERS)
     end if
@@ -82,6 +84,7 @@ contains
     if(lower_ext == 'gds' .or. lower_ext == 'gdsii' .or. lower_ext == 'oas' .or. lower_ext == 'oasis') then
        write(*,*) 'INFO: CTR loading GDSII/OASIS design (hierarchical flatten): ', trim(fn)
        call LoadLayoutDBFileHier(load_design, MAX_LAYERS)
+       if( AnyAngleEnabled() ) call LoadAnyAngleLayers(load_design, fn)
     else
        call parseMagicLayoutFile(load_design, MAX_LAYERS)
     end if
@@ -219,6 +222,11 @@ contains
        initialized = .true.
     end if
     if( .not. enabled ) return
+    if( LayerIsAnyAngle( lyr ) ) then
+       write(*,'(A,I0,A,A,A,I0,A,I0)') 'LAYER_DIGEST line=', line_no, ' layer=', lname, &
+            ' traps=', lyr%n_traps, ' hsum=', AnyAngleDigest( lyr )
+       return
+    end if
     n = lyr%n_used
     hsum = 0; hxor = 0; area = 0
     if( n > 0 .and. allocated( lyr%layer_boxes ) ) then
@@ -268,9 +276,13 @@ contains
     end if
     call cpu_time(t0)
     associate( L => design_dbs(dbi)%layers(li) )
+      if( LayerIsAnyAngle( L ) ) then
+         call AnyAngleMeasure( L, m )
+      else
       if( L%is_compact ) call LayerExpand( L )
       if( L%n_used > 0 .and. NeedsHealing( L ) ) call PreprocessLayer( L )
       call MeasureDisjointBoxes( L%layer_boxes, L%n_used, m )
+      end if
     end associate
     call cpu_time(t1)
     write(*,'(A,I0,A,A,A,A,A,F0.2)') 'MEASURE line=', line_no, ' layer=', ref, ' ', MeasuresToString(m), &
@@ -299,7 +311,9 @@ contains
     real(kind=real64)  :: rvar(16)
     integer(kind=K_COORDINATE_KIND):: ivar(16)
     integer(kind=K_COORDINATE_KIND) :: used_precision
-    logical :: banded_done
+    logical :: banded_done, aa_any
+    integer(int32) :: aa_op
+    integer :: aa_status
     character(len=1024) :: m4_cmd, expanded_file, echo_line, helper_name
     integer :: m4_stat, echo_unit, echo_ios, pid_self, pid_unit, helper_unit, helper_ios
     character(len=1024) :: trs_rules_file, trs_file
@@ -476,6 +490,19 @@ contains
                   write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
                end if
              end block
+          else if( trim(rest(1:pos-1)) == 'anyangle' ) then
+             !> var anyangle 1: layers with non-Manhattan shapes are loaded exactly (canonical
+             !> trapezoids) by the following decl design lines, and Booleans on them are exact
+             rest = adjustl(rest)
+             pos = index( rest, ' ' )
+             rest = trim( adjustl( rest(pos+1:)))
+             read(rest, *, iostat=ios) i
+             if( ios == 0 ) then
+                call AnyAngleSetEnabled( i /= 0 )
+                write(*,*) 'INFO: VAR changing anyangle = ', i
+             else
+                write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
+             end if
           else if( trim(rest(1:pos-1)) == 'abort_on_xor' ) then
              rest = adjustl(rest)
              pos = index( rest, ' ' )
@@ -850,7 +877,33 @@ contains
                      operator_char, &
                      design_dbs(rhs2_db_index)%designName,':',trim(design_dbs(rhs2_db_index)%layerNames(rhs2_layer_index))
                 banded_done = .false.
-                if( index('+*@~!^', operator_char) > 0 ) then
+                aa_any = LayerIsAnyAngle( rhs1_layer ) .or. LayerIsAnyAngle( rhs2_layer )
+                if( aa_any .or. AnyAngleForce() ) then
+                   aa_op = AnyAngleOpFromChar( operator_char )
+                   if( aa_op >= 0 ) then
+                      call StartMarkTime("ANYANGLE")
+                      if( rhs1_layer%n_used == 0 .and. rhs1_layer%n_traps == 0 .and. .not. rhs1_layer%is_compact ) &
+                           call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
+                      if( rhs2_layer%n_used == 0 .and. rhs2_layer%n_traps == 0 .and. .not. rhs2_layer%is_compact ) &
+                           call RestoreSnapToLayer( rhs2_layer, rhs2_layer%fileName )
+                      call LayerDropCompact( lhs_layer )
+                      call touch_layers( lhs_layer, rhs1_layer, rhs2_layer )
+                      call AnyAngleBoolean( rhs1_layer, rhs2_layer, lhs_layer, aa_op, aa_status )
+                      call StopMarkTime("ANYANGLE")
+                      banded_done = .true.
+                   else if( aa_any ) then
+                      write(*,'(A,A,A,I0)') 'ERROR: operator ', operator_char, &
+                           ' is not supported on any-angle layers; result cleared. Line: ', line_number-1
+                      call ClearLayer( lhs_layer )
+                      banded_done = .true.
+                   end if
+                   if( banded_done .and. operator_char == '^' .and. abort_on_xor > 0 .and. &
+                       ( lhs_layer%n_used > 0 .or. lhs_layer%n_traps > 0 ) ) then
+                      write(*,*) 'ERROR: Aborting RUN since abort_on_xor set > 0, and ^ layer has non-zero shapes.'
+                      error stop
+                   end if
+                end if
+                if( .not. banded_done .and. index('+*@~!^', operator_char) > 0 ) then
                    if( BandedEligible( rhs1_layer, rhs2_layer ) ) then
                       !> large compact inputs: run band by band, never expanding whole layers
                       call touch_layers( lhs_layer, rhs1_layer, rhs2_layer )
@@ -1025,6 +1078,39 @@ contains
                      end if
                      call StartMarkTime(primary_operator)
                      banded_done = .false.
+                     aa_any = .false.
+                     if( associated( rhs1_layer ) ) aa_any = LayerIsAnyAngle( rhs1_layer )
+                     if( associated( rhs2_layer ) ) aa_any = aa_any .or. LayerIsAnyAngle( rhs2_layer )
+                     if( ( aa_any .or. AnyAngleForce() ) .and. associated( lhs_layer ) ) then
+                        aa_op = AnyAngleOpFromName( primary_operator, .not. associated( rhs2_layer ) )
+                        if( aa_op >= 0 .and. ( aa_op == TOP_SELF2 .or. associated( rhs2_layer ) ) ) then
+                           if( rhs1_layer%n_used == 0 .and. rhs1_layer%n_traps == 0 .and. .not. rhs1_layer%is_compact ) &
+                                call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
+                           if( aa_op /= TOP_SELF2 ) then
+                              if( rhs2_layer%n_used == 0 .and. rhs2_layer%n_traps == 0 .and. .not. rhs2_layer%is_compact ) &
+                                   call RestoreSnapToLayer( rhs2_layer, rhs2_layer%fileName )
+                              call AnyAngleBoolean( rhs1_layer, rhs2_layer, lhs_layer, aa_op, aa_status )
+                           else
+                              call AnyAngleBoolean( rhs1_layer, rhs1_layer, lhs_layer, aa_op, aa_status )
+                           end if
+                           banded_done = .true.
+                        else if( aa_any .and. primary_operator == 'COPY' ) then
+                           call CopyLayer( lhs_layer, rhs1_layer )
+                           banded_done = .true.
+                        else if( aa_any .and. primary_operator == 'ASSERT_ZERO' ) then
+                           if( rhs1_layer%n_traps > 0 ) then
+                              write(*,'(A,I5,A)') '************ ASSERT_ZERO fail on layer. Line: ', line_number-1, &
+                                   ' **********************'
+                              if( abort_on_assert_zero > 1 ) error stop "ERROR: ASSERT_ZERO variable > 1"
+                           end if
+                           banded_done = .true.
+                        else if( aa_any ) then
+                           write(*,'(A,A,A,I0)') 'ERROR: operator ', primary_operator, &
+                                ' is not supported on any-angle layers; result cleared. Line: ', line_number-1
+                           call ClearLayer( lhs_layer )
+                           banded_done = .true.
+                        end if
+                     end if
                      if( associated( rhs1_layer ) .and. associated( rhs2_layer ) .and. &
                          associated( lhs_layer ) .and. primary_operator == 'INTERACT' ) then
                         if( BandedEligible( rhs1_layer, rhs2_layer ) ) then

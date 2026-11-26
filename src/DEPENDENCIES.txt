@@ -1,4 +1,4 @@
-LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o trapezoid.o trap_merge.o trap_pnum.o device_registry.o compact_layer.o measure.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o \
+LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o trapezoid.o trap_merge.o trap_pnum.o device_registry.o compact_layer.o measure.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o anyangle_ops.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
 	   polygon_fracture.o boxmerge.o kldata.o design_impl.o design_boolean_impl.o design_topo_impl.o design_device_impl.o gpu_morton_sort.o\
@@ -31,7 +31,7 @@ datastructures.o: commonmodule.o
 pnummerge.o: datastructures.o rtree.o geometry.o gpu_pnummerge.o interaction.o utilities.o profiler.o
 gpu_pnummerge.o: interaction.o device_registry.o
 polygon_fracture.o: commonmodule.o hdfdata.o
-design.o: property_table.o compact_layer.o device_registry.o datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o profiler.o
+design.o: trapezoid.o property_table.o compact_layer.o device_registry.o datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o profiler.o
 design_impl.o: commonmodule.o design.o geometry.o boost_polygon_apif.o diskdesign_impl.o
 design_boolean_impl.o: commonmodule.o design.o geometry.o rtree.o interaction.o polygon_fracture.o profiler.o
 design_topo_impl.o: commonmodule.o design.o geometry.o rtree.o interaction.o
@@ -40,7 +40,7 @@ device_registry.o: gpu_morton.o
 diskdesign_impl.o: design.o serialization.o box_codec.o snappy_apif.o utilities.o
 magparser.o: prop_oasis.o polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
 mainmagparser.o: magparser.o controlparser.o rpc_server.o
-controlparser.o: fascl.o prop_oasis.o design.o band_exec.o layoutdb_loader.o trs_optimizer.o fascl_connect.o tech_stacks.o measure.o
+controlparser.o: anyangle_ops.o fascl.o prop_oasis.o design.o band_exec.o layoutdb_loader.o trs_optimizer.o fascl_connect.o tech_stacks.o measure.o
 compressed_spatial_index.o: commonmodule.o geometry.o morton.o box_codec.o snappy_apif.o compact_layer.o
 layout_files.o: geometry.o
 layoutdb_loader.o: layoutdb_f_api.o design.o geometry.o commonmodule.o hashtable.o compressed_spatial_index.o
@@ -78,3 +78,4 @@ test_predicates.o: wide_int.o exact_predicates.o
 # Rotation-invariant layer measurements (exec measure)
 measure.o: geometry.o compact_layer.o
 test_measure.o: measure.o geometry.o
+anyangle_ops.o: design.o measure.o trap_merge.o trap_pnum.o trapezoid.o wide_int.o
