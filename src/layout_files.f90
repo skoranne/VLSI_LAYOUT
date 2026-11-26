@@ -331,10 +331,17 @@ contains
 
   ! ================================================================== strings
   !> Fortran string -> NUL-terminated C string.
+  !> The result is a character array, which every compiler accepts for an
+  !> assumed-size `character(kind=c_char) :: x(*)` dummy (ifort classic rejects
+  !> a scalar character function result there).
   pure function to_c(s) result(c)
     character(len=*), intent(in) :: s
-    character(kind=c_char, len=len_trim(s) + 1) :: c
-    c = trim(s) // c_null_char
+    character(kind=c_char) :: c(len_trim(s) + 1)
+    integer :: i
+    do i = 1, len_trim(s)
+       c(i) = s(i:i)
+    end do
+    c(len_trim(s) + 1) = c_null_char
   end function to_c
 
   !> NUL-terminated C buffer (character array or string) -> trimmed Fortran string.
