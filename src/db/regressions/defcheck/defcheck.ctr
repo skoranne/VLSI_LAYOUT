@@ -1,0 +1,41 @@
+# defcheck regression: extracted connectivity (CONNECT STACK) against the DEF the layout was
+# streamed from, for the built-in SKY130 / ASAP7 / GT2N stacks. Inputs are made by
+# gen_defcheck_input.py; run_defcheck_regression.sh runs this and checks every report with an
+# independent KLayout LEF/DEF reference (defcheck_kl.py).
+program defcheck
+var temp_folder /tmp
+# 1. TinySoC (SKY130, LibreLane; OASIS streamed from its DEF by KLayout): exact match
+decl design t1 = tiny_soc.oas
+CONNECT STACK SKY130 t1
+exec netinfo t1:met1
+exec defcheck t1:met1 tiny_soc.def.gz tiny lef=sky130_fd_sc_hd__nom.tlef strict
+PROPERTY:NET,NAME = t1:met1 FASCL [ (id) NET = NET_ID(id) ; NAME = NET_NAME(id) ] t1:nothing
+exec propdump t1:met1 tiny_m1.csv
+# the same DEF without the LEF: vias placed by the stack rule (OpenROAD states the lower layer)
+exec defcheck t1:li1 tiny_soc.def.gz - strict
+# 2. TinySoC with an open (via cut removed), a short (met2 strap) and a miss (DEF wire moved)
+decl design t2 = tiny_mut.oas
+CONNECT STACK SKY130 t2
+exec defcheck t2:L68_20 tiny_mut.def mut lef=sky130_fd_sc_hd__nom.tlef
+PROPERTY:NET,NAME = t2:met1 FASCL [ (id) NET = NET_ID(id) ; NAME = NET_NAME(id) ] t2:nothing
+exec propdump t2:met1 mut_m1.csv
+# 3. ASAP7 (DEF 4000/um on a 4000/um layout), layer names from var tech
+var tech ASAP7
+decl design a1 = synth_asap7.oas
+CONNECT STACK ASAP7 a1
+exec defcheck a1:M1 synth_asap7.def asap7 lef=synth_asap7.lef strict
+PROPERTY:NET,NAME = a1:M2 FASCL [ (id) NET = NET_ID(id) ; NAME = NET_NAME(id) ] a1:nothing
+exec propdump a1:M2 asap7_m2.csv
+# 4. GT2N backside + front side through BPR-VBPR-M0 (DEF 2000/um on a 4000/um layout)
+var tech GT2N
+decl design g1 = synth_gt2n.oas
+CONNECT STACK GT2N_FULL g1
+exec netinfo g1:RDL
+exec defcheck g1:BM1 synth_gt2n.def gt2n lef=synth_gt2n.lef strict
+PROPERTY:NET,NAME = g1:M0 FASCL [ (id) NET = NET_ID(id) ; NAME = NET_NAME(id) ] g1:nothing
+exec propdump g1:M0 gt2n_m0.csv
+# 5. GT2N front-side slice M1..M5: probes on the other layers are counted, not errors
+decl design g2 = synth_gt2n.oas
+CONNECT STACK GT2N g2 M1 M5
+exec defcheck g2:M3 synth_gt2n.def gt2s lef=synth_gt2n.lef strict
+end

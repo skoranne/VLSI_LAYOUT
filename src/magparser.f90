@@ -67,6 +67,7 @@ module MagicVLSILayoutParser
   use HDFDataModule
   use KLDataModule
   use PNumMergeModule
+  use PropOasisModule, only: OasisWriter, OasisPropOpen, OasisPropAddLayer, OasisPropClose, ParseLayerDatatype
   use SystemInformationModule
   use MortonSortModule
   use MortonSortOMT
@@ -558,11 +559,37 @@ contains
             deleted_layer_count = deleted_layer_count + 1
             cycle
          end if
+         pos = index( resolved_layer%fileName, ".oas", back=.true. )
+         if( pos > 0 .and. pos == len_trim(resolved_layer%fileName)-3 ) then
+            !> OASIS output of one layer, with its per-polygon properties (FASCL)
+            block
+              type(OasisWriter) :: ow
+              integer(kind=int64) :: lno, dt
+              logical :: ok
+              integer :: st
+              character(len=:), allocatable :: msg
+              call ParseLayerDatatype( resolved_layer%fileName, lno, dt, ok )
+              if( .not. ok ) call ParseLayerDatatype( trim(load_design%layerNames(i)), lno, dt, ok )
+              if( .not. ok ) then
+                 lno = i; dt = 0
+              end if
+              call OasisPropOpen( ow, resolved_layer%fileName, 'TOP' )
+              call OasisPropAddLayer( ow, resolved_layer, trim(load_design%layerNames(i)), lno, dt, st, msg )
+              if( st == 0 ) call OasisPropClose( ow, st, msg )
+              if( st /= 0 ) then
+                 write(*,*) 'ERROR: ', msg
+                 error stop "OASIS layer output failed"
+              end if
+            end block
+            call ClearLayer( resolved_layer )
+            deleted_layer_count = deleted_layer_count + 1
+            cycle
+         end if
          pos = index( resolved_layer%fileName, ".bin" )
          !write(*,*) 'pos = ', pos, ' len = ', len_trim(load_design%layers(i)%fileName)
          if( pos /= len_trim(resolved_layer%fileName)-3 ) then
             write(*,*) 'ERROR: File format not supported: ', resolved_layer%fileName
-            error stop "DBOUT only supports KLBIN, edit the output MAG file to fix"
+            error stop "DBOUT supports KLBIN (.bin), .snap and .oas; edit the output MAG file to fix"
          end if
          call WriteKLBin( resolved_layer%fileName, resolved_layer%layer_boxes, resolved_layer%n_used )
          !> as an memory optimization we are going to delete the layer after a flush

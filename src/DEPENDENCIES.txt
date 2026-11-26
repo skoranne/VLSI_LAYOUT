@@ -7,7 +7,7 @@ LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o trapezoid.o trap_merge.o
 	   snappy_api.o snappy_apif.o layout_statistics.o box_codec.o serialization.o\
 	   diskdesign_impl.o gridlayer.o utilities.o event_sorter_apif.o event_sorter.o\
 	   gpu_morton.o layoutdb_f_api.o layout_files.o compressed_spatial_index.o layoutdb_loader.o profiler.o trs_optimizer.o \
-           rpc_socket.o compact_wire.o rpc_server.o
+           rpc_socket.o compact_wire.o rpc_server.o property_table.o tech_stacks.o fascl.o fascl_connect.o prop_oasis.o
 
 
 boxbytestream.o: commonmodule.o
@@ -31,16 +31,16 @@ datastructures.o: commonmodule.o
 pnummerge.o: datastructures.o rtree.o geometry.o gpu_pnummerge.o interaction.o utilities.o profiler.o
 gpu_pnummerge.o: interaction.o device_registry.o
 polygon_fracture.o: commonmodule.o hdfdata.o
-design.o: compact_layer.o device_registry.o datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o profiler.o
+design.o: property_table.o compact_layer.o device_registry.o datastructures.o rtree.o pnummerge.o polygon_fracture.o morton.o gpu_morton_sort.o boost_polygon_apif.o profiler.o
 design_impl.o: commonmodule.o design.o geometry.o boost_polygon_apif.o diskdesign_impl.o
 design_boolean_impl.o: commonmodule.o design.o geometry.o rtree.o interaction.o polygon_fracture.o profiler.o
 design_topo_impl.o: commonmodule.o design.o geometry.o rtree.o interaction.o
 design_device_impl.o: design.o device_registry.o interaction.o
 device_registry.o: gpu_morton.o
 diskdesign_impl.o: design.o serialization.o box_codec.o snappy_apif.o utilities.o
-magparser.o: polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
+magparser.o: prop_oasis.o polygon_fracture.o design.o morton.o kldata.o diskdesign_impl.o
 mainmagparser.o: magparser.o controlparser.o rpc_server.o
-controlparser.o: design.o band_exec.o layoutdb_loader.o trs_optimizer.o measure.o
+controlparser.o: fascl.o prop_oasis.o design.o band_exec.o layoutdb_loader.o trs_optimizer.o fascl_connect.o tech_stacks.o measure.o
 compressed_spatial_index.o: commonmodule.o geometry.o morton.o box_codec.o snappy_apif.o compact_layer.o
 layout_files.o: geometry.o
 layoutdb_loader.o: layoutdb_f_api.o design.o geometry.o commonmodule.o hashtable.o compressed_spatial_index.o
@@ -58,6 +58,11 @@ band_exec.o: design.o compact_layer.o geometry.o commonmodule.o profiler.o
 compact_wire.o: compact_layer.o geometry.o commonmodule.o
 rpc_server.o: compact_wire.o compact_layer.o design.o version_mod.o rpc_socket.o band_exec.o
 test_compact_wire.o: compact_wire.o compact_layer.o geometry.o
+property_table.o: geometry.o datastructures.o compact_layer.o
+fascl.o: design.o property_table.o pnummerge.o
+fascl_connect.o: fascl.o design.o property_table.o tech_stacks.o commonmodule.o
+prop_oasis.o: fascl.o design.o property_table.o
+tech_stacks.o: hashtable.o
 
 # Any-angle exact kernel (wide_int: portable int128; exact_predicates: orientation, hot pixels)
 exact_predicates.o: wide_int.o

@@ -401,6 +401,7 @@ contains
        call load_ldb_common(load_design, MAX_LAYERS, fh, ctx)
        if (.not. c_associated(fh)) return
        if (present(compact)) ctx%compact = compact
+       if (present(part_boxes)) ctx%part_boxes = part_boxes
        ! Flatten from the top cell(s): every placement (SREF/AREF, OASIS PLACEMENT with
        ! repetitions, rotation, mirroring) is expanded. Iterating each cell's local boxes
        ! (ldb_iterate_boxes) would drop all instantiated geometry and leave the child cells'

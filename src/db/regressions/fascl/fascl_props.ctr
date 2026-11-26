@@ -1,0 +1,60 @@
+# FASCL per-polygon properties + OASIS output regression (run from the directory holding the inputs;
+# see run_fascl_regression.sh).  Layers from GDSII are named L<layer>_<datatype>.
+program fascl_props
+var temp_folder /tmp
+var temporary_layers 2
+decl design d1 = fascl_in.gds
+decl output o1 = fascl_out.mag
+info
+# --- 68/20: unique per-polygon properties
+PROPERTY:PNUM = d1:L68_20 FASCL [ (id) PNUM = POLYGON_NUMBER(id) ] d1:nothing
+exec run PROPERTY:AREA_UM2,KIND = d1:L68_20 FASCL [ (id) a = AREA(id); AREA_UM2 = a / 1000000.0; KIND = IF(NUM_BOXES(id) == 1, "rect", "poly" + STRING(NUM_BOXES(id))) ] nothing
+PROPERTY:INFO = d1:L68_20 FASCL [ (id) INFO = STRUCT(w = BBOX_WIDTH(id), h = BBOX_HEIGHT(id), pn = PNUM(id)); INFO.tag = "m1 " + STRING(PNUM(id) % 3) ] d1:nothing
+PROPERTY:BIG = d1:L68_20 FASCL [ (id) WHEN AREA(id) > 1000000; BIG = 1 ] d1:nothing
+PROPERTY:CHK = d1:L68_20 FASCL [ (id) INFO.pn(id) * 1000 + INFO.w(id) % 7 + 2 * (KIND(id) == "rect") ] d1:nothing
+exec propinfo d1:L68_20
+exec propdump d1:L68_20 fascl_m1.csv
+# --- 69/20: low-cardinality properties, the writer can build repetitions
+PROPERTY:K,SHAPE = d1:L69_20 FASCL [ (id) K = NUM_BOXES(id); SHAPE = IF(K == 1, "rect", "ell") ] d1:nothing
+exec propdump d1:L69_20 fascl_m2.csv
+# --- 70/20: one property, bare-expression lambda form
+PROPERTY:ROWY = d1:L70_20 FASCL [ (id) BBOX_Y1(id) ] d1:nothing
+# --- OASIS outputs: default (STRICT + CBLOCK + repetitions), then without repetitions / CBLOCK
+exec oasout d1 fascl_full.oas
+var oasis_cblock_bytes 64
+exec oasout d1 fascl_smallcb.oas
+var oasis_cblock_bytes 0
+var oasis_repetition 0
+exec oasout d1 fascl_norep.oas
+var oasis_repetition 1
+var oasis_cblock 0
+var oasis_strict 0
+exec oasout d1:L68_20 fascl_plain_m1.oas
+var oasis_cblock 1
+var oasis_strict 1
+# --- properties travel with COPY into an output db whose .mag names an .oas file
+exec run o1:met1 = d1:L68_20 COPY nothing
+# --- single-layer outline measures
+PROPERTY:PERIM,NV,LED,LEW,LEL = d1:L68_20 FASCL [ (id) PERIM = PERIMETER(id); NV = VERTICES(id); LED = LINE_END_DIR(id); LEW = LINE_END_WIDTH(id); LEL = LINE_END_LENGTH(id) ] d1:nothing
+exec propdump d1:L68_20 fascl_geom68.csv
+decl design d2 = fascl_in_net.gds
+decl memory n2 = nothing
+exec run n2:via = d2:L72_20 COPY nothing
+PROPERTY:PERIM,NV,LED,LEW,LEL = d2:L71_20 FASCL [ (id) PERIM = PERIMETER(id); NV = VERTICES(id); LED = LINE_END_DIR(id); LEW = LINE_END_WIDTH(id); LEL = LINE_END_LENGTH(id) ] d2:nothing
+exec propdump d2:L71_20 fascl_geom71.csv
+# --- CONNECT m1 via m2: NET_ID on every member
+CONNECT d2:L71_20 n2:via d2:L73_20
+PROPERTY:NET = d2:L71_20 FASCL [ (id) NET_ID(id) ] d2:nothing
+PROPERTY:NET = n2:via FASCL [ (id) NET_ID(id) ] d2:nothing
+PROPERTY:NET = d2:L73_20 FASCL [ (id) NET_ID(id) ] d2:nothing
+exec netinfo d2:L71_20
+exec propdump d2:L71_20 fascl_net71.csv
+exec propdump n2:via fascl_net72.csv
+exec propdump d2:L73_20 fascl_net73.csv
+# --- a member changes (via layer replaced by the 74/20 set): nets are recomputed on next use
+exec run n2:via = d2:L74_20 COPY nothing
+PROPERTY:NET2 = d2:L73_20 FASCL [ (id) NET_ID(id) ] d2:nothing
+exec propdump d2:L73_20 fascl_net73b.csv
+delete n2
+flush
+end
