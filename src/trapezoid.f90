@@ -47,6 +47,14 @@ module TrapezoidModule
   public :: trap_make, trap_from_box_coords, trap_is_box, trap_mbr, trap_clip_y, trap_valid
   public :: trap_less, trap_equal, trap_hash, trap_area2, trap_sort
 
+  !> Slope -> accumulated numerator table (trap_area2).
+  type :: SlopeTab
+     integer(int64) :: cap = 0, n = 0
+     integer(int64), allocatable :: key(:), dy(:)
+     type(i128), allocatable :: acc(:)
+     logical, allocatable :: used(:)
+  end type SlopeTab
+
 contains
 
   ! ------------------------------------------------------------------ sides
@@ -310,55 +318,133 @@ contains
   !> not an integer (the boundary is not on lattice points, i.e. invariant I1 does not hold); then
   !> area2 is rounded to the nearest integer.
   subroutine trap_area2(traps, n, area2, is_integer)
+    ! Exact 2A of a trapezoid set: integer part (rectangle part of every trapezoid) plus, per
+    ! side slope (dx, dy), sum of h (2k + h) dx over the sides with that slope, divided by dy.
+    ! Parallel: each thread accumulates the slope sums in its own open-addressing table (passed
+    ! explicitly, never through host association); the tables are merged, and the per-slope
+    ! divisions are done in ascending key order, so the result is exact and independent of the
+    ! thread count.
     type(Trapezoid), intent(in) :: traps(:)
     integer(int64), intent(in) :: n
     type(i128), intent(out) :: area2
     logical, intent(out) :: is_integer
-    integer(int64), allocatable :: key(:), dyv(:), perm(:)
-    type(i128), allocatable :: num(:)
-    type(i128) :: acc
-    integer(int64) :: i, m, h, j, q, r
+    type(SlopeTab) :: G
+    type(SlopeTab), allocatable :: TT(:)     ! one table per chunk (no private derived types:
+    type(i128), allocatable :: parts(:)      ! nvfortran 26.1 crashes on allocatable components)
+    integer(int64), allocatable :: perm(:), key(:)
+    integer(int64) :: i, h, q, r, j, c, nch, lo, hi
     real(real64) :: frac
     area2 = i128_from_int64(0_int64)
-    allocate(key(2*n), dyv(2*n), num(2*n))
-    m = 0
-    do i = 1, n
-       associate(t => traps(i))
-         h = int(t%y2, int64) - t%y1
-         area2 = i128_add(area2, i128_mul64(2_int64*h, int(t%r%ax, int64) - t%l%ax))
-         if (t%r%dx /= 0) then
-            m = m + 1
-            key(m) = slope_key(t%r); dyv(m) = t%r%dy
-            num(m) = i128_mul_i64(i128_mul64(h, 2_int64*t%r%k + h), int(t%r%dx, int64))
-         end if
-         if (t%l%dx /= 0) then
-            m = m + 1
-            key(m) = slope_key(t%l); dyv(m) = t%l%dy
-            num(m) = i128_neg(i128_mul_i64(i128_mul64(h, 2_int64*t%l%k + h), int(t%l%dx, int64)))
-         end if
-       end associate
-    end do
-    is_integer = .true.
-    if (m == 0) return
-    allocate(perm(m))
-    call sort_keys(key(1:m), perm)
-    frac = 0.0_real64
-    i = 1
-    do while (i <= m)
-       acc = num(perm(i)); j = i + 1
-       do while (j <= m)
-          if (key(perm(j)) /= key(perm(i))) exit
-          acc = i128_add(acc, num(perm(j))); j = j + 1
+    call stab_init(G, 1024_int64)
+    nch = max(1_int64, min(256_int64, n / 65536_int64))
+    allocate(TT(nch), parts(nch))
+    !$omp parallel do schedule(dynamic, 1) private(i, h, lo, hi)
+    do c = 1, nch
+       call stab_init(TT(c), 256_int64)
+       parts(c) = i128_from_int64(0_int64)
+       lo = ((c - 1)*n) / nch + 1; hi = (c*n) / nch
+       do i = lo, hi
+          h = int(traps(i)%y2, int64) - traps(i)%y1
+          parts(c) = i128_add(parts(c), i128_mul64(2_int64*h, int(traps(i)%r%ax, int64) - traps(i)%l%ax))
+          if (traps(i)%r%dx /= 0) call stab_add(TT(c), slope_key(traps(i)%r), int(traps(i)%r%dy, int64), &
+               i128_mul_i64(i128_mul64(h, 2_int64*traps(i)%r%k + h), int(traps(i)%r%dx, int64)))
+          if (traps(i)%l%dx /= 0) call stab_add(TT(c), slope_key(traps(i)%l), int(traps(i)%l%dy, int64), &
+               i128_neg(i128_mul_i64(i128_mul64(h, 2_int64*traps(i)%l%k + h), int(traps(i)%l%dx, int64))))
        end do
-       call i128_divmod(acc, dyv(perm(i)), q, r)
+    end do
+    !$omp end parallel do
+    do c = 1, nch
+       area2 = i128_add(area2, parts(c))
+       do j = 1, TT(c)%cap
+          if (TT(c)%used(j)) call stab_add(G, TT(c)%key(j), TT(c)%dy(j), TT(c)%acc(j))
+       end do
+    end do
+    deallocate(TT, parts)
+    is_integer = .true.
+    if (G%n == 0) return
+    allocate(perm(G%n), key(G%n))
+    j = 0
+    do i = 1, G%cap
+       if (G%used(i)) then
+          j = j + 1; perm(j) = i
+       end if
+    end do
+    key(1:G%n) = G%key(perm(1:G%n))
+    call sort_by_key(key, perm, G%n)
+    frac = 0.0_real64
+    do j = 1, G%n
+       i = perm(j)
+       call i128_divmod(G%acc(i), G%dy(i), q, r)
        area2 = i128_add(area2, i128_from_int64(q))
-       frac = frac + real(r, real64) / real(dyv(perm(i)), real64)
-       i = j
+       frac = frac + real(r, real64) / real(G%dy(i), real64)
     end do
     q = nint(frac, int64)
     is_integer = abs(frac - real(q, real64)) < 1.0e-6_real64
     area2 = i128_add(area2, i128_from_int64(q))
   end subroutine trap_area2
+
+  subroutine stab_init(T, cap)
+    type(SlopeTab), intent(inout) :: T
+    integer(int64), intent(in) :: cap
+    if (allocated(T%key)) deallocate(T%key, T%dy, T%acc, T%used)
+    T%cap = cap; T%n = 0
+    allocate(T%key(cap), T%dy(cap), T%acc(cap), T%used(cap))
+    T%used = .false.
+  end subroutine stab_init
+
+  !> T(k) += v (dy is stored with a new key).
+  subroutine stab_add(T, k, dy, v)
+    type(SlopeTab), intent(inout) :: T
+    integer(int64), intent(in) :: k, dy
+    type(i128), intent(in) :: v
+    integer(int64) :: s, m, oc
+    integer(int64), allocatable :: ok(:), od(:)
+    type(i128), allocatable :: oa(:)
+    logical, allocatable :: ou(:)
+    if (2*(T%n + 1) > T%cap) then
+       call move_alloc(T%key, ok); call move_alloc(T%dy, od); call move_alloc(T%acc, oa)
+       call move_alloc(T%used, ou)
+       oc = T%cap; T%cap = 2*T%cap
+       allocate(T%key(T%cap), T%dy(T%cap), T%acc(T%cap), T%used(T%cap))
+       T%used = .false.
+       do m = 1, oc
+          if (.not. ou(m)) cycle
+          s = iand(mix(ok(m)), T%cap - 1) + 1
+          do while (T%used(s))
+             s = iand(s, T%cap - 1) + 1
+          end do
+          T%used(s) = .true.; T%key(s) = ok(m); T%dy(s) = od(m); T%acc(s) = oa(m)
+       end do
+    end if
+    s = iand(mix(k), T%cap - 1) + 1
+    do while (T%used(s))
+       if (T%key(s) == k) then
+          T%acc(s) = i128_add(T%acc(s), v); return
+       end if
+       s = iand(s, T%cap - 1) + 1
+    end do
+    T%used(s) = .true.; T%key(s) = k; T%dy(s) = dy; T%acc(s) = v; T%n = T%n + 1
+  end subroutine stab_add
+
+  pure integer(int64) function mix(a) result(z)
+    integer(int64), intent(in) :: a
+    z = a + (-7046029254386353131_int64)
+    z = ieor(z, shiftr(z, 30)) * (-4658895280553007687_int64)
+    z = ieor(z, shiftr(z, 27)) * (-7723592293110705685_int64)
+    z = ieor(z, shiftr(z, 31))
+    z = shiftr(z, 1)
+  end function mix
+
+  !> Insertion/merge sort of the (small) slope table by key, carrying perm.
+  subroutine sort_by_key(key, perm, n)
+    integer(int64), intent(inout) :: key(:), perm(:)
+    integer(int64), intent(in) :: n
+    integer(int64), allocatable :: p2(:)
+    integer(int64) :: i
+    allocate(p2(n))
+    call sort_keys(key(1:n), p2)
+    key(1:n) = key(p2); perm(1:n) = perm(p2)
+  end subroutine sort_by_key
 
   elemental pure function slope_key(s) result(k)
     type(TrapSide), intent(in) :: s

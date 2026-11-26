@@ -196,11 +196,15 @@ program trapbool_main
      t0 = omp_get_wtime(); ost = 0
      if (res(k)%n > 0) then
         allocate(rec(10, res(k)%n))
+        !$omp parallel do
         do j = 1, res(k)%n
-           associate(t => res(k)%t(j))
-             rec(:, j) = [t%y1, t%y2, t%l%ax, t%l%k, t%l%dx, t%l%dy, t%r%ax, t%r%k, t%r%dx, t%r%dy]
-           end associate
+           rec(1, j) = res(k)%t(j)%y1;   rec(2, j) = res(k)%t(j)%y2
+           rec(3, j) = res(k)%t(j)%l%ax; rec(4, j) = res(k)%t(j)%l%k
+           rec(5, j) = res(k)%t(j)%l%dx; rec(6, j) = res(k)%t(j)%l%dy
+           rec(7, j) = res(k)%t(j)%r%ax; rec(8, j) = res(k)%t(j)%r%k
+           rec(9, j) = res(k)%t(j)%r%dx; rec(10, j) = res(k)%t(j)%r%dy
         end do
+        !$omp end parallel do
         rc = ldb_ow_trapset(hw, int(outbase + k - 1, c_int), 0_c_int, res(k)%n, rec, ost)
         deallocate(rec)
      end if

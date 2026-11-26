@@ -165,10 +165,15 @@ program trapmerge_main
         end do
      else
         allocate(rec(10, max(ntrap, 1_int64)))
+        !$omp parallel do
         do j = 1, ntrap
-           rec(:, j) = [traps(j)%y1, traps(j)%y2, traps(j)%l%ax, traps(j)%l%k, traps(j)%l%dx, traps(j)%l%dy, &
-                        traps(j)%r%ax, traps(j)%r%k, traps(j)%r%dx, traps(j)%r%dy]
+           rec(1, j) = traps(j)%y1;   rec(2, j) = traps(j)%y2
+           rec(3, j) = traps(j)%l%ax; rec(4, j) = traps(j)%l%k
+           rec(5, j) = traps(j)%l%dx; rec(6, j) = traps(j)%l%dy
+           rec(7, j) = traps(j)%r%ax; rec(8, j) = traps(j)%r%k
+           rec(9, j) = traps(j)%r%dx; rec(10, j) = traps(j)%r%dy
         end do
+        !$omp end parallel do
         if (ntrap > 0) i = ldb_ow_trapset(hw, lay(k), dt(k), ntrap, rec, ost)
         deallocate(rec)
      end if
