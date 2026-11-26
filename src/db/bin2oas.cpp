@@ -13,23 +13,27 @@
 //   --tile-gap G      gap between tiles in database units (default 0)
 //   --bin B           spatial order: bins of B x B database units in Morton order, each bin
 //                     sorted by shape then row (0 = whole layer sorted by shape then row)
-//   --no-strict       old layout: no name tables, no table offsets, no S_* properties
+//   --no-rep          do not look for rectangle arrays (repetitions)
+//   --rep-min N       smallest array written as a repetition (default 8 rectangles)
+//   --no-crc          no CRC32 validation signature in END
+//   --no-strict       no name tables, no table offsets, no S_* properties
 //
-// Encoding (all standard SEMI P39, readable by KLayout and src/db/oasis.cpp):
-//   * RECTANGLE records with modal layer/datatype/width/height and XYRELATIVE deltas; boxes of
-//     one layer are sorted by shape (w,h), then row (y1) and x1 (per spatial bin with --bin),
-//     so a typical record is 3-5 bytes before compression;
-//   * records are wrapped in deflate CBLOCKs. Every CBLOCK holds one layer and starts with
-//     XYABSOLUTE and a fully specified RECTANGLE, so it decodes without the modal state of the
-//     previous CBLOCK (independent CBLOCKs, for parallel and random-access readers);
-//   * strict mode: START offset-flag 1, table offsets in END; CELL by reference number; a
-//     strict CELLNAME table after the geometry whose entry carries S_CELL_OFFSET (byte offset
-//     of the CELL record) and S_BOUNDING_BOX (flags 0, x, y, w, h); a strict LAYERNAME table
-//     (names from the .mag sections, e.g. "li1" for 67/20); file property S_TOP_CELL.
-// Memory: one input layer's boxes at a time (16 B/box) plus one CBLOCK buffer; tiles are
-// emitted as translated copies of the same sorted array.
-#include "oasis_codec.hpp"
-#include <zlib.h>
+// Encoding: the streaming writer of oasis_writer.hpp (standard SEMI P39, readable by KLayout
+// and src/db/oasis.cpp):
+//   * boxes of one layer are sorted by shape (w,h), then row (y1) and x1 (per spatial bin with
+//     --bin); RectArrays turns runs of equal pitch in a row, and identical runs stacked at a
+//     constant row pitch, into RECTANGLE repetitions (types 1, 2, 3); the other boxes are
+//     RECTANGLEs with modal layer/datatype/width/height and XYRELATIVE deltas;
+//   * records are wrapped in deflate CBLOCKs; every CBLOCK holds one layer and is independent
+//     (it starts with XYABSOLUTE and fully specified records), for parallel and random-access
+//     readers (db_mvi);
+//   * strict mode: START offset-flag 1, table offsets in END; CELL by reference number; strict
+//     CELLNAME table with S_CELL_OFFSET and S_BOUNDING_BOX; PROPNAME and PROPSTRING tables; a
+//     strict LAYERNAME table (names from the .mag sections, e.g. "li1" for 67/20); file
+//     properties S_TOP_CELL and S_BOUNDING_BOXES_AVAILABLE; CRC32 in END.
+// Memory: one input layer's boxes at a time (16 B/box), the open repetition stacks and one
+// CBLOCK buffer; tiles are emitted as translated copies of the same sorted array.
+#include "oasis_writer.hpp"
 #include <algorithm>
 #include <chrono>
 #include <climits>
@@ -39,6 +43,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <regex>
 #include <string>
 #include <vector>
@@ -52,35 +57,6 @@ namespace {
 struct Box { int32_t x1, y1, x2, y2; };
 
 struct Input { int layer, datatype; std::string path, name; size_t nbox = 0; };
-
-struct Out {
-    FILE* fp = nullptr;
-    oasis_codec::Encoder blk;        // records of the current CBLOCK
-    size_t cblock_bytes = 8u << 20;
-    uint64_t raw = 0, written = 0, ncblock = 0;
-    void put(const oasis_codec::Encoder& e) {
-        fwrite(e.b.data(), 1, e.b.size(), fp);
-        written += e.b.size();
-    }
-    void flush_cblock() {
-        if (blk.b.empty()) return;
-        std::vector<uint8_t> z(compressBound(blk.b.size()) + 64);
-        z_stream zs{};
-        if (deflateInit2(&zs, 6, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY) != Z_OK) { fprintf(stderr, "deflateInit2 failed\n"); exit(2); }
-        zs.next_in = blk.b.data(); zs.avail_in = (uInt)blk.b.size();
-        zs.next_out = z.data(); zs.avail_out = (uInt)z.size();
-        if (deflate(&zs, Z_FINISH) != Z_STREAM_END) { fprintf(stderr, "deflate failed\n"); exit(2); }
-        size_t zn = zs.total_out;
-        deflateEnd(&zs);
-        oasis_codec::Encoder h;
-        h.u8(34); h.uint_(0); h.uint_(blk.b.size()); h.uint_(zn);   // CBLOCK, comp-type 0 = deflate
-        put(h);
-        fwrite(z.data(), 1, zn, fp);
-        written += zn; raw += blk.b.size(); ++ncblock;
-        blk.b.clear();
-    }
-    void maybe_flush() { if (blk.b.size() >= cblock_bytes) flush_cblock(); }
-};
 
 bool parse_ld_from_name(const std::string& p, int& l, int& d) {
     static const std::regex re("L([0-9]+)_D([0-9]+)[^/]*\\.bin$");
@@ -115,7 +91,8 @@ std::vector<Input> read_mag(const std::string& mag) {
 
 void usage() {
     fprintf(stderr, "usage: bin2oas [--grid N] [--dedup] [--cblock-mb M] [--cell NAME] [--largest K]\n"
-                    "               [--tile NXxNY] [--tile-gap G] [--bin B] [--no-strict] in.mag out.oas\n"
+                    "               [--tile NXxNY] [--tile-gap G] [--bin B] [--no-rep] [--rep-min N] [--no-crc] [--no-strict]\n"
+                    "               in.mag out.oas\n"
                     "       bin2oas [opts] out.oas L:D file.bin [L:D file.bin ...]\n");
     exit(1);
 }
@@ -146,11 +123,6 @@ std::vector<Box> load_bin(const std::string& path) {
     return v;
 }
 
-// PROPERTY record with an inline standard-property name (info: U count, C=1, N=0, S=1).
-void std_prop_head(oasis_codec::Encoder& e, const char* name, unsigned nval) {
-    e.u8(28); e.u8(uint8_t((nval << 4) | 0x04 | 0x01)); e.str(name);
-}
-
 } // namespace
 
 int main(int argc, char** argv) {
@@ -161,7 +133,8 @@ int main(int argc, char** argv) {
     size_t largest = 0;
     int tnx = 1, tny = 1;
     int64_t tile_gap = 0, bin = 0;
-    bool strict = true;
+    bool strict = true, reps = true, crc = true;
+    int64_t rep_min = 8;
     std::vector<std::string> pos;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -174,6 +147,9 @@ int main(int argc, char** argv) {
         else if (a == "--tile-gap" && i + 1 < argc) tile_gap = std::stoll(argv[++i]);
         else if (a == "--bin" && i + 1 < argc) bin = std::stoll(argv[++i]);
         else if (a == "--no-strict") strict = false;
+        else if (a == "--no-rep") reps = false;
+        else if (a == "--rep-min" && i + 1 < argc) rep_min = atoll(argv[++i]);
+        else if (a == "--no-crc") crc = false;
         else if (a.rfind("--", 0) == 0) usage();
         else pos.push_back(a);
     }
@@ -208,7 +184,7 @@ int main(int argc, char** argv) {
         inputs.swap(sel);
     }
     int64_t bx1 = INT64_MAX, by1 = INT64_MAX, bx2 = INT64_MIN, by2 = INT64_MIN;
-    if (tnx * tny > 1 || bin > 0 || strict) {
+    if (tnx * tny > 1 || bin > 0) {
         for (const Input& in : inputs) {
             std::vector<Box> v = load_bin(in.path);
             int64_t a1 = INT64_MAX, b1 = INT64_MAX, a2 = INT64_MIN, b2 = INT64_MIN;
@@ -228,36 +204,40 @@ int main(int argc, char** argv) {
         fprintf(stderr, "tiling %dx%d, pitch %lld x %lld\n", tnx, tny, (long long)px, (long long)py);
     }
 
-    Out o;
-    o.cblock_bytes = cblock_mb << 20;
-    o.fp = fopen(out_path.c_str(), "wb");
-    if (!o.fp) { fprintf(stderr, "cannot write %s\n", out_path.c_str()); return 1; }
-    uint64_t cell_offset = 0;
-    {
-        oasis_codec::Encoder e;
-        e.bytes("%SEMI-OASIS\r\n", 13);
-        e.u8(1); e.str("1.0"); e.real_whole(grid);       // START
-        if (strict) {
-            e.uint_(1);                                  // offset-flag 1: table offsets in END
-            std_prop_head(e, "S_TOP_CELL", 1); e.uint_(12); e.str(cell);
-        } else {
-            e.uint_(0); for (int i = 0; i < 12; ++i) e.uint_(0);
+    oasis_writer::Options wo;
+    wo.unit = (double)grid;
+    wo.strict = strict;
+    wo.cblock_bytes = cblock_mb << 20;
+    wo.independent_cblocks = true;
+    wo.validation = crc ? 1 : 0;
+    oasis_writer::Writer w;
+    if (!w.open(out_path, wo)) { fprintf(stderr, "%s\n", w.error().c_str()); return 1; }
+    if (strict) {
+        std::vector<std::pair<int, int>> seen;
+        for (const Input& in : inputs) {
+            if (std::find(seen.begin(), seen.end(), std::make_pair(in.layer, in.datatype)) != seen.end()) continue;
+            seen.push_back({ in.layer, in.datatype });
+            const std::string nm = in.name.empty() ? std::to_string(in.layer) + "/" + std::to_string(in.datatype) : in.name;
+            w.layer_name(nm, (uint64_t)in.layer, (uint64_t)in.datatype);
         }
-        o.put(e);
-        cell_offset = o.written;
-        oasis_codec::Encoder c;
-        if (strict) { c.u8(13); c.uint_(0); }            // CELL by reference number 0
-        else { c.u8(14); c.str(cell); }                  // CELL by name
-        c.u8(16);                                        // XYRELATIVE
-        o.put(c);
     }
-    uint64_t total = 0, total_in = 0;
-    int64_t mx = 0, my = 0;            // modal geometry-x/y: 0 after CELL
+    w.add_top_cell(cell);
+    w.begin_cell(cell);
+    uint64_t total = 0, total_in = 0, arrays = 0;
     auto t0 = std::chrono::steady_clock::now();
     for (const Input& in : inputs) {
         std::vector<Box> v = load_bin(in.path);
         const size_t n = v.size();
         total_in += n * (size_t)tnx * (size_t)tny;
+        auto shape_row = [](const Box& a, const Box& b) {
+            int64_t wa = (int64_t)a.x2 - a.x1, wb = (int64_t)b.x2 - b.x1;
+            if (wa != wb) return wa < wb;
+            int64_t ha = (int64_t)a.y2 - a.y1, hb = (int64_t)b.y2 - b.y1;
+            if (ha != hb) return ha < hb;
+            if (a.y1 != b.y1) return a.y1 < b.y1;
+            return a.x1 < b.x1;
+        };
+        std::vector<uint64_t> binkey;                    // --bin: Morton bin of each box (kept with v)
         if (bin > 0) {
             auto key = [&](const Box& b) {
                 return morton2((uint32_t)((b.x1 - bx1) / bin), (uint32_t)((b.y1 - by1) / bin));
@@ -265,112 +245,67 @@ int main(int argc, char** argv) {
             __gnu_parallel::sort(v.begin(), v.end(), [&](const Box& a, const Box& b) {
                 uint64_t ka = key(a), kb = key(b);
                 if (ka != kb) return ka < kb;
-                int64_t wa = (int64_t)a.x2 - a.x1, wb = (int64_t)b.x2 - b.x1;
-                if (wa != wb) return wa < wb;
-                int64_t ha = (int64_t)a.y2 - a.y1, hb = (int64_t)b.y2 - b.y1;
-                if (ha != hb) return ha < hb;
-                if (a.y1 != b.y1) return a.y1 < b.y1;
-                return a.x1 < b.x1;
+                return shape_row(a, b);
             }, __gnu_parallel::balanced_quicksort_tag());
+            binkey.resize(v.size());
+            for (size_t k = 0; k < v.size(); ++k) binkey[k] = key(v[k]);
         } else {
-            __gnu_parallel::sort(v.begin(), v.end(), [](const Box& a, const Box& b) {
-                int64_t wa = (int64_t)a.x2 - a.x1, wb = (int64_t)b.x2 - b.x1;
-                if (wa != wb) return wa < wb;
-                int64_t ha = (int64_t)a.y2 - a.y1, hb = (int64_t)b.y2 - b.y1;
-                if (ha != hb) return ha < hb;
-                if (a.y1 != b.y1) return a.y1 < b.y1;
-                return a.x1 < b.x1;
-            }, __gnu_parallel::balanced_quicksort_tag());
+            __gnu_parallel::sort(v.begin(), v.end(), shape_row, __gnu_parallel::balanced_quicksort_tag());
         }
-        if (dedup) v.erase(std::unique(v.begin(), v.end(), [](const Box& a, const Box& b) {
-            return a.x1 == b.x1 && a.y1 == b.y1 && a.x2 == b.x2 && a.y2 == b.y2; }), v.end());
-        int64_t mw = -1, mh = -1;
+        if (dedup) {
+            size_t o = 0;
+            for (size_t k = 0; k < v.size(); ++k) {
+                if (o > 0 && v[k].x1 == v[o - 1].x1 && v[k].y1 == v[o - 1].y1 && v[k].x2 == v[o - 1].x2 && v[k].y2 == v[o - 1].y2) continue;
+                if (!binkey.empty()) binkey[o] = binkey[k];
+                v[o++] = v[k];
+            }
+            v.resize(o); if (!binkey.empty()) binkey.resize(o);
+        }
         size_t nbad = 0;
+        for (const Box& b : v) if (b.x2 < b.x1 || b.y2 < b.y1) ++nbad;
         for (int ty = 0; ty < tny; ++ty) {
             for (int k = 0; k < tnx; ++k) {
                 const int tx = (ty % 2 == 0) ? k : tnx - 1 - k;          // serpentine tile order
                 const int64_t ox = (int64_t)tx * px, oy = (int64_t)ty * py;
-                for (const Box& b : v) {
-                    int64_t w = (int64_t)b.x2 - b.x1, h = (int64_t)b.y2 - b.y1;
-                    if (w < 0 || h < 0) { if (tx == 0 && ty == 0) ++nbad; continue; }
-                    const int64_t x = b.x1 + ox, y = b.y1 + oy;
-                    const bool fresh = o.blk.b.empty();              // new CBLOCK: state everything
-                    uint8_t info = 0;
-                    if (fresh) { info |= 0x03 | 0x40 | 0x20 | 0x10 | 0x08; o.blk.u8(15); }   // XYABSOLUTE
-                    if (w != mw) info |= 0x40;
-                    if (h != mh) info |= 0x20;
-                    if (x != mx) info |= 0x10;
-                    if (y != my) info |= 0x08;
-                    o.blk.u8(20); o.blk.u8(info);
-                    if (info & 0x01) o.blk.uint_((uint64_t)in.layer);
-                    if (info & 0x02) o.blk.uint_((uint64_t)in.datatype);
-                    if (info & 0x40) o.blk.uint_((uint64_t)w);
-                    if (info & 0x20) o.blk.uint_((uint64_t)h);
-                    if (fresh) {
-                        if (info & 0x10) o.blk.sint(x);
-                        if (info & 0x08) o.blk.sint(y);
-                        o.blk.u8(16);                                    // back to XYRELATIVE
-                    } else {
-                        if (info & 0x10) o.blk.sint(x - mx);
-                        if (info & 0x08) o.blk.sint(y - my);
+                if (reps) {
+                    // one finder per tile (and per spatial bin): its input must be sorted by (w,h,y,x)
+                    std::unique_ptr<oasis_writer::RectArrays> ra;
+                    uint64_t cur_bin = ~0ull;
+                    for (size_t q = 0; q < v.size(); ++q) {
+                        const Box& b = v[q];
+                        if (b.x2 < b.x1 || b.y2 < b.y1) continue;
+                        if (!ra || (!binkey.empty() && binkey[q] != cur_bin)) {
+                            if (ra) { ra->finish(); arrays += ra->arrays(); }
+                            ra.reset(new oasis_writer::RectArrays(w, (uint64_t)in.layer, (uint64_t)in.datatype, 64, rep_min));
+                            if (!binkey.empty()) cur_bin = binkey[q];
+                        }
+                        ra->add(b.x1 + ox, b.y1 + oy, (int64_t)b.x2 - b.x1, (int64_t)b.y2 - b.y1);
                     }
-                    mw = w; mh = h; mx = x; my = y;
-                    o.maybe_flush();
+                    if (ra) { ra->finish(); arrays += ra->arrays(); }
+                } else {
+                    for (const Box& b : v) {
+                        if (b.x2 < b.x1 || b.y2 < b.y1) continue;
+                        w.rectangle((uint64_t)in.layer, (uint64_t)in.datatype, b.x1 + ox, b.y1 + oy, (int64_t)b.x2 - b.x1, (int64_t)b.y2 - b.y1);
+                    }
                 }
+                if (!w.ok()) { fprintf(stderr, "%s\n", w.error().c_str()); return 2; }
             }
         }
-        o.flush_cblock();                                    // CBLOCKs never span layers
+        w.flush_cblock();                                    // CBLOCKs never span layers
         total += (v.size() - nbad) * (size_t)tnx * (size_t)tny;
         double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        fprintf(stderr, "L%d_D%d %s: %zu boxes x %d tiles (%zu dup removed, %zu invalid)  out so far %.1f MB  %.1f s\n",
+        fprintf(stderr, "L%d_D%d %s: %zu boxes x %d tiles (%zu dup removed, %zu invalid)  arrays so far %llu  %.1f s\n",
                 in.layer, in.datatype, in.name.c_str(), v.size() - nbad, tnx * tny, dedup ? n - v.size() : (size_t)0, nbad,
-                o.written / 1e6, dt);
+                (unsigned long long)arrays, dt);
     }
-    o.flush_cblock();
-    uint64_t cellname_off = 0, layername_off = 0;
-    if (strict) {
-        oasis_codec::Encoder t;
-        cellname_off = o.written;
-        t.u8(4); t.str(cell); t.uint_(0);                    // CELLNAME with explicit reference 0
-        std_prop_head(t, "S_CELL_OFFSET", 1); t.uint_(8); t.uint_(cell_offset);
-        const int64_t ux2 = (int64_t)(tnx - 1) * px + bx2, uy2 = (int64_t)(tny - 1) * py + by2;
-        std_prop_head(t, "S_BOUNDING_BOX", 5);
-        t.uint_(8); t.uint_(total ? 0 : 1);                  // flags: bit0 = empty cell
-        t.uint_(9); t.sint(total ? bx1 : 0); t.uint_(9); t.sint(total ? by1 : 0);
-        t.uint_(8); t.uint_(total ? (uint64_t)(ux2 - bx1) : 0); t.uint_(8); t.uint_(total ? (uint64_t)(uy2 - by1) : 0);
-        o.put(t);
-        t.b.clear();
-        bool any = false;
-        std::vector<std::pair<int, int>> seen;
-        for (const Input& in : inputs) {
-            std::string nm = in.name.empty() ? std::to_string(in.layer) + "/" + std::to_string(in.datatype) : in.name;
-            if (std::find(seen.begin(), seen.end(), std::make_pair(in.layer, in.datatype)) != seen.end()) continue;
-            seen.push_back({ in.layer, in.datatype });
-            if (!any) { layername_off = o.written; any = true; }
-            t.u8(11); t.str(nm);                             // LAYERNAME (geometry), exact layer/datatype
-            t.uint_(3); t.uint_((uint64_t)in.layer); t.uint_(3); t.uint_((uint64_t)in.datatype);
-        }
-        o.put(t);
-    }
-    {
-        oasis_codec::Encoder e;                              // END: exactly 256 bytes
-        e.u8(2);
-        if (strict) {
-            const uint64_t offs[6] = { cellname_off, 0, 0, 0, layername_off, 0 };   // CELLNAME TEXTSTRING PROPNAME PROPSTRING LAYERNAME XNAME
-            for (uint64_t off : offs) { e.uint_(1); e.uint_(off); }
-        }
-        size_t used = e.b.size() + 1;                        // + validation scheme (uint 0)
-        size_t pad = 256 - used - 2;                         // 2-byte length prefix when pad >= 128
-        if (pad < 128) pad = 256 - used - 1;
-        e.str(std::string(pad, '\0'));
-        e.uint_(0);
-        if (e.b.size() != 256) { fprintf(stderr, "internal: END record is %zu bytes\n", e.b.size()); return 2; }
-        o.put(e);
-    }
-    fclose(o.fp);
-    fprintf(stderr, "wrote %s: %llu boxes (%llu in), %.1f MB (%.2f B/box), %llu CBLOCKs, raw records %.1f MB%s\n",
-            out_path.c_str(), (unsigned long long)total, (unsigned long long)total_in, o.written / 1e6,
-            (double)o.written / std::max<uint64_t>(total, 1), (unsigned long long)o.ncblock, o.raw / 1e6,
-            strict ? ", strict" : "");
+    w.end_cell();
+    if (!w.close()) { fprintf(stderr, "%s\n", w.error().c_str()); return 2; }
+    const auto& st = w.stats();
+    fprintf(stderr, "wrote %s: %llu boxes (%llu in), %.1f MB (%.3f B/box), %llu RECTANGLE records (%llu repetitions "
+                    "covering %llu boxes), %llu CBLOCKs, raw records %.1f MB%s\n",
+            out_path.c_str(), (unsigned long long)total, (unsigned long long)total_in, st.bytes / 1e6,
+            (double)st.bytes / std::max<uint64_t>(total, 1), (unsigned long long)st.rectangles,
+            (unsigned long long)st.repetitions, (unsigned long long)st.shapes_in_repetitions,
+            (unsigned long long)st.cblocks, st.record_bytes / 1e6, strict ? ", strict" : "");
     return 0;
 }

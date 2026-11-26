@@ -45,6 +45,7 @@ struct ldb_oas_info {
     std::vector<LayerName> layers;
     std::vector<CellInfo> cells;
     std::vector<std::pair<uint64_t, std::string>> propnames;   // refnum -> name
+    std::vector<std::pair<uint64_t, std::string>> propstrings; // refnum -> string
     int verified = -1;                                         // ldb_oas_info_verify result
 };
 
@@ -83,7 +84,10 @@ void read_property(Reader& s, ldb_oas_info* I, PropModal& m) {
             else if (v.type == 8) v.u = s.uint_();
             else if (v.type == 9) v.i = s.sint();
             else if (v.type <= 12) v.s = s.str();
-            else if (v.type <= 15) v.u = s.uint_();
+            else if (v.type <= 15) {                         // PROPSTRING reference: resolve
+                v.u = s.uint_();
+                for (auto& p : I->propstrings) if (p.first == v.u) { v.s = p.second; break; }
+            }
             else s.fail("invalid property value type");
             m.vals.push_back(v);
         }
@@ -125,6 +129,21 @@ void parse_propname_table(ldb_oas_info* I, const uint8_t* data, uint64_t size) {
         if (id == 0) continue;
         if (id == 7) I->propnames.push_back({ implicit++, s.str() });
         else if (id == 8) { std::string nm = s.str(); I->propnames.push_back({ s.uint_(), nm }); }
+        else break;
+    }
+}
+
+void parse_propstring_table(ldb_oas_info* I, const uint8_t* data, uint64_t size) {
+    if (!I->table_off[3]) return;
+    std::vector<uint8_t> buf; const uint8_t* p; uint64_t n;
+    if (!table_bytes(data, size, I->table_off[3], buf, p, n)) return;
+    Reader s(p, n, "PROPSTRING table");
+    uint64_t implicit = 0;
+    while (!s.eof()) {
+        uint8_t id = s.u8();
+        if (id == 0) continue;
+        if (id == 9) I->propstrings.push_back({ implicit++, s.str() });
+        else if (id == 10) { std::string v = s.str(); I->propstrings.push_back({ s.uint_(), v }); }
         else break;
     }
 }
@@ -203,6 +222,14 @@ ldb_oas_info_t* ldb_oas_info_open(const char* path, char* errbuf, size_t errbuf_
         I->unit = s.real();
         I->offset_flag = (int)s.uint_();
         if (I->offset_flag == 0) for (int i = 0; i < 6; ++i) { I->table_flag[i] = s.uint_(); I->table_off[i] = s.uint_(); }
+        if (I->offset_flag != 0) {
+            Reader e(data + size - 256, 256, "END");
+            if (e.u8() != 2) throw ParseError{ "last 256 bytes are not an END record (table offsets in END expected)" };
+            for (int i = 0; i < 6; ++i) { I->table_flag[i] = e.uint_(); I->table_off[i] = e.uint_(); }
+        }
+        // Name tables first: file properties may name themselves and their values by reference.
+        parse_propname_table(I, data, size);
+        parse_propstring_table(I, data, size);
         // file properties right after START (S_TOP_CELL, ...)
         PropModal pm;
         for (;;) {
@@ -212,15 +239,9 @@ ldb_oas_info_t* ldb_oas_info_open(const char* path, char* errbuf, size_t errbuf_
             if (id != 28 && id != 29) break;
             s.off++;
             if (id == 28) read_property(s, I, pm);
-            if (pm.name == "S_TOP_CELL" && !pm.vals.empty() && pm.vals[0].type >= 10 && pm.vals[0].type <= 12)
+            if (pm.name == "S_TOP_CELL" && I->top.empty() && !pm.vals.empty() && pm.vals[0].type >= 10 && pm.vals[0].type <= 15)
                 I->top = pm.vals[0].s;
         }
-        if (I->offset_flag != 0) {
-            Reader e(data + size - 256, 256, "END");
-            if (e.u8() != 2) throw ParseError{ "last 256 bytes are not an END record (table offsets in END expected)" };
-            for (int i = 0; i < 6; ++i) { I->table_flag[i] = e.uint_(); I->table_off[i] = e.uint_(); }
-        }
-        parse_propname_table(I, data, size);
         parse_cellname_table(I, data, size);
         parse_layername_table(I, data, size);
         if (I->top.empty() && I->cells.size() == 1) I->top = I->cells[0].name;

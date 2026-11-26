@@ -28,6 +28,7 @@ module DesignModule
   use BoostPolygonAPIModule
   use RTreeBuilderGPU
   use CompactLayerModule
+  use PropertyTableModule, only: PropertyTable
   use iso_c_binding
   use iso_fortran_env, only : int32, int64, real64
   use omp_lib
@@ -118,6 +119,10 @@ module DesignModule
      type(CompactLayer), allocatable :: cextra(:)
      logical                :: parts_failed = .false.   !> streaming compaction gave up (31-bit limit)
      integer(kind=int64)    :: shadow_n = 0, shadow_hash = 0
+     !> Per-polygon properties (FASCL, property_table.f90); allocated on first use.
+     !> Columns are keyed by canonical polygon ordinal and carry the geometry signature
+     !> they were computed on, so a reordered layer keeps them and a rewritten one drops them.
+     type(PropertyTable), allocatable :: props
    contains
      procedure :: has     => layer_has_state
      procedure :: mark    => layer_mark_state
@@ -460,6 +465,7 @@ contains
     call LayerDropCompact( input_layer_A )
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
     if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
+    if( allocated( input_layer_A%props ) ) deallocate( input_layer_A%props )
     call drop_rtree( input_layer_A )
     input_layer_A%n_used = 0
     input_layer_A%n_alloc = 0
@@ -502,6 +508,9 @@ contains
        allocate( output_layer%tree%tree_nodes, source=input_layer_A%tree%tree_nodes )
        output_layer%tree%root_index = input_layer_A%tree%root_index
     end if
+    !> properties travel with the geometry (e.g. o1:m = d1:m COPY nothing)
+    if( allocated( output_layer%props ) ) deallocate( output_layer%props )
+    if( allocated( input_layer_A%props ) ) allocate( output_layer%props, source=input_layer_A%props )
   end subroutine CopyLayer
 
   !> O(1) exchange of two layers; allocatable payloads are moved, never copied.
@@ -512,6 +521,7 @@ contains
     type(RTreeNode), allocatable     :: temp_nodes(:)
     integer(kind=int64), allocatable :: temp_pnum(:)
     character(len=:), allocatable    :: temp_fileName
+    type(PropertyTable), allocatable :: temp_props
 
     if( a%is_compact .or. b%is_compact ) error stop "swap_layer: expand compact layers first"
     call LayerDropCompact( a )      !> shadows belong to the old contents
@@ -539,6 +549,10 @@ contains
     call move_alloc(a%pnumtable%arr, temp_pnum)
     call move_alloc(b%pnumtable%arr, a%pnumtable%arr)
     call move_alloc(temp_pnum,       b%pnumtable%arr)
+
+    call move_alloc(a%props, temp_props)
+    call move_alloc(b%props, a%props)
+    call move_alloc(temp_props, b%props)
 
     if( filename_as_well ) then
        call move_alloc(a%fileName, temp_fileName)

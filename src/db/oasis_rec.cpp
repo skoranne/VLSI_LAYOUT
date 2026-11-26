@@ -34,7 +34,7 @@ struct Scanner {
     FileInfo& info;
     Modal m;
     Record r;
-    bool in_cell = false, saw_end = false;
+    bool in_cell = false, saw_end = false, in_cblock = false;
     db::NvcompStatus nvst;
     std::vector<ldbgeom::Rect> rects;
     std::vector<Pt> verts;
@@ -175,7 +175,15 @@ struct Scanner {
             for (auto& q : rects) { r.box.add(q[0] + a, q[1] + b); r.box.add(q[2] + c, q[3] + d); }
             if (!rects.empty()) return;
         }
-        // Slanted, zero-width or degenerate: conservative box.
+        // Any-angle centreline: mitred outline (ldbgeom::path_bbox); zero width or one point:
+        // the points grown by the half-width and extensions.
+        int64_t bx1, by1, bx2, by2;
+        if (ldbgeom::path_bbox(verts, m.half_width, m.ext_start, m.ext_end, bx1, by1, bx2, by2)) {
+            int64_t a = 0, b = 0, c = 0, d = 0;
+            if (rep) rep_box(m.rep, a, b, c, d);
+            r.box.add(bx1 + a, by1 + b); r.box.add(bx2 + c, by2 + d);
+            return;
+        }
         int64_t grow = std::max<int64_t>(m.half_width, std::max<int64_t>(0, std::max(m.ext_start, m.ext_end)));
         shape_pts(verts, grow, rep);
     }
@@ -197,18 +205,19 @@ struct Scanner {
         uint8_t inf = s.u8();
         read_layer(s, inf);
         if (inf & 0x80) m.ctrap_type = s.uint_();
-        if (inf & 0x40) m.geom_w = (int64_t)s.uint_();
-        if (inf & 0x20) m.geom_h = (int64_t)s.uint_();
-        read_xy(s, inf, m.geom_x, m.geom_y);
-        bool rep = read_rep(s, inf, 0x04);
         const uint64_t t = m.ctrap_type;
         if (t > 25) s.fail("invalid CTRAPEZOID type " + std::to_string(t));
-        int64_t w = m.geom_w, h = m.geom_h;
-        if (t >= 16 && t <= 19) h = w;
-        else if (t == 20 || t == 21) w = 2 * h;
-        else if (t == 22 || t == 23) h = 2 * w;
-        else if (t == 25) h = w;
-        shape(m.geom_x, m.geom_y, m.geom_x + w, m.geom_y + h, rep, m.layer, m.datatype);
+        const oasis_codec::CtrapRule cr = oasis_codec::ctrap_rule(t);      // 29.6
+        if (cr.no_h && (inf & 0x20)) s.fail("CTRAPEZOID type " + std::to_string(t) + " with H = 1");
+        if (cr.no_w && (inf & 0x40)) s.fail("CTRAPEZOID type " + std::to_string(t) + " with W = 1");
+        if (inf & 0x40) m.geom_w = (int64_t)s.uint_();
+        if (inf & 0x20) m.geom_h = (int64_t)s.uint_();
+        oasis_codec::ctrap_implied_box(t, m.geom_w, m.geom_h);           // 29.7
+        if (!oasis_codec::ctrap_consistent(t, m.geom_w, m.geom_h))       // 29.8
+            s.fail("CTRAPEZOID type " + std::to_string(t) + " with inconsistent width/height");
+        read_xy(s, inf, m.geom_x, m.geom_y);
+        bool rep = read_rep(s, inf, 0x04);
+        shape(m.geom_x, m.geom_y, m.geom_x + m.geom_w, m.geom_y + m.geom_h, rep, m.layer, m.datatype);
     }
 
     void circle(Reader& s) {
@@ -240,6 +249,8 @@ struct Scanner {
 
     void cblock(Reader& s) {
         uint64_t comp_type = s.uint_(), uncomp_len = s.uint_(), comp_len = s.uint_();
+        if (comp_type != 0) s.fail("CBLOCK comp-type " + std::to_string(comp_type) + " (only 0 = DEFLATE is defined)");
+        if (in_cblock) s.fail("CBLOCK nested in a CBLOCK");
         s.need(comp_len);
         std::vector<uint8_t> out;
         bool ok = db::decompress_cblock((uint8_t)comp_type, s.p + s.off, (size_t)comp_len, out, (size_t)uncomp_len, nvst);
@@ -248,7 +259,9 @@ struct Scanner {
         info.cblocks++; info.cblock_comp_bytes += comp_len; info.cblock_uncomp_bytes += uncomp_len;
         std::string where = "CBLOCK ending at file offset " + std::to_string(s.off) + ", uncompressed";
         Reader inner(out.data(), out.size(), where.c_str());
+        in_cblock = true;
         parse(inner, true);
+        in_cblock = false;
     }
 
     static bool is_name_record(uint8_t id) { return (id >= 3 && id <= 12) || id == 30 || id == 31; }

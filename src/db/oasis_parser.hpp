@@ -35,9 +35,12 @@ using ldbgeom::is_manhattan; using ldbgeom::fracture_manhattan; using ldbgeom::f
 // ---------------------------------------------------------------------------
 struct CellRef { bool by_number = false; uint64_t number = 0; std::string name; };
 struct PInst { CellRef ref; LdbTransform tr; };
-struct PCell { CellRef id; LdbCell cell; std::vector<PInst> insts; };
+struct PText { size_t index; uint64_t ref; };                    // text string by reference, resolved at finish
+struct PCell { CellRef id; LdbCell cell; std::vector<PInst> insts; std::vector<PText> text_refs; };
+// kind: 0 file, 1 cell, 2 element, 3 placement, 4 CELLNAME (cellname_ref: the cell it names)
 struct PProp { long cell; bool name_by_number; uint64_t name_number; std::string name;
-               bool value_by_number; uint64_t value_number; std::string value; };
+               bool value_by_number; uint64_t value_number; std::string value;
+               int kind = 0; uint64_t cellname_ref = 0; };
 
 struct NameTable {
     std::map<uint64_t, std::string> names; uint64_t next_implicit = 0;
@@ -57,6 +60,7 @@ struct Modal {
     CellRef place_cell;
     Repetition rep;
     std::vector<Pt> polygon_pts, path_pts;
+    bool text_by_ref = false; uint64_t text_ref = 0; std::string text_str;   // modal text-string
     bool prop_by_number = false; uint64_t prop_number = 0; std::string prop_name;
     bool value_by_number = false; uint64_t value_number = 0; std::string value;
     void reset_for_cell() { relative = false; place_x = place_y = geom_x = geom_y = text_x = text_y = 0; }
@@ -186,10 +190,16 @@ struct Parser {
     std::vector<PCell> cells; long cur = -1;
     NameTable cellnames, textstrings, propnames, propstrings;
     std::vector<PProp> props;
+    // Property association (31.8, 31.9): the closest preceding record other than PROPERTY, PAD,
+    // CBLOCK (and XYABSOLUTE/XYRELATIVE). 0 file, 1 cell, 2 element, 3 placement, 4 CELLNAME,
+    // 5 a record without properties in the model (other <name> records, XNAME, XELEMENT).
+    int ptarget = 0; uint64_t ptarget_cellname = 0, last_cellname_ref = 0;
     Modal m;
     db::NvcompStatus nvst;
     size_t cblocks = 0, approximated = 0;
     bool saw_end = false, want_props = false;
+    bool keep_polys = false;                 // also store exact non-rectangle shapes (LdbCell::polys)
+    double unit = 0;                         // START unit: grid steps per micron
     std::vector<Rect> rects;                 // scratch
     std::vector<Pt> verts;             // scratch
     // Streaming mode (ldb_stream_boxes): boxes go straight to the callback, nothing is stored.
@@ -251,9 +261,24 @@ struct Parser {
         emit(s, rep, kind, x1 - grow, y1 - grow, x2 + grow, y2 + grow);
     }
 
+    // Exact shape for the model: `verts` as a polygon (kind 0) or path centreline (kind 1).
+    void keep_poly(const Repetition& rep, int kind, int64_t hw = 0) {
+        if (!keep_polys || stream_cb || scan_only || cur < 0) return;
+        LdbCell& c = cells[(size_t)cur].cell;
+        c.polys_extra = true;
+        rep.for_each([&](int64_t ox, int64_t oy) {
+            LdbPolyElem pe; pe.layer = (int)m.layer; pe.datatype = (int)m.datatype; pe.kind = kind;
+            pe.pts.reserve(verts.size());
+            for (auto& q : verts) pe.pts.push_back({ q.x + ox, q.y + oy });
+            if (kind == 1) { pe.width = 2 * hw; pe.pathtype = 4; pe.ext_begin = m.ext_start; pe.ext_end = m.ext_end; }
+            c.polys.push_back(std::move(pe));
+        });
+    }
+
     // Fill `verts` (a closed polygon) as rectangles.
     void emit_polygon(Reader& s, const Repetition& rep) {
         if (scan_only) return;
+        keep_poly(rep, 0);
         rects.clear();
         if (is_manhattan(verts)) fracture_manhattan(verts, rects);
         else { fracture_general(verts, rects); ++approximated; }
@@ -330,20 +355,35 @@ struct Parser {
 
     void text(Reader& s) {
         uint8_t info = s.u8();
-        if (info & 0x40) { if (info & 0x20) s.uint_(); else s.skip_str(); }
+        const bool store = keep_polys && !stream_cb && !scan_only && cur >= 0;
+        if (info & 0x40) {
+            if (info & 0x20) { m.text_by_ref = true; m.text_ref = s.uint_(); }
+            else if (store) { m.text_by_ref = false; m.text_str = s.str(); }
+            else s.skip_str();
+        }
         if (info & 0x01) m.textlayer = s.uint_();
         if (info & 0x02) m.texttype = s.uint_();
         read_xy(s, info, m.text_x, m.text_y, 0, 0);        // texts carry no area: not tracked
+        const Repetition* rep = &single();
         if (info & 0x04) {                                  // a new repetition is modal for shapes too
             const bool reuse = s.off < s.n && s.p[s.off] == 0;
             read_repetition(s, m.rep);
             if (!reuse) set(D_REP);
+            rep = &m.rep;
         }
+        if (!store) return;
+        PCell& pc = cells[(size_t)cur];
+        rep->for_each([&](int64_t ox, int64_t oy) {
+            LdbTextElem t; t.layer = (int)m.textlayer; t.texttype = (int)m.texttype; t.x = m.text_x + ox; t.y = m.text_y + oy;
+            if (m.text_by_ref) pc.text_refs.push_back({ pc.cell.texts.size(), m.text_ref }); else t.str = m.text_str;
+            pc.cell.texts.push_back(std::move(t));
+        });
     }
 
     void rectangle(Reader& s) {
         uint8_t info = s.u8();
         read_layer(s, info);
+        if ((info & 0x80) && (info & 0x20)) s.fail("RECTANGLE with S = 1 and H = 1");   // 25.7
         modal_i(s, (info & 0x40) != 0, m.geom_w, D_GW);
         if (info & 0x80) { m.geom_h = m.geom_w; set(D_GH); }           // square
         else modal_i(s, (info & 0x20) != 0, m.geom_h, D_GH);
@@ -383,11 +423,17 @@ struct Parser {
         read_xy(s, info, m.geom_x, m.geom_y);
         const Repetition& rep = read_rep(s, info);
         const int64_t hw = m.half_width;
-        if (hw == 0 || m.path_pts.empty()) return;                     // no area
+        if (m.path_pts.empty()) return;
         verts.clear(); verts.push_back({ m.geom_x, m.geom_y });
         for (auto& q : m.path_pts) verts.push_back({ m.geom_x + q.x, m.geom_y + q.y });
+        keep_poly(rep, 1, hw);                       // exact path, zero-width centrelines included
+        if (hw == 0) return;                         // no area: no boxes
         rects.clear();
-        if (!path_to_rects(verts, hw, m.ext_start, m.ext_end, rects)) { emit_bbox_of(s, rep, 1, verts, hw); return; }
+        if (!path_to_rects(verts, hw, m.ext_start, m.ext_end, rects)) {             // any-angle: outline box
+            int64_t x1, y1, x2, y2;
+            if (ldbgeom::path_bbox(verts, hw, m.ext_start, m.ext_end, x1, y1, x2, y2)) { ++approximated; emit(s, rep, 1, x1, y1, x2, y2); }
+            return;
+        }
         emit_rects(s, rep, 1);
     }
 
@@ -401,7 +447,7 @@ struct Parser {
         read_xy(s, info, m.geom_x, m.geom_y);
         const Repetition& rep = read_rep(s, info);
         const int64_t x = m.geom_x, y = m.geom_y, w = m.geom_w, h = m.geom_h;
-        if (da == 0 && db_ == 0) { emit(s, rep, 0, x, y, x + w, y + h); return; }
+        if (da == 0 && db_ == 0) { emit(s, rep, 2, x, y, x + w, y + h); return; }   // a rectangle
         // Horizontal: delta-a = x(top left) - x(bottom left),
         //             delta-b = x(top right) - x(bottom right).
         // Vertical:   delta-a = y(bottom left) - y(bottom right),
@@ -425,46 +471,28 @@ struct Parser {
         uint8_t info = s.u8();
         read_layer(s, info);
         modal_u(s, (info & 0x80) != 0, m.ctrap_type, D_CT);
-        modal_i(s, (info & 0x40) != 0, m.geom_w, D_GW);
-        modal_i(s, (info & 0x20) != 0, m.geom_h, D_GH);
+        const uint64_t t = m.ctrap_type;
+        if (t > 25) s.fail("invalid CTRAPEZOID type " + std::to_string(t));
+        const oasis_codec::CtrapRule cr = oasis_codec::ctrap_rule(t);      // 29.6
+        const bool no_h = cr.no_h, no_w = cr.no_w;
+        if (no_h && (info & 0x20)) s.fail("CTRAPEZOID type " + std::to_string(t) + " with H = 1");
+        if (no_w && (info & 0x40)) s.fail("CTRAPEZOID type " + std::to_string(t) + " with W = 1");
+        if (!no_w) modal_i(s, (info & 0x40) != 0, m.geom_w, D_GW);
+        if (!no_h) modal_i(s, (info & 0x20) != 0, m.geom_h, D_GH);
+        oasis_codec::ctrap_implied_box(t, m.geom_w, m.geom_h);           // 29.7
+        set(D_GW | D_GH);
         read_xy(s, info, m.geom_x, m.geom_y);
         const Repetition& rep = read_rep(s, info);
         const int64_t x = m.geom_x, y = m.geom_y, w = m.geom_w, h = m.geom_h;
-        const uint64_t t = m.ctrap_type;
-        if (t > 25) s.fail("invalid CTRAPEZOID type " + std::to_string(t));
-        if (t == 24) { emit(s, rep, 0, x, y, x + w, y + h); return; }
-        if (t == 25) { emit(s, rep, 0, x, y, x + w, y + w); return; }
-        // Vertices of the 24 compact shapes, relative to (x, y); every slanted
-        // side is at 45 degrees.  Triangles repeat their last vertex.
-        const int64_t V[24][4][2] = {
-            { {0,0}, {w,0},   {w-h,h}, {0,h}   },   //  0  horizontal, right side slanted, top short
-            { {0,0}, {w-h,0}, {w,h},   {0,h}   },   //  1  right side slanted, bottom short
-            { {0,0}, {w,0},   {w,h},   {h,h}   },   //  2  left side slanted, top short
-            { {h,0}, {w,0},   {w,h},   {0,h}   },   //  3  left side slanted, bottom short
-            { {0,0}, {w,0},   {w-h,h}, {h,h}   },   //  4  both slanted, top short
-            { {h,0}, {w-h,0}, {w,h},   {0,h}   },   //  5  both slanted, bottom short
-            { {0,0}, {w-h,0}, {w,h},   {h,h}   },   //  6  parallelogram leaning right
-            { {h,0}, {w,0},   {w-h,h}, {0,h}   },   //  7  parallelogram leaning left
-            { {0,0}, {w,0},   {w,h-w}, {0,h}   },   //  8  vertical, top slanted, right short
-            { {0,0}, {w,0},   {w,h},   {0,h-w} },   //  9  top slanted, left short
-            { {0,0}, {w,w},   {w,h},   {0,h}   },   // 10  bottom slanted, right short
-            { {0,w}, {w,0},   {w,h},   {0,h}   },   // 11  bottom slanted, left short
-            { {0,0}, {w,w},   {w,h-w}, {0,h}   },   // 12  both slanted, right short
-            { {0,w}, {w,0},   {w,h},   {0,h-w} },   // 13  both slanted, left short
-            { {0,0}, {w,w},   {w,h},   {0,h-w} },   // 14  parallelogram rising
-            { {0,w}, {w,0},   {w,h-w}, {0,h}   },   // 15  parallelogram falling
-            { {0,0}, {w,0},   {0,w},   {0,w}   },   // 16  triangle, right angle bottom left
-            { {0,0}, {w,w},   {0,w},   {0,w}   },   // 17  right angle top left
-            { {0,0}, {w,0},   {w,w},   {w,w}   },   // 18  right angle bottom right
-            { {0,w}, {w,0},   {w,w},   {w,w}   },   // 19  right angle top right
-            { {0,0}, {2*h,0}, {h,h},   {h,h}   },   // 20  apex up
-            { {0,h}, {h,0},   {2*h,h}, {2*h,h} },   // 21  apex down
-            { {0,0}, {w,w},   {0,2*w}, {0,2*w} },   // 22  apex right
-            { {0,w}, {w,0},   {w,2*w}, {w,2*w} },   // 23  apex left
-        };
+        // 29.8: shape constraints.
+        if (!oasis_codec::ctrap_consistent(t, w, h))
+            s.fail("CTRAPEZOID type " + std::to_string(t) + " with inconsistent width/height");
+        if (t == 24 || t == 25) { emit(s, rep, 2, x, y, x + w, y + h); return; }    // rectangle / square
+        int64_t V[4][2];
+        oasis_codec::ctrap_vertices(t, w, h, V);
         verts.clear();
         for (int i = 0; i < 4; ++i) {
-            const Pt q{ x + V[t][i][0], y + V[t][i][1] };
+            const Pt q{ x + V[i][0], y + V[i][1] };
             if (verts.empty() || verts.back().x != q.x || verts.back().y != q.y) verts.push_back(q);
         }
         emit_polygon(s, rep);
@@ -495,6 +523,7 @@ struct Parser {
         if (!(info & 0x08)) {
             uint64_t count = info >> 4; if (count == 15) count = s.uint_();
             m.value_by_number = false; m.value.clear();
+            bool first_str = false;
             for (uint64_t i = 0; i < count; ++i) {
                 uint64_t t = s.uint_();
                 bool by_number = false; uint64_t number = 0; std::string v;
@@ -505,20 +534,27 @@ struct Parser {
                 else if (t <= 12) v = s.str();
                 else if (t <= 15) { by_number = true; number = s.uint_(); }
                 else s.fail("invalid property value type " + std::to_string(t));
-                if (i == 0) { m.value_by_number = by_number; m.value_number = number; m.value = v; }
+                // The model keeps one value: the first string-valued one (so S_GDS_PROPERTY
+                // <attribute, b-string> keeps its string), else the first value.
+                const bool is_str = t >= 10;
+                if (i == 0 || (is_str && !first_str)) { m.value_by_number = by_number; m.value_number = number; m.value = v; }
+                if (is_str) first_str = true;
             }
         }
         record_property();
     }
     void record_property() {
-        if (!want_props) return;
-        props.push_back({ cur, m.prop_by_number, m.prop_number, m.prop_name, m.value_by_number, m.value_number, m.value });
+        if (!want_props || ptarget == 5) return;
+        props.push_back({ ptarget == 0 ? -1 : cur, m.prop_by_number, m.prop_number, m.prop_name, m.value_by_number, m.value_number,
+                          m.value, ptarget, ptarget_cellname });
     }
 
     static void skip_interval(Reader& s) { oasis_codec::skip_interval(s); }
 
     void cblock(Reader& s) {
         uint64_t comp_type = s.uint_(), uncomp_len = s.uint_(), comp_len = s.uint_();
+        if (cblock_depth > 0) s.fail("CBLOCK nested in a CBLOCK");                       // 11.4
+        if (comp_type != 0) s.fail("CBLOCK comp-type " + std::to_string(comp_type) + " (only 0 = DEFLATE is defined)");
         s.need(comp_len);
         if (scan_only) {                     // record and skip: payload is self-contained
             if (scan_refs) scan_refs->push_back(CblockRef{ s.p + s.off, comp_type, uncomp_len, comp_len });
@@ -563,12 +599,13 @@ struct Parser {
             switch (id) {
             case 0: break;                                              // PAD
             case 1: {                                                   // START
-                s.skip_str(); s.real();
+                s.skip_str(); unit = s.real();
+                if (!(unit > 0) || !std::isfinite(unit)) s.fail("START unit is not a positive number");   // 13.10
                 if (s.uint_() == 0) for (int i = 0; i < 12; ++i) s.uint_();
             } break;
             case 2: saw_end = true; break;                              // END
             case 3: cellnames.add_implicit(s.str()); break;
-            case 4: { std::string nm = s.str(); cellnames.add(s.uint_(), nm); } break;
+            case 4: { std::string nm = s.str(); last_cellname_ref = s.uint_(); cellnames.add(last_cellname_ref, nm); } break;
             case 5: textstrings.add_implicit(s.str()); break;
             case 6: { std::string nm = s.str(); textstrings.add(s.uint_(), nm); } break;
             case 7: propnames.add_implicit(s.str()); break;
@@ -602,6 +639,16 @@ struct Parser {
             case 34: cblock(s); break;
             default: --s.off; s.fail("unknown OASIS record " + std::to_string((int)id));
             }
+            switch (id) {                                               // property target
+            case 1: ptarget = 0; break;
+            case 3: ptarget = 4; ptarget_cellname = cellnames.next_implicit - 1; break;
+            case 4: ptarget = 4; ptarget_cellname = last_cellname_ref; break;
+            case 13: case 14: ptarget = 1; break;
+            case 17: case 18: ptarget = 3; break;
+            case 19: case 20: case 21: case 22: case 23: case 24: case 25: case 26: case 27: case 33: ptarget = 2; break;
+            case 0: case 15: case 16: case 28: case 29: case 34: break;
+            default: ptarget = 5; break;
+            }
         }
     }
 
@@ -613,9 +660,15 @@ struct Parser {
     }
 
     void finish() {
+        f->dbu_per_micron = unit;
         for (auto& pc : cells) {
             std::string name = cell_name(pc.id);
             LdbCell& c = pc.cell; c.name = name;
+            for (auto& tr : pc.text_refs) {
+                const std::string* s = textstrings.find(tr.ref);
+                // a dangling reference degrades to a placeholder, like '__cell_N' and 'propstring#N'
+                c.texts[tr.index].str = s ? *s : "textstring#" + std::to_string(tr.ref);
+            }
             for (auto& pi : pc.insts) {
                 LdbInstance inst; inst.ref_name = cell_name(pi.ref); inst.tr = pi.tr;
                 c.refs.insert(inst.ref_name);
@@ -637,8 +690,13 @@ struct Parser {
                 const std::string* v = propstrings.find(pp.value_number);
                 lp.value = v ? *v : "propstring#" + std::to_string(pp.value_number);
             } else lp.value = pp.value;
-            if (pp.cell < 0) { lp.target_kind = 0; f->file_properties.push_back(std::move(lp)); }
-            else { lp.target_kind = 1; lp.cell = f->cells[(size_t)pp.cell].name; f->cells[(size_t)pp.cell].properties.push_back(std::move(lp)); }
+            if (pp.kind == 4) {                                        // CELLNAME property: the named cell
+                const std::string* cn = cellnames.find(pp.cellname_ref);
+                auto it = cn ? f->cell_index.find(*cn) : f->cell_index.end();
+                if (it == f->cell_index.end()) continue;               // external or unnamed cell
+                lp.target_kind = 1; lp.cell = *cn; f->cells[it->second].properties.push_back(std::move(lp));
+            } else if (pp.kind == 0 || pp.cell < 0) { lp.target_kind = 0; f->file_properties.push_back(std::move(lp)); }
+            else { lp.target_kind = pp.kind; lp.cell = f->cells[(size_t)pp.cell].name; f->cells[(size_t)pp.cell].properties.push_back(std::move(lp)); }
         }
     }
 };
