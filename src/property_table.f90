@@ -82,6 +82,10 @@ module PropertyTableModule
      integer(int64), allocatable :: poly_boxes(:)  !> box indices grouped by polygon
      type(Box), allocatable      :: bbox(:)
      integer(int64), allocatable :: area(:)        !> sum of (disjoint) box areas
+     !> Any-angle layers (PropTableIndexPieces): exact 2A per polygon (area may be half-integral;
+     !> area(:) then holds floor(2A / 2)); pieces instead of boxes in box_ord / poly_boxes.
+     logical :: anyangle = .false.
+     integer(int64), allocatable :: area2(:)
      integer                     :: n_cols = 0
      type(PropColumn), allocatable :: cols(:)
      !> Outline measures (FASCL PERIMETER/VERTICES/LINE_END_*), computed on first use and
@@ -96,6 +100,7 @@ module PropertyTableModule
      integer(int64), allocatable :: net(:)
   end type PropertyTable
 
+  public :: PropTableIndexPieces
   public :: PropTableIndex, PropTableClear, PropColumnIndex, PropCommitColumn, PropGetValue, &
        PropGetField, PropOrdinalOfId, PropKindName, PropTablePrint, PropTableDumpCSV, PropValueToString, &
        PropDropOutline, PropDropNets
@@ -270,6 +275,58 @@ contains
     t%n_rect = count( t%poly_start(2:np+1) - t%poly_start(1:np) == 1 )
   end subroutine PropTableIndex
 
+  !> Index of an any-angle layer: n trapezoid pieces, already numbered by TrapPNum (lab(i) = canonical
+  !> ordinal 1..np of piece i: lowest-leftmost-vertex order). The FASCL id of a polygon is its
+  !> ordinal. bbox and exact 2A per polygon come from TrapPNum; geom_hash is a signature of the
+  !> piece set (columns, outlines and nets are dropped when it changes, as for box layers).
+  subroutine PropTableIndexPieces( t, n, lab, np, px1, py1, px2, py2, parea2, geom_hash, dropped )
+    type(PropertyTable), intent(inout) :: t
+    integer(int64), intent(in) :: n, np
+    integer(int64), intent(in) :: lab(:), px1(:), py1(:), px2(:), py2(:), parea2(:)
+    integer(int64), intent(in) :: geom_hash
+    logical, intent(out), optional :: dropped
+    integer(int64), allocatable :: fill(:)
+    integer(int64) :: i, p
+    if( present(dropped) ) dropped = .false.
+    if( t%geom_n /= n .or. t%geom_hash /= geom_hash ) then
+       if( present(dropped) ) dropped = ( t%n_cols > 0 )
+       call drop_columns( t )
+       call PropDropOutline( t )
+       call PropDropNets( t )
+    end if
+    t%geom_n = n
+    t%geom_hash = geom_hash
+    call drop_index( t )
+    t%anyangle = .true.
+    t%n_poly = np
+    allocate( t%box_ord(n), t%poly_id(np), t%id_ord(np), t%poly_start(np+1), t%poly_boxes(n), &
+              t%bbox(np), t%area(np), t%area2(np) )
+    t%poly_start = 0
+    do i = 1, n
+       t%box_ord(i) = lab(i)
+       t%poly_start( lab(i) + 1 ) = t%poly_start( lab(i) + 1 ) + 1
+    end do
+    t%poly_start(1) = 1
+    do p = 1, np
+       t%poly_start(p+1) = t%poly_start(p+1) + t%poly_start(p)
+       t%poly_id(p) = p
+       t%id_ord(p) = p
+       t%bbox(p)%x1 = int( px1(p), kind(t%bbox(p)%x1) ); t%bbox(p)%y1 = int( py1(p), kind(t%bbox(p)%y1) )
+       t%bbox(p)%x2 = int( px2(p), kind(t%bbox(p)%x2) ); t%bbox(p)%y2 = int( py2(p), kind(t%bbox(p)%y2) )
+       t%area2(p) = parea2(p)
+       t%area(p) = parea2(p) / 2                      ! floor for non-negative 2A
+    end do
+    allocate( fill(max(np, 1_int64)) )
+    fill(1:np) = t%poly_start(1:np)
+    do i = 1, n
+       p = lab(i)
+       t%poly_boxes( fill(p) ) = i
+       fill(p) = fill(p) + 1
+    end do
+    deallocate( fill )
+    t%n_rect = count( t%poly_start(2:np+1) - t%poly_start(1:np) == 1 )
+  end subroutine PropTableIndexPieces
+
   pure logical function box_less( a, b )
     type(Box), intent(in) :: a, b
     if( a%x1 /= b%x1 ) then
@@ -344,6 +401,8 @@ contains
     if( allocated(t%poly_boxes) ) deallocate( t%poly_boxes )
     if( allocated(t%bbox) )       deallocate( t%bbox )
     if( allocated(t%area) )       deallocate( t%area )
+    if( allocated(t%area2) )      deallocate( t%area2 )
+    t%anyangle = .false.
   end subroutine drop_index
 
   subroutine drop_columns( t )

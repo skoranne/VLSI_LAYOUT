@@ -31,6 +31,7 @@
 #include <numeric>
 #include <unordered_map>
 #include <vector>
+#include <cstring>
 
 namespace {
 using i128 = __int128;
@@ -121,6 +122,14 @@ struct GroupPoly {
     }
 
     void run(const int* M, int nm, ChunkOut& out) {
+        build(M, nm, out.st);
+        trace_emit(M, nm, out);
+    }
+
+    // Boundary of the trapezoid set M: directed segments (region on the left), lattice-or-
+    // rational vertex ids, and nxt[] pairing every incoming segment with its outgoing one
+    // (sharpest left turn: loops separate at pinch points).
+    void build(const int* M, int nm, Stats& st) {
         seg.clear(); pr.clear(); vk.clear(); rowev.clear();
         // --- side segments (inside on the left: left sides go down, right sides go up)
         for (int i = 0; i < nm; ++i) {
@@ -192,10 +201,60 @@ struct GroupPoly {
                 const Seg& a = seg[(size_t)o]; const Seg& b = seg[(size_t)best];
                 if (rel_less(rx, ry, b.dx, b.dy, a.dx, a.dy)) best = o;
             }
-            if (best < 0 || used[(size_t)best]) { out.st.anomalies++; continue; }
+            if (best < 0 || used[(size_t)best]) { st.anomalies++; continue; }
             used[(size_t)best] = 1;
             nxt[(size_t)i] = best;
         }
+    }
+
+    // Measures of the closed region of M (one PNUM polygon): vertices (direction changes, per
+    // boundary visit), holes = 1 - chi with chi = sum of loop orientations - sum over points of
+    // (boundary visits - 1) (gluing m loop points into one lowers chi by m - 1), perimeter.
+    void measure(const int* M, int nm, int64_t& nvert, int64_t& holes, double& perim, int64_t& loops, Stats& st) {
+        build(M, nm, st);
+        const int ns = (int)seg.size();
+        nvert = 0; holes = 0; perim = 0; loops = 0;
+        int64_t chi = 0;
+        for (size_t v = 0; v + 1 < ostart.size(); ++v) {
+            const int deg = ostart[v + 1] - ostart[v];
+            if (deg > 1) chi -= deg - 1;
+        }
+        long double pl = 0;
+        for (int i = 0; i < ns; ++i) {
+            const Seg& sg = seg[(size_t)i];
+            const VKey& a = vk[(size_t)sg.a]; const VKey& b = vk[(size_t)sg.b];
+            if (sg.dy == 0) {
+                pl += std::fabs((long double)b.n / (long double)b.d - (long double)a.n / (long double)a.d);
+            } else {
+                const long double h = std::fabs((long double)(b.y - a.y));
+                pl += h * std::sqrt((long double)sg.dx * sg.dx + (long double)sg.dy * sg.dy) / std::fabs((long double)sg.dy);
+            }
+        }
+        perim = (double)pl;
+        seen.assign((size_t)ns, 0);
+        for (int i = 0; i < ns; ++i) {
+            if (seen[(size_t)i] || nxt[(size_t)i] < 0) continue;
+            ls.clear();
+            int s0 = i; bool ok = true;
+            while (!seen[(size_t)s0]) { seen[(size_t)s0] = 1; ls.push_back(s0); s0 = nxt[(size_t)s0]; if (s0 < 0) { ok = false; break; } }
+            if (!ok || s0 != i) { st.anomalies++; continue; }
+            const size_t L = ls.size();
+            long double a2 = 0;
+            for (size_t k = 0; k < L; ++k) {
+                const Seg& a = seg[(size_t)ls[(k + L - 1) % L]]; const Seg& b = seg[(size_t)ls[k]];
+                if (!(a.dx == b.dx && a.dy == b.dy)) nvert++;
+                const VKey& p = vk[(size_t)b.a]; const VKey& q = vk[(size_t)b.b];
+                const long double px = (long double)p.n / (long double)p.d, qx = (long double)q.n / (long double)q.d;
+                a2 += px * (long double)q.y - qx * (long double)p.y;
+            }
+            chi += a2 > 0 ? 1 : -1;
+            loops++;
+        }
+        holes = 1 - chi;
+    }
+
+    void trace_emit(const int* M, int nm, ChunkOut& out) {
+        const int ns = (int)seg.size();
         // --- trace loops, drop collinear vertices, require lattice vertices
         nd.clear(); loop_start.clear(); loop_area.clear();
         seen.assign((size_t)ns, 0);
@@ -331,8 +390,55 @@ int find(std::vector<int>& p, int x) { while (p[(size_t)x] != x) { p[(size_t)x] 
 
 // traps: n records of 10 int32 (y1, y2, l.ax, l.k, l.dx, l.dy, r.ax, r.k, r.dx, r.dy).
 // stats: trapezoid records, polygons, polygon vertices, groups, holes, max group size, anomalies.
+namespace {
+// Receives the exact output of trapset_run in a deterministic order.
+struct TrapSink {
+    virtual void trap(int64_t y1, int64_t y2, int64_t xbl, int64_t xbr, int64_t xtl, int64_t xtr) = 0;
+    virtual void poly(const Pt* p, size_t n) = 0;
+    virtual ~TrapSink() {}
+};
+struct WriterSink : TrapSink {
+    oasis_writer::Writer* w; uint64_t layer, dt;
+    void trap(int64_t y1, int64_t y2, int64_t bl, int64_t br, int64_t tl, int64_t tr) override {
+        w->trapezoid_h(layer, dt, y1, y2, bl, br, tl, tr);
+    }
+    void poly(const Pt* p, size_t n) override { w->polygon(layer, dt, p, n); }
+};
+// Lattice polygons (CSR, 1-based offsets for Fortran); a lattice-corner trapezoid becomes a
+// 3- or 4-point polygon.
+struct PolySink : TrapSink {
+    std::vector<int64_t> off{1}, xs, ys;
+    void push(int64_t x, int64_t y) {
+        const size_t b = (size_t)(off.back() - 1);
+        if (xs.size() > b && xs.back() == x && ys.back() == y) return;
+        xs.push_back(x); ys.push_back(y);
+    }
+    void close() {
+        const size_t b = (size_t)(off.back() - 1);
+        if (xs.size() > b + 1 && xs.back() == xs[b] && ys.back() == ys[b]) { xs.pop_back(); ys.pop_back(); }
+        if (xs.size() < b + 3) { xs.resize(b); ys.resize(b); return; }
+        off.push_back((int64_t)xs.size() + 1);
+    }
+    void trap(int64_t y1, int64_t y2, int64_t bl, int64_t br, int64_t tl, int64_t tr) override {
+        push(bl, y1); push(br, y1); push(tr, y2); push(tl, y2); close();
+    }
+    void poly(const Pt* p, size_t n) override { for (size_t i = 0; i < n; ++i) push(p[i].x, p[i].y); close(); }
+};
+int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink);
+}
+
 extern "C" int ldb_ow_trapset(void* h, int layer, int dt, int64_t n, const int32_t* rec, int64_t* stats) {
-    auto* w = (oasis_writer::Writer*)h;
+    WriterSink ws; ws.w = (oasis_writer::Writer*)h; ws.layer = (uint64_t)layer; ws.dt = (uint64_t)dt;
+    return trapset_run(n, rec, stats, ws);
+}
+
+// Exact lattice polygons of a canonical trapezoid set (the same grouping as ldb_ow_trapset), for
+// feeding a result back into the engine. Read with ldb_polys_count / ldb_polys_get (k = 0) and
+// release with ldb_polys_free.
+extern "C" void* ldb_trapset_polys(int64_t n, const int32_t* rec, int64_t* stats);
+
+namespace {
+int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink) {
     using clk = std::chrono::steady_clock;
     const auto tA = clk::now();
     auto secs = [&](clk::time_point a) { return std::chrono::duration<double>(clk::now() - a).count(); };
@@ -341,7 +447,7 @@ extern "C" int ldb_ow_trapset(void* h, int layer, int dt, int64_t n, const int32
         const int32_t* r = rec + 10 * i;
         T[(size_t)i] = { r[0], r[1], { r[2], r[3], r[4], r[5] }, { r[6], r[7], r[8], r[9] } };
     }
-    Output out{ w, (uint64_t)layer, (uint64_t)dt, {} };
+    Output out{ nullptr, 0, 0, {} };
     int nth = (int)std::thread::hardware_concurrency();
     if (const char* e = std::getenv("OMP_NUM_THREADS")) { int v = std::atoi(e); if (v > 0) nth = v; }
     nth = std::max(1, nth);
@@ -482,14 +588,14 @@ extern "C" int ldb_ow_trapset(void* h, int layer, int dt, int64_t n, const int32
                 const Trap& z = T[(size_t)order[(size_t)a]];
                 const Q bl = side_x(z.l, z.y1, z.y1), br = side_x(z.r, z.y1, z.y1);
                 const Q tl = side_x(z.l, z.y1, z.y2), tr = side_x(z.r, z.y1, z.y2);
-                w->trapezoid_h((uint64_t)layer, (uint64_t)dt, z.y1, z.y2, (int64_t)bl.n, (int64_t)br.n, (int64_t)tl.n, (int64_t)tr.n);
+                sink.trap(z.y1, z.y2, (int64_t)bl.n, (int64_t)br.n, (int64_t)tl.n, (int64_t)tr.n);
                 if (dump) std::fprintf(dump, "T %lld %lld %lld %lld %lld %lld\n", (long long)z.y1, (long long)z.y2, (long long)bl.n, (long long)br.n, (long long)tl.n, (long long)tr.n);
                 out.st.trap_records++;
             }
         }
         for (pk = 0; pk + 1 < co.pstart.size(); ++pk)
         {
-            w->polygon((uint64_t)layer, (uint64_t)dt, co.pts.data() + co.pstart[pk], (size_t)(co.pstart[pk + 1] - co.pstart[pk]));
+            sink.poly(co.pts.data() + co.pstart[pk], (size_t)(co.pstart[pk + 1] - co.pstart[pk]));
             if (dump) { std::fprintf(dump, "P");
                 for (int64_t q = co.pstart[pk]; q < co.pstart[pk + 1]; ++q) std::fprintf(dump, " %lld %lld", (long long)co.pts[(size_t)q].x, (long long)co.pts[(size_t)q].y);
                 std::fprintf(dump, "\n"); }
@@ -507,4 +613,62 @@ extern "C" int ldb_ow_trapset(void* h, int layer, int dt, int64_t n, const int32
         stats[3] = out.st.groups; stats[4] = out.st.holes; stats[5] = out.st.max_group; stats[6] = out.st.anomalies;
     }
     return out.st.anomalies == 0 ? 0 : 1;
+}
+}
+
+struct TrapPolySet { std::vector<int64_t> off, xs, ys; };
+extern "C" void* ldb_trapset_polys(int64_t n, const int32_t* rec, int64_t* stats) {
+    PolySink ps;
+    trapset_run(n, rec, stats, ps);
+    auto* r = new TrapPolySet();
+    r->off.swap(ps.off); r->xs.swap(ps.xs); r->ys.swap(ps.ys);
+    return r;
+}
+extern "C" int64_t ldb_trapset_polys_count(void* h, int64_t* nvert) {
+    auto* r = (TrapPolySet*)h; *nvert = (int64_t)r->xs.size(); return (int64_t)r->off.size() - 1;
+}
+extern "C" void ldb_trapset_polys_get(void* h, int64_t* poff, int64_t* xs, int64_t* ys) {
+    auto* r = (TrapPolySet*)h;
+    std::memcpy(poff, r->off.data(), r->off.size() * sizeof(int64_t));
+    if (!r->xs.empty()) { std::memcpy(xs, r->xs.data(), r->xs.size() * 8); std::memcpy(ys, r->ys.data(), r->ys.size() * 8); }
+}
+extern "C" void ldb_trapset_polys_free(void* h) { delete (TrapPolySet*)h; }
+
+// Per-polygon measures of a canonical trapezoid set: lab[i] = PNUM ordinal (1..np) of trap i.
+// Outputs (np each): vertices, holes, perimeter (dbu, real). stats[0] = anomalies.
+extern "C" int ldb_trapset_measure(int64_t n, const int32_t* rec, const int64_t* lab, int64_t np,
+                                   int64_t* nvert, int64_t* holes, double* perim, int64_t* stats) {
+    std::vector<Trap> T((size_t)n);
+    for (int64_t i = 0; i < n; ++i) {
+        const int32_t* r = rec + 10 * i;
+        T[(size_t)i] = { r[0], r[1], { r[2], r[3], r[4], r[5] }, { r[6], r[7], r[8], r[9] } };
+    }
+    std::vector<int> start((size_t)np + 2, 0), order((size_t)n);
+    for (int64_t i = 0; i < n; ++i) start[(size_t)lab[i] + 1]++;
+    for (int64_t p = 0; p <= np; ++p) start[(size_t)p + 1] += start[(size_t)p];
+    { std::vector<int> pos(start.begin(), start.end() - 1);
+      for (int64_t i = 0; i < n; ++i) order[(size_t)pos[(size_t)lab[i]]++] = (int)i; }
+    int nth = (int)std::thread::hardware_concurrency();
+    if (const char* e = std::getenv("OMP_NUM_THREADS")) { int v = std::atoi(e); if (v > 0) nth = v; }
+    nth = std::max(1, nth);
+    std::atomic<int64_t> next{1}, anom{0};
+    auto worker = [&]() {
+        GroupPoly gp(T); Stats st;
+        for (;;) {
+            const int64_t p0 = next.fetch_add(256);
+            if (p0 > np) break;
+            for (int64_t p = p0; p < std::min(np + 1, p0 + 256); ++p) {
+                int64_t lp = 0;
+                gp.measure(order.data() + start[(size_t)p], start[(size_t)p + 1] - start[(size_t)p],
+                           nvert[p - 1], holes[p - 1], perim[p - 1], lp, st);
+            }
+        }
+        anom += st.anomalies;
+    };
+    std::vector<std::thread> th;
+    for (int t = 1; t < nth; ++t) th.emplace_back(worker);
+    worker();
+    for (auto& t : th) t.join();
+    if (stats) stats[0] = anom.load();
+    return anom.load() == 0 ? 0 : 1;
 }

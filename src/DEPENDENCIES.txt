@@ -71,7 +71,7 @@ trap_merge.o: wide_int.o exact_predicates.o trapezoid.o compact_layer.o
 test_trapmerge.o: trap_merge.o trapezoid.o
 test_trapbool.o: trap_merge.o trapezoid.o trap_pnum.o
 trap_pnum.o: trapezoid.o wide_int.o compact_layer.o
-trapbool_main.o: trap_merge.o trapezoid.o wide_int.o
+trapbool_main.o: trap_merge.o trapezoid.o trap_pnum.o
 trapmerge_main.o: trap_merge.o trapezoid.o
 test_wide_int.o: wide_int.o
 test_predicates.o: wide_int.o exact_predicates.o

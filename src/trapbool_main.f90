@@ -224,14 +224,18 @@ program trapbool_main
   if (len_trim(pnumpfx) > 0) then
      do k = 1, nops
         call TrapPNum(res(k)%t, res(k)%n, PP)
-        write(*, '(a,a,a,i0,a,i0,a,i0,4(a,f0.3))') 'TRAPBOOL pnum op=', trim(opn(k)), ' polygons=', PP%np, &
-             ' contacts=', PP%contacts, ' anomalies=', PP%anomalies, ' t_grid=', PP%t_grid, &
-             ' t_contacts=', PP%t_contacts, ' t_union=', PP%t_union, ' t_props=', PP%t_props
+        call TrapPolyOutline(res(k)%t, res(k)%n, PP)
+        write(*, '(a,a,a,i0,a,i0,a,i0,a,i0,a,i0,a,i0,a,f0.1,5(a,f0.3))') 'TRAPBOOL pnum op=', trim(opn(k)), &
+             ' polygons=', PP%np, ' contacts=', PP%contacts, ' anomalies=', PP%anomalies + PP%outline_anomalies, &
+             ' holes=', sum(PP%holes(1:PP%np)), ' vertices=', sum(PP%nvert(1:PP%np)), &
+             ' area2=', sum(PP%area2(1:PP%np)), ' perimeter=', sum(PP%perim(1:PP%np)), &
+             ' t_grid=', PP%t_grid, ' t_contacts=', PP%t_contacts, ' t_union=', PP%t_union, &
+             ' t_props=', PP%t_props, ' t_outline=', PP%t_outline
         open(newunit=u, file=trim(pnumpfx)//'_'//trim(opn(k))//'.csv', status='replace', action='write')
-        write(u, '(a)') 'ord,vx,vy,area2,x1,y1,x2,y2,pieces'
+        write(u, '(a)') 'ord,vx,vy,area2,x1,y1,x2,y2,pieces,vertices,holes,perimeter'
         do j = 1, PP%np
-           write(u, '(i0,8(",",i0))') j, PP%vx(j), PP%vy(j), PP%area2(j), PP%x1(j), PP%y1(j), &
-                PP%x2(j), PP%y2(j), PP%npieces(j)
+           write(u, '(i0,10(",",i0),",",f0.3)') j, PP%vx(j), PP%vy(j), PP%area2(j), PP%x1(j), PP%y1(j), &
+                PP%x2(j), PP%y2(j), PP%npieces(j), PP%nvert(j), PP%holes(j), PP%perim(j)
         end do
         close(u)
      end do

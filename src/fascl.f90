@@ -1157,7 +1157,16 @@ contains
        select case( nd%fn )
        case( F_PNUM ); v = ival( ord )
        case( F_PID );  v = ival( a%i )
-       case( F_AREA ); v = ival( t%area(ord) )
+       case( F_AREA )
+          if( t%anyangle ) then                   ! exact: INT when 2A is even, else FLOAT
+             if( mod( t%area2(ord), 2_int64 ) == 0 ) then
+                v = ival( t%area2(ord) / 2 )
+             else
+                v = rval( real( t%area2(ord), real64 ) * 0.5_real64 )
+             end if
+          else
+             v = ival( t%area(ord) )
+          end if
        case( F_NBOX ); v = ival( t%poly_start(ord+1) - t%poly_start(ord) )
        case( F_BX1 );  v = ival( int( t%bbox(ord)%x1, int64 ) )
        case( F_BY1 );  v = ival( int( t%bbox(ord)%y1, int64 ) )
@@ -1377,6 +1386,7 @@ contains
     integer(c_int64_t) :: o(4)
     integer(c_int32_t) :: d, st
     if( t%have_outline ) return
+    if( t%anyangle ) return            ! box outlines do not apply; PERIMETER etc. report "not computed"
     call PropDropOutline( t )
     allocate( t%perim(t%n_poly), t%nvert(t%n_poly), t%le_w(t%n_poly), t%le_len(t%n_poly), &
          t%le_dir(t%n_poly) )

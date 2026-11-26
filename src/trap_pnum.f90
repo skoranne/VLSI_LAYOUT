@@ -23,6 +23,7 @@
 module TrapPNumModule
   use, intrinsic :: iso_fortran_env, only: int32, int64, real64
   use omp_lib
+  use, intrinsic :: iso_c_binding, only: c_int, c_int32_t, c_int64_t, c_double
   use WideIntModule
   use TrapezoidModule
   use CompactLayerModule, only: CompactSortPairs
@@ -40,7 +41,12 @@ module TrapPNumModule
      integer(int64), allocatable :: area2(:)                !> exact 2A
      integer(int64), allocatable :: x1(:), y1(:), x2(:), y2(:)
      integer(int64), allocatable :: npieces(:)
-     real(real64) :: t_grid = 0, t_contacts = 0, t_union = 0, t_props = 0
+     !> outline measures (TrapPolyOutline): vertices per boundary visit, holes, perimeter (dbu)
+     logical :: have_outline = .false.
+     integer(int64), allocatable :: nvert(:), holes(:)
+     real(real64), allocatable :: perim(:)
+     integer(int64) :: outline_anomalies = 0
+     real(real64) :: t_grid = 0, t_contacts = 0, t_union = 0, t_props = 0, t_outline = 0
   end type TrapPolys
 
   type :: PairBuf
@@ -48,7 +54,21 @@ module TrapPNumModule
      integer(int64), allocatable :: a(:), b(:)
   end type PairBuf
 
-  public :: TrapPNum, traps_touch
+  public :: TrapPNum, traps_touch, TrapPolyOutline, TrapRecords
+
+  interface
+     function ldb_trapset_measure(n, rec, lab, np, nvert, holes, perim, stats) result(rc) &
+          bind(c, name='ldb_trapset_measure')
+       import :: c_int, c_int32_t, c_int64_t, c_double
+       integer(c_int64_t), value :: n, np
+       integer(c_int32_t), intent(in) :: rec(*)
+       integer(c_int64_t), intent(in) :: lab(*)
+       integer(c_int64_t), intent(out) :: nvert(*), holes(*)
+       real(c_double), intent(out) :: perim(*)
+       integer(c_int64_t), intent(out) :: stats(*)
+       integer(c_int) :: rc
+     end function ldb_trapset_measure
+  end interface
 
 contains
 
@@ -337,8 +357,53 @@ contains
     type(TrapPolys), intent(inout) :: P
     if (allocated(P%lab)) deallocate(P%lab)
     if (allocated(P%vx)) deallocate(P%vx, P%vy, P%area2, P%x1, P%y1, P%x2, P%y2, P%npieces)
+    if (allocated(P%nvert)) deallocate(P%nvert, P%holes, P%perim)
+    P%have_outline = .false.
     P%np = 0; P%contacts = 0; P%anomalies = 0
   end subroutine free_polys
+
+  !> 10 int32 per trapezoid (y1, y2, l.ax, l.k, l.dx, l.dy, r.ax, r.k, r.dx, r.dy): the record
+  !> layout of the C side (db/trap_out.cpp).
+  subroutine TrapRecords(t, n, rec)
+    type(Trapezoid), intent(in) :: t(:)
+    integer(int64), intent(in) :: n
+    integer(int32), allocatable, intent(out) :: rec(:, :)
+    integer(int64) :: j
+    allocate(rec(10, max(n, 1_int64)))
+    !$omp parallel do
+    do j = 1, n
+       rec(1, j) = t(j)%y1;   rec(2, j) = t(j)%y2
+       rec(3, j) = t(j)%l%ax; rec(4, j) = t(j)%l%k
+       rec(5, j) = t(j)%l%dx; rec(6, j) = t(j)%l%dy
+       rec(7, j) = t(j)%r%ax; rec(8, j) = t(j)%r%k
+       rec(9, j) = t(j)%r%dx; rec(10, j) = t(j)%r%dy
+    end do
+    !$omp end parallel do
+  end subroutine TrapRecords
+
+  !> Vertices, holes and perimeter of every polygon (P from TrapPNum on the same t): the boundary
+  !> of each polygon traced exactly (db/trap_out.cpp, ldb_trapset_measure), polygons in parallel.
+  subroutine TrapPolyOutline(t, n, P)
+    type(Trapezoid), intent(in) :: t(:)
+    integer(int64), intent(in) :: n
+    type(TrapPolys), intent(inout) :: P
+    integer(int32), allocatable :: rec(:, :)
+    integer(int64) :: st(4)
+    integer :: rc
+    real(real64) :: t0
+    t0 = omp_get_wtime()
+    if (allocated(P%nvert)) deallocate(P%nvert, P%holes, P%perim)
+    allocate(P%nvert(max(P%np, 1_int64)), P%holes(max(P%np, 1_int64)), P%perim(max(P%np, 1_int64)))
+    P%outline_anomalies = 0
+    if (P%np > 0) then
+       call TrapRecords(t, n, rec)
+       st = 0
+       rc = ldb_trapset_measure(n, rec, P%lab, P%np, P%nvert, P%holes, P%perim, st)
+       P%outline_anomalies = st(1)
+    end if
+    P%have_outline = .true.
+    P%t_outline = omp_get_wtime() - t0
+  end subroutine TrapPolyOutline
 
   ! ---------------------------------------------------------------- helpers
 
