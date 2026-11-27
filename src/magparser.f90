@@ -77,7 +77,7 @@ module MagicVLSILayoutParser
   use iso_fortran_env, only : int32, int64
   implicit none
   private
-  public:: parseMagicLayoutFile, writeMagicLayoutFile
+  public:: parseMagicLayoutFile, writeMagicLayoutFile, writeSingleLayer
   interface
      function gzopen(path, mode) bind(C, name="gzopen")
        import :: c_ptr, c_char
@@ -106,12 +106,16 @@ module MagicVLSILayoutParser
   integer, parameter :: MAX_CHILD = M         ! internal nodes have ≤ M children
 contains
 
-  subroutine parseMagicLayoutFile(load_design, MAX_LAYERS)
+  subroutine parseMagicLayoutFile(load_design, MAX_LAYERS, filter_ht, filter_prefix)
     implicit none
     ! Parses Magic VLSI layout files with component sections and rectangle definitions
     type(Design), intent(inout), target :: load_design
     integer, intent(in) :: MAX_LAYERS
+    type(hash_type), intent(in), optional :: filter_ht
+    character(len=*), intent(in), optional :: filter_prefix
     type(hash_type), pointer :: ht
+    logical :: use_filter, want_layer
+    integer :: skipped_unused, filter_dummy
     character(len=1024), dimension(:), pointer :: layerNames(:)
     type(Layer), pointer :: layers(:)
     type(Box), pointer :: boxes(:)
@@ -155,6 +159,9 @@ contains
     found_section = .false.
     current_layer_id = 1
     NUM_LAYERS = 0
+    use_filter = present(filter_ht) .and. present(filter_prefix) .and. &
+         ( load_design%design_direction == DESIGN_DIRECTION_INPUT )
+    skipped_unused = 0
     call system_clock(count_rate=clock_rate)
 
     ! Initialize the layer structure by allocating memory for box arrays
@@ -215,6 +222,14 @@ contains
           section_name = trim(section_name)
           if( section_name == "labels" ) cycle
           if( section_name == "end" ) cycle
+          if( use_filter ) then
+             call hash_get( filter_ht, trim(filter_prefix)//trim(section_name), filter_dummy, want_layer )
+             if( .not. want_layer ) then
+                skipped_unused = skipped_unused + 1
+                found_section = .false.
+                cycle
+             end if
+          end if
           !> More sections than max_layers: skip this section (and its rects) instead of
           !> indexing layers/layerNames out of bounds.
           if( layer_count > MAX_LAYERS ) then
@@ -326,6 +341,9 @@ contains
     NUM_LAYERS = min( hash_nitems( load_design%ht ), MAX_LAYERS )
     ! Print parsed results
     write(*,*) 'Parsed ', hash_nitems(ht), ' layer(s).'
+    if( skipped_unused > 0 ) then
+       write(*,'(A,I0,A)') 'INFO: DAG demand-load skipped ', skipped_unused, ' unused layer(s).'
+    end if
     call StopMarkTime("ReadDB")
     if( load_design%design_direction /= DESIGN_DIRECTION_INPUT ) then
        return
@@ -469,7 +487,7 @@ contains
          end if
        end associate
     end do
-    if( .not. DESIGN_EXTENT%is_valid() ) then
+    if( .not. DESIGN_EXTENT%is_valid() .and. .not. use_filter ) then
        error stop 'Design EXTENT is not valid'
     end if
     call StopMarkTime("ExtentLoop")
@@ -501,6 +519,13 @@ contains
     end do
     write (*,*) '+-----------------------------------------------------------------+'
     write(*,*) ''
+    if( CompactLayersEnabled() ) then
+       call StartMarkTime("CompactLoad")
+       do i = 1, NUM_LAYERS
+          call LayerCompact( layers(i) )
+       end do
+       call StopMarkTime("CompactLoad")
+    end if
   end subroutine parseMagicLayoutFile
 
   subroutine ResizeLayer(boxes, newSize)
@@ -528,11 +553,78 @@ contains
     input_layer%layer_boxes(input_layer%n_used) = tempBox
   end subroutine addBoxToLayer
 
+  !> Write a single output/memory layer to its backing store and clear it from RAM.
+  subroutine writeSingleLayer(load_design, i, wrote)
+    type(Design), intent(inout), target :: load_design
+    integer, intent(in) :: i
+    logical, intent(out) :: wrote
+    integer :: pos
+    wrote = .false.
+    if( .not. allocated( load_design%layers ) ) return
+    if( i < 1 .or. i > size( load_design%layers ) ) return
+    call LayerExpand( load_design%layers(i) )   !> compact layers carry no Box array
+    associate( resolved_layer => load_design%layers(i) )
+      if( resolved_layer%n_used == 0 ) return
+      if(.not. allocated( resolved_layer%fileName ) ) then
+         write(*,*) 'Layer id: ', i, ' not assigned backing store.'
+         error stop "ERROR: layer backing store name not allocated"
+      end if
+      if( load_design%design_direction == DESIGN_DIRECTION_MEMORY ) then
+         write(*,*) 'INFO: Writing layer to FILE: ', resolved_layer%fileName
+         call SaveLayerToSnap( resolved_layer, resolved_layer%fileName, K_COMPRESSION_METHOD_TO_USE )
+         call ClearLayer( resolved_layer )
+         wrote = .true.
+         return
+      end if
+      pos = index( resolved_layer%fileName, ".snap" )
+      if( pos == len_trim(resolved_layer%fileName)-4 ) then
+         call SaveLayerToSnap( resolved_layer, resolved_layer%fileName, K_COMPRESSION_METHOD_TO_USE )
+         call ClearLayer( resolved_layer )
+         wrote = .true.
+         return
+      end if
+      pos = index( resolved_layer%fileName, ".oas", back=.true. )
+      if( pos > 0 .and. pos == len_trim(resolved_layer%fileName)-3 ) then
+         block
+           type(OasisWriter) :: ow
+           integer(kind=int64) :: lno, dt
+           logical :: ok
+           integer :: st
+           character(len=:), allocatable :: msg
+           call ParseLayerDatatype( resolved_layer%fileName, lno, dt, ok )
+           if( .not. ok ) call ParseLayerDatatype( trim(load_design%layerNames(i)), lno, dt, ok )
+           if( .not. ok ) then
+              lno = i; dt = 0
+           end if
+           call OasisPropOpen( ow, resolved_layer%fileName, 'TOP' )
+           call OasisPropAddLayer( ow, resolved_layer, trim(load_design%layerNames(i)), lno, dt, st, msg )
+           if( st == 0 ) call OasisPropClose( ow, st, msg )
+           if( st /= 0 ) then
+              write(*,*) 'ERROR: ', msg
+              error stop "OASIS layer output failed"
+           end if
+         end block
+         call ClearLayer( resolved_layer )
+         wrote = .true.
+         return
+      end if
+      pos = index( resolved_layer%fileName, ".bin" )
+      if( pos /= len_trim(resolved_layer%fileName)-3 ) then
+         write(*,*) 'ERROR: File format not supported: ', resolved_layer%fileName
+         error stop "DBOUT supports KLBIN (.bin), .snap and .oas; edit the output MAG file to fix"
+      end if
+      call WriteKLBin( resolved_layer%fileName, resolved_layer%layer_boxes, resolved_layer%n_used )
+      call ClearLayer( resolved_layer )
+      wrote = .true.
+    end associate
+  end subroutine writeSingleLayer
+
   !> support for writing VLSI Magic format with binary payload of geometry data
   subroutine writeMagicLayoutFile(load_design)
     ! Write Magic VLSI layout files with component sections and rectangle definitions
     type(Design), intent(inout), target :: load_design
-    integer :: i, pos, deleted_layer_count
+    integer :: i, deleted_layer_count
+    logical :: wrote
     if( load_design%design_direction /= DESIGN_DIRECTION_OUTPUT ) then
        if( temporary_layers /= K_TEMPORARY_LAYER_DISK ) then
           error stop "Non-output DB being written out" !> I may relax this, but not good idea
@@ -544,68 +636,8 @@ contains
     deleted_layer_count = 0
     if( .not. allocated( load_design%layers ) ) return !> we have already flushed this db
     do i=1,min( hash_nitems( load_design%ht), size( load_design%layers ) ) !> skipped sections have no layers(i)
-       call LayerExpand( load_design%layers(i) )   !> compact layers carry no Box array
-       associate( resolved_layer => load_design%layers(i) )
-         if( resolved_layer%n_used == 0 ) cycle
-         !> Lets just assume we are writing in KLBIN
-         if(.not. allocated( resolved_layer%fileName ) ) then
-            write(*,*) 'Layer id: ', i, ' not assigned backing store.'
-            error stop "ERROR: layer backing store name not allocated"
-         end if
-         if( load_design%design_direction == DESIGN_DIRECTION_MEMORY ) then
-            !> we are not going to check syntax
-            write(*,*) 'INFO: Writing layer to FILE: ', resolved_layer%fileName
-            call SaveLayerToSnap( resolved_layer, resolved_layer%fileName, K_COMPRESSION_METHOD_TO_USE )
-            call ClearLayer( resolved_layer )
-            deleted_layer_count = deleted_layer_count + 1
-            cycle
-         end if
-         pos = index( resolved_layer%fileName, ".snap" )
-         !write(*,*) 'IS_SNAP ',pos,' ',load_design%layers(i)%fileName
-         if( pos == len_trim(resolved_layer%fileName)-4 ) then
-            call SaveLayerToSnap( resolved_layer, resolved_layer%fileName, K_COMPRESSION_METHOD_TO_USE )
-            call ClearLayer( resolved_layer )
-            deleted_layer_count = deleted_layer_count + 1
-            cycle
-         end if
-         pos = index( resolved_layer%fileName, ".oas", back=.true. )
-         if( pos > 0 .and. pos == len_trim(resolved_layer%fileName)-3 ) then
-            !> OASIS output of one layer, with its per-polygon properties (FASCL)
-            block
-              type(OasisWriter) :: ow
-              integer(kind=int64) :: lno, dt
-              logical :: ok
-              integer :: st
-              character(len=:), allocatable :: msg
-              call ParseLayerDatatype( resolved_layer%fileName, lno, dt, ok )
-              if( .not. ok ) call ParseLayerDatatype( trim(load_design%layerNames(i)), lno, dt, ok )
-              if( .not. ok ) then
-                 lno = i; dt = 0
-              end if
-              call OasisPropOpen( ow, resolved_layer%fileName, 'TOP' )
-              call OasisPropAddLayer( ow, resolved_layer, trim(load_design%layerNames(i)), lno, dt, st, msg )
-              if( st == 0 ) call OasisPropClose( ow, st, msg )
-              if( st /= 0 ) then
-                 write(*,*) 'ERROR: ', msg
-                 error stop "OASIS layer output failed"
-              end if
-            end block
-            call ClearLayer( resolved_layer )
-            deleted_layer_count = deleted_layer_count + 1
-            cycle
-         end if
-         pos = index( resolved_layer%fileName, ".bin" )
-         !write(*,*) 'pos = ', pos, ' len = ', len_trim(load_design%layers(i)%fileName)
-         if( pos /= len_trim(resolved_layer%fileName)-3 ) then
-            write(*,*) 'ERROR: File format not supported: ', resolved_layer%fileName
-            error stop "DBOUT supports KLBIN (.bin), .snap and .oas; edit the output MAG file to fix"
-         end if
-         call WriteKLBin( resolved_layer%fileName, resolved_layer%layer_boxes, resolved_layer%n_used )
-         !> as an memory optimization we are going to delete the layer after a flush
-         !> if this layer is reused later, that will be a problem, so let us deliberately let it crash for now
-         call ClearLayer( resolved_layer )
-         deleted_layer_count = deleted_layer_count + 1
-       end associate
+       call writeSingleLayer( load_design, i, wrote )
+       if( wrote ) deleted_layer_count = deleted_layer_count + 1
     end do
     if( debug_verbosity > 1 ) then
        write(*,*) 'Written and delete : ', deleted_layer_count, ' layers.'
