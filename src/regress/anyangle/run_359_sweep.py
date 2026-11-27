@@ -119,11 +119,15 @@ def wait_mem(min_gb: int):
         time.sleep(10)
 
 
-def run_cmd(cmd, log_path: Path, cwd=None):
+def run_cmd(cmd, log_path: Path, cwd=None, extra_env=None):
     log_path.parent.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
+    env = None
+    if extra_env:
+        env = os.environ.copy()
+        env.update(extra_env)
     with open(log_path, "w") as lf:
-        p = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=cwd)
+        p = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=cwd, env=env)
     return p.returncode, time.time() - t0
 
 
@@ -288,7 +292,8 @@ def stage_topo(tag: str, topo_pair: tuple, a: int, oas_in: Path, out_dir: Path, 
     lines.append("end")
     ctr.write_text("\n".join(lines) + "\n")
 
-    rc, dt = run_cmd([str(args.magparser), str(ctr), "256"], d / "topo.log", cwd=d)
+    rc, dt = run_cmd([str(args.magparser), str(ctr), "256"], d / "topo.log", cwd=d,
+                     extra_env={"MAGPARSER_FORCE_TRAP": "1"})
     shutil.rmtree(tmp_dir, ignore_errors=True)
     if rc != 0:
         print(f"[topo] {tag} R{a:03d}: MAGPARSER rc={rc} ({dt:.1f}s)", flush=True)
