@@ -152,6 +152,7 @@ contains
     fileName = load_design%fileName
     line_number = 0
     layer_count = 1
+    found_section = .false.
     current_layer_id = 1
     NUM_LAYERS = 0
     call system_clock(count_rate=clock_rate)
@@ -214,6 +215,14 @@ contains
           section_name = trim(section_name)
           if( section_name == "labels" ) cycle
           if( section_name == "end" ) cycle
+          !> More sections than max_layers: skip this section (and its rects) instead of
+          !> indexing layers/layerNames out of bounds.
+          if( layer_count > MAX_LAYERS ) then
+             write(*,*) 'WARNING: layer section ', trim(section_name), ' skipped (exceeds max_layers=', &
+                  MAX_LAYERS, '; raise max_layers)'
+             found_section = .false.
+             cycle
+          end if
           write (*,'(3A10,I5)') 'Layer = ', section_name, ' = id: ', layer_count
           call hash_put( ht, section_name, layer_count, ins )
           if( .not. ins ) write (*,*) 'Duplicate layer seen: ', section_name
@@ -383,7 +392,7 @@ contains
            elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
            num_roots = resolved_layer%pnumtable%count_roots()
            num_rects = count(resolved_layer%pnumtable%arr == 0)
-           call resolved_layer%mark( LAYER_STATE_PNUM )
+           call LayerMark( resolved_layer, LAYER_STATE_PNUM )
            if( overlap_areas(i) > 0.0 ) then
               !> this layer needs HEALING as we have detected overlap
               !write(*,*) 'PerformUnion as overlap detected on ', size(area_overlap_roots), ' roots ', elapsed_time
@@ -403,7 +412,7 @@ contains
               if( NeedsPNum( resolved_layer ) ) then
                  call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes(1:resolved_layer%n_used), K_LEAF_CAPACITY, &
                       resolved_layer%tree%tree_nodes, resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
-                 call resolved_layer%mark( LAYER_STATE_PNUM )
+                 call LayerMark( resolved_layer, LAYER_STATE_PNUM )
               end if
               num_roots = resolved_layer%pnumtable%count_roots()
               num_rects = count(resolved_layer%pnumtable%arr == 0)
@@ -412,13 +421,13 @@ contains
                       ' non-rects ',num_rects , ' rects. STAT ',resolved_layer%layerState, &
                       ' |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
                  write(*,*) 'OVLP AREA = ', overlap_areas(i)
-                 call resolved_layer%unmark( LAYER_STATE_HEAL )
+                 call LayerUnmark( resolved_layer, LAYER_STATE_HEAL )
                  error stop 'UNION failed.'
               else
-                 call resolved_layer%mark( LAYER_STATE_HEAL )
+                 call LayerMark( resolved_layer, LAYER_STATE_HEAL )
               end if
            else
-              call resolved_layer%mark( LAYER_STATE_HEAL )
+              call LayerMark( resolved_layer, LAYER_STATE_HEAL )
            end if
            call system_clock(count=end_tick)
            elapsed_time2 = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)

@@ -11,7 +11,7 @@ decl memory f1 = nothing
 info
 # exec run f1:diff = d1:pdiff + d1:ndiff
 exec run o1:gate = d1:poly * d1:diff
-exec run o1:source_drain = d1:diff - d1:poly
+exec run o1:source_drain = d1:diff @ d1:poly
 exec run f1:poly_box = d1:poly EXTENT nothing
 exec run o1:poly_bbox = d1:poly EXTENT nothing
 exec run o1:poly_grid = d1:poly GRID nothing 10 10

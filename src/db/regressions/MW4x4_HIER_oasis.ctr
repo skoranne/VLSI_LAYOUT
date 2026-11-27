@@ -29,7 +29,8 @@ exec run t1:sd2  = d1:diff ~ d1:poly
 exec run t1:check_sd = t1:sd1 ^ t1:sd2
 exec run t1:nothing = t1:check_sd ASSERT_ZERO t1:nothing
 exec run t1:poly_grow = d1:poly SIZE t1:nothing 0.01
-exec run t1:self_poly_xor = (t1:poly_grow * d1:poly) ^ d1:poly
+exec run t1:_self_poly_and = t1:poly_grow * d1:poly
+exec run t1:self_poly_xor = t1:_self_poly_and ^ d1:poly
 exec run t1:nothing = t1:self_poly_xor ASSERT_ZERO t1:nothing
 flush
 delete t1

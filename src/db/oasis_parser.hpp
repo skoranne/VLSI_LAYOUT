@@ -37,10 +37,12 @@ struct CellRef { bool by_number = false; uint64_t number = 0; std::string name; 
 struct PInst { CellRef ref; LdbTransform tr; };
 struct PText { size_t index; uint64_t ref; };                    // text string by reference, resolved at finish
 struct PCell { CellRef id; LdbCell cell; std::vector<PInst> insts; std::vector<PText> text_refs; };
-// kind: 0 file, 1 cell, 2 element, 3 placement, 4 CELLNAME (cellname_ref: the cell it names)
+struct PVal { bool by_number = false; uint64_t number = 0; std::string s; };
+// kind: 0 file, 1 cell, 2 element, 3 placement (inst_lo..inst_hi: the instances that PLACEMENT made),
+//       4 CELLNAME (cellname_ref: the cell it names)
 struct PProp { long cell; bool name_by_number; uint64_t name_number; std::string name;
-               bool value_by_number; uint64_t value_number; std::string value;
-               int kind = 0; uint64_t cellname_ref = 0; };
+               std::vector<PVal> values; int kind = 0; uint64_t cellname_ref = 0;
+               size_t inst_lo = 0, inst_hi = 0; };
 
 struct NameTable {
     std::map<uint64_t, std::string> names; uint64_t next_implicit = 0;
@@ -62,7 +64,7 @@ struct Modal {
     std::vector<Pt> polygon_pts, path_pts;
     bool text_by_ref = false; uint64_t text_ref = 0; std::string text_str;   // modal text-string
     bool prop_by_number = false; uint64_t prop_number = 0; std::string prop_name;
-    bool value_by_number = false; uint64_t value_number = 0; std::string value;
+    std::vector<PVal> values;
     void reset_for_cell() { relative = false; place_x = place_y = geom_x = geom_y = text_x = text_y = 0; }
 };
 
@@ -200,6 +202,7 @@ struct Parser {
     bool saw_end = false, want_props = false;
     bool keep_polys = false;                 // also store exact non-rectangle shapes (LdbCell::polys)
     double unit = 0;                         // START unit: grid steps per micron
+    size_t last_inst_lo = 0, last_inst_hi = 0;
     std::vector<Rect> rects;                 // scratch
     std::vector<Pt> verts;             // scratch
     // Streaming mode (ldb_stream_boxes): boxes go straight to the callback, nothing is stored.
@@ -340,6 +343,8 @@ struct Parser {
         const Repetition* rep = &single();
         if (info & 0x08) { read_rep_into(s); rep = &m.rep; }
         if (scan_only) return;
+        last_inst_lo = cells[(size_t)cur].insts.size();
+        struct SetHi { Parser* p; ~SetHi() { p->last_inst_hi = p->cells[(size_t)p->cur].insts.size(); } } set_hi{ this };
         PInst pi; pi.ref = m.place_cell;
         pi.tr.mag = mag; pi.tr.angle_deg = angle; pi.tr.mirror_x = (info & 0x01) ? 1 : 0;
         auto& insts = cells[(size_t)cur].insts;
@@ -522,8 +527,7 @@ struct Parser {
         }
         if (!(info & 0x08)) {
             uint64_t count = info >> 4; if (count == 15) count = s.uint_();
-            m.value_by_number = false; m.value.clear();
-            bool first_str = false;
+            m.values.clear();
             for (uint64_t i = 0; i < count; ++i) {
                 uint64_t t = s.uint_();
                 bool by_number = false; uint64_t number = 0; std::string v;
@@ -534,19 +538,17 @@ struct Parser {
                 else if (t <= 12) v = s.str();
                 else if (t <= 15) { by_number = true; number = s.uint_(); }
                 else s.fail("invalid property value type " + std::to_string(t));
-                // The model keeps one value: the first string-valued one (so S_GDS_PROPERTY
-                // <attribute, b-string> keeps its string), else the first value.
-                const bool is_str = t >= 10;
-                if (i == 0 || (is_str && !first_str)) { m.value_by_number = by_number; m.value_number = number; m.value = v; }
-                if (is_str) first_str = true;
+                m.values.push_back(PVal{ by_number, number, v });
             }
         }
         record_property();
     }
     void record_property() {
-        if (!want_props || ptarget == 5) return;
-        props.push_back({ ptarget == 0 ? -1 : cur, m.prop_by_number, m.prop_number, m.prop_name, m.value_by_number, m.value_number,
-                          m.value, ptarget, ptarget_cellname });
+        // placement properties (names) are always kept; file/cell/element/CELLNAME ones on request
+        if ((!want_props && ptarget != 3) || ptarget == 5) return;
+        if (scan_only) return;
+        props.push_back({ ptarget == 0 ? -1 : cur, m.prop_by_number, m.prop_number, m.prop_name,
+                          m.values, ptarget, ptarget_cellname, last_inst_lo, last_inst_hi });
     }
 
     static void skip_interval(Reader& s) { oasis_codec::skip_interval(s); }
@@ -686,17 +688,31 @@ struct Parser {
                 const std::string* nm = propnames.find(pp.name_number);
                 lp.name = nm ? *nm : "prop#" + std::to_string(pp.name_number);
             } else lp.name = pp.name;
-            if (pp.value_by_number) {
-                const std::string* v = propstrings.find(pp.value_number);
-                lp.value = v ? *v : "propstring#" + std::to_string(pp.value_number);
-            } else lp.value = pp.value;
+            // values joined by a space (S_GDS_PROPERTY: "<attr> <string>")
+            std::vector<std::string> vals;
+            for (auto& v : pp.values) {
+                if (v.by_number) { const std::string* ps = propstrings.find(v.number); vals.push_back(ps ? *ps : "propstring#" + std::to_string(v.number)); }
+                else vals.push_back(v.s);
+            }
+            for (size_t i = 0; i < vals.size(); ++i) { if (i) lp.value += ' '; lp.value += vals[i]; }
             if (pp.kind == 4) {                                        // CELLNAME property: the named cell
                 const std::string* cn = cellnames.find(pp.cellname_ref);
                 auto it = cn ? f->cell_index.find(*cn) : f->cell_index.end();
                 if (it == f->cell_index.end()) continue;               // external or unnamed cell
                 lp.target_kind = 1; lp.cell = *cn; f->cells[it->second].properties.push_back(std::move(lp));
-            } else if (pp.kind == 0 || pp.cell < 0) { lp.target_kind = 0; f->file_properties.push_back(std::move(lp)); }
-            else { lp.target_kind = pp.kind; lp.cell = f->cells[(size_t)pp.cell].name; f->cells[(size_t)pp.cell].properties.push_back(std::move(lp)); }
+            } else if (pp.kind == 0 || pp.cell < 0) {
+                lp.target_kind = 0; f->file_properties.push_back(std::move(lp));
+            } else if (pp.kind == 3) {
+                LdbCell& c = f->cells[(size_t)pp.cell];
+                const std::string nm = ldb_instance_name_from_property(lp.name, vals);
+                for (size_t k = pp.inst_lo; k < pp.inst_hi && k < c.instances.size(); ++k) {
+                    if (!nm.empty() && c.instances[k].name.empty()) c.instances[k].name = nm;
+                    c.instances[k].props.push_back({ lp.name, lp.value });
+                }
+                if (want_props) { lp.target_kind = 3; lp.cell = c.name; c.properties.push_back(std::move(lp)); }
+            } else {
+                lp.target_kind = pp.kind; lp.cell = f->cells[(size_t)pp.cell].name; f->cells[(size_t)pp.cell].properties.push_back(std::move(lp));
+            }
         }
     }
 };

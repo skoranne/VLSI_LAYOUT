@@ -48,6 +48,33 @@ Notes: external `/scratch1/...` paths and some in-repo layouts may need to be pr
 bash src/db/regressions/fascl/run_fascl_regression.sh src/MAGPARSER.exe
 ```
 
+## DEF cross-check (`db_defcheck`)
+- `defcheck_mkALU.sh [--gds] [workdir]`: checks `64bit_ALU/gds/mkALU.oas` (and with `--gds`, `mkALU.gds`)
+  against `def/mkALU.def`, and against the same DEF gzip'ed, using the SKY130 HD tech LEF and cell LEFs.
+  Checks: DIEAREA, every COMPONENT against a top-cell placement, point probes for every wire/via/RECT/PIN,
+  a per-layer XOR of the DEF geometry with the top cell (15 layers, 0 area), and every LEF PIN/OBS
+  rectangle against the cell's geometry. It also runs a mutated `.def.gz` that must fail with each error
+  located. Overrides: `MKALU_DIR`, `SKY130_HD`. Takes about 1 minute (1.5 minutes with `--gds`).
+```sh
+bash src/db/regressions/defcheck_mkALU.sh
+src/db/db_defcheck --lef tech.tlef --lef cells.lef design.def.gz layout.oas   # one-off
+```
+
+## DEF -> OASIS (`db_def2oas`)
+- `def2oas_mkALU.sh [--klayout-xor] [workdir]`:
+  - Converts `data/def2oas_props.def`, a small DEF that holds every kind of name and property.
+    KLayout must read all of them back (`def2oas_props_check.py`): instance names (property
+    61), DEF_STATUS/ATTR/PROPERTY, DEF_NET/DEF_PIN on shapes, pin labels, net and pin info,
+    ROW/TRACKS/PROPERTYDEFINITIONS, and the transforms of N/FS/FN/S placements.
+  - Converts `mkALU.def.gz` with the cells from `mkALU.oas`. db_defcheck must PASS with 0 XOR
+    on 15 layers, and KLayout must see all 301203 placements named and DEF_NET on every met1
+    shape.
+  - `--klayout-xor` (+7 min) also XORs the result against `mkALU.oas`. The only expected
+    difference is 81/14, a P&R marker that is not in the DEF.
+```sh
+bash src/db/regressions/def2oas_mkALU.sh
+```
+
 ## MPW_MERGE (shuttle assembly)
 - `mpw_merge_check.rb`: KLayout batch script that compares one slot of an `MPW_MERGE`
   output with its original file. It walks the hierarchy cell by cell and compares

@@ -116,7 +116,10 @@ $(LIBRARY): $(LIB_OBJS)
 
 # --- Executable Builds ---
 # By linking against the library, we don't have to list out all objects again.
-MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a
+omp_target_stubs.o: omp_target_stubs.c
+	$(CC) -O2 -c $< -o $@
+
+MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a omp_target_stubs.o
 	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)
@@ -160,17 +163,29 @@ gpu_morton.o:	gpu_morton.cu
 	g++ -O3 -c -x c++ gpu_morton.cu
 glf90w.o: glf90w.F90
 	$(FC) -c -O3 -fpp -DGLF90W_USE_INTRINSIC_C_F_STRPOINTER glf90w.F90 -o $@
-GLFW_INC ?= $(GLFW_LIBDIR)/../include
+# GLFW header discovery: do not assume a system-wide GLFW (rhel8-A has none;
+# spark-bc08 / macOS do, which used to hide a wrong default path).
+# Order: explicit GLFW_INC, pkg-config glfw3, glf90w's bundled glfw source tree.
+ifeq ($(origin GLFW_INC),undefined)
+  GLFW_INC := $(patsubst -I%,%,$(filter -I%,$(shell pkg-config --cflags glfw3 2>/dev/null)))
+  ifeq ($(GLFW_INC),)
+    GLFW_INC := $(firstword $(wildcard $(GLFW_LIBDIR)/../glfw/include $(GLFW_LIBDIR)/../include))
+  endif
+endif
 viewer_gl.o: viewer_gl.c
-	gcc -c -O2 -I$(GLFW_INC) viewer_gl.c -o $@
+	@for d in $(GLFW_INC) /usr/include /usr/local/include; do \
+	   [ -f $$d/GLFW/glfw3.h ] && exit 0; done; \
+	 echo "ERROR: GLFW/glfw3.h not found (GLFW_INC='$(GLFW_INC)')."; \
+	 echo "       Set GLFW_INC=<dir containing GLFW/glfw3.h> or GLFW_LIBDIR=<glfw build dir>."; exit 1
+	gcc -c -O2 $(addprefix -I,$(GLFW_INC)) viewer_gl.c -o $@
 viewer_font.o: viewer_font.f90
 	$(FC) -c -O2 viewer_font.f90 -o $@
 test_layout_files.exe: test_layout_files.f90 viewer_tiles.o $(LIBRARY) db/liblayoutdb.a
 	$(LINKER_FC) $(FCFLAGS) test_layout_files.f90 viewer_tiles.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
 viewer_tiles.o: viewer_tiles.f90 $(LIBRARY)
 	$(FC) $(FCFLAGS) -c viewer_tiles.f90 -o $@
-MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o viewer_tiles.o db/liblayoutdb.a
-	$(LINKER_FC) $(FCFLAGS) magviewer.f90 viewer_font.o viewer_tiles.o $(LIBRARY) viewer_gl.o -L$(GLFW_LIBDIR) -Wl,-rpath,$(GLFW_LIBDIR) -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
+MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o viewer_tiles.o db/liblayoutdb.a omp_target_stubs.o
+	$(LINKER_FC) $(FCFLAGS) magviewer.f90 viewer_font.o viewer_tiles.o $(LIBRARY) viewer_gl.o omp_target_stubs.o -L$(GLFW_LIBDIR) -Wl,-rpath,$(GLFW_LIBDIR) -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
        
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe MAGVIEWER.exe
 

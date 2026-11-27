@@ -14,7 +14,7 @@ program test_predicates
   use WideIntModule
   use ExactPredicatesModule
   implicit none
-#if defined(__GFORTRAN__) || defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
+#if defined(__GFORTRAN__)
 #define HAVE_INT128 1
   integer, parameter :: ik = selected_int_kind(38)
 #else

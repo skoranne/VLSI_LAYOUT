@@ -209,7 +209,7 @@ contains
          !> BuildTree may re-sort the boxes: polygon numbers and the index are rebuilt after it.
          do iter = 1, 3
             if( L%n_used == 0 .or. .not. NeedsRTree( L ) ) exit
-            call L%unmark( LAYER_STATE_PNUM )
+            call LayerUnmark( L, LAYER_STATE_PNUM )
             call BuildTree( L )
             call LayerEnsureProperties( L, connect_records(rec)%specs(k)%s )
          end do

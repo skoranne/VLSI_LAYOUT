@@ -25,21 +25,33 @@ contains
     nB = input_layer_B%n_used
     nTot = nA + nB
 
-    if( allocated( output_layer%layer_boxes ) ) deallocate( output_layer%layer_boxes )
-    if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
-    if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )
-    output_layer%tree%root_index = 0
-    output_layer%device_resident = .false.
-
     if( nTot == 0 ) then
        call ClearLayer( output_layer )
        return
     end if
 
-    allocate( output_layer%layer_boxes( nTot ), stat=alloc_status )
-    if( alloc_status /= 0 ) error stop "ALLOCATION FAILED in CalculateOR"
-    if( nA > 0 ) output_layer%layer_boxes(1:nA) = input_layer_A%layer_boxes(1:nA)
-    if( nB > 0 ) output_layer%layer_boxes(nA+1:nTot) = input_layer_B%layer_boxes(1:nB)
+    !> Gather into a local array first: the output may be the same layer as A or B
+    !> (`X = X + Y`), so it must not be freed before the inputs are read. Explicit
+    !> loops: the array-section assignments made ifx build a stack temporary of the
+    !> whole layer (the same pattern overflowed the 8 MB stack in the edge selectors).
+    block
+      type(Box), allocatable :: merged(:)
+      integer(kind=int64) :: k
+      allocate( merged( nTot ), stat=alloc_status )
+      if( alloc_status /= 0 ) error stop "ALLOCATION FAILED in CalculateOR"
+      do k = 1, nA
+         merged(k) = input_layer_A%layer_boxes(k)
+      end do
+      do k = 1, nB
+         merged(nA + k) = input_layer_B%layer_boxes(k)
+      end do
+      call LayerDeviceRelease( output_layer )
+      if( allocated( output_layer%tree%tree_nodes ) ) deallocate( output_layer%tree%tree_nodes )
+      if( allocated( output_layer%pnumtable%arr ) ) deallocate( output_layer%pnumtable%arr )
+      output_layer%tree%root_index = 0
+      output_layer%device_resident = .false.
+      call move_alloc( from=merged, to=output_layer%layer_boxes )
+    end block
     output_layer%n_used = nTot
     output_layer%n_alloc = nTot
     output_layer%layerState = LAYER_STATE_NONE
@@ -267,7 +279,7 @@ contains
        bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
        call generate_trackers( input_layer_B%layer_boxes(1:input_layer_B%n_used), bboxA, trackers )
        call scanline_fracture(trackers, temp_layer%layer_boxes)
-       call temp_layer%mark( LAYER_STATE_HEAL )
+       call LayerMark( temp_layer, LAYER_STATE_HEAL )
        temp_layer%n_used = size( temp_layer%layer_boxes, kind=int64 )
        temp_layer%n_alloc = temp_layer%n_used
        call CalculateAND( input_layer_A, temp_layer, output_layer )
@@ -312,7 +324,7 @@ contains
 
     if (num_boxesA == 0) then
        call ClearLayer(output_layer)
-       call output_layer%mark( LAYER_STATE_HEAL )
+       call LayerMark( output_layer, LAYER_STATE_HEAL )
        if (profiling_enabled) call RecordTime("CalculateNOT", get_cpu_time() - t_start)
        return
     end if

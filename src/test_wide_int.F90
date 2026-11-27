@@ -11,7 +11,7 @@ program test_wide_int
   use, intrinsic :: iso_fortran_env, only: int32, int64, real64
   use WideIntModule
   implicit none
-#if defined(__GFORTRAN__) || defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
+#if defined(__GFORTRAN__)
 #define HAVE_INT128 1
   integer, parameter :: ik16 = selected_int_kind(38)
 #endif

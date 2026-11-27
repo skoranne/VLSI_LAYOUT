@@ -112,6 +112,22 @@ module FASCLModule
      type(PropValue), allocatable :: v(:)
   end type ValueColumn
 
+  !> Plain POD runtime value (no allocatable components) so ifx does not emit
+  !> static global RTTI/finalizer descriptor writes on every AST node inside
+  !> the OpenMP polygon loop. STRING, STRUCT and ERROR payloads live in a
+  !> thread-local ExtPool slot indexed by `ext` (> 0).
+  type :: FastVal
+     integer        :: kind = PV_NONE
+     integer(int64) :: i = 0
+     real(real64)   :: r = 0.0_real64
+     integer        :: ext = 0
+  end type FastVal
+
+  type :: ExtPool
+     type(PropValue), allocatable :: items(:)
+     integer :: n = 0
+  end type ExtPool
+
 contains
 
   !=================================================================
@@ -839,34 +855,276 @@ contains
   end function arity
 
   !=================================================================
-  ! Evaluator
+  ! ExtPool helpers (cold path: STRING / STRUCT / ERROR only)
   !=================================================================
-  pure function err( m ) result(v)
-    character(len=*), intent(in) :: m
-    type(PropValue) :: v
-    v%kind = PV_ERROR
-    v%s = m
-  end function err
+  function ext_alloc( pool ) result(idx)
+    type(ExtPool), intent(inout) :: pool
+    integer :: idx, new_cap, j
+    type(PropValue), allocatable :: tmp(:)
+    if( .not. allocated( pool%items ) ) then
+       allocate( pool%items(16) )
+    else if( pool%n >= size( pool%items ) ) then
+       new_cap = size( pool%items ) * 2
+       allocate( tmp(new_cap) )
+       do j = 1, pool%n
+          tmp(j) = pool%items(j)
+       end do
+       call move_alloc( tmp, pool%items )
+    end if
+    pool%n = pool%n + 1
+    idx = pool%n
+    pool%items(idx)%kind = PV_NONE
+    pool%items(idx)%i = 0
+    pool%items(idx)%r = 0.0_real64
+    if( allocated( pool%items(idx)%s ) ) deallocate( pool%items(idx)%s )
+    if( allocated( pool%items(idx)%f ) ) deallocate( pool%items(idx)%f )
+  end function ext_alloc
 
+  function ext_err( pool, m ) result(v)
+    type(ExtPool), intent(inout) :: pool
+    character(len=*), intent(in) :: m
+    type(FastVal) :: v
+    integer :: idx
+    idx = ext_alloc( pool )
+    pool%items(idx)%kind = PV_ERROR
+    pool%items(idx)%s = m
+    v = FastVal( PV_ERROR, 0_int64, 0.0_real64, idx )
+  end function ext_err
+
+  function ext_str( pool, s ) result(v)
+    type(ExtPool), intent(inout) :: pool
+    character(len=*), intent(in) :: s
+    type(FastVal) :: v
+    integer :: idx
+    idx = ext_alloc( pool )
+    pool%items(idx)%kind = PV_STRING
+    pool%items(idx)%s = s
+    v = FastVal( PV_STRING, 0_int64, 0.0_real64, idx )
+  end function ext_str
+
+  function ext_from_prop( pool, pv ) result(v)
+    type(ExtPool), intent(inout) :: pool
+    type(PropValue), intent(in) :: pv
+    type(FastVal) :: v
+    integer :: idx
+    select case( pv%kind )
+    case( PV_NONE );  v = FastVal( PV_NONE,  0_int64, 0.0_real64, 0 )
+    case( PV_INT );   v = FastVal( PV_INT,   pv%i,    0.0_real64, 0 )
+    case( PV_FLOAT ); v = FastVal( PV_FLOAT, 0_int64, pv%r,       0 )
+    case default
+       idx = ext_alloc( pool )
+       pool%items(idx) = pv
+       v = FastVal( pv%kind, pv%i, pv%r, idx )
+    end select
+  end function ext_from_prop
+
+  subroutine ext_to_prop( pool, fv, pv )
+    type(ExtPool), intent(in) :: pool
+    type(FastVal), intent(in) :: fv
+    type(PropValue), intent(inout) :: pv
+    if( fv%ext > 0 ) then
+       pv = pool%items( fv%ext )
+    else
+       pv%kind = fv%kind
+       pv%i    = fv%i
+       pv%r    = fv%r
+    end if
+  end subroutine ext_to_prop
+
+  function ext_to_string_val( pool, a ) result(s)
+    type(ExtPool), intent(in) :: pool
+    type(FastVal), intent(in) :: a
+    character(len=:), allocatable :: s
+    type(PropValue) :: pv
+    if( a%ext > 0 ) then
+       s = PropValueToString( pool%items( a%ext ) )
+    else
+       pv%kind = a%kind; pv%i = a%i; pv%r = a%r
+       s = PropValueToString( pv )
+    end if
+  end function ext_to_string_val
+
+  function ext_binop_str( code, a, b, pool ) result(v)
+    integer, intent(in) :: code
+    type(FastVal), intent(in) :: a, b
+    type(ExtPool), intent(inout) :: pool
+    type(FastVal) :: v
+    logical :: r
+    if( code == B_ADD ) then
+       v = ext_str( pool, ext_to_string_val( pool, a ) // ext_to_string_val( pool, b ) )
+       return
+    end if
+    if( a%kind == PV_STRING .and. b%kind == PV_STRING ) then
+       select case( code )
+       case( B_EQ ); r = pool%items(a%ext)%s == pool%items(b%ext)%s
+       case( B_NE ); r = pool%items(a%ext)%s /= pool%items(b%ext)%s
+       case( B_LT ); r = llt( pool%items(a%ext)%s, pool%items(b%ext)%s )
+       case( B_LE ); r = lle( pool%items(a%ext)%s, pool%items(b%ext)%s )
+       case( B_GT ); r = lgt( pool%items(a%ext)%s, pool%items(b%ext)%s )
+       case( B_GE ); r = lge( pool%items(a%ext)%s, pool%items(b%ext)%s )
+       case default
+          v = ext_err( pool, 'operator not defined on STRING' ); return
+       end select
+       v = ival( merge( 1_int64, 0_int64, r ) ); return
+    end if
+    v = ext_err( pool, 'operator mixes STRING and number' )
+  end function ext_binop_str
+
+  function ext_field_get( pool, a_ext, fname ) result(v)
+    type(ExtPool), intent(inout) :: pool
+    integer, intent(in) :: a_ext
+    character(len=*), intent(in) :: fname
+    type(FastVal) :: v
+    integer :: j, idx
+    do j = 1, size( pool%items(a_ext)%f )
+       if( pool%items(a_ext)%f(j)%name == fname ) then
+          select case( pool%items(a_ext)%f(j)%kind )
+          case( PV_INT )
+             v = ival( pool%items(a_ext)%f(j)%i )
+          case( PV_FLOAT )
+             v = rval( pool%items(a_ext)%f(j)%r )
+          case( PV_STRING )
+             if( allocated( pool%items(a_ext)%f(j)%s ) ) then
+                v = ext_str( pool, pool%items(a_ext)%f(j)%s )
+             else
+                v = ext_str( pool, '' )
+             end if
+          case default
+             idx = ext_alloc( pool )
+             pool%items(idx)%kind = pool%items(a_ext)%f(j)%kind
+             pool%items(idx)%i    = pool%items(a_ext)%f(j)%i
+             pool%items(idx)%r    = pool%items(a_ext)%f(j)%r
+             if( allocated( pool%items(a_ext)%f(j)%s ) ) pool%items(idx)%s = pool%items(a_ext)%f(j)%s
+             v = FastVal( pool%items(idx)%kind, pool%items(idx)%i, pool%items(idx)%r, idx )
+          end select
+          return
+       end if
+    end do
+    v = ext_err( pool, 'STRUCT has no field '//fname )
+  end function ext_field_get
+
+  function ext_eval_prop( t, col, fname, is_field, ord, pool ) result(v)
+    type(PropertyTable), intent(in) :: t
+    integer, intent(in) :: col
+    character(len=*), intent(in) :: fname
+    logical, intent(in) :: is_field
+    integer(int64), intent(in) :: ord
+    type(ExtPool), intent(inout) :: pool
+    type(FastVal) :: v
+    type(PropValue) :: pv
+    if( is_field ) then
+       pv = PropGetField( t, col, fname, ord )
+    else
+       pv = PropGetValue( t, col, ord )
+    end if
+    if( pv%kind == PV_NONE ) then
+       v = ext_err( pool, 'property '//t%cols(col)%name//' has no value on this polygon' )
+    else
+       v = ext_from_prop( pool, pv )
+    end if
+  end function ext_eval_prop
+
+  function ext_parse_int( pool, a ) result(v)
+    type(ExtPool), intent(inout) :: pool
+    type(FastVal), intent(in) :: a
+    type(FastVal) :: v
+    integer(int64) :: iv
+    integer :: ios
+    iv = 0_int64
+    read( pool%items(a%ext)%s, *, iostat=ios ) iv
+    if( ios /= 0 ) then
+       v = ext_err( pool, 'INT: cannot convert "'//pool%items(a%ext)%s//'"' )
+    else
+       v = ival( iv )
+    end if
+  end function ext_parse_int
+
+  function ext_parse_float( pool, a ) result(v)
+    type(ExtPool), intent(inout) :: pool
+    type(FastVal), intent(in) :: a
+    type(FastVal) :: v
+    real(real64) :: rv
+    integer :: ios
+    rv = 0.0_real64
+    read( pool%items(a%ext)%s, *, iostat=ios ) rv
+    if( ios /= 0 ) then
+       v = ext_err( pool, 'FLOAT: cannot convert "'//pool%items(a%ext)%s//'"' )
+    else
+       v = rval( rv )
+    end if
+  end function ext_parse_float
+
+  subroutine ext_fassign( pool, slot_val, slot_name, field_name, v, errv )
+    type(ExtPool), intent(inout) :: pool
+    type(FastVal), intent(inout) :: slot_val
+    character(len=*), intent(in) :: slot_name, field_name
+    type(FastVal), intent(in) :: v
+    type(FastVal), intent(inout) :: errv
+    type(PropField), allocatable :: tmp(:)
+    integer :: idx, j, n
+    if( v%kind == PV_STRUCT ) then
+       errv = ext_err( pool, 'STRUCT fields must be INT, FLOAT or STRING (no nesting)' ); return
+    end if
+    if( slot_val%kind /= PV_STRUCT ) then
+       if( slot_val%kind /= PV_NONE ) then
+          errv = ext_err( pool, slot_name//'.'//field_name//' = ... on a non-STRUCT value' ); return
+       end if
+       idx = ext_alloc( pool )
+       pool%items(idx)%kind = PV_STRUCT
+       allocate( pool%items(idx)%f(0) )
+       slot_val = FastVal( PV_STRUCT, 0_int64, 0.0_real64, idx )
+    else
+       idx = slot_val%ext
+    end if
+    associate( L => pool%items(idx) )
+      n = 0
+      do j = 1, size( L%f )
+         if( L%f(j)%name == field_name ) then
+            n = j; exit
+         end if
+      end do
+      if( n == 0 ) then
+         allocate( tmp( size(L%f) + 1 ) )
+         tmp(1:size(L%f)) = L%f
+         call move_alloc( tmp, L%f )
+         n = size( L%f )
+         L%f(n)%name = field_name
+      end if
+      L%f(n)%kind = v%kind; L%f(n)%i = v%i; L%f(n)%r = v%r
+      if( v%ext > 0 ) then
+         if( allocated( pool%items(v%ext)%s ) ) then
+            L%f(n)%s = pool%items(v%ext)%s
+         else if( allocated( L%f(n)%s ) ) then
+            deallocate( L%f(n)%s )
+         end if
+      else if( allocated( L%f(n)%s ) ) then
+         deallocate( L%f(n)%s )
+      end if
+    end associate
+  end subroutine ext_fassign
+
+  !=================================================================
+  ! Evaluator (hot path: strictly POD FastVal, zero allocatable locals)
+  !=================================================================
   pure function ival( i ) result(v)
     integer(int64), intent(in) :: i
-    type(PropValue) :: v
-    v%kind = PV_INT; v%i = i
+    type(FastVal) :: v
+    v = FastVal( PV_INT, i, 0.0_real64, 0 )
   end function ival
 
   pure function rval( r ) result(v)
     real(real64), intent(in) :: r
-    type(PropValue) :: v
-    v%kind = PV_FLOAT; v%r = r
+    type(FastVal) :: v
+    v = FastVal( PV_FLOAT, 0_int64, r, 0 )
   end function rval
 
   pure logical function is_num( v )
-    type(PropValue), intent(in) :: v
+    type(FastVal), intent(in) :: v
     is_num = v%kind == PV_INT .or. v%kind == PV_FLOAT
   end function is_num
 
   pure real(real64) function as_real( v )
-    type(PropValue), intent(in) :: v
+    type(FastVal), intent(in) :: v
     if( v%kind == PV_INT ) then
        as_real = real( v%i, real64 )
     else
@@ -874,192 +1132,174 @@ contains
     end if
   end function as_real
 
-  pure logical function truthy( v )
-    type(PropValue), intent(in) :: v
+  pure logical function truthy( v, pool )
+    type(FastVal), intent(in) :: v
+    type(ExtPool), intent(in) :: pool
     select case( v%kind )
     case( PV_INT );    truthy = v%i /= 0
     case( PV_FLOAT );  truthy = v%r /= 0.0_real64
-    case( PV_STRING ); truthy = len( v%s ) > 0
+    case( PV_STRING ); truthy = len( pool%items(v%ext)%s ) > 0
     case( PV_STRUCT ); truthy = .true.
     case default;      truthy = .false.
     end select
   end function truthy
 
   !> Polygon ordinal of an id-valued argument (0 + error value when invalid).
-  function ord_of( t, v, e ) result(ord)
+  function ord_of( t, v, e, pool ) result(ord)
     type(PropertyTable), intent(in) :: t
-    type(PropValue), intent(in) :: v
-    type(PropValue), intent(inout) :: e
+    type(FastVal), intent(in) :: v
+    type(FastVal), intent(inout) :: e
+    type(ExtPool), intent(inout) :: pool
     integer(int64) :: ord
     ord = 0
     if( v%kind /= PV_INT ) then
-       e = err( 'polygon id must be an INT' ); return
+       e = ext_err( pool, 'polygon id must be an INT' ); return
     end if
     ord = PropOrdinalOfId( t, v%i )
-    if( ord == 0 ) e = err( 'not a polygon id of this layer' )
+    if( ord == 0 ) e = ext_err( pool, 'not a polygon id of this layer' )
   end function ord_of
 
-  recursive function eval( lam, k, ids, locals, t ) result(v)
+  recursive function eval( lam, k, ids, locals, t, pool ) result(v)
     type(Lambda), intent(in) :: lam
     integer, intent(in) :: k
     integer(int64), intent(in) :: ids(*)   ! assumed size: nvfortran 26.1 lost the assumed-shape descriptor in this recursion
-    type(PropValue), intent(in) :: locals(:)
+    type(FastVal), intent(in) :: locals(:)
     type(PropertyTable), intent(in) :: t
-    type(PropValue) :: v, a, b, c
+    type(ExtPool), intent(inout) :: pool
+    type(FastVal) :: v, a, b, c
     integer(int64) :: ord
-    integer :: j
     ! no associate here: nvfortran 26.1 keeps the associate name of a recursive function in
     ! static storage, so nested calls overwrote it (wrong operands after the first recursion)
-      select case( lam%nodes(k)%op )
-      case( N_INT );   v = ival( lam%nodes(k)%iv )
-      case( N_FLT );   v = rval( lam%nodes(k)%rv )
-      case( N_STR );   v%kind = PV_STRING; v%s = lam%nodes(k)%sv
-      case( N_PARAM ); v = ival( ids(lam%nodes(k)%slot) )
-      case( N_LOCAL )
-         v = locals( lam%nodes(k)%slot )
-         if( v%kind == PV_NONE ) v = err( lam%slots(lam%nodes(k)%slot)%s//' used before it is assigned' )
-      case( N_NEG )
-         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
-         select case( a%kind )
-         case( PV_INT );   v = ival( -a%i )
-         case( PV_FLOAT ); v = rval( -a%r )
-         case( PV_ERROR ); v = a
-         case default;     v = err( 'unary - needs a number' )
-         end select
-      case( N_NOT )
-         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
-         if( a%kind == PV_ERROR ) then
-            v = a
-         else
-            v = ival( merge( 0_int64, 1_int64, truthy( a ) ) )
-         end if
-      case( N_BIN )
-         if( lam%nodes(k)%fn == B_AND .or. lam%nodes(k)%fn == B_OR ) then
-            a = eval( lam, lam%nodes(k)%a, ids, locals, t )
-            if( a%kind == PV_ERROR ) then
-               v = a; return
-            end if
-            if( lam%nodes(k)%fn == B_AND .and. .not. truthy( a ) ) then
-               v = ival( 0_int64 ); return
-            end if
-            if( lam%nodes(k)%fn == B_OR .and. truthy( a ) ) then
-               v = ival( 1_int64 ); return
-            end if
-            b = eval( lam, lam%nodes(k)%b, ids, locals, t )
-            if( b%kind == PV_ERROR ) then
-               v = b
-            else
-               v = ival( merge( 1_int64, 0_int64, truthy( b ) ) )
-            end if
-            return
-         end if
-         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
-         if( a%kind == PV_ERROR ) then
-            v = a; return
-         end if
-         b = eval( lam, lam%nodes(k)%b, ids, locals, t )
-         if( b%kind == PV_ERROR ) then
-            v = b; return
-         end if
-         v = binop( lam%nodes(k)%fn, a, b )
-      case( N_STRUCT )
-         v = eval_struct( lam, k, ids, locals, t )
-      case( N_FIELD )
-         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
-         if( a%kind == PV_ERROR ) then
-            v = a; return
-         end if
-         if( a%kind /= PV_STRUCT ) then
-            v = err( '.'//lam%nodes(k)%sv//' applied to a non-STRUCT value' ); return
-         end if
-         v = err( 'STRUCT has no field '//lam%nodes(k)%sv )
-         do j = 1, size( a%f )
-            if( a%f(j)%name == lam%nodes(k)%sv ) then
-               v = PropValue()
-               v%kind = a%f(j)%kind; v%i = a%f(j)%i; v%r = a%f(j)%r
-               if( allocated( a%f(j)%s ) ) v%s = a%f(j)%s
-               exit
-            end if
-         end do
-      case( N_PROP, N_PROPF )
-         a = eval( lam, lam%nodes(k)%a, ids, locals, t )
-         if( a%kind == PV_ERROR ) then
-            v = a; return
-         end if
-         c = PropValue()
-         ord = ord_of( t, a, c )
-         if( c%kind == PV_ERROR ) then
-            v = c; return
-         end if
-         if( lam%nodes(k)%op == N_PROP ) then
-            v = PropGetValue( t, lam%nodes(k)%col, ord )
-         else
-            v = PropGetField( t, lam%nodes(k)%col, lam%nodes(k)%sv, ord )
-         end if
-         if( v%kind == PV_NONE ) v = err( 'property '//t%cols(lam%nodes(k)%col)%name//' has no value on this polygon' )
-      case( N_CALL )
-         v = call_builtin( lam, lam%nodes(k), ids, locals, t )
-      case default
-         v = err( 'internal: bad node' )
-      end select
+    select case( lam%nodes(k)%op )
+    case( N_INT );   v = ival( lam%nodes(k)%iv )
+    case( N_FLT );   v = rval( lam%nodes(k)%rv )
+    case( N_STR );   v = ext_str( pool, lam%nodes(k)%sv )
+    case( N_PARAM ); v = ival( ids(lam%nodes(k)%slot) )
+    case( N_LOCAL )
+       v = locals( lam%nodes(k)%slot )
+       if( v%kind == PV_NONE ) v = ext_err( pool, lam%slots(lam%nodes(k)%slot)%s//' used before it is assigned' )
+    case( N_NEG )
+       a = eval( lam, lam%nodes(k)%a, ids, locals, t, pool )
+       select case( a%kind )
+       case( PV_INT );   v = ival( -a%i )
+       case( PV_FLOAT ); v = rval( -a%r )
+       case( PV_ERROR ); v = a
+       case default;     v = ext_err( pool, 'unary - needs a number' )
+       end select
+    case( N_NOT )
+       a = eval( lam, lam%nodes(k)%a, ids, locals, t, pool )
+       if( a%kind == PV_ERROR ) then
+          v = a
+       else
+          v = ival( merge( 0_int64, 1_int64, truthy( a, pool ) ) )
+       end if
+    case( N_BIN )
+       if( lam%nodes(k)%fn == B_AND .or. lam%nodes(k)%fn == B_OR ) then
+          a = eval( lam, lam%nodes(k)%a, ids, locals, t, pool )
+          if( a%kind == PV_ERROR ) then
+             v = a; return
+          end if
+          if( lam%nodes(k)%fn == B_AND .and. .not. truthy( a, pool ) ) then
+             v = ival( 0_int64 ); return
+          end if
+          if( lam%nodes(k)%fn == B_OR .and. truthy( a, pool ) ) then
+             v = ival( 1_int64 ); return
+          end if
+          b = eval( lam, lam%nodes(k)%b, ids, locals, t, pool )
+          if( b%kind == PV_ERROR ) then
+             v = b
+          else
+             v = ival( merge( 1_int64, 0_int64, truthy( b, pool ) ) )
+          end if
+          return
+       end if
+       a = eval( lam, lam%nodes(k)%a, ids, locals, t, pool )
+       if( a%kind == PV_ERROR ) then
+          v = a; return
+       end if
+       b = eval( lam, lam%nodes(k)%b, ids, locals, t, pool )
+       if( b%kind == PV_ERROR ) then
+          v = b; return
+       end if
+       v = binop( lam%nodes(k)%fn, a, b, pool )
+    case( N_STRUCT )
+       v = eval_struct( lam, k, ids, locals, t, pool )
+    case( N_FIELD )
+       a = eval( lam, lam%nodes(k)%a, ids, locals, t, pool )
+       if( a%kind == PV_ERROR ) then
+          v = a; return
+       end if
+       if( a%kind /= PV_STRUCT ) then
+          v = ext_err( pool, '.'//lam%nodes(k)%sv//' applied to a non-STRUCT value' ); return
+       end if
+       v = ext_field_get( pool, a%ext, lam%nodes(k)%sv )
+    case( N_PROP, N_PROPF )
+       a = eval( lam, lam%nodes(k)%a, ids, locals, t, pool )
+       if( a%kind == PV_ERROR ) then
+          v = a; return
+       end if
+       c = FastVal()
+       ord = ord_of( t, a, c, pool )
+       if( c%kind == PV_ERROR ) then
+          v = c; return
+       end if
+       v = ext_eval_prop( t, lam%nodes(k)%col, lam%nodes(k)%sv, lam%nodes(k)%op == N_PROPF, ord, pool )
+    case( N_CALL )
+       v = call_builtin( lam, lam%nodes(k), ids, locals, t, pool )
+    case default
+       v = ext_err( pool, 'internal: bad node' )
+    end select
   end function eval
 
   ! STRUCT constructor, outside eval's associate block (nvfortran 26.1 ICE: "args$sd1 is an
   ! inconsistent array descriptor" on an allocatable component through the associate name).
-  recursive function eval_struct( lam, k, ids, locals, t ) result(v)
+  recursive function eval_struct( lam, k, ids, locals, t, pool ) result(v)
     type(Lambda), intent(in) :: lam
     integer, intent(in) :: k
     integer(int64), intent(in) :: ids(*)   ! assumed size: nvfortran 26.1 lost the assumed-shape descriptor in this recursion
-    type(PropValue), intent(in) :: locals(:)
+    type(FastVal), intent(in) :: locals(:)
     type(PropertyTable), intent(in) :: t
-    type(PropValue) :: v, a
+    type(ExtPool), intent(inout) :: pool
+    type(FastVal) :: v, a
     integer, allocatable :: args(:)
-    integer :: j
+    integer :: j, idx
     args = lam%nodes(k)%args
-    v%kind = PV_STRUCT
-    allocate( v%f( size(args) ) )
+    idx = ext_alloc( pool )
+    pool%items(idx)%kind = PV_STRUCT
+    allocate( pool%items(idx)%f( size(args) ) )
     do j = 1, size( args )
-       a = eval( lam, args(j), ids, locals, t )
+       a = eval( lam, args(j), ids, locals, t, pool )
        if( a%kind == PV_ERROR ) then
           v = a; return
        end if
        if( a%kind == PV_STRUCT ) then
-          v = err( 'STRUCT fields must be INT, FLOAT or STRING (no nesting)' ); return
+          v = ext_err( pool, 'STRUCT fields must be INT, FLOAT or STRING (no nesting)' ); return
        end if
-       v%f(j)%name = lam%nodes(k)%names(j)%s
-       v%f(j)%kind = a%kind; v%f(j)%i = a%i; v%f(j)%r = a%r
-       if( allocated( a%s ) ) v%f(j)%s = a%s
+       pool%items(idx)%f(j)%name = lam%nodes(k)%names(j)%s
+       pool%items(idx)%f(j)%kind = a%kind
+       pool%items(idx)%f(j)%i    = a%i
+       pool%items(idx)%f(j)%r    = a%r
+       if( a%ext > 0 ) then
+          if( allocated( pool%items(a%ext)%s ) ) pool%items(idx)%f(j)%s = pool%items(a%ext)%s
+       end if
     end do
+    v = FastVal( PV_STRUCT, 0_int64, 0.0_real64, idx )
   end function eval_struct
 
-  function binop( code, a, b ) result(v)
+  function binop( code, a, b, pool ) result(v)
     integer, intent(in) :: code
-    type(PropValue), intent(in) :: a, b
-    type(PropValue) :: v
+    type(FastVal), intent(in) :: a, b
+    type(ExtPool), intent(inout) :: pool
+    type(FastVal) :: v
     logical :: both_int, r
     if( a%kind == PV_STRUCT .or. b%kind == PV_STRUCT ) then
-       v = err( 'operators do not apply to STRUCT values' ); return
+       v = ext_err( pool, 'operators do not apply to STRUCT values' ); return
     end if
-    if( code == B_ADD .and. ( a%kind == PV_STRING .or. b%kind == PV_STRING ) ) then
-       v%kind = PV_STRING
-       v%s = PropValueToString( a ) // PropValueToString( b )
-       return
-    end if
-    if( a%kind == PV_STRING .and. b%kind == PV_STRING ) then
-       select case( code )
-       case( B_EQ ); r = a%s == b%s
-       case( B_NE ); r = a%s /= b%s
-       case( B_LT ); r = llt( a%s, b%s )
-       case( B_LE ); r = lle( a%s, b%s )
-       case( B_GT ); r = lgt( a%s, b%s )
-       case( B_GE ); r = lge( a%s, b%s )
-       case default
-          v = err( 'operator not defined on STRING' ); return
-       end select
-       v = ival( merge( 1_int64, 0_int64, r ) ); return
+    if( a%kind == PV_STRING .or. b%kind == PV_STRING ) then
+       v = ext_binop_str( code, a, b, pool ); return
     end if
     if( .not. ( is_num( a ) .and. is_num( b ) ) ) then
-       v = err( 'operator mixes STRING and number' ); return
+       v = ext_err( pool, 'operator mixes STRING and number' ); return
     end if
     both_int = a%kind == PV_INT .and. b%kind == PV_INT
     select case( code )
@@ -1083,27 +1323,19 @@ contains
        end if
     case( B_DIV )
        if( as_real(b) == 0.0_real64 ) then
-          v = err( 'division by zero' )
+          v = ext_err( pool, 'division by zero' )
        else
           v = rval( as_real(a) / as_real(b) )
        end if
     case( B_MOD )
        if( .not. both_int ) then
-          v = err( '% needs INT operands' )
+          v = ext_err( pool, '% needs INT operands' )
        else if( b%i == 0 ) then
-          v = err( 'modulo by zero' )
+          v = ext_err( pool, 'modulo by zero' )
        else
           v = ival( modulo( a%i, b%i ) )
        end if
     case default
-       select case( code )
-       case( B_EQ ); r = as_real(a) == as_real(b)
-       case( B_NE ); r = as_real(a) /= as_real(b)
-       case( B_LT ); r = as_real(a) <  as_real(b)
-       case( B_LE ); r = as_real(a) <= as_real(b)
-       case( B_GT ); r = as_real(a) >  as_real(b)
-       case( B_GE ); r = as_real(a) >= as_real(b)
-       end select
        if( both_int ) then
           select case( code )
           case( B_EQ ); r = a%i == b%i
@@ -1113,37 +1345,46 @@ contains
           case( B_GT ); r = a%i >  b%i
           case( B_GE ); r = a%i >= b%i
           end select
+       else
+          select case( code )
+          case( B_EQ ); r = as_real(a) == as_real(b)
+          case( B_NE ); r = as_real(a) /= as_real(b)
+          case( B_LT ); r = as_real(a) <  as_real(b)
+          case( B_LE ); r = as_real(a) <= as_real(b)
+          case( B_GT ); r = as_real(a) >  as_real(b)
+          case( B_GE ); r = as_real(a) >= as_real(b)
+          end select
        end if
        v = ival( merge( 1_int64, 0_int64, r ) )
     end select
   end function binop
 
-  recursive function call_builtin( lam, nd, ids, locals, t ) result(v)
+  recursive function call_builtin( lam, nd, ids, locals, t, pool ) result(v)
     type(Lambda), intent(in) :: lam
     type(Node), intent(in) :: nd
     integer(int64), intent(in) :: ids(*)   ! assumed size: nvfortran 26.1 lost the assumed-shape descriptor in this recursion
-    type(PropValue), intent(in) :: locals(:)
+    type(FastVal), intent(in) :: locals(:)
     type(PropertyTable), intent(in) :: t
-    type(PropValue) :: v, a, b, e
+    type(ExtPool), intent(inout) :: pool
+    type(FastVal) :: v, a, b, e
     integer(int64) :: ord
-    integer :: ios
     if( nd%fn == F_IF ) then
-       a = eval( lam, nd%args(1), ids, locals, t )
+       a = eval( lam, nd%args(1), ids, locals, t, pool )
        if( a%kind == PV_ERROR ) then
           v = a
-       else if( truthy( a ) ) then
-          v = eval( lam, nd%args(2), ids, locals, t )
+       else if( truthy( a, pool ) ) then
+          v = eval( lam, nd%args(2), ids, locals, t, pool )
        else
-          v = eval( lam, nd%args(3), ids, locals, t )
+          v = eval( lam, nd%args(3), ids, locals, t, pool )
        end if
        return
     end if
-    a = eval( lam, nd%args(1), ids, locals, t )
+    a = eval( lam, nd%args(1), ids, locals, t, pool )
     if( a%kind == PV_ERROR ) then
        v = a; return
     end if
     if( size( nd%args ) > 1 ) then
-       b = eval( lam, nd%args(2), ids, locals, t )
+       b = eval( lam, nd%args(2), ids, locals, t, pool )
        if( b%kind == PV_ERROR ) then
           v = b; return
        end if
@@ -1151,8 +1392,8 @@ contains
     select case( nd%fn )
     case( F_PNUM, F_PID, F_AREA, F_NBOX, F_BX1, F_BY1, F_BX2, F_BY2, F_BW, F_BH, &
           F_PERIM, F_NVERT, F_LEDIR, F_LELEN, F_LEW, F_NET, F_NETNAME )
-       e = PropValue()
-       ord = ord_of( t, a, e )
+       e = FastVal()
+       ord = ord_of( t, a, e, pool )
        if( e%kind == PV_ERROR ) then
           v = e; return
        end if
@@ -1178,163 +1419,125 @@ contains
        case( F_BH );   v = ival( int( t%bbox(ord)%y2, int64 ) - int( t%bbox(ord)%y1, int64 ) )
        case( F_PERIM, F_NVERT, F_LEDIR, F_LELEN, F_LEW )
           if( .not. allocated( t%perim ) ) then
-             v = err( 'outline measures not computed' ); return
+             v = ext_err( pool, 'outline measures not computed' ); return
           end if
           select case( nd%fn )
           case( F_PERIM ); v = ival( t%perim(ord) )
           case( F_NVERT )
              if( t%nvert(ord) < 0 ) then
-                v = err( 'VERTICES: outline could not be traced' )
+                v = ext_err( pool, 'VERTICES: outline could not be traced' )
              else
                 v = ival( t%nvert(ord) )
              end if
           case( F_LEW, F_LELEN, F_LEDIR )
              if( t%anyangle ) then
-                v = err( 'LINE_END_*: not defined for any-angle polygons' ); return
+                v = ext_err( pool, 'LINE_END_*: not defined for any-angle polygons' ); return
              end if
           end select
           select case( nd%fn )
           case( F_LEW );   v = ival( t%le_w(ord) )
           case( F_LELEN ); v = ival( t%le_len(ord) )
           case( F_LEDIR )
-             v%kind = PV_STRING
              select case( int( t%le_dir(ord) ) )
-             case( 0 ); v%s = 'E'
-             case( 1 ); v%s = 'N'
-             case( 2 ); v%s = 'W'
-             case( 3 ); v%s = 'S'
-             case default; v%s = ''
+             case( 0 ); v = ext_str( pool, 'E' )
+             case( 1 ); v = ext_str( pool, 'N' )
+             case( 2 ); v = ext_str( pool, 'W' )
+             case( 3 ); v = ext_str( pool, 'S' )
+             case default; v = ext_str( pool, '' )
              end select
           end select
        case( F_NET )
           if( .not. allocated( t%net ) ) then
-             v = err( 'NET_ID: layer is not part of a CONNECT' ); return
+             v = ext_err( pool, 'NET_ID: layer is not part of a CONNECT' ); return
           end if
           v = ival( t%net(ord) )
        case( F_NETNAME )
           if( .not. allocated( t%net ) ) then
-             v = err( 'NET_NAME: layer is not part of a CONNECT' ); return
+             v = ext_err( pool, 'NET_NAME: layer is not part of a CONNECT' ); return
           end if
-          v%kind = PV_STRING
-          v%s = PropNetName( t%net_rec, t%net(ord) )
+          v = ext_str( pool, PropNetName( t%net_rec, t%net(ord) ) )
        end select
     case( F_INT )
        select case( a%kind )
        case( PV_INT );    v = a
        case( PV_FLOAT );  v = ival( int( a%r, int64 ) )
-       case( PV_STRING )
-          v = ival( 0_int64 )
-          read( a%s, *, iostat=ios ) v%i
-          if( ios /= 0 ) v = err( 'INT: cannot convert "'//a%s//'"' )
-       case default;      v = err( 'INT: bad argument' )
+       case( PV_STRING ); v = ext_parse_int( pool, a )
+       case default;      v = ext_err( pool, 'INT: bad argument' )
        end select
     case( F_FLOAT )
        select case( a%kind )
        case( PV_INT, PV_FLOAT ); v = rval( as_real( a ) )
-       case( PV_STRING )
-          v = rval( 0.0_real64 )
-          read( a%s, *, iostat=ios ) v%r
-          if( ios /= 0 ) v = err( 'FLOAT: cannot convert "'//a%s//'"' )
-       case default; v = err( 'FLOAT: bad argument' )
+       case( PV_STRING );        v = ext_parse_float( pool, a )
+       case default;             v = ext_err( pool, 'FLOAT: bad argument' )
        end select
     case( F_STRING )
-       v%kind = PV_STRING
-       v%s = PropValueToString( a )
+       v = ext_str( pool, ext_to_string_val( pool, a ) )
     case( F_ABS )
        if( a%kind == PV_INT ) then
           v = ival( abs( a%i ) )
        else if( a%kind == PV_FLOAT ) then
           v = rval( abs( a%r ) )
        else
-          v = err( 'ABS needs a number' )
+          v = ext_err( pool, 'ABS needs a number' )
        end if
     case( F_SQRT )
        if( .not. is_num( a ) ) then
-          v = err( 'SQRT needs a number' )
+          v = ext_err( pool, 'SQRT needs a number' )
        else if( as_real( a ) < 0 ) then
-          v = err( 'SQRT of a negative number' )
+          v = ext_err( pool, 'SQRT of a negative number' )
        else
           v = rval( sqrt( as_real( a ) ) )
        end if
     case( F_POW )
        if( .not. ( is_num( a ) .and. is_num( b ) ) ) then
-          v = err( 'POW needs numbers' )
+          v = ext_err( pool, 'POW needs numbers' )
        else
           v = rval( as_real( a ) ** as_real( b ) )
        end if
     case( F_MIN, F_MAX )
        if( .not. ( is_num( a ) .and. is_num( b ) ) ) then
-          v = err( 'MIN/MAX need numbers' )
+          v = ext_err( pool, 'MIN/MAX need numbers' )
        else if( a%kind == PV_INT .and. b%kind == PV_INT ) then
           v = ival( merge( min( a%i, b%i ), max( a%i, b%i ), nd%fn == F_MIN ) )
        else
           v = rval( merge( min( as_real(a), as_real(b) ), max( as_real(a), as_real(b) ), nd%fn == F_MIN ) )
        end if
     case default
-       v = err( 'internal: unknown builtin' )
+       v = ext_err( pool, 'internal: unknown builtin' )
     end select
   end function call_builtin
 
   !> Run the lambda statements for one polygon; locals(slot) hold the results.
   !> skipped = a WHEN guard was false; errv%kind == PV_ERROR on a runtime error.
-  subroutine run_one( lam, id, locals, t, skipped, errv )
+  subroutine run_one( lam, id, locals, t, pool, skipped, errv )
     type(Lambda), intent(in) :: lam
     integer(int64), intent(in) :: id
-    type(PropValue), intent(inout) :: locals(:)
+    type(FastVal), intent(inout) :: locals(:)
     type(PropertyTable), intent(in) :: t
+    type(ExtPool), intent(inout) :: pool
     logical, intent(out) :: skipped
-    type(PropValue), intent(inout) :: errv
-    type(PropValue) :: v
-    type(PropField), allocatable :: tmp(:)
-    integer :: s, j, n
+    type(FastVal), intent(inout) :: errv
+    type(FastVal) :: v
+    integer :: s
     integer(int64) :: ids(1)
     ids(1) = id
     skipped = .false.
     do s = 1, lam%nstmts
        associate( st => lam%stmts(s) )
-         v = eval( lam, st%expr, ids, locals, t )
+         v = eval( lam, st%expr, ids, locals, t, pool )
          if( v%kind == PV_ERROR ) then
             errv = v; return
          end if
          select case( st%kind )
          case( S_WHEN )
-            if( .not. truthy( v ) ) then
+            if( .not. truthy( v, pool ) ) then
                skipped = .true.; return
             end if
          case( S_ASSIGN )
             locals( st%slot ) = v
          case( S_FASSIGN )
-            if( v%kind == PV_STRUCT ) then
-               errv = err( 'STRUCT fields must be INT, FLOAT or STRING (no nesting)' ); return
-            end if
-            associate( L => locals( st%slot ) )
-              if( L%kind /= PV_STRUCT ) then
-                 if( L%kind /= PV_NONE ) then
-                    errv = err( lam%slots(st%slot)%s//'.'//st%field//' = ... on a non-STRUCT value' ); return
-                 end if
-                 L%kind = PV_STRUCT
-                 allocate( L%f(0) )
-              end if
-              n = 0
-              do j = 1, size( L%f )
-                 if( L%f(j)%name == st%field ) then
-                    n = j; exit
-                 end if
-              end do
-              if( n == 0 ) then
-                 allocate( tmp( size(L%f) + 1 ) )
-                 tmp(1:size(L%f)) = L%f
-                 call move_alloc( tmp, L%f )
-                 n = size( L%f )
-                 L%f(n)%name = st%field
-              end if
-              L%f(n)%kind = v%kind; L%f(n)%i = v%i; L%f(n)%r = v%r
-              if( allocated( v%s ) ) then
-                 L%f(n)%s = v%s
-              else if( allocated( L%f(n)%s ) ) then
-                 deallocate( L%f(n)%s )
-              end if
-            end associate
+            call ext_fassign( pool, locals( st%slot ), lam%slots(st%slot)%s, st%field, v, errv )
+            if( errv%kind == PV_ERROR ) return
          end select
        end associate
     end do
@@ -1359,7 +1562,7 @@ contains
           if( NeedsRTree( L ) ) call BuildTree( L )
           call PerformMerge( L%pnumtable, L%layer_boxes(1:L%n_used), K_LEAF_CAPACITY, &
                L%tree%tree_nodes, L%tree%root_index, oa, op )
-          call L%mark( LAYER_STATE_PNUM )
+          call LayerMark( L, LAYER_STATE_PNUM )
        end if
     end if
     if( .not. allocated( L%props ) ) allocate( L%props )
@@ -1546,8 +1749,9 @@ contains
     integer, intent(in) :: out_slot(:)
     integer(int64), intent(inout) :: err_ord, nskip
     type(PropValue), intent(inout) :: first_err
-    type(PropValue), allocatable :: locals(:)
-    type(PropValue) :: errv
+    type(FastVal), allocatable :: locals(:)
+    type(FastVal) :: errv, lv
+    type(ExtPool) :: pool
     integer(int64) :: ord
     integer :: k
     logical :: skipped
@@ -1555,15 +1759,18 @@ contains
     !$omp do schedule(dynamic, 512) reduction(+:nskip)
     do ord = 1, np
        do k = 1, lam%nslots
-          locals(k) = PropValue()
+          locals(k)%kind = PV_NONE
+          locals(k)%ext  = 0
        end do
-       errv = PropValue()
-       call run_one( lam, L%props%poly_id(ord), locals, L%props, skipped, errv )
+       errv%kind = PV_NONE
+       errv%ext  = 0
+       pool%n    = 0
+       call run_one( lam, L%props%poly_id(ord), locals, L%props, pool, skipped, errv )
        if( errv%kind == PV_ERROR ) then
           !$omp critical (fascl_err)
           if( ord < err_ord ) then
              err_ord = ord
-             first_err = errv
+             call ext_to_prop( pool, errv, first_err )
           end if
           !$omp end critical (fascl_err)
           cycle
@@ -1573,7 +1780,14 @@ contains
           cycle
        end if
        do k = 1, size(out_slot)
-          outs(k)%v(ord) = locals( out_slot(k) )
+          lv = locals( out_slot(k) )
+          if( lv%ext == 0 ) then
+             outs(k)%v(ord)%kind = lv%kind
+             outs(k)%v(ord)%i    = lv%i
+             outs(k)%v(ord)%r    = lv%r
+          else
+             call ext_to_prop( pool, lv, outs(k)%v(ord) )
+          end if
        end do
     end do
     !$omp end do

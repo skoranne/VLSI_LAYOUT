@@ -28,7 +28,7 @@ contains
     ! 1. Initialize Grid dimensions
     this%rows = n_rows
     this%cols = n_cols
-    call CreateGrid( base_layer, grid, rows, cols, 0) !> create over
+    call CreateGrid( base_layer, grid, int(n_rows), int(n_cols), 0) !> create over (was uninitialized rows/cols)
     ! 2. Allocate the internal 2D array of layers
     if (allocated(this%sub_layers)) deallocate(this%sub_layers)
     allocate(this%sub_layers(n_rows, n_cols))
@@ -52,20 +52,14 @@ contains
 
   module subroutine PerformOperation( gA, gB, gO, opcode )
     character(len=*), parameter :: functionName = "PerformOperation"
-    class(Layer), intent(inout) :: gA, gB, gO
+    type(Layer), intent(inout) :: gA, gB, gO
     integer                        :: opcode
 
-    select type( A => gA )
-    type is (Layer)
-       select type( B => gB )
-       type is (Layer)
-          select case(opcode)
-          case(K_BOOST_CONTROL_OR)
-             call CalculateOR( A, B, gO )
-          case default
-             error stop "ERROR: Unsupported OPCODE"
-          end select
-       end select
+    select case(opcode)
+    case(K_BOOST_CONTROL_OR)
+       call CalculateOR( gA, gB, gO )
+    case default
+       error stop "ERROR: Unsupported OPCODE"
     end select
     
     

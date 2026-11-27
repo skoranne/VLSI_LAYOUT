@@ -40,6 +40,7 @@ module DesignModule
        LAYER_STATE_SLSORT, LAYER_STATE_FINAL, LAYER_STATE_PREPROCESSED, LAYER_STATE_EVERYTHING
   public :: DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY
   public :: NeedsSorting, NeedsRTree, NeedsPNum, NeedsHealing
+  public :: LayerHas, LayerMark, LayerUnmark, LayerReserve
   public :: LayerCompact, LayerExpand, LayerDropCompact, LayerExpandedBytes, CompactLayersEnabled
   public :: LayerAppendPart, LayerFinishParts
   public :: push_box, ClearLayer, CopyLayer, AssignFromBox, swap_layer, FinalizeLayer, DeleteDesign
@@ -137,11 +138,6 @@ module DesignModule
      integer(kind=int64) :: raw_np = 0
      integer(kind=int64), allocatable :: raw_off(:)
      integer(kind=int32), allocatable :: raw_x(:), raw_y(:)
-   contains
-     procedure :: has     => layer_has_state
-     procedure :: mark    => layer_mark_state
-     procedure :: unmark  => layer_unmark_state
-     procedure :: reserve => layer_reserve
   end type Layer
 
   !> A layer partitioned on a rows x cols grid. This *has* layers, it is
@@ -246,7 +242,7 @@ module DesignModule
      end subroutine populate_gridlayer_from_unit
 
      module subroutine PerformOperation( gA, gB, gO, opcode )
-       class(Layer), intent(inout) :: gA, gB, gO
+       type(Layer), intent(inout) :: gA, gB, gO
        integer                        :: opcode
      end subroutine PerformOperation
 
@@ -261,7 +257,7 @@ module DesignModule
      end subroutine SaveLayerToSnap
 
      module subroutine RestoreSnapToLayer( input_layer, snap_filename )
-       class(Layer), intent(inout) :: input_layer
+       type(Layer), intent(inout) :: input_layer
        character(*), intent(in)   :: snap_filename      
      end subroutine RestoreSnapToLayer
 
@@ -393,57 +389,57 @@ module DesignModule
 
 contains
   !------------------------------------------------------------------
-  !  Layer state
+  !  Layer state (non-polymorphic: avoids ifx static RTTI prologue writes)
   !------------------------------------------------------------------
-  pure function layer_has_state(this, flags) result(retval)
-    class(Layer), intent(in)        :: this
+  pure function LayerHas(this, flags) result(retval)
+    type(Layer), intent(in)         :: this
     integer(kind=c_int), intent(in) :: flags
     logical :: retval
     retval = iand(this%layerState, flags) == flags
-  end function layer_has_state
+  end function LayerHas
 
-  pure subroutine layer_mark_state(this, flags)
-    class(Layer), intent(inout)     :: this
+  pure subroutine LayerMark(this, flags)
+    type(Layer), intent(inout)      :: this
     integer(kind=c_int), intent(in) :: flags
     this%layerState = ior(this%layerState, flags)
-  end subroutine layer_mark_state
+  end subroutine LayerMark
 
-  pure subroutine layer_unmark_state(this, flags)
-    class(Layer), intent(inout)     :: this
+  pure subroutine LayerUnmark(this, flags)
+    type(Layer), intent(inout)      :: this
     integer(kind=c_int), intent(in) :: flags
     this%layerState = iand(this%layerState, not(flags))
-  end subroutine layer_unmark_state
+  end subroutine LayerUnmark
 
   pure function NeedsSorting(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_SORT)
+    retval = iand(input_layer%layerState, LAYER_STATE_SORT) == 0
   end function NeedsSorting
 
   pure function NeedsPNum(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_PNUM)
+    retval = iand(input_layer%layerState, LAYER_STATE_PNUM) == 0
   end function NeedsPNum
 
   pure function NeedsRTree(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_RTREE)
+    retval = iand(input_layer%layerState, LAYER_STATE_RTREE) == 0
   end function NeedsRTree
 
   pure function NeedsHealing(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_HEAL)
+    retval = iand(input_layer%layerState, LAYER_STATE_HEAL) == 0
   end function NeedsHealing
 
   !------------------------------------------------------------------
   !  Layer storage
   !------------------------------------------------------------------
   !> Make room for at least min_capacity boxes, keeping the live ones.
-  subroutine layer_reserve(this, min_capacity)
-    class(Layer), intent(inout)     :: this
+  subroutine LayerReserve(this, min_capacity)
+    type(Layer), intent(inout)      :: this
     integer(kind=int64), intent(in) :: min_capacity
     type(Box), allocatable :: grown(:)
     integer(kind=int64)    :: i
@@ -457,14 +453,14 @@ contains
     end do
     call move_alloc( from=grown, to=this%layer_boxes )
     this%n_alloc = min_capacity
-  end subroutine layer_reserve
+  end subroutine LayerReserve
 
   subroutine push_box( xbox, th_layer )
     type(Box), intent(in) :: xbox
     type(Layer), intent(inout) :: th_layer
     integer(kind=int64), parameter :: K_GROWTH_FACTOR = 2
     if( th_layer%n_used == th_layer%n_alloc ) then
-       call th_layer%reserve( max( 1_int64, th_layer%n_alloc * K_GROWTH_FACTOR ) )
+       call LayerReserve( th_layer, max( 1_int64, th_layer%n_alloc * K_GROWTH_FACTOR ) )
     end if
     th_layer%n_used = th_layer%n_used + 1
     th_layer%layer_boxes( th_layer%n_used ) = xbox
@@ -667,7 +663,7 @@ contains
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
     call BuildRTree( input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY, &
          input_layer%tree%tree_nodes, input_layer%tree%root_index )
-    call input_layer%mark( LAYER_STATE_RTREE )
+    call LayerMark( input_layer, LAYER_STATE_RTREE )
     call LayerTreeBuilt( input_layer )
   end subroutine rebuild_rtree
 
@@ -696,13 +692,13 @@ contains
        !> OMT packing on 1e8 boxes) at the cost of a less overlap-minimising R-tree order.
        if( presort_gpu_enabled() .and. input_layer%n_used >= 65536_int64 ) then
           call SortBoxesDirect( input_layer%layer_boxes, input_layer%n_used )
-          call input_layer%mark( LAYER_STATE_SORT )
+          call LayerMark( input_layer, LAYER_STATE_SORT )
           return
        end if
 #endif
        call omt_pack( input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY )
     end if
-    call input_layer%mark( LAYER_STATE_SORT )
+    call LayerMark( input_layer, LAYER_STATE_SORT )
   end subroutine sort_layer_boxes
 
   logical function presort_gpu_enabled()
@@ -790,7 +786,7 @@ contains
     if( first_polygon == 2 ) num_rects = segments(1)%end_idx
     if( num_rects == input_layer%n_used ) then
        !> nothing touches anything else, so the layer is healed as it stands
-       call input_layer%mark( LAYER_STATE_HEAL )
+       call LayerMark( input_layer, LAYER_STATE_HEAL )
        return
     end if
 
@@ -855,8 +851,8 @@ contains
     input_layer%n_alloc = final_count
 
     !> boxes changed: the polygon numbers and the tree are stale
-    call input_layer%unmark( LAYER_STATE_PNUM )
-    call input_layer%mark( LAYER_STATE_HEAL )
+    call LayerUnmark( input_layer, LAYER_STATE_PNUM )
+    call LayerMark( input_layer, LAYER_STATE_HEAL )
     call sort_layer_boxes( input_layer, use_morton=dominated_by_squares )
     call rebuild_rtree( input_layer )
   contains
@@ -966,7 +962,7 @@ contains
           tp = PhaseBegin('pre.certify')
           if( CertifyHealing( input_layer ) ) then
              call PhaseEnd('pre.certify', tp, input_layer%n_used)
-             call input_layer%mark( LAYER_STATE_HEAL )      !> boxes, order and tree unchanged
+             call LayerMark( input_layer, LAYER_STATE_HEAL )      !> boxes, order and tree unchanged
           else
              call PhaseEnd('pre.certify', tp, input_layer%n_used)
              tp = PhaseBegin('pre.mergeheal')
@@ -1005,7 +1001,7 @@ contains
             input_layer%tree%tree_nodes, input_layer%tree%root_index, overlap_area, overlap_perimeter)
        call LayerDeviceDone( input_layer )
        call PhaseEnd('pre.pnum', tp, input_layer%n_used)
-       call input_layer%mark( LAYER_STATE_PNUM )
+       call LayerMark( input_layer, LAYER_STATE_PNUM )
     end if
   end subroutine PreprocessLayerSL
 
@@ -1039,8 +1035,8 @@ contains
        call PerformMergeWithOverlapDetection( input_layer%pnumtable, input_layer%layer_boxes(1:input_layer%n_used), &
             K_LEAF_CAPACITY, input_layer%tree%tree_nodes, &
             input_layer%tree%root_index, overlap_area, overlap_perimeter, area_overlap_roots)
-       if( overlap_area == 0 ) call input_layer%mark( LAYER_STATE_HEAL )
-       call input_layer%mark( LAYER_STATE_PNUM )
+       if( overlap_area == 0 ) call LayerMark( input_layer, LAYER_STATE_HEAL )
+       call LayerMark( input_layer, LAYER_STATE_PNUM )
     end if
     if( .not. allocated( area_overlap_roots ) ) allocate( area_overlap_roots(0) )
     call PerformPolygonUnion( input_layer, area_overlap_roots )

@@ -84,7 +84,7 @@ contains
           call omt_pack( input_layer%layer_boxes(1:n_used), K_LEAF_CAPACITY )
        end if
 #endif
-       call input_layer%mark( LAYER_STATE_SORT )
+       call LayerMark( input_layer, LAYER_STATE_SORT )
     end if
     ! Boxes may have been sorted above and the tree is replaced: drop device copies first.
     call LayerDeviceRelease( input_layer )
@@ -94,7 +94,7 @@ contains
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
     t_phase = PhaseBegin('load.rtree')
     call BuildRTree( input_layer%layer_boxes(1:n_used), K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index )
-    call input_layer%mark( LAYER_STATE_RTREE )
+    call LayerMark( input_layer, LAYER_STATE_RTREE )
     call LayerTreeBuilt( input_layer )
     call PhaseEnd('load.rtree', t_phase, n_used)
 
@@ -126,7 +126,7 @@ contains
   end subroutine SaveLayerToSnap
 
   module subroutine RestoreSnapToLayer( input_layer, snap_filename )
-    class(Layer), intent(inout) :: input_layer
+    type(Layer), intent(inout) :: input_layer
     character(*), intent(in)   :: snap_filename
     type(CompressedStream)     :: snappy_stream
     integer                    :: pos, iunit, ios
