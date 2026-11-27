@@ -52,20 +52,14 @@ contains
 
   module subroutine PerformOperation( gA, gB, gO, opcode )
     character(len=*), parameter :: functionName = "PerformOperation"
-    class(Layer), intent(inout) :: gA, gB, gO
+    type(Layer), intent(inout) :: gA, gB, gO
     integer                        :: opcode
 
-    select type( A => gA )
-    type is (Layer)
-       select type( B => gB )
-       type is (Layer)
-          select case(opcode)
-          case(K_BOOST_CONTROL_OR)
-             call CalculateOR( A, B, gO )
-          case default
-             error stop "ERROR: Unsupported OPCODE"
-          end select
-       end select
+    select case(opcode)
+    case(K_BOOST_CONTROL_OR)
+       call CalculateOR( gA, gB, gO )
+    case default
+       error stop "ERROR: Unsupported OPCODE"
     end select
     
     

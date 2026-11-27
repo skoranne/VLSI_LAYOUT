@@ -192,20 +192,46 @@ contains
   end subroutine ensure_quad_capacity
 
   ! ------------------------------------------------------------------
-  ! ChunkLRUCache methods
+  ! ChunkLRUCache methods (concrete helpers avoid ifx polymorphic RTTI
+  ! prologue writes in hot cache_fetch_slot)
   ! ------------------------------------------------------------------
-  subroutine cache_init(this, capacity)
-    class(ChunkLRUCache), intent(inout) :: this
-    integer, intent(in), optional       :: capacity
+  subroutine cache_destroy_concrete(this)
+    type(ChunkLRUCache), intent(inout) :: this
+    integer :: i
+    if (allocated(this%slots)) then
+       do i = 1, size(this%slots)
+          if (allocated(this%slots(i)%boxes)) deallocate(this%slots(i)%boxes)
+       end do
+       deallocate(this%slots)
+    end if
+    if (allocated(this%scratch_codec)) deallocate(this%scratch_codec)
+    this%capacity = 0
+    this%clock    = 0_int64
+    this%hits     = 0_int64
+    this%misses   = 0_int64
+  end subroutine cache_destroy_concrete
+
+  subroutine cache_init_concrete(this, capacity)
+    type(ChunkLRUCache), intent(inout) :: this
+    integer, intent(in), optional      :: capacity
     integer :: cap
     cap = K_CSI_DEFAULT_CACHE
     if (present(capacity)) cap = max(1, capacity)
-    call this%destroy()
+    call cache_destroy_concrete(this)
     this%capacity = cap
     this%clock    = 0_int64
     this%hits     = 0_int64
     this%misses   = 0_int64
     allocate(this%slots(cap))
+  end subroutine cache_init_concrete
+
+  subroutine cache_init(this, capacity)
+    class(ChunkLRUCache), intent(inout) :: this
+    integer, intent(in), optional       :: capacity
+    select type (this)
+    type is (ChunkLRUCache)
+       call cache_init_concrete(this, capacity)
+    end select
   end subroutine cache_init
 
   subroutine cache_clear(this)
@@ -225,18 +251,10 @@ contains
 
   subroutine cache_destroy(this)
     class(ChunkLRUCache), intent(inout) :: this
-    integer :: i
-    if (allocated(this%slots)) then
-       do i = 1, size(this%slots)
-          if (allocated(this%slots(i)%boxes)) deallocate(this%slots(i)%boxes)
-       end do
-       deallocate(this%slots)
-    end if
-    if (allocated(this%scratch_codec)) deallocate(this%scratch_codec)
-    this%capacity = 0
-    this%clock    = 0_int64
-    this%hits     = 0_int64
-    this%misses   = 0_int64
+    select type (this)
+    type is (ChunkLRUCache)
+       call cache_destroy_concrete(this)
+    end select
   end subroutine cache_destroy
 
   ! ------------------------------------------------------------------
@@ -296,7 +314,7 @@ contains
     integer(int64) :: oldest
 
     if (.not. allocated(cache%slots) .or. cache%capacity <= 0) then
-       call cache%init(K_CSI_DEFAULT_CACHE)
+       call cache_init_concrete(cache, K_CSI_DEFAULT_CACHE)
     end if
 
     ! Fast hit scan (small capacity <= 32 fits in L1 cache)

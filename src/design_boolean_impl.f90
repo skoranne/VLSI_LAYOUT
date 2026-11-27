@@ -279,7 +279,7 @@ contains
        bboxA = mbr_of_array( input_layer_A%layer_boxes, input_layer_A%n_used )
        call generate_trackers( input_layer_B%layer_boxes(1:input_layer_B%n_used), bboxA, trackers )
        call scanline_fracture(trackers, temp_layer%layer_boxes)
-       call temp_layer%mark( LAYER_STATE_HEAL )
+       call LayerMark( temp_layer, LAYER_STATE_HEAL )
        temp_layer%n_used = size( temp_layer%layer_boxes, kind=int64 )
        temp_layer%n_alloc = temp_layer%n_used
        call CalculateAND( input_layer_A, temp_layer, output_layer )
@@ -324,7 +324,7 @@ contains
 
     if (num_boxesA == 0) then
        call ClearLayer(output_layer)
-       call output_layer%mark( LAYER_STATE_HEAL )
+       call LayerMark( output_layer, LAYER_STATE_HEAL )
        if (profiling_enabled) call RecordTime("CalculateNOT", get_cpu_time() - t_start)
        return
     end if

@@ -392,7 +392,7 @@ contains
            elapsed_time = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)
            num_roots = resolved_layer%pnumtable%count_roots()
            num_rects = count(resolved_layer%pnumtable%arr == 0)
-           call resolved_layer%mark( LAYER_STATE_PNUM )
+           call LayerMark( resolved_layer, LAYER_STATE_PNUM )
            if( overlap_areas(i) > 0.0 ) then
               !> this layer needs HEALING as we have detected overlap
               !write(*,*) 'PerformUnion as overlap detected on ', size(area_overlap_roots), ' roots ', elapsed_time
@@ -412,7 +412,7 @@ contains
               if( NeedsPNum( resolved_layer ) ) then
                  call PerformMerge( resolved_layer%pnumtable, resolved_layer%layer_boxes(1:resolved_layer%n_used), K_LEAF_CAPACITY, &
                       resolved_layer%tree%tree_nodes, resolved_layer%tree%root_index, overlap_areas(i), overlap_perimeter(i))
-                 call resolved_layer%mark( LAYER_STATE_PNUM )
+                 call LayerMark( resolved_layer, LAYER_STATE_PNUM )
               end if
               num_roots = resolved_layer%pnumtable%count_roots()
               num_rects = count(resolved_layer%pnumtable%arr == 0)
@@ -421,13 +421,13 @@ contains
                       ' non-rects ',num_rects , ' rects. STAT ',resolved_layer%layerState, &
                       ' |RTREE| = CPU ', (t2-t1), ' secs.', elapsed_time, ' REAL secs'
                  write(*,*) 'OVLP AREA = ', overlap_areas(i)
-                 call resolved_layer%unmark( LAYER_STATE_HEAL )
+                 call LayerUnmark( resolved_layer, LAYER_STATE_HEAL )
                  error stop 'UNION failed.'
               else
-                 call resolved_layer%mark( LAYER_STATE_HEAL )
+                 call LayerMark( resolved_layer, LAYER_STATE_HEAL )
               end if
            else
-              call resolved_layer%mark( LAYER_STATE_HEAL )
+              call LayerMark( resolved_layer, LAYER_STATE_HEAL )
            end if
            call system_clock(count=end_tick)
            elapsed_time2 = real(end_tick - start_tick, kind=8) / real(clock_rate, kind=8)

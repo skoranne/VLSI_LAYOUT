@@ -258,10 +258,11 @@ module BoxCodecModule
 contains
 
   ! ==================================================================
-  ! Codec Type-Bound Procedures
+  ! Codec Procedures (concrete init avoids ifx polymorphic RTTI writes
+  ! inside OpenMP parallel compression/decompression loops)
   ! ==================================================================
-  subroutine codec_init(this, capacity)
-    class(BoxCodec), intent(inout) :: this
+  subroutine codec_init_concrete(this, capacity)
+    type(BoxCodec), intent(inout) :: this
     integer, intent(in), optional :: capacity
     integer :: cap
     integer, parameter :: K_WH_CAPACITY = 1024 !> we expand, so this only impacts memory re-alloc
@@ -295,6 +296,15 @@ contains
     ! Reset the anchor states for the delta optimization
     this%current_x = 0
     this%current_y = 0
+  end subroutine codec_init_concrete
+
+  subroutine codec_init(this, capacity)
+    class(BoxCodec), intent(inout) :: this
+    integer, intent(in), optional :: capacity
+    select type (this)
+    type is (BoxCodec)
+       call codec_init_concrete(this, capacity)
+    end select
   end subroutine codec_init
 
   pure function codec_hash_slot(val, mask) result(slot)
@@ -692,7 +702,7 @@ contains
     bytes_written = 1_int64
 
     ! This init handles the first-time allocation check securely
-    if (codec_state%num_w == 0) call codec_state%init()
+    if (codec_state%num_w == 0) call codec_init_concrete(codec_state)
 
     do i = 1, size(boxes, kind=int64)
        w = boxes(i)%x2 - boxes(i)%x1
@@ -822,7 +832,7 @@ contains
     do i = 1_int64, stream%num_chunks
        current_start = (i - 1_int64) * BOXES_PER_CHUNK + 1_int64
        current_end = min(current_start + BOXES_PER_CHUNK - 1_int64, stream%total_boxes)
-       call local_codec%init() !> for large N we might want 1024
+       call codec_init_concrete(local_codec) !> for large N we might want 1024
        stream%chunks(i)%num_boxes = current_end - current_start + 1_int64
 
        ! Reset codec spatial cursor and dictionary sizes without reallocating
@@ -906,7 +916,7 @@ contains
     !$omp private(i, current_start, current_end, uncompressed_bytes, status, local_codec)
 
     allocate(uncompressed_bytes(max_raw_size))
-    call local_codec%init()
+    call codec_init_concrete(local_codec)
 
     !$omp do
     do i = 1_int64, stream%num_chunks

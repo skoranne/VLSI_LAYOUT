@@ -102,7 +102,7 @@ contains
     if (L%is_compact) then
        LayerIsHealed = iand(L%compact_state, LAYER_STATE_HEAL) /= 0
     else
-       LayerIsHealed = L%has(LAYER_STATE_HEAL)
+       LayerIsHealed = LayerHas(L, LAYER_STATE_HEAL)
     end if
   end function LayerIsHealed
 
@@ -264,7 +264,7 @@ contains
           T%layer_boxes(j) = L%layer_boxes(i)
        end do
        T%n_used = j
-       healed = L%has(LAYER_STATE_HEAL)
+       healed = LayerHas(L, LAYER_STATE_HEAL)
     end if
     T%n_alloc = size(T%layer_boxes, kind=int64)
     T%layerState = LAYER_STATE_NONE
@@ -479,7 +479,7 @@ contains
        end if
        call ClearLayer(tA)
        call ClearLayer(tB)
-       if (tC%n_used > 0 .and. .not. tC%has(LAYER_STATE_HEAL)) all_healed = .false.
+       if (tC%n_used > 0 .and. .not. LayerHas(tC, LAYER_STATE_HEAL)) all_healed = .false.
        call TileClip(tC, lo, hi, op /= K_BAND_INTERACT)
        if (tC%n_used > 0) then
           np = np + 1
