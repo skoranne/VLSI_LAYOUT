@@ -107,7 +107,7 @@ struct GroupPoly {
     std::vector<Seg> seg;
     std::vector<PRef> pr;
     std::vector<VKey> vk;
-    std::vector<std::pair<int64_t, int>> rowev;       // (y, +-(trap index in M + 1))
+    std::vector<std::pair<int64_t, int64_t>> rowev;   // (y, +-(trap index in M + 1))
     std::vector<int> ostart, olist, nxt, ls, cv, loop_start;
     std::vector<char> used, seen, vis;
     std::vector<i128> loop_area;
@@ -121,7 +121,7 @@ struct GroupPoly {
         pr.push_back({ ya, xa.n, xa.d, 2 * k }); pr.push_back({ yb, xb.n, xb.d, 2 * k + 1 });
     }
 
-    void run(const int* M, int nm, ChunkOut& out) {
+    void run(const int64_t* M, int64_t nm, ChunkOut& out) {
         build(M, nm, out.st);
         trace_emit(M, nm, out);
     }
@@ -129,10 +129,10 @@ struct GroupPoly {
     // Boundary of the trapezoid set M: directed segments (region on the left), lattice-or-
     // rational vertex ids, and nxt[] pairing every incoming segment with its outgoing one
     // (sharpest left turn: loops separate at pinch points).
-    void build(const int* M, int nm, Stats& st) {
+    void build(const int64_t* M, int64_t nm, Stats& st) {
         seg.clear(); pr.clear(); vk.clear(); rowev.clear();
         // --- side segments (inside on the left: left sides go down, right sides go up)
-        for (int i = 0; i < nm; ++i) {
+        for (int64_t i = 0; i < nm; ++i) {
             const Trap& z = T[(size_t)M[i]];
             add_seg(z.y2, side_x(z.l, z.y1, z.y2), z.y1, side_x(z.l, z.y1, z.y1), -z.l.dx, -z.l.dy);
             add_seg(z.y1, side_x(z.r, z.y1, z.y1), z.y2, side_x(z.r, z.y1, z.y2), z.r.dx, z.r.dy);
@@ -147,8 +147,8 @@ struct GroupPoly {
             const int64_t y = rowev[r0].first;
             ev.clear();
             while (r1 < rowev.size() && rowev[r1].first == y) {
-                const int code = rowev[r1].second;
-                const Trap& z = T[(size_t)M[std::abs(code) - 1]];
+                const int64_t code = rowev[r1].second;
+                const Trap& z = T[(size_t)M[std::llabs(code) - 1]];
                 Q xl = side_x(z.l, z.y1, y), xr = side_x(z.r, z.y1, y);
                 if (qcmp(xl, xr) < 0) {
                     if (code > 0) { ev.push_back({ xl, +1, 0 }); ev.push_back({ xr, -1, 0 }); }
@@ -210,7 +210,7 @@ struct GroupPoly {
     // Measures of the closed region of M (one PNUM polygon): vertices (direction changes, per
     // boundary visit), holes = 1 - chi with chi = sum of loop orientations - sum over points of
     // (boundary visits - 1) (gluing m loop points into one lowers chi by m - 1), perimeter.
-    void measure(const int* M, int nm, int64_t& nvert, int64_t& holes, double& perim, int64_t& loops, Stats& st) {
+    void measure(const int64_t* M, int64_t nm, int64_t& nvert, int64_t& holes, double& perim, int64_t& loops, Stats& st) {
         build(M, nm, st);
         const int ns = (int)seg.size();
         nvert = 0; holes = 0; perim = 0; loops = 0;
@@ -256,7 +256,7 @@ struct GroupPoly {
 
     // Unbridged oriented boundary loops of M (outer CCW, holes CW), collinear vertices dropped.
     // Every direction-change vertex of a canonical trapezoid set is on the integer lattice (d == 1).
-    void extract_loops(const int* M, int nm, std::vector<int64_t>& loff,
+    void extract_loops(const int64_t* M, int64_t nm, std::vector<int64_t>& loff,
                        std::vector<int64_t>& lxs, std::vector<int64_t>& lys, Stats& st) {
         build(M, nm, st);
         const int ns = (int)seg.size();
@@ -427,7 +427,7 @@ struct GroupPoly {
         return neg;
     }
 
-    void trace_emit(const int* M, int nm, ChunkOut& out) {
+    void trace_emit(const int64_t* M, int64_t nm, ChunkOut& out) {
         const int ns = (int)seg.size();
         // --- trace loops, drop collinear vertices, require lattice vertices
         nd.clear(); loop_start.clear(); loop_area.clear();
@@ -500,7 +500,7 @@ struct GroupPoly {
         if (std::fabs((long double)got - want) > 0.25L) {
             out.st.anomalies++;
             if (std::getenv("LDB_TRAPOUT_DEBUG")) {
-                std::fprintf(stderr, "trapset: group area2 %.2Lf, polygons %.2Lf, %d traps:", want, (long double)got, nm);
+                std::fprintf(stderr, "trapset: group area2 %.2Lf, polygons %.2Lf, %lld traps:", want, (long double)got, (long long)nm);
                 for (int64_t q = pts0; q < (int64_t)out.pts.size(); ++q) std::fprintf(stderr, " (%lld,%lld)", (long long)out.pts[(size_t)q].x, (long long)out.pts[(size_t)q].y);
                 std::fprintf(stderr, "\n");
                 for (int i = 0; i < nm; ++i) { const Trap& z = T[(size_t)M[i]];
@@ -510,19 +510,20 @@ struct GroupPoly {
         }
     }
 
-    void bridge_holes(const int* M, int nm, std::vector<std::pair<std::pair<int64_t, int64_t>, int>>& holes, ChunkOut& out) {
+    void bridge_holes(const int64_t* M, int64_t nm, std::vector<std::pair<std::pair<int64_t, int64_t>, int>>& holes, ChunkOut& out) {
         std::sort(holes.begin(), holes.end());
         out.st.holes += (int64_t)holes.size();
-        std::unordered_map<int64_t, std::vector<int>> by_y2, nodes_at;      // row -> trapezoids ending / nodes
-        for (int i = 0; i < nm; ++i) by_y2[T[(size_t)M[i]].y2].push_back(M[i]);
+        std::unordered_map<int64_t, std::vector<int64_t>> by_y2;            // row -> trapezoids ending
+        std::unordered_map<int64_t, std::vector<int>> nodes_at;             // row -> nodes
+        for (int64_t i = 0; i < nm; ++i) by_y2[T[(size_t)M[i]].y2].push_back(M[i]);
         for (size_t i = 0; i < nd.size(); ++i) nodes_at[nd[i].y].push_back((int)i);
         for (auto& h : holes) {
             const int vh = h.second;
             const int64_t vx = nd[(size_t)vh].x, vy = nd[(size_t)vh].y;
             // trapezoid whose top edge contains v (prefer v strictly inside the top edge)
-            int tb = -1;
+            int64_t tb = -1;
             auto it = by_y2.find(vy);
-            if (it != by_y2.end()) for (int t : it->second) {
+            if (it != by_y2.end()) for (int64_t t : it->second) {
                 const Trap& z = T[(size_t)t];
                 const Q xl = side_x(z.l, z.y1, vy), xr = side_x(z.r, z.y1, vy);
                 if (qcmp_int(xl, vx) <= 0 && qcmp_int(xr, vx) >= 0) {
@@ -559,7 +560,7 @@ struct GroupPoly {
     }
 };
 
-int find(std::vector<int>& p, int x) { while (p[(size_t)x] != x) { p[(size_t)x] = p[(size_t)p[(size_t)x]]; x = p[(size_t)x]; } return x; }
+int64_t find(std::vector<int64_t>& p, int64_t x) { while (p[(size_t)x] != x) { p[(size_t)x] = p[(size_t)p[(size_t)x]]; x = p[(size_t)x]; } return x; }
 }
 
 // traps: n records of 10 int32 (y1, y2, l.ax, l.k, l.dx, l.dy, r.ax, r.k, r.dx, r.dy).
@@ -647,8 +648,8 @@ int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink) {
     // Join across rational corners: a bottom corner (row y1) and a top corner (row y2) of the
     // trapezoid below, on the same side line, must pair up one to one. Entries are sorted by a
     // 64-bit hash of (row, line, side); equal hashes are compared exactly.
-    struct Ent { uint64_t h; int32_t id; int8_t top, right; };
-    auto key_of = [&](int32_t id, int top, int right) {
+    struct Ent { uint64_t h; int64_t id; int8_t top, right; };
+    auto key_of = [&](int64_t id, int top, int right) {
         const Trap& z = T[(size_t)id];
         const Side& sd = right ? z.r : z.l;
         LineKey k = line_key(sd, z.y1, top ? z.y2 : z.y1);
@@ -669,7 +670,7 @@ int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink) {
             for (int c = 0; c < 4; ++c) {
                 if (!(rat[(size_t)i] & (1 << c))) continue;
                 const int top = c >= 2, right = c & 1;
-                E[(size_t)p++] = { hash_of(key_of((int32_t)i, top, right), right), (int32_t)i, (int8_t)top, (int8_t)right };
+                E[(size_t)p++] = { hash_of(key_of(i, top, right), right), i, (int8_t)top, (int8_t)right };
             }
         }
     });
@@ -688,8 +689,8 @@ int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink) {
             for (int64_t q = a; q < b; ++q) std::sort(E.begin() + bc[(size_t)q], E.begin() + bc[(size_t)q + 1], lt);
         });
     }
-    std::vector<int> par((size_t)n);
-    std::iota(par.begin(), par.end(), 0);
+    std::vector<int64_t> par((size_t)n);
+    std::iota(par.begin(), par.end(), (int64_t)0);
     for (int64_t p = 0; p < ne;) {
         int64_t q = p;
         while (q < ne && E[(size_t)q].h == E[(size_t)p].h) ++q;
@@ -711,13 +712,13 @@ int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink) {
     }
     { std::vector<Ent>().swap(E); }
     // groups
-    std::vector<int> root((size_t)n), cnt((size_t)n, 0);
-    for (int64_t i = 0; i < n; ++i) { root[(size_t)i] = find(par, (int)i); cnt[(size_t)root[(size_t)i]]++; }
-    std::vector<int> start((size_t)n + 1, 0), order((size_t)n);
+    std::vector<int64_t> root((size_t)n), cnt((size_t)n, 0);
+    for (int64_t i = 0; i < n; ++i) { root[(size_t)i] = find(par, i); cnt[(size_t)root[(size_t)i]]++; }
+    std::vector<int64_t> start((size_t)n + 1, 0), order((size_t)n);
     for (int64_t i = 0; i < n; ++i) start[(size_t)root[(size_t)i] + 1]++;
     for (int64_t i = 0; i < n; ++i) start[(size_t)i + 1] += start[(size_t)i];
-    { std::vector<int> pos(start.begin(), start.end() - 1);
-      for (int64_t i = 0; i < n; ++i) order[(size_t)pos[(size_t)root[(size_t)i]]++] = (int)i; }
+    { std::vector<int64_t> pos(start.begin(), start.end() - 1);
+      for (int64_t i = 0; i < n; ++i) order[(size_t)pos[(size_t)root[(size_t)i]]++] = i; }
     const double t_join = secs(tA);
     const auto tB = clk::now();
     // groups in order: singletons with lattice corners become records, the rest polygons
@@ -736,7 +737,7 @@ int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink) {
             ChunkOut& co = chunks[(size_t)c];
             for (int64_t q = c * CH; q < std::min(ng, (c + 1) * CH); ++q) {
                 const int64_t g = gl[(size_t)q];
-                const int a = start[(size_t)g], b = start[(size_t)g + 1];
+                const int64_t a = start[(size_t)g], b = start[(size_t)g + 1];
                 if (b - a == 1 && rat[(size_t)order[(size_t)a]] == 0) continue;     // record, written below
                 co.st.groups++;
                 co.st.max_group = std::max<int64_t>(co.st.max_group, b - a);
@@ -757,7 +758,7 @@ int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink) {
         size_t pk = 0;
         for (int64_t q = c * CH; q < std::min(ng, (c + 1) * CH); ++q) {
             const int64_t g = gl[(size_t)q];
-            const int a = start[(size_t)g], b = start[(size_t)g + 1];
+            const int64_t a = start[(size_t)g], b = start[(size_t)g + 1];
             if (b - a == 1 && rat[(size_t)order[(size_t)a]] == 0) {
                 const Trap& z = T[(size_t)order[(size_t)a]];
                 const Q bl = side_x(z.l, z.y1, z.y1), br = side_x(z.r, z.y1, z.y1);
@@ -817,11 +818,11 @@ extern "C" int ldb_trapset_measure(int64_t n, const int32_t* rec, const int64_t*
         const int32_t* r = rec + 10 * i;
         T[(size_t)i] = { r[0], r[1], { r[2], r[3], r[4], r[5] }, { r[6], r[7], r[8], r[9] } };
     }
-    std::vector<int> start((size_t)np + 2, 0), order((size_t)n);
+    std::vector<int64_t> start((size_t)np + 2, 0), order((size_t)n);
     for (int64_t i = 0; i < n; ++i) start[(size_t)lab[i] + 1]++;
     for (int64_t p = 0; p <= np; ++p) start[(size_t)p + 1] += start[(size_t)p];
-    { std::vector<int> pos(start.begin(), start.end() - 1);
-      for (int64_t i = 0; i < n; ++i) order[(size_t)pos[(size_t)lab[i]]++] = (int)i; }
+    { std::vector<int64_t> pos(start.begin(), start.end() - 1);
+      for (int64_t i = 0; i < n; ++i) order[(size_t)pos[(size_t)lab[i]]++] = i; }
     int nth = (int)std::thread::hardware_concurrency();
     if (const char* e = std::getenv("OMP_NUM_THREADS")) { int v = std::atoi(e); if (v > 0) nth = v; }
     nth = std::max(1, nth);
@@ -854,6 +855,7 @@ extern "C" void* ldb_trapset_loops(int64_t n, const int32_t* rec, const int64_t*
                                    int64_t* stats) {
     auto* r = new TrapPolySet();
     r->off.push_back(1);
+    r->poly_off.push_back(1);
     if (n <= 0 || np <= 0) {
         if (stats) stats[0] = 0;
         return r;
@@ -863,11 +865,11 @@ extern "C" void* ldb_trapset_loops(int64_t n, const int32_t* rec, const int64_t*
         const int32_t* p = rec + 10 * i;
         T[(size_t)i] = { p[0], p[1], { p[2], p[3], p[4], p[5] }, { p[6], p[7], p[8], p[9] } };
     }
-    std::vector<int> start((size_t)np + 2, 0), order((size_t)n);
+    std::vector<int64_t> start((size_t)np + 2, 0), order((size_t)n);
     for (int64_t i = 0; i < n; ++i) start[(size_t)lab[i] + 1]++;
     for (int64_t p = 0; p <= np; ++p) start[(size_t)p + 1] += start[(size_t)p];
-    { std::vector<int> pos(start.begin(), start.end() - 1);
-      for (int64_t i = 0; i < n; ++i) order[(size_t)pos[(size_t)lab[i]]++] = (int)i; }
+    { std::vector<int64_t> pos(start.begin(), start.end() - 1);
+      for (int64_t i = 0; i < n; ++i) order[(size_t)pos[(size_t)lab[i]]++] = i; }
 
     int nth = (int)std::thread::hardware_concurrency();
     if (const char* e = std::getenv("OMP_NUM_THREADS")) { int v = std::atoi(e); if (v > 0) nth = v; }
@@ -903,7 +905,6 @@ extern "C" void* ldb_trapset_loops(int64_t n, const int32_t* rec, const int64_t*
     r->xs.reserve((size_t)tot_verts);
     r->ys.reserve((size_t)tot_verts);
     r->poly_off.reserve((size_t)np + 1);
-    r->poly_off.push_back(1);
     int64_t vbase = 0;
     for (const auto& c : chunks) {
         for (int64_t cnt : c.pcnt) r->poly_off.push_back(r->poly_off.back() + cnt);

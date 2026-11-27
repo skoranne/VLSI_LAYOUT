@@ -10,7 +10,7 @@
 | Canonical PNUM & exact lattice outlines / hole counts | Done | `trap_pnum.f90`, `db/trap_out.cpp` (`ldb_trapset_polys`, `ldb_trapset_measure`, `ldb_trapset_loops`) | `kl_pnum_check.py`, `exec measure` |
 | Polygon-level Topologicals (`INTERACT`, `CUT`, `TOUCH`, `INSIDE`, `OUTSIDE`, `EQUAL`, `DISJOINT`, `MEET`, `OVERLAPS`, `COVERS`, `COVEREDBY`, `CONTAINS` + `NOT_*`) | Done | `trap_topo.f90`, `anyangle_ops.f90` | `regress/anyangle/helpers/kl_topo.py` |
 | Morphology (`GROW`, `SHRINK`, `SIZE`, closing/opening, isotropic mode=2 & anisotropic E/N/W/S) | Done | `trap_morph.f90`, `anyangle_ops.f90`, `controlparser.f90` | `test_trapmorph.exe`, `SDT16S_R015` vs KLayout (`pass=7 fail=0`; `id_close` 4.8x and `id_open` 10.2x lower error than KLayout) |
-| Polygon Predicates (rotation-invariant: `AREA`, `PERIMETER`, `VERTEX`, `HOLES`, `WIDTH`, `LENGTH`, `ASPECT_RATIO`, `DIAMETER`, `COMPACTNESS`, `SOLIDITY`, `CONVEX_CRITERIA`, `CONCAVE_CRITERIA`, `IS_RECTANGLE_WITH_ROTATION`, `IS_SQUARE_WITH_ROTATION`, `NOTCH`, `ENCLOSE_RECTANGLE`; orientation-specific: `IS_RECTILINEAR`, `IS_45`, `IS_RECTANGLE`, `IS_SQUARE`) | Done | `trap_pred.f90`, `anyangle_ops.f90`, `controlparser.f90`, `db/trap_out.cpp` (`ldb_trapset_loops_poly_off`) | `test_trappred.exe` (0/1/15/30/45/90/137° + exact 45° octagon), `MAGPARSER.exe` CTR on `sky130_stdcell` R000/R001/R015 |
+| Polygon Predicates (rotation-invariant: `AREA`, `PERIMETER`, `VERTEX`, `HOLES`, `WIDTH`, `LENGTH`, `ASPECT_RATIO`, `DIAMETER`, `COMPACTNESS`, `SOLIDITY`, `CONVEX_CRITERIA`, `CONCAVE_CRITERIA`, `IS_RECTANGLE_WITH_ROTATION`, `IS_SQUARE_WITH_ROTATION`, `NOTCH`, `ENCLOSE_RECTANGLE`; orientation-specific: `IS_RECTILINEAR`, `IS_45`, `IS_RECTANGLE`, `IS_SQUARE`; all `+ NOT_*` complements & compound ranges `> a < b`) | Done | `trap_pred.f90`, `anyangle_ops.f90`, `controlparser.f90`, `db/trap_out.cpp` (`ldb_trapset_loops_poly_off`, 64-bit trapezoid indexing) | `test_trappred.exe` (0/1/15/30/45/90/137°, `NOT_*`, ranges, large coords, >256-crossing comb, non-rect & hole-vs-notch regressions) |
 | FASCL properties (`AREA`, `PERIMETER`, `VERTICES`, bbox) & `CONNECT` / `NET_ID` | Done | `fascl.f90`, `fascl_connect.f90`, `property_table.f90` | `db/regressions/fascl/run_fascl_regression.sh` |
 
 ---
@@ -45,9 +45,9 @@
    - Booleans: slab sweep cut at every exact vertex and crossing (`regress/anyangle/gold/gold_check.py`), asserting `H_inf <= 0.5 dbu` (theoretical snap-rounding tube) and exact set identities (`OR = NOT + AND + BNOTA`, `XOR = OR - AND`).
    - Morphology: exact rational offset-polygon oracle on 15°/30°/45° clips asserting `H_inf <= 1.0 dbu` and exact inclusion (`A - GROW(A) == 0`, `SHRINK(A) - A == 0`).
    - Topologicals: exact rational DE-9IM matrix (`I/B/E` intersections) on random & rotated clips.
-2. **15°-Increment Rotation Invariance (`0°, 15°, ..., 180°`)**:
-   - Full designs (`SDT16S`, `MW`, `SDT6X6`) via `regress/anyangle/run_mag_rot.sh` and `regress/anyangle/run_bool.sh`.
-   - Check polygon count, hole count, `|dA| <= 0.7072 * P`, `|dP| <= 1.5 * V`, and algebraic identities.
+2. **Rotation Invariance (`1°` full sweep `0°..359°` & `15°` increments)**:
+   - Full `0°..359°` resumable sweep via `regress/anyangle/run_359_sweep.py` (merge + FASCL props, Booleans, polygon-level topologicals with `MAGPARSER_FORCE_TRAP=1` at `R000`), plus full designs (`SDT16S`, `MW`, `SDT6X6`) via `regress/anyangle/run_mag_rot.sh` and `regress/anyangle/run_bool.sh`.
+   - Check polygon count, hole count, `|dA| <= 0.7072 * P`, `|dP| <= 1.5 * V`, algebraic identities, and polygon-predicate invariance (`test_trappred.exe` + CTR rotated-design predicate sweeps).
 3. **Differential Fuzzing**:
    - `test_trapmerge.exe`, `test_trapbool.exe`, `test_trapmorph.exe`, `test_trapoverlap.exe` with brute-force exact winding-number sampling + band-count invariance (`nbands = 1` vs `nbands = K`).
 
@@ -55,13 +55,13 @@
 
 ## 4. GPU Deployment Plan (NVIDIA Grace-Blackwell GB10 / H100 / B200)
 
-Current GPU footprint: `gpu_morton.cu` (CUB/Thrust radix sort for `CompactSortPairs`), `trapezoid.f90` (`!$omp declare target` on all exact predicates). `TrapSnapRound`, `TrapSweepUnion`, `TrapPNum`, `TrapTopo`, `TrapMorph` currently execute on CPU OpenMP.
+Current GPU footprint: `gpu_morton.cu` (CUB/Thrust radix sort for `CompactSortPairs`), `trapezoid.f90` (`!$omp declare target` on all exact predicates). `TrapSnapRound`, `TrapSweepUnion`, `TrapPNum`, `TrapTopo`, `TrapMorph`, `TrapPred` currently execute on CPU OpenMP.
 
 | Phase | Bottleneck on Large Layouts | GPU Kernel Design | Expected Speedup |
 |---|---|---|---|
 | **G1: Snap-Rounding Grid & Crossings** (`TrapSnapRound`) | `t_grid`, `t_cross`, `t_hits` (~55–70% of Boolean time) | 1. GPU edge->cell registration (2-pass count + CUB prefix sum + scatter).<br>2. GPU CUB radix sort `(cell_id, edge_id)` (`gpu_morton.cu`).<br>3. CUDA kernel (1 warp/cell, `__int128` exact orientation & rational crossing) emitting hot pixels.<br>4. GPU CUB sort + unique hot pixels.<br>5. GPU fragment split & identical-fragment winding reduction (`cub::DeviceReduce::ReduceByKey`). | 8–20x |
 | **G2: Band-Parallel Sweep** (`TrapSweepUnion`) | `t_sweep` (~25–35% of Boolean time) | Partition Y into `B = 4096..65536` narrow horizontal bands (so active-edge set per band fits in GPU L1/shared memory / L2). Launch 1 warp or CTA per band using a flat sorted active array (replacing pointer-chasing treap for small active sets `<= 256`, falling back to CPU/HBM treap only for ultra-dense bands). | 5–15x |
-| **G3: Morphology Collar Generation** (`TrapMorph`) | `t_loops` + `t_collar` | Embarrassingly parallel CUDA kernel: 1 thread per loop vertex computes `(ox, oy)`, miter/bevel cap, and emits CSR collar polygons directly in device memory feeding **G1** (zero host-device round-trip on GB10 unified memory). | 10–30x |
+| **G3: Morphology Collar Generation** (`TrapMorph`) | `t_loops` + `t_collar` | Port boundary edge/loop extraction (`db/trap_out.cpp` `ldb_trapset_loops`, currently CPU `std::thread`) to GPU — or emit directed boundary edges directly from canonical trapezoids on GPU — then run 1 thread per vertex to compute `(ox, oy)` miter/bevel caps and emit CSR collar polygons directly in device memory feeding **G1**. | 10–30x |
 | **G4: Topological & CONNECT Pair Filtering** (`TrapTopo`, `fascl_connect`) | `t_pairs` broad + narrow phase | Reuse `trapezoid.f90`'s existing `!$omp declare target` `trap_overlap_positive` / `trap_contact` kernels over GPU spatial grid / LBVH pairs. | 10–25x |
 
 ---
@@ -80,12 +80,13 @@ At **100B shapes**:
    - **Halo `H`**:
      - Booleans (`OR/AND/NOT/XOR`): `H = 1 dbu` (snap-rounding pixel radius!).
      - Morphology (`GROW/SHRINK/SIZE d`): `H = |d| + 1 dbu`.
-     - Clip input edges/trapezoids to `[y_lo - H, y_hi + H]`, run GPU **G1 + G2** on band `k`, discard output outside `[y_lo, y_hi]`, stitch exact seam trapezoids with band `k-1` in a streaming 1-row boundary buffer, and compress/write band `k` to disk.
+     - Select all raw input polygon edges whose Y-span intersects `[y_lo - H, y_hi + H]` **keeping their exact unclipped lattice endpoints** (clipping raw input edges at band seams would round endpoints and tilt slopes); canonical trapezoids can be clipped exactly at integer `y` by re-anchoring `k` (`trapezoid.f90:12`). Run GPU **G1 + G2** on band `k`, discard output outside `[y_lo, y_hi]`, stitch exact seam trapezoids with band `k-1` in a streaming 1-row boundary buffer, and compress/write band `k` to disk.
    - **Double-buffered async pipeline**: NVMe/nvCOMP decode band `k+1` || GPU compute band `k` || nvCOMP encode/write band `k-1`.
-3. **Out-of-Core PNUM / Topologicals / CONNECT**:
-   - Pass 1 (per band, streaming): local PNUM + local seam-edge table at `y = y_hi`.
-   - Seam Resolve (host/GPU, tiny): union-find across `M-1` band seams (`O(perimeter)` rather than `O(area)`).
-   - Pass 2 (per band, streaming): relabel local polygon IDs to canonical global IDs and evaluate FASCL / topological selection.
+3. **Out-of-Core PNUM / Topologicals / CONNECT / Predicates (64-bit indexed throughout)**:
+   - All trapezoid/polygon indices use 64-bit `int64_t` (`db/trap_out.cpp` upgraded from 32-bit `int` to support `> 2^31 - 1` trapezoids).
+   - Pass 1 (per band, streaming): local PNUM + local seam-edge table at `y = y_hi`, plus additive per-polygon summaries (`area2`, `perim`, `bbox`, local convex hull).
+   - Seam Resolve (host/GPU, tiny): union-find across `M-1` band seams (`O(perimeter)` rather than `O(area)`), merging additive summaries and convex hulls for multi-band polygons.
+   - Pass 2 (per band, streaming): relabel local polygon IDs to canonical global IDs and evaluate FASCL / topological / local polygon predicates; polygons spanning multiple bands needing full-outline predicates (`NOTCH`, `ENCLOSE_RECTANGLE`) are streamed into a small multi-band side-pass.
 
 ---
 

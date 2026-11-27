@@ -468,86 +468,187 @@ contains
 
   ! ------------------------------------------------------------------ polygon predicates
 
-  integer(int32) function AnyAnglePredCode(w) result(c)
+  integer(int32) function pred_base_code(w) result(c)
     character(len=*), intent(in) :: w
     select case (trim(w))
-    case ('AREA');                                        c = TPRED_AREA
-    case ('PERIMETER');                                   c = TPRED_PERIMETER
-    case ('VERTEX', 'VERTICES');                          c = TPRED_VERTEX
-    case ('HOLES');                                       c = TPRED_HOLES
-    case ('WIDTH');                                       c = TPRED_WIDTH
-    case ('LENGTH');                                      c = TPRED_LENGTH
-    case ('ASPECT_RATIO');                                c = TPRED_ASPECT
-    case ('DIAMETER');                                    c = TPRED_DIAMETER
-    case ('COMPACTNESS', 'CIRCULARITY');                  c = TPRED_COMPACTNESS
-    case ('SOLIDITY', 'CONVEXITY');                       c = TPRED_SOLIDITY
-    case ('CONVEX_CRITERIA', 'IS_CONVEX', 'CONVEX');      c = TPRED_CONVEX
-    case ('CONCAVE_CRITERIA', 'IS_CONCAVE', 'CONCAVE');   c = TPRED_CONCAVE
-    case ('IS_RECTANGLE_WITH_ROTATION', 'IS_ROTATED_RECTANGLE'); c = TPRED_IS_RECT_ROT
-    case ('IS_SQUARE_WITH_ROTATION', 'IS_ROTATED_SQUARE');       c = TPRED_IS_SQ_ROT
-    case ('IS_RECTANGLE');                                c = TPRED_IS_RECT
-    case ('IS_SQUARE');                                   c = TPRED_IS_SQ
-    case ('IS_RECTILINEAR', 'IS_ORTHOGONAL');             c = TPRED_IS_RECTILIN
-    case ('IS_45', 'IS_OCTAGONAL');                       c = TPRED_IS_45
-    case ('NOTCH');                                       c = TPRED_NOTCH
-    case ('ENCLOSE_RECTANGLE');                           c = TPRED_ENCLOSE_RECT
-    case default;                                         c = TPRED_NONE
+    case ('AREA');                                                c = TPRED_AREA
+    case ('PERIMETER');                                           c = TPRED_PERIMETER
+    case ('VERTEX', 'VERTICES');                                  c = TPRED_VERTEX
+    case ('HOLES');                                               c = TPRED_HOLES
+    case ('WIDTH');                                               c = TPRED_WIDTH
+    case ('LENGTH');                                              c = TPRED_LENGTH
+    case ('ASPECT_RATIO');                                        c = TPRED_ASPECT
+    case ('DIAMETER');                                            c = TPRED_DIAMETER
+    case ('COMPACTNESS', 'CIRCULARITY');                          c = TPRED_COMPACTNESS
+    case ('SOLIDITY', 'CONVEXITY');                               c = TPRED_SOLIDITY
+    case ('CONVEX_CRITERIA', 'IS_CONVEX', 'CONVEX');              c = TPRED_CONVEX
+    case ('CONCAVE_CRITERIA', 'IS_CONCAVE', 'CONCAVE');           c = TPRED_CONCAVE
+    case ('IS_RECTANGLE_WITH_ROTATION', 'IS_ROTATED_RECTANGLE');  c = TPRED_IS_RECT_ROT
+    case ('IS_SQUARE_WITH_ROTATION', 'IS_ROTATED_SQUARE');        c = TPRED_IS_SQ_ROT
+    case ('IS_RECTANGLE');                                        c = TPRED_IS_RECT
+    case ('IS_SQUARE');                                           c = TPRED_IS_SQ
+    case ('IS_RECTILINEAR', 'IS_ORTHOGONAL');                     c = TPRED_IS_RECTILIN
+    case ('IS_45', 'IS_OCTAGONAL');                               c = TPRED_IS_45
+    case ('NOTCH');                                               c = TPRED_NOTCH
+    case ('ENCLOSE_RECTANGLE');                                   c = TPRED_ENCLOSE_RECT
+    case default;                                                 c = TPRED_NONE
     end select
+  end function pred_base_code
+
+  integer(int32) function AnyAnglePredCode(w) result(c)
+    character(len=*), intent(in) :: w
+    character(len=:), allocatable :: s
+    integer(int32) :: base
+    s = trim(adjustl(w))
+    if (len(s) > 4) then
+       if (s(1:4) == 'NOT_') then
+          base = pred_base_code(s(5:))
+          if (base > 0) then
+             c = TPRED_NOT_OFFSET + base
+             return
+          end if
+       end if
+    end if
+    c = pred_base_code(s)
   end function AnyAnglePredCode
 
-  !> Parse trailing tokens of `OP nothing [<cmp> <val> | <lo> <hi> | <W> <H>]`.
-  subroutine AnyAngleParsePredArgs(rest, pred, cmp, v1, v2)
+  subroutine next_ws_tok(s, pos, tok)
+    character(len=*), intent(in) :: s
+    integer, intent(inout) :: pos
+    character(len=*), intent(out) :: tok
+    integer :: n, i0
+    tok = ''
+    n = len_trim(s)
+    do while (pos <= n)
+       if (s(pos:pos) /= ' ' .and. s(pos:pos) /= char(9)) exit
+       pos = pos + 1
+    end do
+    if (pos > n) return
+    i0 = pos
+    do while (pos <= n)
+       if (s(pos:pos) == ' ' .or. s(pos:pos) == char(9)) exit
+       pos = pos + 1
+    end do
+    tok = s(i0:pos - 1)
+  end subroutine next_ws_tok
+
+  !> Parse trailing tokens of `[NOT] OP nothing [<cmp> <val> [<cmp2> <val2>] | <lo> <hi> | <W> <H>]`.
+  !> Uses whitespace tokenization (not Fortran list-directed I/O) so `/=` is not truncated by `/`.
+  subroutine AnyAngleParsePredArgs(rest, pred, cmp, v1, v2, status)
     character(len=*), intent(in) :: rest
     integer(int32), intent(in) :: pred
     integer(int32), intent(out) :: cmp
     real(real64), intent(out) :: v1, v2
-    character(len=128) :: b1, b2, t1, t2, t3
-    integer :: ios
-    cmp = TCMP_NONE; v1 = 0.0_real64; v2 = 0.0_real64
-    t1 = ''; t2 = ''; t3 = ''
-    if (pred == TPRED_ENCLOSE_RECT) then
-       read(rest, *, iostat=ios) b1, b2, v1, v2
-       if (ios /= 0) then
-          read(rest, *, iostat=ios) b1, b2, v1
-          v2 = v1
-       end if
-       return
+    integer, intent(out), optional :: status
+    character(len=128) :: tok, t1, t2, t3, t4
+    integer :: pos, ios, st
+    integer(int32) :: base_pred, c1, c2
+    real(real64) :: x1, x2
+
+    cmp = TCMP_NONE; v1 = 0.0_real64; v2 = 0.0_real64; st = 0
+    base_pred = merge(pred - TPRED_NOT_OFFSET, pred, pred > TPRED_NOT_OFFSET)
+
+    pos = 1
+    call next_ws_tok(rest, pos, tok)  ! OP or NOT
+    if (trim(tok) == 'NOT' .or. trim(tok) == 'not') then
+       call next_ws_tok(rest, pos, tok) ! OP
     end if
-    read(rest, *, iostat=ios) b1, b2, t1, t2, t3
-    if (ios /= 0) then
-       t3 = ''
-       read(rest, *, iostat=ios) b1, b2, t1, t2
-       if (ios /= 0) then
-          t2 = ''
-          read(rest, *, iostat=ios) b1, b2, t1
-          if (ios /= 0) t1 = ''
-       end if
-    end if
-    if (len_trim(t1) == 0) return
-    select case (trim(t1))
-    case ('>');       cmp = TCMP_GT; read(t2, *, iostat=ios) v1
-    case ('>=');      cmp = TCMP_GE; read(t2, *, iostat=ios) v1
-    case ('<');       cmp = TCMP_LT; read(t2, *, iostat=ios) v1
-    case ('<=');      cmp = TCMP_LE; read(t2, *, iostat=ios) v1
-    case ('==', '='); cmp = TCMP_EQ; read(t2, *, iostat=ios) v1
-    case ('!=', '/='); cmp = TCMP_NE; read(t2, *, iostat=ios) v1
-    case default
-       ! Two numeric values -> closed range [v1, v2]; one numeric value -> == v1
-       read(t1, *, iostat=ios) v1
-       if (ios == 0) then
-          if (len_trim(t2) > 0) then
+    call next_ws_tok(rest, pos, tok)  ! rhs2 ('nothing')
+    call next_ws_tok(rest, pos, t1)
+    call next_ws_tok(rest, pos, t2)
+    call next_ws_tok(rest, pos, t3)
+    call next_ws_tok(rest, pos, t4)
+
+    if (base_pred == TPRED_ENCLOSE_RECT) then
+       if (len_trim(t1) == 0) then
+          st = 1
+       else
+          read(t1, *, iostat=ios) v1
+          if (ios /= 0) then
+             st = 1
+          else if (len_trim(t2) > 0) then
              read(t2, *, iostat=ios) v2
-             if (ios == 0) then
-                cmp = TCMP_RANGE
-             else
-                cmp = TCMP_EQ
-             end if
+             if (ios /= 0) st = 1
           else
-             cmp = TCMP_EQ
+             v2 = v1
           end if
        end if
-    end select
+       if (present(status)) status = st
+       return
+    end if
+
+    if (len_trim(t1) == 0) then
+       if (present(status)) status = st
+       return
+    end if
+
+    c1 = parse_cmp_tok(t1)
+    if (c1 /= TCMP_NONE) then
+       if (len_trim(t2) == 0) then
+          st = 1
+       else
+          read(t2, *, iostat=ios) x1
+          if (ios /= 0) then
+             st = 1
+          else if (len_trim(t3) > 0) then
+             c2 = parse_cmp_tok(t3)
+             if (c2 == TCMP_NONE .or. len_trim(t4) == 0) then
+                st = 1
+             else
+                read(t4, *, iostat=ios) x2
+                if (ios /= 0) then
+                   st = 1
+                else if ((c1 == TCMP_GT .or. c1 == TCMP_GE) .and. (c2 == TCMP_LT .or. c2 == TCMP_LE)) then
+                   v1 = x1; v2 = x2
+                   if (c1 == TCMP_GT .and. c2 == TCMP_LT) cmp = TCMP_RANGE_OO
+                   if (c1 == TCMP_GT .and. c2 == TCMP_LE) cmp = TCMP_RANGE_OC
+                   if (c1 == TCMP_GE .and. c2 == TCMP_LT) cmp = TCMP_RANGE_CO
+                   if (c1 == TCMP_GE .and. c2 == TCMP_LE) cmp = TCMP_RANGE
+                else if ((c2 == TCMP_GT .or. c2 == TCMP_GE) .and. (c1 == TCMP_LT .or. c1 == TCMP_LE)) then
+                   v1 = x2; v2 = x1
+                   if (c2 == TCMP_GT .and. c1 == TCMP_LT) cmp = TCMP_RANGE_OO
+                   if (c2 == TCMP_GT .and. c1 == TCMP_LE) cmp = TCMP_RANGE_OC
+                   if (c2 == TCMP_GE .and. c1 == TCMP_LT) cmp = TCMP_RANGE_CO
+                   if (c2 == TCMP_GE .and. c1 == TCMP_LE) cmp = TCMP_RANGE
+                else
+                   st = 1
+                end if
+             end if
+          else
+             cmp = c1; v1 = x1
+          end if
+       end if
+    else
+       ! Bare numeric values: two values -> closed range [v1, v2]; one value -> == v1
+       read(t1, *, iostat=ios) v1
+       if (ios /= 0) then
+          st = 1
+       else if (len_trim(t2) > 0) then
+          read(t2, *, iostat=ios) v2
+          if (ios /= 0) then
+             st = 1
+          else
+             cmp = TCMP_RANGE
+          end if
+       else
+          cmp = TCMP_EQ
+       end if
+    end if
+    if (present(status)) status = st
   end subroutine AnyAngleParsePredArgs
+
+  pure integer(int32) function parse_cmp_tok(t) result(c)
+    character(len=*), intent(in) :: t
+    select case (trim(t))
+    case ('>');         c = TCMP_GT
+    case ('>=');        c = TCMP_GE
+    case ('<');         c = TCMP_LT
+    case ('<=');        c = TCMP_LE
+    case ('==', '=');   c = TCMP_EQ
+    case ('!=', '/=');  c = TCMP_NE
+    case default;       c = TCMP_NONE
+    end select
+  end function parse_cmp_tok
 
   subroutine AnyAnglePredicate(A, out, pred, cmp, v1, v2, prec, status)
     type(Layer), intent(inout), target :: A, out

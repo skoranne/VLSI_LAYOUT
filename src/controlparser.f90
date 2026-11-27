@@ -1050,9 +1050,12 @@ contains
                           op_cand='NOT_COVERS'; rhs2_source_name=trim(adjustl(o3))
                        else if( trim(u1)=='NOT' .and. trim(u2)=='COVEREDBY' ) then
                           op_cand='NOT_COVEREDBY'; rhs2_source_name=trim(adjustl(o3))
-                       else if( trim(u1)=='NOT' .and. trim(u2)=='CONTAINS' ) then
-                          op_cand='NOT_CONTAINS'; rhs2_source_name=trim(adjustl(o3))
-                       end if
+                        else if( trim(u1)=='NOT' .and. trim(u2)=='CONTAINS' ) then
+                           op_cand='NOT_CONTAINS'; rhs2_source_name=trim(adjustl(o3))
+                        else if( trim(u1)=='NOT' .and. AnyAnglePredCode( trim(u2) ) > 0 .and. &
+                                 AnyAnglePredCode( trim(u2) ) <= 100 ) then
+                           op_cand='NOT_'//trim(u2); rhs2_source_name=trim(adjustl(o3))
+                        end if
                        if( len_trim(op_cand) > 0 ) primary_operator = op_cand
                      end block
                      if( .not. associated( rhs1_layer ) ) error stop "RHS1 layer not associated"
@@ -1087,9 +1090,19 @@ contains
                         if( rhs1_layer%n_used == 0 .and. rhs1_layer%n_traps == 0 .and. .not. rhs1_layer%is_compact ) &
                              call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
                         aa_op = AnyAnglePredCode( primary_operator )
-                        call AnyAngleParsePredArgs( rest, aa_op, aa_cmp, aa_v1, aa_v2 )
-                        call AnyAnglePredicate( rhs1_layer, lhs_layer, aa_op, aa_cmp, aa_v1, aa_v2, &
-                             real( used_precision, real64 ), aa_status )
+                        call AnyAngleParsePredArgs( rest, aa_op, aa_cmp, aa_v1, aa_v2, aa_status )
+                        if( aa_status /= 0 ) then
+                           write(*,'(A,A,A,I0)') 'ERROR: invalid predicate arguments for ', trim(primary_operator), &
+                                ' at line ', line_number - 1
+                           call ClearLayer( lhs_layer )
+                        else
+                           call AnyAnglePredicate( rhs1_layer, lhs_layer, aa_op, aa_cmp, aa_v1, aa_v2, &
+                                real( used_precision, real64 ), aa_status )
+                           if( aa_status /= 0 ) then
+                              write(*,'(A,A,A,I0,A,I0)') 'ERROR: predicate ', trim(primary_operator), &
+                                   ' failed status=', aa_status, ' at line ', line_number - 1
+                           end if
+                        end if
                         banded_done = .true.
                      end if
                      if( ( .not. banded_done ) .and. ( aa_any .or. AnyAngleForce() ) .and. associated( lhs_layer ) ) then

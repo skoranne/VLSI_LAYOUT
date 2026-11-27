@@ -82,6 +82,6 @@ anyangle_ops.o: design.o measure.o trap_merge.o trap_pnum.o trap_topo.o trap_mor
 test_trapoverlap.o: trapezoid.o
 trap_topo.o: trapezoid.o trap_pnum.o
 trap_morph.o: trapezoid.o trap_merge.o trap_pnum.o
-trap_pred.o: trapezoid.o trap_pnum.o
+trap_pred.o: wide_int.o trapezoid.o trap_pnum.o
 test_trapmorph.o: trapezoid.o trap_merge.o trap_pnum.o trap_morph.o
-test_trappred.o: trapezoid.o trap_merge.o trap_pnum.o trap_pred.o
+test_trappred.o: trapezoid.o trap_merge.o trap_pnum.o trap_pred.o anyangle_ops.o
