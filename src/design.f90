@@ -403,33 +403,36 @@ contains
   pure function NeedsSorting(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_SORT)
+    retval = iand(input_layer%layerState, LAYER_STATE_SORT) == 0
   end function NeedsSorting
 
   pure function NeedsPNum(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_PNUM)
+    retval = iand(input_layer%layerState, LAYER_STATE_PNUM) == 0
   end function NeedsPNum
 
   pure function NeedsRTree(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_RTREE)
+    retval = iand(input_layer%layerState, LAYER_STATE_RTREE) == 0
   end function NeedsRTree
 
   pure function NeedsHealing(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_HEAL)
+    retval = iand(input_layer%layerState, LAYER_STATE_HEAL) == 0
   end function NeedsHealing
 
   !------------------------------------------------------------------
   !  Layer storage
   !------------------------------------------------------------------
-  !> Make room for at least min_capacity boxes, keeping the live ones.
-  subroutine layer_reserve(this, min_capacity)
-    class(Layer), intent(inout)     :: this
+  !> Non-polymorphic reserve implementation. Avoiding class(Layer) dispatch
+  !> in hot paths (notably push_box) prevents ifx from emitting global static
+  !> RTTI descriptor writes in the function prologue, which otherwise causes
+  !> severe cache-line contention across OpenMP threads.
+  subroutine layer_reserve_concrete(this, min_capacity)
+    type(Layer), intent(inout)      :: this
     integer(kind=int64), intent(in) :: min_capacity
     type(Box), allocatable :: grown(:)
     integer(kind=int64)    :: i
@@ -443,6 +446,16 @@ contains
     end do
     call move_alloc( from=grown, to=this%layer_boxes )
     this%n_alloc = min_capacity
+  end subroutine layer_reserve_concrete
+
+  !> Make room for at least min_capacity boxes, keeping the live ones.
+  subroutine layer_reserve(this, min_capacity)
+    class(Layer), intent(inout)     :: this
+    integer(kind=int64), intent(in) :: min_capacity
+    select type (this)
+    type is (Layer)
+       call layer_reserve_concrete(this, min_capacity)
+    end select
   end subroutine layer_reserve
 
   subroutine push_box( xbox, th_layer )
@@ -450,7 +463,7 @@ contains
     type(Layer), intent(inout) :: th_layer
     integer(kind=int64), parameter :: K_GROWTH_FACTOR = 2
     if( th_layer%n_used == th_layer%n_alloc ) then
-       call th_layer%reserve( max( 1_int64, th_layer%n_alloc * K_GROWTH_FACTOR ) )
+       call layer_reserve_concrete( th_layer, max( 1_int64, th_layer%n_alloc * K_GROWTH_FACTOR ) )
     end if
     th_layer%n_used = th_layer%n_used + 1
     th_layer%layer_boxes( th_layer%n_used ) = xbox
