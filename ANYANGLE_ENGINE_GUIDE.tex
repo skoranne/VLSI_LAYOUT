@@ -1,0 +1,179 @@
+\documentclass[11pt,letterpaper,oneside]{report}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.multipart,fit,calc,backgrounds,decorations.pathreplacing,patterns}
+\usepackage[hidelinks,bookmarks=true,bookmarksopen=true]{hyperref}
+
+% --- Color palette ---
+\definecolor{navy}{RGB}{20,45,90}
+\definecolor{slate}{RGB}{65,85,115}
+\definecolor{tealaccent}{RGB}{15,115,120}
+\definecolor{amberaccent}{RGB}{185,110,15}
+\definecolor{crimson}{RGB}{165,35,45}
+\definecolor{codebg}{RGB}{247,248,250}
+\definecolor{codeborder}{RGB}{210,216,224}
+\definecolor{kwcolor}{RGB}{15,65,155}
+\definecolor{cmtcolor}{RGB}{85,115,85}
+\definecolor{strcolor}{RGB}{155,45,35}
+
+% --- Header / Footer ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{slate}\nouppercase{\leftmark}}
+\fancyhead[R]{\small\color{slate}MAGPARSER Any-Angle Geometry Engine}
+\fancyfoot[C]{\small\color{slate}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% --- Listings configuration ---
+\lstdefinestyle{fortranstyle}{
+  language=[90]Fortran,
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeborder},
+  keywordstyle=\color{kwcolor}\bfseries,
+  commentstyle=\color{cmtcolor}\itshape,
+  stringstyle=\color{strcolor},
+  numbers=left,
+  numberstyle=\tiny\color{slate},
+  numbersep=6pt,
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  tabsize=2,
+  captionpos=b,
+  morekeywords={int8,int32,int64,real64,c_ptr,c_int32_t,c_int64_t,c_double,bind,value,import,omp,pure,elemental,allocatable,intent,associate,block,error,stop,move_alloc,contiguous}
+}
+
+\lstdefinestyle{cppstyle}{
+  language=C++,
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeborder},
+  keywordstyle=\color{kwcolor}\bfseries,
+  commentstyle=\color{cmtcolor}\itshape,
+  stringstyle=\color{strcolor},
+  numbers=left,
+  numberstyle=\tiny\color{slate},
+  numbersep=6pt,
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  tabsize=2,
+  captionpos=b,
+  morekeywords={int8_t,int32_t,int64_t,uint64_t,size_t,override,constexpr,auto,nullptr}
+}
+
+\lstdefinestyle{ctrstyle}{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeborder},
+  commentstyle=\color{cmtcolor}\itshape,
+  morecomment=[l]{\#},
+  numbers=left,
+  numberstyle=\tiny\color{slate},
+  numbersep=6pt,
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b
+}
+
+\lstset{style=fortranstyle}
+
+% --- Theorems / Invariants ---
+\newtheorem{invariant}{Invariant}[chapter]
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{definition}{Definition}[chapter]
+
+% --- TikZ common styles ---
+\tikzset{
+  stage/.style={rectangle, rounded corners=3pt, draw=navy, fill=blue!6, thick, minimum width=2.8cm, minimum height=0.85cm, align=center, font=\small\sffamily},
+  datanode/.style={rectangle, draw=tealaccent, fill=teal!7, thick, minimum width=2.5cm, minimum height=0.75cm, align=center, font=\small\sffamily},
+  warnnode/.style={rectangle, rounded corners=3pt, draw=crimson, fill=red!6, thick, minimum width=2.8cm, minimum height=0.8cm, align=center, font=\small\sffamily},
+  flow/.style={-{Stealth[length=2.4mm]}, thick, color=navy},
+  dflow/.style={-{Stealth[length=2.2mm]}, thick, dashed, color=slate}
+}
+
+\begin{document}
+
+% --- Title Page ---
+\begin{titlepage}
+\centering
+\vspace*{1.5cm}
+{\scshape\Large VLSI Layout Verification \& Geometry Processing Architecture \par}
+\vspace{1.2cm}
+\rule{\linewidth}{1.5pt}\\[0.5cm]
+{\Huge\bfseries\color{navy} The Any-Angle Geometry Processing Engine in MAGPARSER\par}
+\vspace{0.4cm}
+{\Large\color{slate} Exact Integer-Lattice Trapezoid Decomposition, Snap Rounding, Two-Layer Booleans, Morphology, Topologicals, Predicates, OASIS \texttt{CTRAPEZOID}/\texttt{PROPERTY} Output, Modern Fortran Systems Design, and Heap-Consing Analysis\par}
+\vspace{0.3cm}
+\rule{\linewidth}{1.5pt}\\[1.4cm]
+
+\begin{tikzpicture}[scale=0.92]
+  \draw[step=0.5,gray!25,very thin] (0,0) grid (12,3.2);
+  % Slanted canonical trapezoids illustration
+  \fill[blue!15, draw=navy, thick] (1.0,0.5) -- (3.5,0.5) -- (4.5,1.5) -- (2.0,1.5) -- cycle;
+  \fill[teal!18, draw=tealaccent, thick] (2.0,1.5) -- (4.5,1.5) -- (5.0,2.5) -- (1.5,2.5) -- cycle;
+  \fill[amberaccent!20, draw=amberaccent, thick] (6.2,0.5) -- (8.8,0.5) -- (9.8,1.5) -- (7.2,1.5) -- cycle;
+  \fill[crimson!15, draw=crimson, thick] (7.2,1.5) -- (9.8,1.5) -- (8.8,2.5) -- (6.2,2.5) -- cycle;
+  \draw[dashed, slate] (0.5,0.5) -- (11.5,0.5);
+  \draw[dashed, slate] (0.5,1.5) -- (11.5,1.5);
+  \draw[dashed, slate] (0.5,2.5) -- (11.5,2.5);
+  \node[font=\scriptsize\sffamily, color=navy] at (3.25,1.0) {$T_1$ (lattice sides)};
+  \node[font=\scriptsize\sffamily, color=tealaccent] at (3.25,2.0) {$T_2$ (canonical)};
+  \node[font=\scriptsize\sffamily, color=amberaccent] at (8.0,1.0) {OASIS \texttt{CTRAPEZOID}};
+  \node[font=\scriptsize\sffamily, color=crimson] at (8.0,2.0) {Exact $i128$ Snap};
+  \node[font=\scriptsize\ttfamily, color=slate, anchor=west] at (10.1,0.5) {$y_1$};
+  \node[font=\scriptsize\ttfamily, color=slate, anchor=west] at (10.1,1.5) {$y_2$};
+  \node[font=\scriptsize\ttfamily, color=slate, anchor=west] at (10.1,2.5) {$y_3$};
+\end{tikzpicture}
+
+\vspace{1.2cm}
+{\large\textbf{Repository:} \texttt{VLSI\_LAYOUT} (\texttt{anyangle-booleans} branch)\\[0.3cm]
+\textbf{Core Implementation:} \texttt{src/wide\_int.f90}, \texttt{src/exact\_predicates.f90}, \texttt{src/trapezoid.f90}, \texttt{src/trap\_merge.f90}, \texttt{src/trap\_pnum.f90}, \texttt{src/trap\_topo.f90}, \texttt{src/trap\_morph.f90}, \texttt{src/trap\_pred.f90}, \texttt{src/anyangle\_ops.f90}, \texttt{src/prop\_oasis.f90}, \texttt{src/db/trap\_out.cpp}, \texttt{src/db/prop\_oasis\_writer.cpp}\par}
+
+\vfill
+{\large November 2026\par}
+\end{titlepage}
+
+\begin{abstract}
+This technical monograph documents the architecture, mathematical foundations, algorithms, verification methodology, language engineering trade-offs, and runtime memory behavior of the \textbf{any-angle (non-rectilinear) geometry processing engine} in \texttt{MAGPARSER}. Unlike conventional Manhattan-only layout verification engines that approximate rotated or curvilinear shapes by axis-aligned rectangular strips, \texttt{MAGPARSER}'s any-angle engine represents every planar region as a canonical, interior-disjoint set of horizontal trapezoids whose left and right sides are exact integer lattice lines stored in 40-byte Plain-Old-Data (POD) records.
+
+We trace the complete data flow from hierarchical OASIS/GDSII/Magic ingestion through exact 128-bit integer arithmetic (\texttt{WideIntModule}), single-layer merge and two-layer Booleans via parallel Hobby/Guibas--Marimont snap rounding and band-parallel treap sweeps (\texttt{TrapMergeModule}), canonical polygon numbering (\texttt{TrapPNumModule}), Minkowski collar morphology (\texttt{TrapMorphModule}), exact zero-rounding DE-9IM polygon topologicals (\texttt{TrapTopoModule}), rotation-invariant and orientation-specific geometric predicates (\texttt{TrapPredModule}), and final OASIS serialization using SEMI P39 \texttt{CTRAPEZOID}, \texttt{TRAPEZOID}, \texttt{POLYGON}, and per-polygon \texttt{PROPERTY} records (\texttt{db/trap\_out.cpp}, \texttt{db/prop\_oasis\_writer.cpp}).
+
+We document the rotational-invariance verification methodology---combining a resumable 360-angle $1^\circ$ rotation sweep (\texttt{run\_359\_sweep.py}) with an exact rational-integer (\texttt{fractions.Fraction}) gold oracle proving a strict $H_\infty \le 0.5\text{ dbu}$ Hausdorff error bound compared to $1.49\text{ dbu}$ double-rounding drift in merged-operand KLayout flows. We analyze the unique choice of \textbf{Modern Fortran (F2008/F2018)} versus C++ for EDA geometry kernels, including the Intel \texttt{ifx} OpenMP polymorphism cache-line ping-pong hazard and \texttt{nvfortran} 26.1 constraints. Finally, we empirically profile the engine's dynamic heap allocation (``consing'') behavior on rotated SKY130 layouts (\texttt{SDT16S\_R015.oas}), measuring 22.6M allocations ($6.00\times$ consing ratio) in single-layer merge and 133.3M allocations ($11.19\times$ consing ratio, 40.06 GiB allocated vs.\ 3.58 GiB peak live) in four-operation Booleans, and present a concrete four-tier Modern Fortran arena, flat-hash C++ interop, GPU memory pool, and out-of-core 100-billion-shape streaming architecture to eliminate consing.
+\end{abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\clearpage
+
+\input{docs/anyangle/ch01_arch}
+\input{docs/anyangle/ch02_trapezoid}
+\input{docs/anyangle/ch03_merge_bool}
+\input{docs/anyangle/ch04_pnum_morph}
+\input{docs/anyangle/ch05_topo_pred}
+\input{docs/anyangle/ch06_oasis_props}
+\input{docs/anyangle/ch07_verification}
+\input{docs/anyangle/ch08_fortran_vs_cpp}
+\input{docs/anyangle/ch09_memory_consing}
+\input{docs/anyangle/app_a_gpu}
+\input{docs/anyangle/app_b_ref}
+
+\end{document}

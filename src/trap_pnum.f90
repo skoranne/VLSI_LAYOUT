@@ -59,9 +59,9 @@ module TrapPNumModule
   interface
      function ldb_trapset_measure(n, rec, lab, np, nvert, holes, perim, stats) result(rc) &
           bind(c, name='ldb_trapset_measure')
-       import :: c_int, c_int32_t, c_int64_t, c_double
+       import :: c_int, c_int64_t, c_double, Trapezoid
        integer(c_int64_t), value :: n, np
-       integer(c_int32_t), intent(in) :: rec(*)
+       type(Trapezoid), intent(in) :: rec(*)
        integer(c_int64_t), intent(in) :: lab(*)
        integer(c_int64_t), intent(out) :: nvert(*), holes(*)
        real(c_double), intent(out) :: perim(*)
@@ -387,7 +387,6 @@ contains
     type(Trapezoid), intent(in) :: t(:)
     integer(int64), intent(in) :: n
     type(TrapPolys), intent(inout) :: P
-    integer(int32), allocatable :: rec(:, :)
     integer(int64) :: st(4)
     integer :: rc
     real(real64) :: t0
@@ -396,9 +395,8 @@ contains
     allocate(P%nvert(max(P%np, 1_int64)), P%holes(max(P%np, 1_int64)), P%perim(max(P%np, 1_int64)))
     P%outline_anomalies = 0
     if (P%np > 0) then
-       call TrapRecords(t, n, rec)
        st = 0
-       rc = ldb_trapset_measure(n, rec, P%lab, P%np, P%nvert, P%holes, P%perim, st)
+       rc = ldb_trapset_measure(n, t, P%lab, P%np, P%nvert, P%holes, P%perim, st)
        P%outline_anomalies = st(1)
     end if
     P%have_outline = .true.

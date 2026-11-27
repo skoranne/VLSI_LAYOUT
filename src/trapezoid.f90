@@ -29,12 +29,14 @@ module TrapezoidModule
   private
 
   !> One side of a trapezoid: the lattice line through (ax, y1 - k) with direction (dx, dy).
-  type, public :: TrapSide
+  !> bind(c) matches C++ struct Side { int32_t ax, k, dx, dy; } for zero-copy c_loc interop.
+  type, bind(c), public :: TrapSide
      integer(int32) :: ax = 0, k = 0, dx = 0, dy = 1
   end type TrapSide
 
   !> Horizontal trapezoid y1 <= y <= y2 between the sides l (left) and r (right).
-  type, public :: Trapezoid
+  !> bind(c) matches C++ struct Trap { int32_t y1, y2; Side l, r; } (40 bytes POD).
+  type, bind(c), public :: Trapezoid
      integer(int32) :: y1 = 0, y2 = 0
      type(TrapSide) :: l, r
   end type Trapezoid

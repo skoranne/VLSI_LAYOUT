@@ -1,0 +1,96 @@
+\chapter{Canonical Polygon Numbering (PNUM), Boundary Extraction, and Morphology}
+\label{ch:pnum_morph}
+
+\section{Closed-Set Polygon Components (\texttt{TrapPNumModule})}
+
+A canonical trapezoid set represents a planar region $R \subset \mathbb{R}^2$ as a collection of interior-disjoint horizontal pieces. However, topological selectors, geometric predicates, FASCL properties, and netlist connectivity all operate at the \textbf{polygon-component level}, where a polygon is a maximal connected component of the closed region $\overline{R}$ (two pieces sharing an edge \emph{or} a single corner belong to the same polygon, matching \texttt{MAGPARSER}'s Manhattan box-PNUM rule and KLayout's \texttt{merged()} with \texttt{min\_coherence=False}).
+
+\begin{theorem}[Row-Contact Theorem for Canonical Trapezoids]
+Let $T_a$ and $T_b$ be two distinct trapezoids in a canonical trapezoid set. If $\overline{T_a} \cap \overline{T_b} \ne \emptyset$, then their contact contains at least one point lying on a horizontal row $y \in \{y_{1,a}, y_{2,a}, y_{1,b}, y_{2,b}\}$.
+\end{theorem}
+\begin{proof}
+Two canonical trapezoids cannot share a side segment of positive vertical length, because the sweep in \texttt{TrapSweepUnion} would have emitted a single wider horizontal interval instead of two adjacent intervals. Nor can two non-collinear side lines meet strictly inside $(y_{1,a}, y_{2,a}) \cap (y_{1,b}, y_{2,b})$, because snap rounding splits every edge at every crossing and the sweep cuts every trapezoid at every event row. Hence any contact must occur on a top or bottom row of $T_a$ or $T_b$.
+\end{proof}
+
+\texttt{src/trap\_pnum.f90} exploits this theorem to achieve near-linear $O(N \log N)$ parallel connected-component labeling:
+\begin{enumerate}
+  \item \textbf{Spatial Grid Indexing (\texttt{t\_grid}):} All $N$ trapezoids are registered into a uniform 2D cell grid by their bounding boxes.
+  \item \textbf{Exact Row-Contact Discovery (\texttt{t\_contacts}):} In parallel over OpenMP threads, each trapezoid $i$ queries only the grid cells intersecting its bottom row $y_{1,i}$ and top row $y_{2,i}$. For each candidate $j$, \texttt{traps\_touch(T(i), T(j), y)} compares their closed rational $x$-intervals $[x_l(y), x_r(y)]$ exactly in \texttt{i128}.
+  \item \textbf{Union-Find (\texttt{t\_union}):} Contact pairs are united into disjoint sets.
+  \item \textbf{Canonical Ordering (\texttt{t\_props}):} Each connected component is assigned a unique geometric key: its \emph{lowest, then leftmost} lattice vertex $(v_y, v_x)$ (the left endpoint of a bottom edge on the component's minimum $y_1$). Sorting components by $(v_y, v_x)$ produces canonical ordinals $1 \dots N_p$ completely independent of thread count, band count, or input ordering. Simultaneously, exact integer doubled area \texttt{area2(p)}, bounding box \texttt{(x1,y1,x2,y2)}, and piece count \texttt{npieces(p)} are accumulated.
+\end{enumerate}
+
+\section{Exact Boundary Loop Tracing and 64-Bit Indexing (\texttt{db/trap\_out.cpp})}
+
+Many operations---perimeter, vertex count, hole count, morphology collars, convex hull / MABR, exterior notch distance, and \texttt{ENCLOSE\_RECTANGLE}---require the exact unbridged oriented boundary loops (outer contour counter-clockwise, holes clockwise) of each PNUM polygon. \texttt{src/db/trap\_out.cpp} implements this in a multithreaded C++17 engine (\texttt{GroupPoly}):
+
+\begin{enumerate}
+  \item \textbf{Directed Boundary Synthesis (\texttt{GroupPoly::build}):} Each trapezoid contributes its left side directed downwards, its right side directed upwards, and its bottom/top horizontal intervals directed rightwards/leftwards. Internal horizontal seams where a bottom interval cancels an identical top interval vanish via a per-row 1D interval difference sweep.
+  \item \textbf{Sharpest-Left-Turn Pairing:} All remaining boundary segments keep the polygon interior on their left. At every vertex (including pinch points where multiple contours meet at a single lattice vertex), incoming segments are paired with outgoing segments by the \emph{sharpest left turn}, decomposing the boundary cleanly into simple oriented cycles.
+  \item \textbf{Exact Collinear Simplification:} Consecutive segments on a cycle sharing the exact same primitive direction $(dx, dy)$ are collapsed into a single maximal edge. All remaining vertices are asserted to lie on the integer lattice ($q.d = 1$); any rational residue increments \texttt{st.anomalies}.
+  \item \textbf{Exact Hole Counting via Complement Cycles:} Holes are counted as bounded complement faces by splitting segments at interior lattice vertices (via line hashing) and tracing sharpest-right negative-area cycles, handling T-contacts and pinch points identically to KLayout.
+  \item \textbf{64-Bit Indexing for $> 2^{31}-1$ Trapezoids:} All global trapezoid and group index arrays (\texttt{start}, \texttt{order}, \texttt{pos}, \texttt{par}, \texttt{root}, \texttt{cnt}, \texttt{Ent::id}, \texttt{GroupPoly::run/build/measure/extract\_loops} pointers \texttt{const int64\_t* M, int64\_t nm}) use 64-bit \texttt{int64\_t}, preventing 32-bit overflow on billion-trapezoid layouts.
+\end{enumerate}
+
+\texttt{db/trap\_out.cpp} exposes three C-callable entrypoints to Fortran:
+\begin{itemize}
+  \item \texttt{ldb\_trapset\_measure}: computes per-polygon \texttt{nvert}, \texttt{holes}, and \texttt{perim} in parallel.
+  \item \texttt{ldb\_trapset\_loops} + \texttt{ldb\_trapset\_loops\_poly\_off}: returns CSR arrays \texttt{(loff, lx, ly)} plus per-polygon loop offsets \texttt{ploff(1:np+1)}.
+  \item \texttt{ldb\_trapset\_polys} / \texttt{ldb\_ow\_trapset}: exports exact lattice polygons (with zero-width keyhole hole-bridging) either back into Fortran or directly to the OASIS writer.
+\end{itemize}
+
+\section{Morphology via Minkowski Collar Duality (\texttt{TrapMorphModule})}
+
+Naive polygon offsetting shifts every edge along its normal and intersects consecutive shifted lines. On arbitrary non-convex VLSI polygons with acute corners, holes, and narrow channels, naive offsetting creates self-intersecting bow-ties, inverted loops, and vanishing islands that are notoriously fragile to untangle.
+
+\texttt{src/trap\_morph.f90} solves \texttt{GROW}, \texttt{SHRINK}, and signed \texttt{SIZE} cleanly and robustly using \textbf{Minkowski collar duality}:
+\begin{align}
+  \operatorname{GROW}(A, d)   &= A \;\cup\; C_{\text{out}}(\partial A, d), \label{eq:grow} \\
+  \operatorname{SHRINK}(A, d) &= A \;\setminus\; C_{\text{in}}(\partial A, d). \label{eq:shrink}
+\end{align}
+Here $C_{\text{out}}$ (resp.\ $C_{\text{in}}$) is the union of simple convex \emph{collar polygons} constructed along every directed edge and every diverging corner of the unbridged boundary loops $\partial A$:
+\begin{itemize}
+  \item \textbf{Edge Offset Quad:} Every boundary edge $e = (p \to q)$ with unit outward normal $\mathbf{n}_{\text{out}}$ (or inward normal $\mathbf{n}_{\text{in}}$ for \texttt{SHRINK}) emits the quadrilateral $(p, q, q + \mathbf{o}, p + \mathbf{o})$ where $\mathbf{o} = \operatorname{nint}(d\,\mathbf{n})$ (preserving the exact edge slope!).
+  \item \textbf{Corner Cap (Isotropic Mode 2):} At every diverging corner (convex vertex for \texttt{GROW}, reflex vertex for \texttt{SHRINK}), if the turning angle is $\le 90^\circ$, a miter quad $(v, q_1, m, q_2)$ connects the two offset edges; for sharper turning angles ($> 90^\circ$), an \textbf{octagon bevel 5-gon} cuts the miter at distance $\sqrt{2}\,d$ along the angle bisector, matching KLayout's \texttt{Region.sized(d, mode=2)}.
+  \item \textbf{Anisotropic 4-Directional Sizing $(d_E, d_N, d_W, d_S)$:} Uses the exact support function of the rectangle $[-d_W, d_E] \times [-d_S, d_N]$ along each edge normal.
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.05]
+  % Left: GROW = A OR C_out
+  \begin{scope}[xshift=0cm]
+    % Base polygon A (slanted L-corner)
+    \fill[blue!18, draw=navy, very thick] (0.5,0.5) -- (3.0,0.5) -- (4.0,2.5) -- (2.2,2.5) -- (1.5,1.5) -- (0.5,1.5) -- cycle;
+    \node[font=\small\bfseries, color=navy] at (2.2,1.2) {$A$};
+    % Edge offset quads (outward)
+    \fill[amberaccent!25, draw=amberaccent, thick] (0.5,0.5) -- (3.0,0.5) -- (3.0,0.0) -- (0.5,0.0) -- cycle;
+    \fill[amberaccent!25, draw=amberaccent, thick] (3.0,0.5) -- (4.0,2.5) -- (4.45,2.28) -- (3.45,0.28) -- cycle;
+    % Miter/bevel corner cap at (3.0, 0.5)
+    \fill[crimson!25, draw=crimson, thick] (3.0,0.5) -- (3.0,0.0) -- (3.35,0.0) -- (3.45,0.28) -- cycle;
+    \node[font=\scriptsize\sffamily, color=crimson, anchor=west] at (3.55,0.15) {bevel cap ($\sqrt{2}\,d$)};
+    \node[font=\scriptsize\sffamily, color=amberaccent] at (1.75,-0.25) {edge quad};
+    \node[font=\footnotesize\bfseries, color=navy] at (2.4,-0.8) {(a) $\operatorname{GROW}(A, d) = A \;\cup\; C_{\text{out}}$};
+  \end{scope}
+
+  % Right: SHRINK = A NOT C_in
+  \begin{scope}[xshift=6.5cm]
+    \fill[blue!18, draw=navy, very thick] (0.5,0.5) -- (4.0,0.5) -- (4.0,2.5) -- (2.3,2.5) -- (2.3,1.4) -- (0.5,1.4) -- cycle;
+    % Inner collar C_in along boundary
+    \fill[crimson!22, draw=crimson, dashed, thick] (0.5,0.5) -- (4.0,0.5) -- (3.65,0.85) -- (0.85,0.85) -- cycle;
+    \fill[crimson!22, draw=crimson, dashed, thick] (4.0,0.5) -- (4.0,2.5) -- (3.65,2.15) -- (3.65,0.85) -- cycle;
+    \fill[crimson!22, draw=crimson, dashed, thick] (4.0,2.5) -- (2.3,2.5) -- (2.65,2.15) -- (3.65,2.15) -- cycle;
+    \fill[crimson!22, draw=crimson, dashed, thick] (2.3,2.5) -- (2.3,1.4) -- (2.65,1.05) -- (2.65,2.15) -- cycle;
+    \fill[crimson!22, draw=crimson, dashed, thick] (2.3,1.4) -- (0.5,1.4) -- (0.85,1.05) -- (2.65,1.05) -- cycle;
+    \fill[crimson!22, draw=crimson, dashed, thick] (0.5,1.4) -- (0.5,0.5) -- (0.85,0.85) -- (0.85,1.05) -- cycle;
+    % Surviving core
+    \fill[teal!35, draw=tealaccent, very thick] (0.85,0.85) -- (3.65,0.85) -- (3.65,2.15) -- (2.65,2.15) -- (2.65,1.05) -- (0.85,1.05) -- cycle;
+    \node[font=\scriptsize\bfseries, color=tealaccent] at (3.15,1.5) {$A \setminus C_{\text{in}}$};
+    \node[font=\footnotesize\bfseries, color=navy] at (2.3,-0.8) {(b) $\operatorname{SHRINK}(A, d) = A \;\setminus\; C_{\text{in}}$};
+  \end{scope}
+\end{tikzpicture}
+\caption{Minkowski collar duality in \texttt{TrapMorphModule}. Because self-intersections and topological pinches are resolved by \texttt{TrapBooleanPolygons}, \texttt{GROW} guarantees $A \subseteq \operatorname{GROW}(A,d)$ and \texttt{SHRINK} guarantees $\operatorname{SHRINK}(A,d) \subseteq A$ with zero self-intersection artifacts.}
+\label{fig:morph_collar}
+\end{figure}
+
+Feeding $(A, C)$ into \texttt{TrapBooleanPolygons} (\texttt{TOP\_OR} for \texttt{GROW}, \texttt{TOP\_NOT} for \texttt{SHRINK}) delegates all self-intersection, hole-closure, island-vanishing, and pinch-splitting topology to the exact snap-rounding Boolean engine. On \texttt{SDT16S\_R015.oas}, \texttt{TrapMorph} passes all 7 morphology checks against KLayout with $4.8\times$ lower closing-identity error and $10.2\times$ lower opening-identity error than KLayout.

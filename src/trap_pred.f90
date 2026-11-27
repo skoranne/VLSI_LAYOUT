@@ -74,9 +74,9 @@ module TrapPredModule
 
   interface
      function ldb_trapset_loops(n, rec, lab, np, stats) result(h) bind(c, name='ldb_trapset_loops')
-       import :: c_ptr, c_int32_t, c_int64_t
+       import :: c_ptr, c_int64_t, Trapezoid
        integer(c_int64_t), value :: n, np
-       integer(c_int32_t), intent(in) :: rec(*)
+       type(Trapezoid), intent(in) :: rec(*)
        integer(c_int64_t), intent(in) :: lab(*)
        integer(c_int64_t), intent(out) :: stats(*)
        type(c_ptr) :: h
@@ -115,7 +115,6 @@ contains
     type(TrapPredStats), intent(out) :: st
 
     type(TrapPolys) :: tp
-    integer(int32), allocatable :: rec(:, :)
     integer(c_int64_t) :: cstat(8)
     type(c_ptr) :: hl
     integer(int64) :: nloop, nvert, pid, i, k, nsel_p
@@ -159,16 +158,14 @@ contains
     st%t_pnum = t1 - t0
 
     if (need_loops) then
-       call TrapRecords(traps, ntrap, rec)
        cstat = 0
-       hl = ldb_trapset_loops(ntrap, rec, tp%lab, tp%np, cstat)
+       hl = ldb_trapset_loops(ntrap, traps, tp%lab, tp%np, cstat)
        st%anomalies = st%anomalies + cstat(1)
        nloop = ldb_trapset_polys_count(hl, nvert)
        allocate(loff(nloop + 1), lx(max(nvert, 1_int64)), ly(max(nvert, 1_int64)), ploff(tp%np + 1))
        call ldb_trapset_polys_get(hl, loff, lx, ly)
        call ldb_trapset_loops_poly_off(hl, ploff)
        call ldb_trapset_polys_free(hl)
-       deallocate(rec)
     else
        allocate(loff(1), lx(1), ly(1), ploff(1))
     end if

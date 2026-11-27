@@ -37,8 +37,9 @@ namespace {
 using i128 = __int128;
 using ldbgeom::Pt;
 
-struct Side { int64_t ax, k, dx, dy; };
-struct Trap { int64_t y1, y2; Side l, r; };
+struct Side { int32_t ax, k, dx, dy; };
+struct Trap { int32_t y1, y2; Side l, r; };
+static_assert(sizeof(Trap) == 10 * sizeof(int32_t), "Trap must match 10 x int32_t POD layout");
 struct Q { i128 n; int64_t d; };                 // x = n / d, d > 0
 
 Q qred(Q q) {
@@ -49,7 +50,7 @@ Q qred(Q q) {
     if (a > 1) { q.n /= a; q.d /= a; }
     return q;
 }
-Q side_x(const Side& s, int64_t y1, int64_t y) { return qred({ (i128)s.ax * s.dy + (i128)(y - (y1 - s.k)) * s.dx, s.dy }); }
+Q side_x(const Side& s, int64_t y1, int64_t y) { return qred({ (i128)s.ax * s.dy + (i128)(y - (y1 - s.k)) * s.dx, (int64_t)s.dy }); }
 int qcmp(const Q& a, const Q& b) { i128 l = a.n * b.d, r = b.n * a.d; return l < r ? -1 : (l > r ? 1 : 0); }
 int qcmp_int(const Q& a, int64_t x) { i128 l = a.n, r = (i128)x * a.d; return l < r ? -1 : (l > r ? 1 : 0); }
 
@@ -100,19 +101,28 @@ struct ChunkOut {
 // ---------------------------------------------------------------- one group -> polygons
 // Reusable per-thread workspace: vectors keep their capacity between groups.
 struct GroupPoly {
-    const std::vector<Trap>& T;
+    const Trap* T;
     struct Seg { int a, b; int64_t dx, dy; };
     struct PRef { int64_t y; i128 n; int64_t d; int seg_end; };   // seg_end = 2*seg + (0 a / 1 b)
     struct Node { int64_t x, y; int prev, next; };
+    struct Ev { Q x; int b, t; };
+    struct LineSeg { int64_t dx, dy; i128 c; int seg_id; };
     std::vector<Seg> seg;
     std::vector<PRef> pr;
     std::vector<VKey> vk;
     std::vector<std::pair<int64_t, int64_t>> rowev;   // (y, +-(trap index in M + 1))
-    std::vector<int> ostart, olist, nxt, ls, cv, loop_start;
+    std::vector<Ev> ev;
+    std::vector<int> ostart, olist, pos_tmp, nxt, ls, cv, loop_start;
     std::vector<char> used, seen, vis;
     std::vector<i128> loop_area;
     std::vector<Node> nd;
-    GroupPoly(const std::vector<Trap>& t) : T(t) {}
+    std::vector<std::pair<std::pair<int64_t, int64_t>, int>> holes_tmp;
+    std::vector<LineSeg> lse;
+    std::vector<std::pair<int64_t, int64_t>> dirs_tmp, by_y2_flat;
+    std::vector<std::pair<int64_t, int>> nodes_at_flat;
+    std::vector<std::pair<long double, int>> pts_tmp;
+    std::vector<char> used2_tmp;
+    GroupPoly(const Trap* t) : T(t) {}
 
     void add_seg(int64_t ya, const Q& xa, int64_t yb, const Q& xb, int64_t dx, int64_t dy) {
         if (ya == yb && xa.n == xb.n && xa.d == xb.d) return;
@@ -140,8 +150,6 @@ struct GroupPoly {
         }
         // --- horizontal parts: bottoms (rightwards) minus tops (leftwards), per row
         std::sort(rowev.begin(), rowev.end());
-        struct Ev { Q x; int b, t; };
-        std::vector<Ev> ev;
         for (size_t r0 = 0; r0 < rowev.size();) {
             size_t r1 = r0;
             const int64_t y = rowev[r0].first;
@@ -188,8 +196,8 @@ struct GroupPoly {
         ostart.assign((size_t)nv + 1, 0); olist.assign((size_t)ns, 0);
         for (auto& sg : seg) ostart[(size_t)sg.a + 1]++;
         for (int v = 0; v < nv; ++v) ostart[(size_t)v + 1] += ostart[(size_t)v];
-        { std::vector<int> pos(ostart.begin(), ostart.end() - 1);
-          for (int i = 0; i < ns; ++i) olist[(size_t)pos[(size_t)seg[(size_t)i].a]++] = i; }
+        pos_tmp.assign(ostart.begin(), ostart.end() - 1);
+        for (int i = 0; i < ns; ++i) olist[(size_t)pos_tmp[(size_t)seg[(size_t)i].a]++] = i;
         nxt.assign((size_t)ns, -1); used.assign((size_t)ns, 0);
         for (int i = 0; i < ns; ++i) {
             const Seg& sg = seg[(size_t)i];
@@ -319,8 +327,8 @@ struct GroupPoly {
             ndx = dx / g; ndy = dy / g;
             if (ndy < 0 || (ndy == 0 && ndx < 0)) { ndx = -ndx; ndy = -ndy; }
         };
-        std::unordered_map<LKey, std::vector<int>, LHash> lines;
-        std::vector<std::pair<int64_t,int64_t>> dirs;
+        lse.clear();
+        dirs_tmp.clear();
         auto vx_is_int = [&](int v) { return vk[(size_t)v].n % vk[(size_t)v].d == 0; };
         for (int i = 0; i < ns; ++i) {
             const Seg& sg = seg[(size_t)i];
@@ -330,19 +338,27 @@ struct GroupPoly {
             const i128 cn = (i128)ndy * a.n - (i128)ndx * a.y * a.d;   // c * a.d (exact for lattice lines)
             if (cn % a.d != 0) continue;               // not a lattice line: cannot hold a lattice vertex
             const i128 c = cn / a.d;
-            lines[{ ndx, ndy, c }].push_back(i);
-            dirs.push_back({ ndx, ndy });
+            lse.push_back({ ndx, ndy, c, i });
+            dirs_tmp.push_back({ ndx, ndy });
         }
-        std::sort(dirs.begin(), dirs.end()); dirs.erase(std::unique(dirs.begin(), dirs.end()), dirs.end());
+        auto lse_lt = [](const LineSeg& a, const LineSeg& b) {
+            if (a.dx != b.dx) return a.dx < b.dx;
+            if (a.dy != b.dy) return a.dy < b.dy;
+            return a.c < b.c;
+        };
+        std::sort(lse.begin(), lse.end(), lse_lt);
+        std::sort(dirs_tmp.begin(), dirs_tmp.end());
+        dirs_tmp.erase(std::unique(dirs_tmp.begin(), dirs_tmp.end()), dirs_tmp.end());
         splits.clear();
         for (int v = 0; v < nv; ++v) {
             if (!vx_is_int(v)) continue;
             const int64_t x = (int64_t)(vk[(size_t)v].n / vk[(size_t)v].d), y = vk[(size_t)v].y;
-            for (auto& d : dirs) {
+            for (auto& d : dirs_tmp) {
                 const i128 c = (i128)d.second * x - (i128)d.first * y;
-                auto it = lines.find({ d.first, d.second, c });
-                if (it == lines.end()) continue;
-                for (int i : it->second) {
+                const LineSeg key{ d.first, d.second, c, 0 };
+                auto it = std::lower_bound(lse.begin(), lse.end(), key, lse_lt);
+                for (; it != lse.end() && it->dx == d.first && it->dy == d.second && it->c == c; ++it) {
+                    const int i = it->seg_id;
                     const Seg& sg = seg[(size_t)i];
                     if (sg.a == v || sg.b == v) continue;
                     const VKey& a = vk[(size_t)sg.a]; const VKey& b = vk[(size_t)sg.b];
@@ -362,23 +378,22 @@ struct GroupPoly {
         std::sort(splits.begin(), splits.end());
         seg2.clear();
         size_t q = 0;
-        std::vector<std::pair<long double,int>> pts;
         for (int i = 0; i < ns; ++i) {
             const Seg& sg = seg[(size_t)i];
             if (q < splits.size() && splits[q].first == i) {
-                pts.clear();
+                pts_tmp.clear();
                 const VKey& a = vk[(size_t)sg.a];
                 const long double ax = (long double)a.n / (long double)a.d;
                 while (q < splits.size() && splits[q].first == i) {
                     const VKey& p = vk[(size_t)splits[q].second];
                     const long double t = sg.dy != 0 ? (long double)(p.y - a.y) / (long double)sg.dy
                                                      : ((long double)p.n / (long double)p.d - ax) / (long double)sg.dx;
-                    pts.push_back({ t, splits[q].second });
+                    pts_tmp.push_back({ t, splits[q].second });
                     ++q;
                 }
-                std::sort(pts.begin(), pts.end());
+                std::sort(pts_tmp.begin(), pts_tmp.end());
                 int prev = sg.a;
-                for (auto& pp : pts) { if (pp.second != prev) { seg2.push_back({ prev, pp.second, sg.dx, sg.dy }); prev = pp.second; } }
+                for (auto& pp : pts_tmp) { if (pp.second != prev) { seg2.push_back({ prev, pp.second, sg.dx, sg.dy }); prev = pp.second; } }
                 seg2.push_back({ prev, sg.b, sg.dx, sg.dy });
             } else {
                 seg2.push_back(sg);
@@ -389,10 +404,10 @@ struct GroupPoly {
         os2.assign((size_t)nv + 1, 0); ol2.assign((size_t)n2, 0);
         for (auto& sg : seg2) os2[(size_t)sg.a + 1]++;
         for (int v = 0; v < nv; ++v) os2[(size_t)v + 1] += os2[(size_t)v];
-        { std::vector<int> pos(os2.begin(), os2.end() - 1);
-          for (int i = 0; i < n2; ++i) ol2[(size_t)pos[(size_t)seg2[(size_t)i].a]++] = i; }
+        pos_tmp.assign(os2.begin(), os2.end() - 1);
+        for (int i = 0; i < n2; ++i) ol2[(size_t)pos_tmp[(size_t)seg2[(size_t)i].a]++] = i;
         nx2.assign((size_t)n2, -1);
-        std::vector<char> used2((size_t)n2, 0);
+        used2_tmp.assign((size_t)n2, 0);
         for (int i = 0; i < n2; ++i) {
             const Seg& sg = seg2[(size_t)i];
             const int64_t rx = -sg.dx, ry = -sg.dy;
@@ -403,8 +418,8 @@ struct GroupPoly {
                 const Seg& a = seg2[(size_t)o]; const Seg& b = seg2[(size_t)best];
                 if (rel_less(rx, ry, a.dx, a.dy, b.dx, b.dy)) best = o;      // smallest ccw angle
             }
-            if (best < 0 || used2[(size_t)best]) { st.anomalies++; return -1; }
-            used2[(size_t)best] = 1;
+            if (best < 0 || used2_tmp[(size_t)best]) { st.anomalies++; return -1; }
+            used2_tmp[(size_t)best] = 1;
             nx2[(size_t)i] = best;
         }
         seen2.assign((size_t)n2, 0);
@@ -462,14 +477,14 @@ struct GroupPoly {
             loop_start.push_back(base); loop_area.push_back(a2);
         }
         // --- holes (clockwise loops): bridge each to a lattice vertex below it
-        std::vector<std::pair<std::pair<int64_t, int64_t>, int>> holes;     // (lowest y, x), node
+        holes_tmp.clear();
         for (size_t l = 0; l < loop_start.size(); ++l) {
             if (loop_area[l] >= 0) continue;
             int b = loop_start[l], n = b, lo = b;
             do { if (nd[(size_t)n].y < nd[(size_t)lo].y || (nd[(size_t)n].y == nd[(size_t)lo].y && nd[(size_t)n].x < nd[(size_t)lo].x)) lo = n; n = nd[(size_t)n].next; } while (n != b);
-            holes.push_back({ { nd[(size_t)lo].y, nd[(size_t)lo].x }, lo });
+            holes_tmp.push_back({ { nd[(size_t)lo].y, nd[(size_t)lo].x }, lo });
         }
-        if (!holes.empty()) bridge_holes(M, nm, holes, out);
+        if (!holes_tmp.empty()) bridge_holes(M, nm, holes_tmp, out);
         long double want = 0;                                 // 2A of the trapezoids
         for (int i = 0; i < nm; ++i) {
             const Trap& z = T[(size_t)M[i]];
@@ -513,17 +528,21 @@ struct GroupPoly {
     void bridge_holes(const int64_t* M, int64_t nm, std::vector<std::pair<std::pair<int64_t, int64_t>, int>>& holes, ChunkOut& out) {
         std::sort(holes.begin(), holes.end());
         out.st.holes += (int64_t)holes.size();
-        std::unordered_map<int64_t, std::vector<int64_t>> by_y2;            // row -> trapezoids ending
-        std::unordered_map<int64_t, std::vector<int>> nodes_at;             // row -> nodes
-        for (int64_t i = 0; i < nm; ++i) by_y2[T[(size_t)M[i]].y2].push_back(M[i]);
-        for (size_t i = 0; i < nd.size(); ++i) nodes_at[nd[i].y].push_back((int)i);
+        by_y2_flat.clear();
+        nodes_at_flat.clear();
+        for (int64_t i = 0; i < nm; ++i) by_y2_flat.push_back({ (int64_t)T[(size_t)M[i]].y2, M[i] });
+        std::sort(by_y2_flat.begin(), by_y2_flat.end());
+        for (size_t i = 0; i < nd.size(); ++i) nodes_at_flat.push_back({ nd[i].y, (int)i });
+        std::sort(nodes_at_flat.begin(), nodes_at_flat.end());
+        auto cmp_y_i64 = [](const std::pair<int64_t, int64_t>& a, int64_t y) { return a.first < y; };
+        auto cmp_y_int = [](const std::pair<int64_t, int>& a, int64_t y) { return a.first < y; };
         for (auto& h : holes) {
             const int vh = h.second;
             const int64_t vx = nd[(size_t)vh].x, vy = nd[(size_t)vh].y;
-            // trapezoid whose top edge contains v (prefer v strictly inside the top edge)
             int64_t tb = -1;
-            auto it = by_y2.find(vy);
-            if (it != by_y2.end()) for (int64_t t : it->second) {
+            auto it = std::lower_bound(by_y2_flat.begin(), by_y2_flat.end(), vy, cmp_y_i64);
+            for (; it != by_y2_flat.end() && it->first == vy; ++it) {
+                const int64_t t = it->second;
                 const Trap& z = T[(size_t)t];
                 const Q xl = side_x(z.l, z.y1, vy), xr = side_x(z.r, z.y1, vy);
                 if (qcmp_int(xl, vx) <= 0 && qcmp_int(xr, vx) >= 0) {
@@ -533,11 +552,10 @@ struct GroupPoly {
             if (tb < 0) { out.st.anomalies++; continue; }
             const Trap& z = T[(size_t)tb];
             const Q bl = side_x(z.l, z.y1, z.y1), br = side_x(z.r, z.y1, z.y1);
-            // a node on the bottom edge of tb whose wedge contains the direction towards v,
-            // closest to vx; the bridge lies inside tb, so it is exact and crosses nothing
             int wn = -1; int64_t bestd = INT64_MAX;
-            auto jt = nodes_at.find(z.y1);
-            if (jt != nodes_at.end()) for (int n : jt->second) {
+            auto jt = std::lower_bound(nodes_at_flat.begin(), nodes_at_flat.end(), (int64_t)z.y1, cmp_y_int);
+            for (; jt != nodes_at_flat.end() && jt->first == (int64_t)z.y1; ++jt) {
+                const int n = jt->second;
                 const Node& c = nd[(size_t)n];
                 if (qcmp_int(bl, c.x) > 0 || qcmp_int(br, c.x) < 0) continue;
                 const int64_t ux = vx - c.x, uy = vy - c.y;
@@ -547,7 +565,6 @@ struct GroupPoly {
                 if (d < bestd) { bestd = d; wn = n; }
             }
             if (wn < 0) { out.st.anomalies++; continue; }
-            // splice: wn -> vh ... (hole) ... hp -> v' -> w' -> n1
             const int n1 = nd[(size_t)wn].next, hp = nd[(size_t)vh].prev;
             const int vp = (int)nd.size(); nd.push_back({ vx, vy, hp, -1 });
             const int wp = (int)nd.size(); nd.push_back({ nd[(size_t)wn].x, nd[(size_t)wn].y, vp, n1 });
@@ -555,7 +572,12 @@ struct GroupPoly {
             nd[(size_t)hp].next = vp;
             nd[(size_t)n1].prev = wp;
             nd[(size_t)wn].next = vh; nd[(size_t)vh].prev = wn;
-            nodes_at[vy].push_back(vp); nodes_at[nd[(size_t)wp].y].push_back(wp);
+            // insert vp and wp keeping nodes_at_flat sorted by y (rare: only when a polygon has >1 hole)
+            auto ins_node = [&](int64_t ny, int nid) {
+                auto pos = std::lower_bound(nodes_at_flat.begin(), nodes_at_flat.end(), ny, cmp_y_int);
+                nodes_at_flat.insert(pos, { ny, nid });
+            };
+            ins_node(vy, vp); ins_node(nd[(size_t)wp].y, wp);
         }
     }
 };
@@ -617,11 +639,7 @@ int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink) {
     using clk = std::chrono::steady_clock;
     const auto tA = clk::now();
     auto secs = [&](clk::time_point a) { return std::chrono::duration<double>(clk::now() - a).count(); };
-    std::vector<Trap> T((size_t)n);
-    for (int64_t i = 0; i < n; ++i) {
-        const int32_t* r = rec + 10 * i;
-        T[(size_t)i] = { r[0], r[1], { r[2], r[3], r[4], r[5] }, { r[6], r[7], r[8], r[9] } };
-    }
+    const Trap* T = reinterpret_cast<const Trap*>(rec);
     Output out{ nullptr, 0, 0, {} };
     int nth = (int)std::thread::hardware_concurrency();
     if (const char* e = std::getenv("OMP_NUM_THREADS")) { int v = std::atoi(e); if (v > 0) nth = v; }
@@ -813,11 +831,7 @@ extern "C" void ldb_trapset_polys_free(void* h) { delete (TrapPolySet*)h; }
 // Outputs (np each): vertices, holes, perimeter (dbu, real). stats[0] = anomalies.
 extern "C" int ldb_trapset_measure(int64_t n, const int32_t* rec, const int64_t* lab, int64_t np,
                                    int64_t* nvert, int64_t* holes, double* perim, int64_t* stats) {
-    std::vector<Trap> T((size_t)n);
-    for (int64_t i = 0; i < n; ++i) {
-        const int32_t* r = rec + 10 * i;
-        T[(size_t)i] = { r[0], r[1], { r[2], r[3], r[4], r[5] }, { r[6], r[7], r[8], r[9] } };
-    }
+    const Trap* T = reinterpret_cast<const Trap*>(rec);
     std::vector<int64_t> start((size_t)np + 2, 0), order((size_t)n);
     for (int64_t i = 0; i < n; ++i) start[(size_t)lab[i] + 1]++;
     for (int64_t p = 0; p <= np; ++p) start[(size_t)p + 1] += start[(size_t)p];
@@ -860,11 +874,7 @@ extern "C" void* ldb_trapset_loops(int64_t n, const int32_t* rec, const int64_t*
         if (stats) stats[0] = 0;
         return r;
     }
-    std::vector<Trap> T((size_t)n);
-    for (int64_t i = 0; i < n; ++i) {
-        const int32_t* p = rec + 10 * i;
-        T[(size_t)i] = { p[0], p[1], { p[2], p[3], p[4], p[5] }, { p[6], p[7], p[8], p[9] } };
-    }
+    const Trap* T = reinterpret_cast<const Trap*>(rec);
     std::vector<int64_t> start((size_t)np + 2, 0), order((size_t)n);
     for (int64_t i = 0; i < n; ++i) start[(size_t)lab[i] + 1]++;
     for (int64_t p = 0; p <= np; ++p) start[(size_t)p + 1] += start[(size_t)p];

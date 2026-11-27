@@ -1,0 +1,154 @@
+\chapter{OASIS Output Pipeline: \texttt{CTRAPEZOID} Emission and Per-Polygon \texttt{PROPERTY} Support}
+\label{ch:oasis_props}
+
+\section{From Canonical Trapezoids to OASIS \texttt{CTRAPEZOID} / \texttt{POLYGON}}
+
+Although \texttt{MAGPARSER}'s internal representation stores canonical horizontal trapezoids whose sides are exact lattice lines, an individual trapezoid can have \emph{rational} (non-integer) $x$-coordinates at its top or bottom corners when a slab cut intersects a slanted boundary edge between two lattice vertices. SEMI P39 OASIS geometry records require \textbf{integer} vertex coordinates.
+
+\texttt{src/db/trap\_out.cpp} solves this exact-export problem cleanly without rounding any coordinate:
+\begin{enumerate}
+  \item \textbf{Rational-Corner Classification:} For each trapezoid $i$, a 4-bit mask \texttt{rat[i]} tests whether each corner $(bl, br, tl, tr)$ has a non-zero modulo remainder in Eq.~(\ref{eq:side_x}) using \texttt{i128}.
+  \item \textbf{Exact Pairing Across Rational Corners:} Every rational top corner on row $y_2$ of a trapezoid must match a unique rational bottom corner on row $y_1 = y_2$ of the trapezoid directly above it on the \emph{exact same lattice line}. Using a 64-bit hash of \texttt{(row, LineKey, side)} and parallel bucket sorting, \texttt{trapset\_run} pairs every rational corner one-to-one and unions the two trapezoids into a single export group.
+  \item \textbf{Singleton Fast Path (\texttt{CTRAPEZOID} / \texttt{TRAPEZOID}):} Any trapezoid whose four corners are all integer lattice points (\texttt{rat[i] == 0}, forming a singleton group) is emitted directly to \texttt{oasis\_writer::Writer::trapezoid\_h} without polygon tracing:
+  \begin{itemize}
+    \item \textbf{\texttt{CTRAPEZOID} (record 26, types 0--23):} If both slanted sides have angles in $\{0^\circ, \pm 45^\circ, 90^\circ\}$ (all $45^\circ$-octagonal / $45^\circ$-rotated Manhattan shapes!), OASIS encodes the entire trapezoid in a compact \texttt{CTRAPEZOID} record specifying only a 5-bit type code plus width/height!
+    \item \textbf{\texttt{TRAPEZOID\_A} (24), \texttt{TRAPEZOID\_B} (25), or \texttt{TRAPEZOID} (23):} If one or both sides have general rational slopes, OASIS emits a horizontal \texttt{TRAPEZOID} record with exact integer $\Delta a, \Delta b$ deltas.
+  \end{itemize}
+  \item \textbf{Multi-Trapezoid Group Path (\texttt{POLYGON}):} Any group joined across rational corners has all its outer boundary vertices on the integer lattice (Invariant I1). \texttt{GroupPoly::trace\_emit} extracts its exact lattice contour, bridges any holes via zero-width keyhole cuts inside a single trapezoid (guaranteed crossing-free), and emits an exact OASIS \texttt{POLYGON} (record 21).
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.75cm and 0.9cm, scale=0.9, transform shape]
+  \node[datanode] (tset) {Canonical \texttt{Trapezoid(1:N)}\\(\texttt{ldb\_ow\_trapset})};
+  \node[stage, right=1.0cm of tset] (rat) {Rational-Corner Mask\\(\texttt{rat[i]} via \texttt{i128})};
+  \node[stage, below=0.95cm of rat, xshift=-3.0cm] (sing) {Singleton \& \texttt{rat==0}\\(\texttt{Writer::trapezoid\_h})};
+  \node[stage, below=0.95cm of rat, xshift=3.2cm] (grp) {Union Across Rational Corners\\(\texttt{GroupPoly::trace\_emit})};
+
+  \node[datanode, below=0.95cm of sing, xshift=-1.9cm] (ctrap) {\textbf{OASIS \texttt{CTRAPEZOID}}\\Rec 26 (types 0--23)\\$0^\circ / 45^\circ / 90^\circ$ sides};
+  \node[datanode, below=0.95cm of sing, xshift=1.9cm] (trap) {\textbf{OASIS \texttt{TRAPEZOID}}\\Rec 23/24/25\\Arbitrary slopes};
+  \node[datanode, below=0.95cm of grp] (poly) {\textbf{OASIS \texttt{POLYGON}}\\Rec 21 + Keyhole\\Hole Bridging};
+
+  \node[stage, below=1.0cm of trap, xshift=1.5cm, minimum width=7.5cm] (cblk) {Modal Variables + \texttt{CBLOCK} (Rec 34, Deflate) + \texttt{STRICT} Tables};
+
+  \draw[flow] (tset) -- (rat);
+  \draw[flow] (rat.south) -| (sing.north);
+  \draw[flow] (rat.south) -| (grp.north);
+  \draw[flow] (sing.south) -| node[above left, font=\scriptsize]{$45^\circ$/$90^\circ$} (ctrap.north);
+  \draw[flow] (sing.south) -| node[above right, font=\scriptsize]{general} (trap.north);
+  \draw[flow] (grp.south) -- (poly.north);
+  \draw[flow] (ctrap.south) |- (cblk.west);
+  \draw[flow] (trap.south) -- (cblk.north -| trap.south);
+  \draw[flow] (poly.south) |- (cblk.east);
+\end{tikzpicture}
+\caption{Exact integer-coordinate OASIS serialization decision tree in \texttt{db/trap\_out.cpp} and \texttt{db/oasis\_writer.cpp}.}
+\label{fig:oasis_decision}
+\end{figure}
+
+Table~\ref{tab:oasis_records} shows the actual OASIS record distribution emitted by \texttt{TRAPMERGE.exe} on \texttt{SDT16S\_R045.oas} ($45^\circ$-rotated) versus \texttt{SDT16S\_R015.oas} ($15^\circ$-rotated). At $45^\circ$, \textbf{2,948,381} shapes ($57.2\%$ of all emitted geometry records, and $100\%$ of the 2.21M rotated square contacts on \texttt{67/44}) are emitted as compact OASIS \texttt{CTRAPEZOID} / \texttt{TRAPEZOID} records with zero polygon tracing overhead.
+
+\begin{table}[htbp]
+\centering
+\caption{Measured OASIS record counts from \texttt{TRAPMERGE.exe} on rotated \texttt{SDT16S} layers.}
+\label{tab:oasis_records}
+\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{Design / Layers} & \textbf{Can. Traps} & \textbf{\texttt{CTRAPEZOID}} & \textbf{\texttt{TRAPEZOID}} & \textbf{\texttt{POLYGON}} & \textbf{Degen.} & \textbf{OASIS Size} \\
+\midrule
+\texttt{SDT16S\_R015} (\texttt{66/20}) & 4,317,174 & 0 & 556 & 487,343 & 0 & 5.87 MB \\
+\texttt{SDT16S\_R045} (\texttt{66/20}+\texttt{67/44}) & 6,366,607 & \textbf{2,948,381} & 1,650,258 & 551,167 & 0 & 23.55 MB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{FASCL Per-Polygon Properties and OASIS \texttt{PROPERTY} Support}
+
+Modern verification and LVS/extraction flows attach rich typed metadata---such as electrical net IDs (\texttt{NET\_ID}), DEF net names (\texttt{NET\_NAME}), polygon area, perimeter, vertex count, and custom user-defined attributes---directly to individual polygons. \texttt{MAGPARSER} implements this via four tightly integrated modules:
+\begin{itemize}
+  \item \textbf{\texttt{PropertyTableModule} (\texttt{src/property\_table.f90}):} Stores per-polygon typed columns (\texttt{PK\_INT}, \texttt{PK\_FLOAT}, \texttt{PK\_STRING}, \texttt{PK\_STRUCT}) in flat SoA arrays indexed by canonical PNUM ordinal $1 \dots N_p$. On any-angle layers, \texttt{PropTableIndexPieces} binds the table directly to \texttt{TrapPNum}'s canonical ordinals and caches validity on the trapezoid-set hash.
+  \item \textbf{\texttt{FASCLModule} (\texttt{src/fascl.f90}):} Compiles and evaluates CTR lambda expressions (\texttt{PROPERTY:NAME = db:layer FASCL [ (id) ... ] db:nothing}) in parallel over polygons, with exact \texttt{AREA}, \texttt{PERIMETER}, \texttt{VERTICES}, bbox, and \texttt{NET\_ID} builtins working on both Manhattan and any-angle layers.
+  \item \textbf{\texttt{FASCLConnectModule} (\texttt{src/fascl\_connect.f90}):} Evaluates multi-layer connectivity (\texttt{CONNECT a cut b [cut c ...]}, built-in PDK stacks \texttt{SKY130}, \texttt{ASAP7}, \texttt{GT2N}) using exact \texttt{trap\_overlap\_positive} whenever any stack member is any-angle, assigning canonical \texttt{NET\_ID(id)} ordinals (verified byte-identical at \texttt{R000} and multiset-identical at \texttt{R030} across 186,565 nets on \texttt{SDT16S}).
+  \item \textbf{\texttt{PropOasisModule} (\texttt{src/prop\_oasis.f90}) + \texttt{db/prop\_oasis\_writer.cpp}:} Serializes layers with their typed \texttt{PropertyTable} columns into standards-compliant SEMI P39 OASIS files (\texttt{exec oasout}).
+\end{itemize}
+
+\subsection{SEMI P39 \texttt{PROPERTY} Encoding, Repetitions, and \texttt{STRICT} Tables}
+
+In \texttt{src/db/prop\_oasis\_writer.cpp}, each polygon element is followed immediately by its typed OASIS \texttt{PROPERTY} (record 28) records:
+\begin{itemize}
+  \item \texttt{PK\_INT} $\to$ OASIS value type 9 (signed integer);
+  \item \texttt{PK\_FLOAT} $\to$ OASIS value type 7 (IEEE-754 64-bit double);
+  \item \texttt{PK\_STRING} $\to$ \texttt{PROPSTRING} table reference (types 13/14/15 selected by character class: \texttt{n-string}, \texttt{a-string}, or \texttt{b-string});
+  \item \texttt{PK\_STRUCT} $\to$ a single \texttt{PROPERTY} record whose value list alternates \texttt{[field-name (PROPSTRING ref), field-value, ...]}.
+  \item \textbf{\texttt{PROPERTY\_REPEAT} (record 29):} Whenever consecutive elements share identical property records, the writer emits the 1-byte \texttt{PROPERTY\_REPEAT} record instead of re-encoding the payload.
+  \item \textbf{Property-Aware Pattern Recognition \& Repetitions:} Polygons are grouped by the composite key \textbf{\texttt{(canonical shape, serialized property records)}} and decomposed into OASIS repetitions (type 1 2D grids, types 2/3 rows/columns, types 4/6/10 irregular point lists). Because SEMI P39 specifies that a \texttt{PROPERTY} record following a repeated geometry element applies to \emph{every} instance in the repetition, keying on both shape and properties guarantees that identical shapes with different \texttt{NET\_ID} or attribute values are never falsely merged.
+  \item \textbf{\texttt{CBLOCK} and \texttt{STRICT} Mode:} Controlled via CTR \texttt{var oasis\_cblock}, \texttt{oasis\_repetition}, \texttt{oasis\_strict} (all default 1), and \texttt{oasis\_cblock\_bytes} (default 4 MiB). Cell bodies are deflate-compressed into \texttt{CBLOCK} (record 34) chunks aligned on record boundaries, and \texttt{STRICT} mode writes contiguous \texttt{CELLNAME}/\texttt{PROPNAME}/\texttt{PROPSTRING}/\texttt{LAYERNAME} tables with explicit offsets in the 256-byte-padded \texttt{END} record.
+\end{itemize}
+
+\begin{lstlisting}[style=cppstyle,caption={OASIS \texttt{PROPERTY} type mapping and property-keyed repetition invariant in \texttt{src/db/prop\_oasis\_writer.cpp}.},label={lst:prop_oasis}]
+// Every element is followed by its PROPERTY records:
+//   INT    -> signed integer (type 9)
+//   FLOAT  -> IEEE double    (type 7)
+//   STRING -> PROPSTRING ref (types 13/14/15 by character class)
+//   STRUCT -> [field-name (PROPSTRING ref), field-value, ...]
+// Identical consecutive property records emit PROPERTY-REPEAT (29).
+// Pattern recognition groups polygons by (shape AND property records)
+// so OASIS repetitions (types 1,2,3,4,6,10) never merge differing props.
+\end{lstlisting}
+
+\textbf{Any-Angle \texttt{exec oasout} Roadmap:} Currently \texttt{prop\_oasis.f90:132} rejects any-angle layers with a clean error message while Manhattan layers export full \texttt{PROPERTY} tables (verified by \texttt{db/regressions/fascl/run\_fascl\_regression.sh} against KLayout). Extending \texttt{exec oasout} to any-angle layers requires adding \texttt{fpo\_begin\_anyangle\_layer} in \texttt{db/prop\_oasis\_writer.cpp} to accept CSR lattice polygons (or \texttt{CTRAPEZOID} singletons) directly from \texttt{ldb\_trapset\_polys} grouped by PNUM ordinal, reusing the exact same \texttt{PROPERTY}, repetition, \texttt{CBLOCK}, and \texttt{STRICT} encoder.
+
+\section{SEMI P39 Binary Stream Anatomy}
+
+Figure~\ref{fig:oasis_stream} illustrates the exact byte-level framing produced by \texttt{db/oasis\_writer.cpp} and \texttt{db/prop\_oasis\_writer.cpp} in \texttt{STRICT} + \texttt{CBLOCK} mode.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.92, transform shape]
+  % Top stream: File layout
+  \node[datanode, minimum width=1.8cm] (hdr) {\texttt{START} (1)\\\scriptsize offset-flag=1};
+  \node[stage, right=0.3cm of hdr, minimum width=2.2cm] (cell) {\texttt{CELL} (14)\\\scriptsize top cell header};
+  \node[stage, right=0.3cm of cell, minimum width=4.6cm, fill=amberaccent!14, draw=amberaccent] (cblk) {\texttt{CBLOCK} (34) $\times K$\\\scriptsize Deflate stream (4 MiB chunks)};
+  \node[datanode, right=0.3cm of cblk, minimum width=2.7cm] (tbl) {\texttt{STRICT} Tables\\\scriptsize CELL/PROP/LAYER};
+  \node[datanode, right=0.3cm of tbl, minimum width=1.8cm] (endr) {\texttt{END} (2)\\\scriptsize 256 B pad};
+
+  \draw[flow] (hdr) -- (cell);
+  \draw[flow] (cell) -- (cblk);
+  \draw[flow] (cblk) -- (tbl);
+  \draw[flow] (tbl) -- (endr);
+
+  % Zoom-in box inside CBLOCK
+  \node[draw=navy, rounded corners=3pt, fill=blue!4, below=1.0cm of cblk, minimum width=12.6cm, minimum height=2.1cm] (zoom) {};
+  \node[font=\scriptsize\bfseries, color=navy, anchor=north west] at (zoom.north west) {\quad Inside Deflated \texttt{CBLOCK} Stream (Modal Variables + \texttt{XYRELATIVE} Mode):};
+
+  \node[datanode, minimum width=2.4cm, minimum height=0.85cm] (g1) at ([xshift=-4.6cm, yshift=-0.2cm]zoom.center) {\texttt{CTRAPEZOID} (26)\\\scriptsize info, type 0--23, w, h, xy};
+  \node[stage, right=0.35cm of g1, minimum width=2.4cm, minimum height=0.85cm, fill=teal!12, draw=tealaccent] (p1) {\texttt{PROPERTY} (28)\\\scriptsize propname ref + val};
+  \node[datanode, right=0.35cm of p1, minimum width=2.6cm, minimum height=0.85cm] (g2) {\texttt{POLYGON} (21)\\\scriptsize pointlist + repetition};
+  \node[stage, right=0.35cm of g2, minimum width=2.5cm, minimum height=0.85cm, fill=crimson!10, draw=crimson] (p2) {\texttt{PROP\_REPEAT} (29)\\\scriptsize 1-byte reuse};
+
+  \draw[flow] (g1) -- (p1);
+  \draw[flow] (p1) -- (g2);
+  \draw[flow] (g2) -- (p2);
+
+  \draw[dashed, amberaccent, thick] (cblk.south west) -- (zoom.north west);
+  \draw[dashed, amberaccent, thick] (cblk.south east) -- (zoom.north east);
+\end{tikzpicture}
+\caption{SEMI P39 OASIS binary record layout combining \texttt{CTRAPEZOID}/\texttt{POLYGON} geometry records, per-polygon \texttt{PROPERTY} (28) / \texttt{PROPERTY\_REPEAT} (29) metadata, 4 MiB \texttt{CBLOCK} deflate compression, and \texttt{STRICT} table offsets.}
+\label{fig:oasis_stream}
+\end{figure}
+
+\subsection{\texttt{PropertyTable} SoA Storage and Proposed Any-Angle Writer API}
+
+In \texttt{src/property\_table.f90}, each layer's \texttt{PropertyTable} stores polygon attributes in flat column arrays (\texttt{present(:)}, \texttt{ival(:)}, \texttt{rval(:)}, \texttt{soff(:)}, \texttt{schars(:)}) indexed directly by canonical PNUM ordinal $1 \dots N_p$. Listing~\ref{lst:fpo_anyangle} shows the proposed C API extension to \texttt{db/prop\_oasis\_writer.cpp} to connect any-angle trapezoid layers to \texttt{exec oasout} with zero changes to the downstream \texttt{PROPERTY} and repetition encoder.
+
+\begin{lstlisting}[style=cppstyle,caption={Proposed \texttt{fpo\_begin\_anyangle\_layer} C API bridging \texttt{ldb\_trapset\_polys} to \texttt{db/prop\_oasis\_writer.cpp}.},label={lst:fpo_anyangle}]
+extern "C" int32_t fpo_begin_anyangle_layer(
+    void* h, const char* lname, int64_t layer, int64_t datatype,
+    int64_t npoly,
+    const int64_t* poly_off,   // 1-based CSR offsets per PNUM polygon (len npoly+1)
+    const int64_t* xs,         // lattice polygon X vertices (exact int64)
+    const int64_t* ys          // lattice polygon Y vertices (exact int64)
+);
+// Reuses fpo_column() for INT/FLOAT/STRING/STRUCT properties and fpo_end_layer()
+// for (shape, property)-keyed repetition detection, CBLOCK compression, and STRICT tables.
+\end{lstlisting}

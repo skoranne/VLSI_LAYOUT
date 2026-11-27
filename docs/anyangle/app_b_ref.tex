@@ -1,0 +1,73 @@
+\chapter{Reference Tables: DE-9IM Topologicals, OASIS \texttt{CTRAPEZOID} Types, and Build Targets}
+\label{app:ref}
+
+\section{DE-9IM Polygon-Level Topological Operator Definitions}
+
+Table~\ref{tab:de9im_ref} lists the exact Boolean combinations of the five per-polygon flags computed by \texttt{TrapTopoModule} (\texttt{src/trap\_topo.f90}): interior overlap (\texttt{ov}), 1D segment touch (\texttt{t2}), 0D point touch (\texttt{t1}), full coverage of $a$ by $B$ (\texttt{inB} $= \neg\texttt{a\_out}$), and boundary-to-complement contact (\texttt{bnd}). Every operator also has an exact \texttt{NOT\_*} and two-word \texttt{NOT <OP>} complement.
+
+\begin{table}[htbp]
+\centering
+\caption{Exact definitions of the 12 polygon-level topological operators in \texttt{src/trap\_topo.f90}.}
+\label{tab:de9im_ref}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Operator} & \textbf{Code} & \textbf{Complement} & \textbf{Exact Predicate on Polygon $a \in A$ vs.\ Layer $B$} \\
+\midrule
+\texttt{INTERACT} & 101 & \texttt{NOT\_INTERACT} (102) & $\texttt{ov} \lor \texttt{t2} \lor \texttt{t1}$ (any closed-set contact) \\
+\texttt{CUT} & 103 & \texttt{NOT\_CUT} (104) & $\texttt{ov} \land \neg\texttt{inB}$ (interior overlap, not fully inside $B$) \\
+\texttt{TOUCH} & 105 & \texttt{NOT\_TOUCH} (106) & $\texttt{t2} \land \neg\texttt{ov}$ (1D boundary segment contact only) \\
+\texttt{INSIDE} & 107 & \texttt{NOT\_INSIDE} (108) & $\texttt{inB}$ ($a \subseteq B$ as closed sets) \\
+\texttt{OUTSIDE} & 109 & \texttt{NOT\_OUTSIDE} (110) & $\neg(\texttt{ov} \lor \texttt{t2} \lor \texttt{t1})$ (no contact at all) \\
+\texttt{EQUAL} & 119 & \texttt{NOT\_EQUAL} (120) & $a \subseteq B \land \exists b \in B$ meeting $a$ with $b \subseteq A \land 2A(a)=2A(b)$ \\
+\texttt{DISJOINT} & 121 & \texttt{NOT\_DISJOINT} (122) & $\neg(\texttt{ov} \lor \texttt{t2} \lor \texttt{t1})$ (synonym of \texttt{OUTSIDE}) \\
+\texttt{MEET} & 123 & \texttt{NOT\_MEET} (124) & $(\texttt{t2} \lor \texttt{t1}) \land \neg\texttt{ov}$ (1D or 0D boundary touch only) \\
+\texttt{OVERLAPS} & 125 & \texttt{NOT\_OVERLAPS} (126) & $\exists b \in B$: $\texttt{ov}(a,b) \land a \not\subseteq B \land b \not\subseteq A$ \\
+\texttt{COVERS} & 127 & \texttt{NOT\_COVERS} (128) & $\exists b \in B$ meeting $a$: $b \subseteq A \land \partial b \cap A^c \text{ has 1D contact}$ \\
+\texttt{COVEREDBY} & 129 & \texttt{NOT\_COVEREDBY} (130) & $a \subseteq B \land \partial a \cap B^c \text{ has 1D contact}$ \\
+\texttt{CONTAINS} & 131 & \texttt{NOT\_CONTAINS} (132) & $\exists b \in B$ with interior meeting $a$ and $b \subseteq A$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{OASIS SEMI P39 \texttt{CTRAPEZOID} Record Encoding Summary}
+
+In \texttt{src/db/oasis\_writer.cpp}, \texttt{Writer::trapezoid\_h} maps any horizontal trapezoid with integer lattice corners $(bl, y_1), (br, y_1), (tl, y_2), (tr, y_2)$ and height $h = y_2 - y_1 > 0$ into a SEMI P39 \texttt{CTRAPEZOID} (record 26, types 0--23) whenever both side slopes $(tl - bl)/h$ and $(tr - br)/h$ lie in $\{-1, 0, +1\}$ (corresponding to $-45^\circ$, $90^\circ$, $+45^\circ$ edges). Table~\ref{tab:ctrap_types} summarizes the primary horizontal \texttt{CTRAPEZOID} families used by the any-angle writer.
+
+\begin{table}[htbp]
+\centering
+\caption{Primary horizontal OASIS \texttt{CTRAPEZOID} (record 26) families emitted by \texttt{db/oasis\_writer.cpp}.}
+\label{tab:ctrap_types}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Types} & \textbf{Geometry Class} & \textbf{Left / Right Slopes} & \textbf{Encoded Dimensions} \\
+\midrule
+0--3 & Right-angled $45^\circ$ trapezoids & One vertical ($0$), one $\pm 45^\circ$ ($\pm 1$) & Width $w$, height $h$ \\
+4--7 & Symmetric / parallelogram $45^\circ$ & Both $\pm 45^\circ$ (parallel or symmetric) & Width $w$, height $h$ \\
+16--19 & Right isosceles $45^\circ$ triangles & Degenerate top or bottom edge ($w_t=0$ or $w_b=0$) & Leg length $h$ only \\
+20--23 & Isosceles $45^\circ$ triangles & Base $2h$, apex at midpoint & Height $h$ only \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Build and Regression Command Quick Reference}
+
+\begin{lstlisting}[style=ctrstyle,caption={Build and verification commands for NVIDIA HPC SDK (\texttt{nvfortran}) and Intel (\texttt{ifx}).},label={lst:build_ref}]
+# 1. Build on NVIDIA Grace-Blackwell (aarch64, nvfortran 26.1)
+export PATH="/opt/nvidia/hpc_sdk/Linux_aarch64/26.1/compilers/bin:$PATH"
+cd src && make -C db liblayoutdb.a -j4
+make -f Makefile.nvf MAGPARSER.exe TRAPMERGE.exe TRAPBOOL.exe \
+     test_wide_int.exe test_predicates.exe test_trapoverlap.exe \
+     test_trapmerge.exe test_trapbool.exe test_trapmorph.exe test_trappred.exe -j4
+
+# 2. Build on Intel Xeon (x86_64, ifx 2025.0)
+bash -lc 'source ~/LOAD_IFX.sh && cd src && make -f Makefile.ifx MAGPARSER.exe test_trappred.exe -j4'
+
+# 3. Unit & Rational Gold Verification
+./test_trappred.exe && ./test_trapmorph.exe && ./test_trapbool.exe
+(cd regress/anyangle/gold && TRAPBOOL=../../../TRAPBOOL.exe ./run_gold.sh)
+
+# 4. Full 1-degree (0..359) Rotation-Invariance Sweep
+python3 regress/anyangle/run_359_sweep.py --designs SDT16,MW --angles 0-359
+\end{lstlisting}

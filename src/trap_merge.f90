@@ -40,6 +40,7 @@ module TrapMergeModule
   use WideIntModule
   use ExactPredicatesModule
   use TrapezoidModule
+  use TrapArenaModule
   use CompactLayerModule, only: CompactSortPairs
   implicit none
   private
@@ -106,10 +107,17 @@ module TrapMergeModule
      logical, allocatable :: oLin(:), oRin(:), nLin(:), nRin(:), used(:)
      integer(int64), allocatable :: oys(:), nys(:)
      integer(int32) :: nseq = 0
+     ! persistent per-thread event & cluster scratch (grown on high-water mark, never freed between bands)
+     integer(int64), allocatable :: sk(:), sv(:), ek(:), ev(:), hk(:), hv(:), iv(:), stk(:), sti(:)
+     integer(int64), allocatable :: ca(:), cb(:), ce0(:), cs0(:), ce1(:), cs1(:)
+     integer(int32), allocatable :: starts(:), ends(:)
      ! output: raw trapezoids (y1, y2, left fragment, right fragment), global fragment ids
      integer(int64) :: nout = 0
      integer(int64), allocatable :: oy1(:), oy2(:), outl(:), outr(:)
   end type Sweep
+
+  !> Persistent per-thread sweep arena pool (Tier 1 consing elimination).
+  type(Sweep), allocatable, save :: g_sw(:)
 
   public :: TrapMergePolygons, TrapBuildEdges, TrapSnapRound, TrapSweepUnion
   public :: TrapBooleanPolygons
@@ -828,12 +836,12 @@ contains
 
   ! ======================================================================= 3. sweep
 
-  !> Serial LSD radix sort of non-negative keys (< 2**63) carrying idx.
-  subroutine radix_sort_pairs(key, idx, n)
+  !> Serial LSD radix sort of non-negative keys (< 2**63) carrying idx, reusing caller workspace.
+  subroutine radix_sort_pairs_ws(key, idx, n, tk, ti)
     integer(int64), intent(inout) :: key(:)
     integer(int64), intent(inout) :: idx(:)
     integer(int64), intent(in) :: n
-    integer(int64), allocatable :: tk(:), ti(:)
+    integer(int64), allocatable, intent(inout) :: tk(:), ti(:)
     integer(int64) :: cnt(0:2047), i, j, d, s, kk, ii
     integer :: pass
     if (n < 2) return
@@ -848,7 +856,7 @@ contains
        end do
        return
     end if
-    allocate(tk(n), ti(n))
+    call arena_ensure_i64(tk, n); call arena_ensure_i64(ti, n)
     do pass = 0, 5
        cnt = 0
        do i = 1, n
@@ -867,6 +875,15 @@ contains
        end do
        key(1:n) = tk(1:n); idx(1:n) = ti(1:n)
     end do
+  end subroutine radix_sort_pairs_ws
+
+  subroutine radix_sort_pairs(key, idx, n)
+    integer(int64), intent(inout) :: key(:)
+    integer(int64), intent(inout) :: idx(:)
+    integer(int64), intent(in) :: n
+    integer(int64), allocatable :: tk(:), ti(:)
+    if (n < 2) return
+    call radix_sort_pairs_ws(key, idx, n, tk, ti)
   end subroutine radix_sort_pairs
 
   !> op (default TOP_NONZERO) selects the region: see TrapInside.
@@ -880,9 +897,9 @@ contains
     integer(int64), parameter :: NBIN = 65536
     integer(int64) :: ymin, ymax, i, nnh, tot, acc, b, nb, b0, b1, j, span
     integer(int64), allocatable :: hist(:), ybnd(:), bcnt(:), boff(:), bids(:), bpos(:)
-    type(Sweep), allocatable :: sw(:)
     integer(int64), allocatable :: ry1(:), ry2(:), rl(:), rr(:)
-    integer :: nbw
+    integer :: nbw, nt, tid
+    integer(int32) :: op_use
     real(real64) :: t0
     integer(int64) :: atot(8)
 
@@ -954,32 +971,46 @@ contains
           end do
        end if
     end do
-    allocate(sw(0:nb - 1))
-    if (present(op)) sw(:)%op = op
-    !$omp parallel do schedule(dynamic, 1)
+    nt = max(1, omp_get_max_threads())
+    if (.not. allocated(g_sw)) then
+       allocate(g_sw(0:nt - 1))
+    else if (size(g_sw) < nt) then
+       deallocate(g_sw)
+       allocate(g_sw(0:nt - 1))
+    end if
+    op_use = TOP_NONZERO
+    if (present(op)) op_use = op
+    do tid = 0, nt - 1
+       g_sw(tid)%op = op_use
+       g_sw(tid)%nout = 0
+       g_sw(tid)%anomalies = 0
+       g_sw(tid)%atype = 0
+       g_sw(tid)%rng = -1831433054_int32
+    end do
+    !$omp parallel do schedule(dynamic, 1) private(tid)
     do b = 0, nb - 1
-       call sweep_band(F, bids(boff(b) + 1:boff(b + 1)), bcnt(b), ybnd(b), ybnd(b + 1), sw(b))
+       tid = omp_get_thread_num()
+       call sweep_band(F, bids(boff(b) + 1:boff(b + 1)), bcnt(b), ybnd(b), ybnd(b + 1), g_sw(tid))
     end do
     !$omp end parallel do
     tot = 0
     atot = 0
-    do b = 0, nb - 1
-       tot = tot + sw(b)%nout
-       st%anomalies = st%anomalies + sw(b)%anomalies
-       atot = atot + sw(b)%atype
+    do tid = 0, nt - 1
+       tot = tot + g_sw(tid)%nout
+       st%anomalies = st%anomalies + g_sw(tid)%anomalies
+       atot = atot + g_sw(tid)%atype
     end do
     allocate(ry1(max(tot, 1_int64)), ry2(max(tot, 1_int64)), rl(max(tot, 1_int64)), rr(max(tot, 1_int64)))
     j = 0
-    do b = 0, nb - 1
-       if (sw(b)%nout > 0) then
-          ry1(j + 1:j + sw(b)%nout) = sw(b)%oy1(1:sw(b)%nout)
-          ry2(j + 1:j + sw(b)%nout) = sw(b)%oy2(1:sw(b)%nout)
-          rl(j + 1:j + sw(b)%nout) = sw(b)%outl(1:sw(b)%nout)
-          rr(j + 1:j + sw(b)%nout) = sw(b)%outr(1:sw(b)%nout)
-          j = j + sw(b)%nout
+    do tid = 0, nt - 1
+       if (g_sw(tid)%nout > 0) then
+          ry1(j + 1:j + g_sw(tid)%nout) = g_sw(tid)%oy1(1:g_sw(tid)%nout)
+          ry2(j + 1:j + g_sw(tid)%nout) = g_sw(tid)%oy2(1:g_sw(tid)%nout)
+          rl(j + 1:j + g_sw(tid)%nout) = g_sw(tid)%outl(1:g_sw(tid)%nout)
+          rr(j + 1:j + g_sw(tid)%nout) = g_sw(tid)%outr(1:g_sw(tid)%nout)
+          j = j + g_sw(tid)%nout
        end if
     end do
-    deallocate(sw)
     if (any(atot /= 0)) write(*, '(a,8(1x,i0))') 'TrapSweepUnion anomaly types:', atot
     st%traps_raw = tot
     st%t_sweep = omp_get_wtime() - t0
@@ -1534,6 +1565,7 @@ contains
   end subroutine process_cluster
 
   !> Sweep one band [ylo, yhi]: fragments ids(1:nid) (global indices into F).
+  !> Reuses thread-local persistent arena buffers inside S (zero per-band alloc/free after warmup).
   subroutine sweep_band(F, ids, nid, ylo, yhi, S)
     type(FragSet), intent(in) :: F
     integer(int64), intent(in) :: ids(:), nid, ylo, yhi
@@ -1541,9 +1573,6 @@ contains
     integer(int64) :: i, g, nn, nh, ns, ne, ni, y, ps, pe, ph, ys, ye, yh, pe1, ps1, ph1, xa, xb
     integer(int64) :: nc, c, c2
     integer(int64) :: qe, qs, qh, x0, x1v, which
-    integer(int64), allocatable :: sk(:), sv(:), ek(:), ev(:), hk(:), hv(:), iv(:)
-    integer(int64), allocatable :: ca(:), cb(:), ce0(:), cs0(:), ce1(:), cs1(:)
-    integer(int32), allocatable :: starts(:), ends(:)
     integer(int32) :: n, curL, R
     integer(int64) :: W
     logical :: prev, now
@@ -1558,21 +1587,33 @@ contains
        end if
     end do
     S%nn = int(nn, int32)
-    allocate(S%x1(0:nn), S%y1(0:nn), S%x2(0:nn), S%y2(0:nn), S%dx(0:nn), S%dy(0:nn), S%rec_y(0:nn))
-    allocate(S%w(0:nn), S%lc(0:nn), S%rc(0:nn), S%par(0:nn), S%pri(0:nn), S%sw(0:nn), S%slb(0:nn), &
-             S%srb(0:nn), S%rec_r(0:nn), S%gid(0:nn), S%flb(0:nn), S%frb(0:nn))
-    S%lc = 0; S%rc = 0; S%par = 0; S%sw = 0; S%slb = 0; S%srb = 0; S%flb = 0; S%frb = 0; S%w = 0
-    S%dy(0) = 1; S%dx(0) = 0; S%x1(0) = 0; S%y1(0) = 0; S%rec_y = 0; S%rec_r = 0
-    allocate(S%oy1(1024), S%oy2(1024), S%outl(1024), S%outr(1024))
-    S%nout = 0; S%root = 0
+    call arena_ensure0_i64(S%x1, nn); call arena_ensure0_i64(S%y1, nn)
+    call arena_ensure0_i64(S%x2, nn); call arena_ensure0_i64(S%y2, nn)
+    call arena_ensure0_i64(S%dx, nn); call arena_ensure0_i64(S%dy, nn)
+    call arena_ensure0_i64(S%rec_y, nn); call arena_ensure0_i64(S%w, nn)
+    call arena_ensure0_i64(S%sw, nn); call arena_ensure0_i64(S%gid, nn)
+    call arena_ensure0_i32(S%lc, nn); call arena_ensure0_i32(S%rc, nn)
+    call arena_ensure0_i32(S%par, nn); call arena_ensure0_i32(S%pri, nn)
+    call arena_ensure0_i32(S%slb, nn); call arena_ensure0_i32(S%srb, nn)
+    call arena_ensure0_i32(S%rec_r, nn)
+    call arena_ensure0_i8(S%flb, nn); call arena_ensure0_i8(S%frb, nn)
+    S%lc(0:nn) = 0; S%rc(0:nn) = 0; S%par(0:nn) = 0; S%sw(0:nn) = 0
+    S%slb(0:nn) = 0; S%srb(0:nn) = 0; S%flb(0:nn) = 0; S%frb(0:nn) = 0; S%w(0:nn) = 0
+    S%dy(0) = 1; S%dx(0) = 0; S%x1(0) = 0; S%y1(0) = 0; S%rec_y(0:nn) = 0; S%rec_r(0:nn) = 0
+    if (.not. allocated(S%oy1)) then
+       allocate(S%oy1(65536), S%oy2(65536), S%outl(65536), S%outr(65536))
+    end if
+    S%root = 0
     call grow_work(S, 64)
-    allocate(sk(max(nn, 1_int64)), sv(max(nn, 1_int64)), ek(max(nn, 1_int64)), ev(max(nn, 1_int64)))
-    allocate(hk(max(nh, 1_int64)), hv(max(nh, 1_int64)), iv(max(nn, 1_int64)))
+    call arena_ensure_i64(S%sk, max(nn, 1_int64)); call arena_ensure_i64(S%sv, max(nn, 1_int64))
+    call arena_ensure_i64(S%ek, max(nn, 1_int64)); call arena_ensure_i64(S%ev, max(nn, 1_int64))
+    call arena_ensure_i64(S%hk, max(nh, 1_int64)); call arena_ensure_i64(S%hv, max(nh, 1_int64))
+    call arena_ensure_i64(S%iv, max(nn, 1_int64))
     nn = 0; nh = 0; ns = 0; ne = 0; ni = 0
     do i = 1, nid
        g = ids(i)
        if (F%y1(g) == F%y2(g)) then
-          nh = nh + 1; hk(nh) = (F%y1(g) + KB)*K31 + (F%x1(g) + KB); hv(nh) = g
+          nh = nh + 1; S%hk(nh) = (F%y1(g) + KB)*K31 + (F%x1(g) + KB); S%hv(nh) = g
           cycle
        end if
        nn = nn + 1
@@ -1580,24 +1621,24 @@ contains
        S%dx(nn) = F%x2(g) - F%x1(g); S%dy(nn) = F%y2(g) - F%y1(g)
        S%w(nn) = F%w(g); S%gid(nn) = g
        if (F%y1(g) <= ylo) then
-          ni = ni + 1; iv(ni) = nn
+          ni = ni + 1; S%iv(ni) = nn
        else
-          ns = ns + 1; sk(ns) = (F%y1(g) + KB)*K31 + (F%x1(g) + KB); sv(ns) = nn
+          ns = ns + 1; S%sk(ns) = (F%y1(g) + KB)*K31 + (F%x1(g) + KB); S%sv(ns) = nn
        end if
        if (F%y2(g) < yhi) then
-          ne = ne + 1; ek(ne) = (F%y2(g) + KB)*K31 + (F%x2(g) + KB); ev(ne) = nn
+          ne = ne + 1; S%ek(ne) = (F%y2(g) + KB)*K31 + (F%x2(g) + KB); S%ev(ne) = nn
        end if
     end do
-    call radix_sort_pairs(sk, sv, ns)
-    call radix_sort_pairs(ek, ev, ne)
-    call radix_sort_pairs(hk, hv, nh)
-    allocate(starts(max(ns, 1_int64)), ends(max(ne, 1_int64)))
-    starts(1:ns) = int(sv(1:ns), int32); ends(1:ne) = int(ev(1:ne), int32)
+    call radix_sort_pairs_ws(S%sk, S%sv, ns, S%stk, S%sti)
+    call radix_sort_pairs_ws(S%ek, S%ev, ne, S%stk, S%sti)
+    call radix_sort_pairs_ws(S%hk, S%hv, nh, S%stk, S%sti)
+    call arena_ensure_i32(S%starts, max(ns, 1_int64)); call arena_ensure_i32(S%ends, max(ne, 1_int64))
+    S%starts(1:ns) = int(S%sv(1:ns), int32); S%ends(1:ne) = int(S%ev(1:ne), int32)
 
     ! ---- initial state at ylo
     S%y = ylo
     do i = 1, ni
-       call tr_insert(S, int(iv(i), int32))
+       call tr_insert(S, int(S%iv(i), int32))
     end do
     W = 0; prev = .false.; curL = 0
     n = tr_first(S)
@@ -1617,27 +1658,29 @@ contains
     end if
 
     ! ---- event rows
-    allocate(ca(64), cb(64), ce0(64), cs0(64), ce1(64), cs1(64))
+    call arena_ensure_i64(S%ca, 64_int64); call arena_ensure_i64(S%cb, 64_int64)
+    call arena_ensure_i64(S%ce0, 64_int64); call arena_ensure_i64(S%cs0, 64_int64)
+    call arena_ensure_i64(S%ce1, 64_int64); call arena_ensure_i64(S%cs1, 64_int64)
     ps = 1; pe = 1; ph = 1
     do
        ys = BIG; ye = BIG; yh = BIG
-       if (ps <= ns) ys = sk(ps) / K31 - KB
-       if (pe <= ne) ye = ek(pe) / K31 - KB
-       if (ph <= nh) yh = hk(ph) / K31 - KB
+       if (ps <= ns) ys = S%sk(ps) / K31 - KB
+       if (pe <= ne) ye = S%ek(pe) / K31 - KB
+       if (ph <= nh) yh = S%hk(ph) / K31 - KB
        y = min(ys, ye, yh)
        if (y == BIG) exit
        S%y = y
        ps1 = ps; pe1 = pe; ph1 = ph
        do while (ps1 <= ns)
-          if (sk(ps1) / K31 - KB /= y) exit
+          if (S%sk(ps1) / K31 - KB /= y) exit
           ps1 = ps1 + 1
        end do
        do while (pe1 <= ne)
-          if (ek(pe1) / K31 - KB /= y) exit
+          if (S%ek(pe1) / K31 - KB /= y) exit
           pe1 = pe1 + 1
        end do
        do while (ph1 <= nh)
-          if (hk(ph1) / K31 - KB /= y) exit
+          if (S%hk(ph1) / K31 - KB /= y) exit
           ph1 = ph1 + 1
        end do
        ! clusters: x-intervals of end points, start points and horizontal fragments
@@ -1647,28 +1690,28 @@ contains
          do while (qe < pe1 .or. qs < ps1 .or. qh < ph1)
             x0 = BIG; which = 0
             if (qe < pe1) then
-               if (mod(ek(qe), K31) - KB < x0) then
-                  x0 = mod(ek(qe), K31) - KB; which = 1
+               if (mod(S%ek(qe), K31) - KB < x0) then
+                  x0 = mod(S%ek(qe), K31) - KB; which = 1
                end if
             end if
             if (qs < ps1) then
-               if (mod(sk(qs), K31) - KB < x0) then
-                  x0 = mod(sk(qs), K31) - KB; which = 2
+               if (mod(S%sk(qs), K31) - KB < x0) then
+                  x0 = mod(S%sk(qs), K31) - KB; which = 2
                end if
             end if
             if (qh < ph1) then
-               if (mod(hk(qh), K31) - KB < x0) then
-                  x0 = mod(hk(qh), K31) - KB; which = 3
+               if (mod(S%hk(qh), K31) - KB < x0) then
+                  x0 = mod(S%hk(qh), K31) - KB; which = 3
                end if
             end if
             x1v = x0
-            if (which == 3) x1v = F%x2(hv(qh))
+            if (which == 3) x1v = F%x2(S%hv(qh))
             if (nc == 0) then
                call new_cluster()
-            else if (x0 > cb(nc)) then
+            else if (x0 > S%cb(nc)) then
                call new_cluster()
             else
-               cb(nc) = max(cb(nc), x1v)
+               S%cb(nc) = max(S%cb(nc), x1v)
             end if
             select case (which)
             case (1); qe = qe + 1
@@ -1677,21 +1720,21 @@ contains
             end select
          end do
          if (nc > 0) then
-            ce1(nc) = pe1 - 1; cs1(nc) = ps1 - 1
+            S%ce1(nc) = pe1 - 1; S%cs1(nc) = ps1 - 1
             do c = 1, nc - 1
-               ce1(c) = ce0(c + 1) - 1; cs1(c) = cs0(c + 1) - 1
+               S%ce1(c) = S%ce0(c + 1) - 1; S%cs1(c) = S%cs0(c + 1) - 1
             end do
          end if
          c = 1
          do while (c <= nc)
-            xa = ca(c); xb = cb(c); c2 = c
+            xa = S%ca(c); xb = S%cb(c); c2 = c
             do
                R = tr_first_gt(S, xb)
                if (R == 0 .or. c2 >= nc) exit
-               if (x_cmp_int(S, R, ca(c2 + 1)) < 0) exit
-               c2 = c2 + 1; xb = cb(c2)
+               if (x_cmp_int(S, R, S%ca(c2 + 1)) < 0) exit
+               c2 = c2 + 1; xb = S%cb(c2)
             end do
-            call process_cluster(S, xa, xb, ends, ce0(c), ce1(c2), starts, cs0(c), cs1(c2))
+            call process_cluster(S, xa, xb, S%ends, S%ce0(c), S%ce1(c2), S%starts, S%cs0(c), S%cs1(c2))
             c = c2 + 1
          end do
        end block
@@ -1705,21 +1748,18 @@ contains
        if (S%flb(n) /= 0) call emit(S, S%rec_y(n), yhi, n, S%rec_r(n))
        n = tr_succ(S, n)
     end do
-    deallocate(S%x1, S%y1, S%x2, S%y2, S%dx, S%dy, S%rec_y, S%w, S%lc, S%rc, S%par, S%pri, &
-               S%sw, S%slb, S%srb, S%rec_r, S%gid, S%flb, S%frb)
   contains
     subroutine new_cluster()
-      integer(int64), allocatable :: t(:)
-      if (nc >= size(ca, kind=int64)) then
-         allocate(t(2*nc)); t(1:nc) = ca(1:nc); call move_alloc(t, ca)
-         allocate(t(2*nc)); t(1:nc) = cb(1:nc); call move_alloc(t, cb)
-         allocate(t(2*nc)); t(1:nc) = ce0(1:nc); call move_alloc(t, ce0)
-         allocate(t(2*nc)); t(1:nc) = cs0(1:nc); call move_alloc(t, cs0)
-         allocate(t(2*nc)); t(1:nc) = ce1(1:nc); call move_alloc(t, ce1)
-         allocate(t(2*nc)); t(1:nc) = cs1(1:nc); call move_alloc(t, cs1)
+      if (nc >= size(S%ca, kind=int64)) then
+         call arena_grow_i64(S%ca, nc, 2 * nc)
+         call arena_grow_i64(S%cb, nc, 2 * nc)
+         call arena_grow_i64(S%ce0, nc, 2 * nc)
+         call arena_grow_i64(S%cs0, nc, 2 * nc)
+         call arena_grow_i64(S%ce1, nc, 2 * nc)
+         call arena_grow_i64(S%cs1, nc, 2 * nc)
       end if
       nc = nc + 1
-      ca(nc) = x0; cb(nc) = x1v; ce0(nc) = qe; cs0(nc) = qs
+      S%ca(nc) = x0; S%cb(nc) = x1v; S%ce0(nc) = qe; S%cs0(nc) = qs
     end subroutine new_cluster
   end subroutine sweep_band
 

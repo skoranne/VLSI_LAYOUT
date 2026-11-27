@@ -1,0 +1,76 @@
+\chapter{Modern Fortran vs.\ C++ for VLSI Geometry Processing}
+\label{ch:fortran_vs_cpp}
+
+\section{Why Modern Fortran Is a Unique Choice in EDA}
+
+Commercial and open-source EDA geometry engines (Calibre, ICV, KLayout, Boost.Polygon, CGAL) are written almost exclusively in C or C++. Choosing \textbf{Modern Fortran (Fortran 2008/2018)} for \texttt{MAGPARSER}'s core geometric algorithms---while delegating irregular graph/hash/I/O codecs to C++17 in \texttt{src/db/}---is a genuinely distinctive architectural decision. After implementing nearly 12,000 lines of exact any-angle geometry, FASCL, and OpenMP/GPU kernels across both Intel \texttt{ifx} and NVIDIA \texttt{nvfortran}, we can evaluate this choice with concrete engineering evidence rather than folklore.
+
+\section{Concrete Advantages of Modern Fortran}
+
+\begin{enumerate}
+  \item \textbf{Zero-Aliasing SoA Arrays by Default:} In Fortran, distinct dummy array arguments are guaranteed non-aliasing by the language standard (equivalent to pervasive \texttt{\_\_restrict\_\_} in C++). Structure-of-Arrays (SoA) geometry representations---such as \texttt{FragSet}'s contiguous \texttt{x1(:), y1(:), x2(:), y2(:), w(:)} and \texttt{TrapPolys}'s \texttt{lab(:), vx(:), vy(:), area2(:)}---vectorize aggressively without manual pointer-aliasing pragmas.
+  \item \textbf{\texttt{pure} and \texttt{elemental} Mathematical Discipline:} Declaring exact arithmetic (\texttt{i128\_mul64}, \texttt{i128\_cmp\_prod}, \texttt{side\_at\_row}, \texttt{trap\_overlap\_positive}, \texttt{trap\_contact}) as \texttt{pure} or \texttt{elemental pure} enforces side-effect freedom at compile time. This makes OpenMP parallelization and GPU offloading (\texttt{!\$omp declare target}) safer and easier to reason about than arbitrary C++ lambdas capturing mutable references.
+  \item \textbf{First-Class OpenMP and GPU Target Offload:} Directives such as \texttt{!\$omp target teams distribute parallel do} and \texttt{!\$omp declare target} integrate seamlessly with Fortran array-section mapping (\texttt{map(to: boxes(:n))}), allowing \texttt{WideIntModule} and \texttt{TrapezoidModule} to compile identically for x86\_64 Xeon (\texttt{ifx}), ARM64 Grace CPU, and NVIDIA Blackwell/Hopper GPUs (\texttt{nvfortran -mp=gpu -cuda}).
+  \item \textbf{Clean \texttt{iso\_c\_binding} Interoperability:} Interfacing Fortran directly to C++17 (\texttt{db/liblayoutdb.a}) and CUDA CUB radix sort (\texttt{gpu\_morton.cu}) requires zero marshaling frameworks---only explicit \texttt{bind(c)} interfaces over raw \texttt{c\_int32\_t} / \texttt{c\_int64\_t} / \texttt{c\_ptr} descriptors.
+\end{enumerate}
+
+\section{Concrete Disadvantages and Compiler Hazards Encountered}
+
+\subsection{Absence of Generics and Standard Containers}
+Fortran 2018 lacks C++ templates and a standard container library (\texttt{std::vector}, \texttt{std::unordered\_map}, \texttt{std::sort}). As a result:
+\begin{itemize}
+  \item Every dynamic buffer requires handwritten boilerplate (\texttt{I64Buf}, \texttt{TrapBuf}, \texttt{PairBuf}, \texttt{ensure\_i64}, \texttt{ensure\_r64}).
+  \item Every sort (\texttt{sort\_pts\_xy}, \texttt{sort\_r64}, Shell sorts in \texttt{trap\_pred.f90}) and hash/grid structure must be re-implemented per type or bridged to C++/CUB (\texttt{CompactSortPairs}).
+\end{itemize}
+
+\subsection{The Intel \texttt{ifx} Polymorphism / Allocatable-Component OpenMP Hazard}
+A critical, non-obvious compiler hazard was discovered on Intel Xeon systems using \texttt{ifx 2025.0} (documented in \texttt{AGENTS.md} and resolved in commits \texttt{55b8c2f} and \texttt{7138cb2}):
+\begin{quote}
+  Whenever a Fortran procedure inside an OpenMP parallel hot path uses \texttt{class(...)} polymorphic dummy arguments, type-bound procedures on concrete derived types, or returns/assigns derived types containing \texttt{allocatable} components, \texttt{ifx} emits writes to \emph{global static RTTI/descriptor symbols} (\texttt{movq ..., <var\$...>}) in function prologues. Across 32--64 Xeon cores, these invisible writes cause catastrophic L1 cache-line ping-pong, resulting in an observed \textbf{$\sim 5\times$ slowdown in Boolean/PNum loops} and \textbf{$\sim 616\times$ slowdown in FASCL evaluators}!
+\end{quote}
+Because \texttt{nvfortran} on NVIDIA Grace/Blackwell does \emph{not} exhibit this hazard, regressions can go unnoticed on ARM64 until benchmarked on Xeon. Consequently, \texttt{MAGPARSER} enforces a strict cross-compiler discipline across all \texttt{trap\_*.f90} modules: \textbf{non-polymorphic \texttt{type(...)} procedures only, pure POD/SoA structs, and zero allocatable-component derived types inside OpenMP parallel loops.}
+
+\begin{lstlisting}[caption={Forbidden polymorphic/allocatable-UDT pattern (causes \texttt{ifx} L1 RTTI ping-pong) vs.\ approved POD/SoA pattern enforced across \texttt{src/trap\_*.f90}.},label={lst:ifx_hazard}]
+! FORBIDDEN in OpenMP hot paths (Intel ifx emits global static RTTI writes!):
+!   subroutine eval_bad(self, pid)
+!     class(PolyGeom), intent(in) :: self   ! <-- polymorphic class(...)
+!     type(DynBuf) :: tmp                   ! <-- UDT with allocatable component
+!   end subroutine
+
+! APPROVED across all trap_*.f90 modules (zero static writes, full Xeon scaling):
+subroutine eval_good(pid, loff, lx, ly, wi1, wr1)
+  integer(int64), intent(in) :: pid, loff(:), lx(:), ly(:)
+  integer(int64), allocatable, intent(inout) :: wi1(:)   ! plain thread-local array
+  real(real64),   allocatable, intent(inout) :: wr1(:)   ! plain thread-local array
+end subroutine eval_good
+\end{lstlisting}
+
+\subsection{\texttt{nvfortran} 26.1 Compiler Quirks and Fortran I/O Traps}
+\begin{itemize}
+  \item \textbf{\texttt{nvfortran} 26.1 OpenMP/Recursion Limits:} \texttt{nvfortran} rejects Fortran 2008 \texttt{block} constructs inside \texttt{!\$omp parallel} regions (\texttt{NVFORTRAN-S-1219}), requiring thread-local workspace arrays to be declared in the enclosing subroutine's \texttt{private(...)} clause (\texttt{trap\_pred.f90}). Similarly, \texttt{associate} blocks inside \texttt{recursive} functions and assumed-shape \texttt{ids(:)} in recursive FASCL evaluators must be avoided in favor of assumed-size \texttt{ids(*)}.
+  \item \textbf{List-Directed I/O \texttt{/} End-of-Record Trap:} In Fortran list-directed \texttt{read(str, *)}, the slash character \texttt{/} terminates input immediately! Parsing CTR operators like \texttt{/=} via \texttt{read(rest, *)} silently truncated the line, requiring a dedicated whitespace tokenizer (\texttt{next\_ws\_tok} in \texttt{anyangle\_ops.f90}).
+\end{itemize}
+
+\section{Engineering Comparison Matrix and Hybrid Boundary Rule}
+
+Table~\ref{tab:fortran_vs_cpp} summarizes the trade-offs and explains \texttt{MAGPARSER}'s pragmatic \textbf{hybrid boundary rule}: write bulk, regular SoA numerical/geometric sweeps and OpenMP/GPU kernels in pure POD Modern Fortran, while writing irregular pointer/hash graph traversals (\texttt{GroupPoly} in \texttt{db/trap\_out.cpp}) and byte-level binary codecs (\texttt{db/oasis\_writer.cpp}, \texttt{db/prop\_oasis\_writer.cpp}) in C++17.
+
+\begin{table}[htbp]
+\centering
+\caption{Modern Fortran (F2008/F2018) vs.\ C++17 for VLSI any-angle geometry processing.}
+\label{tab:fortran_vs_cpp}
+\small
+\begin{tabular}{@{}p{3.0cm}p{5.5cm}p{5.5cm}@{}}
+\toprule
+\textbf{Dimension} & \textbf{Modern Fortran (\texttt{src/trap\_*.f90})} & \textbf{C++17 (\texttt{src/db/*.cpp})} \\
+\midrule
+Array aliasing & Non-aliasing by standard; easy SIMD & Requires \texttt{\_\_restrict\_\_} discipline \\
+Containers / generics & Manual typed buffers \& sorts & Rich STL (\texttt{vector}, \texttt{sort}, templates) \\
+Exact 128-bit math & Portable \texttt{type(i128)} (\texttt{wide\_int.f90}) & Native \texttt{\_\_int128} on GCC/Clang/NVCC \\
+OpenMP / GPU offload & Native array-section \texttt{!\$omp target} & CUDA / OpenMP target / SYCL \\
+Polymorphism hazard & Severe \texttt{ifx} RTTI ping-pong $\to$ ban \texttt{class} & Zero-overhead templates / CRTP \\
+Memory pools & Explicit contiguous POD arenas (Ch.~\ref{ch:memory}) & Custom PMR / arena allocators \\
+Binary I/O \& parsing & Clunky (e.g.\ \texttt{/} in list-directed \texttt{read}) & Natural (\texttt{mmap}, bitfields, zlib) \\
+\bottomrule
+\end{tabular}
+\end{table}

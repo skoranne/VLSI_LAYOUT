@@ -1,0 +1,229 @@
+\chapter{Trapezoid Memory Management (``Consing''): Empirical Profile and Engineering Plan}
+\label{ch:memory}
+
+\section{The ``Consing'' Problem in Planar Geometry Engines}
+
+In Lisp and functional systems literature, \emph{consing} denotes the rapid allocation and immediate destruction of short-lived heap objects during computation. A high-throughput VLSI geometry engine exhibits an analogous pathology: a single Boolean operation on 1 million polygons can generate 14 million snap-rounded fragments, 30 million raw trapezoids across 160 sweep bands, millions of grid-cell registration entries, and millions of boundary-tracing edges---most of which are discarded within milliseconds.
+
+\subsection{Static Allocation Audit of the Current Codebase}
+
+An honest audit of the current \texttt{anyangle-booleans} codebase reveals a mixed picture. Table~\ref{tab:static_alloc} counts all explicit Fortran \texttt{allocate}, \texttt{deallocate}, and \texttt{move\_alloc} statements across the seven core any-angle Fortran modules:
+
+\begin{table}[htbp]
+\centering
+\caption{Static dynamic-memory statement counts in the any-angle Fortran modules.}
+\label{tab:static_alloc}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Module} & \texttt{allocate()} & \texttt{deallocate()} & \texttt{move\_alloc()} \\
+\midrule
+\texttt{trapezoid.f90} & 7 & 2 & 2 \\
+\texttt{trap\_merge.f90} & \textbf{52} & \textbf{17} & \textbf{12} \\
+\texttt{trap\_pnum.f90} & 17 & 10 & 2 \\
+\texttt{trap\_topo.f90} & 19 & 2 & 3 \\
+\texttt{trap\_morph.f90} & 10 & 3 & 1 \\
+\texttt{trap\_pred.f90} & 9 & 6 & 0 \\
+\texttt{anyangle\_ops.f90} & 13 & 5 & 0 \\
+\midrule
+\textbf{Total} & \textbf{127} & \textbf{45} & \textbf{20} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{What IS already optimized:}
+\begin{itemize}
+  \item \texttt{trap\_pred.f90} allocates thread-local POD workspace arrays (\texttt{wi1..wi8}, \texttt{wr1..wr13}) \emph{once per OpenMP thread} and grows them on demand via \texttt{ensure\_i64}/\texttt{ensure\_r64}---eliminating per-polygon heap contention.
+  \item \texttt{GroupPoly} in \texttt{db/trap\_out.cpp} reuses per-thread \texttt{std::vector} workspaces across polygon groups via \texttt{.clear()} without releasing capacity.
+\end{itemize}
+
+\textbf{What is NOT yet solved (no global memory pool, arena, or GPU memory pool):}
+\begin{itemize}
+  \item \texttt{trap\_merge.f90} (52 \texttt{allocate}, 12 \texttt{move\_alloc}) creates and destroys per-band \texttt{I64Buf}/\texttt{TrapBuf} growable arrays across all 160 bands in \texttt{TrapSweepUnion} and \texttt{TrapSnapRound}, triggering repeated $2\times$ geometric reallocation + copy + deallocation cycles.
+  \item Across the Fortran--C++ boundary (\texttt{TrapRecords} $\to$ \texttt{db/trap\_out.cpp}), every call allocates a temporary $10 \times N$ \texttt{int32} array in Fortran, then copies it into a second \texttt{std::vector<Trap>} of size $N$ in C++.
+  \item Inside \texttt{db/trap\_out.cpp} (\texttt{std::unordered\_map} for line hashing and hole bridging) and the C++ OASIS reader/writer, millions of tiny ($\le 64\text{ B}$) node allocations hit \texttt{glibc malloc} concurrently.
+\end{itemize}
+
+\section{Empirical Heap-Consing Profile (\texttt{LD\_PRELOAD} + \texttt{/usr/bin/time})}
+
+To measure the exact severity of consing rather than guessing, we instrumented both \texttt{TRAPMERGE.exe} and \texttt{TRAPBOOL.exe} on \texttt{SDT16S\_R015.oas} (20 OpenMP threads) with a thread-safe \texttt{LD\_PRELOAD} allocator interposer (\texttt{malloc}, \texttt{calloc}, \texttt{realloc}, \texttt{free} with atomic size-bucket histograms and peak-live tracking) alongside \texttt{/usr/bin/time -v} for Max RSS and minor page faults.
+
+\begin{table}[htbp]
+\centering
+\caption{Measured heap-consing profile on \texttt{SDT16S\_R015.oas} (20 threads, \texttt{LD\_PRELOAD} \texttt{malloc\_prof.so}).}
+\label{tab:consing_profile}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Metric} & \textbf{\texttt{TRAPMERGE} (\texttt{66/20})} & \textbf{\texttt{TRAPBOOL} (\texttt{66/20}$\times$\texttt{65/20}, 4 ops)} \\
+\midrule
+Output canonical trapezoids & 4,317,174 & 31,606,589 \\
+Total heap allocations (\texttt{malloc+calloc+realloc}) & \textbf{22,620,589} & \textbf{133,300,127} \\
+Total \texttt{free()} calls & 22,518,240 & 133,197,766 \\
+Allocation rate & 2.02M / sec & 1.99M / sec \\
+Total bytes allocated & \textbf{7,157.77 MiB} (6.99 GiB) & \textbf{41,018.87 MiB} (40.06 GiB) \\
+Peak live heap bytes & 1,193.55 MiB (1.17 GiB) & 3,664.35 MiB (3.58 GiB) \\
+\textbf{Consing ratio (Total / Peak)} & \textbf{6.00$\times$} & \textbf{11.19$\times$} \\
+Max RSS (\texttt{/usr/bin/time -v}) & 1,618.5 MiB & 4,313.5 MiB \\
+Minor page faults & 1,131,408 & \textbf{5,105,223} \\
+\midrule
+Bucket $\le 64\text{ B}$ & 19,431,151 calls (789.2 MiB) & \textbf{116,546,022 calls} (2,741.7 MiB) \\
+Bucket $65\text{ B}\dots 4\text{ KiB}$ & 3,176,849 calls (516.6 MiB) & 16,686,922 calls (3,016.2 MiB) \\
+Bucket $4\text{ KiB}\dots 1\text{ MiB}$ & 12,454 calls (1,638.5 MiB) & 65,484 calls (\textbf{15,910.7 MiB}) \\
+Bucket $1\text{ MiB}\dots 64\text{ MiB}$ & 124 calls (2,533.5 MiB) & 1,631 calls (6,006.3 MiB) \\
+Bucket $> 64\text{ MiB}$ & 11 calls (1,680.0 MiB) & 68 calls (\textbf{13,344.0 MiB}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.95]
+  % Bar chart of bytes allocated by bucket in TRAPBOOL (GiB)
+  \draw[->, thick, navy] (0,0) -- (11.2,0) node[right, font=\scriptsize\sffamily] {Allocation Size Bucket};
+  \draw[->, thick, navy] (0,0) -- (0,4.6) node[above, font=\scriptsize\sffamily] {Total Allocated (GiB) in \texttt{TRAPBOOL}};
+  \foreach \y/\lab in {1/4, 2/8, 3/12, 4/16} {
+    \draw[gray!30, dashed] (0,\y) -- (10.8,\y);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1,\y) {\lab};
+  }
+  % Bars: 2.68, 2.95, 15.54, 5.87, 13.03 GiB (scale: 1 unit = 4 GiB)
+  \fill[crimson!70] (0.6,0) rectangle (1.9,0.67);
+  \node[above, font=\scriptsize\bfseries, color=crimson] at (1.25,0.67) {2.68 GiB};
+  \node[below, font=\scriptsize\sffamily, align=center] at (1.25,-0.1) {$\le 64$ B\\(116.5M calls!)};
+
+  \fill[amberaccent!75] (2.6,0) rectangle (3.9,0.74);
+  \node[above, font=\scriptsize\bfseries, color=amberaccent] at (3.25,0.74) {2.95 GiB};
+  \node[below, font=\scriptsize\sffamily, align=center] at (3.25,-0.1) {65B--4KB\\(16.7M calls)};
+
+  \fill[navy!80] (4.6,0) rectangle (5.9,3.885);
+  \node[above, font=\scriptsize\bfseries, color=navy] at (5.25,3.885) {15.54 GiB};
+  \node[below, font=\scriptsize\sffamily, align=center] at (5.25,-0.1) {4KB--1MB\\(65.5k band bufs)};
+
+  \fill[tealaccent!80] (6.6,0) rectangle (7.9,1.47);
+  \node[above, font=\scriptsize\bfseries, color=tealaccent] at (7.25,1.47) {5.87 GiB};
+  \node[below, font=\scriptsize\sffamily, align=center] at (7.25,-0.1) {1MB--64MB\\(1,631 calls)};
+
+  \fill[purple!70] (8.6,0) rectangle (9.9,3.26);
+  \node[above, font=\scriptsize\bfseries, color=purple] at (9.25,3.26) {13.03 GiB};
+  \node[below, font=\scriptsize\sffamily, align=center] at (9.25,-0.1) {$>64$ MB\\(68 huge bufs)};
+\end{tikzpicture}
+\caption{Measured allocation volume and call-count distribution in \texttt{TRAPBOOL.exe} on \texttt{SDT16S\_R015.oas} (40.06 GiB total allocated vs.\ 3.58 GiB peak live = $11.19\times$ consing ratio).}
+\label{fig:consing_chart}
+\end{figure}
+
+\textbf{Key Diagnostic Findings:}
+\begin{enumerate}
+  \item \textbf{Call-Count Bottleneck ($\le 64\text{ B}$):} \textbf{87.4\%} of all allocations (116.5 million calls!) are tiny $\le 64\text{ B}$ allocations from C++ \texttt{std::unordered\_map} hash-node allocations in \texttt{db/trap\_out.cpp} and OASIS polygon/vertex decoding.
+  \item \textbf{Bandwidth \& Page-Fault Bottleneck ($4\text{ KiB}\dots 1\text{ MiB}$ and $> 64\text{ MiB}$):} \textbf{15.54 GiB} is churned in medium band buffers (\texttt{I64Buf}/\texttt{TrapBuf} \texttt{move\_alloc} doubling across 160 bands $\times$ 4 ops), and \textbf{13.03 GiB} in huge whole-layer arrays, triggering \textbf{5.11 million minor page faults} (fresh kernel zero-fill overhead on every \texttt{mmap}/\texttt{munmap} cycle above glibc's \texttt{M\_MMAP\_THRESHOLD}).
+\end{enumerate}
+
+\section{Four-Tier Memory Pool and Zero-Consing Plan}
+
+To reduce consing from $11.2\times$ to $< 1.5\times$, eliminate $> 99\%$ of small allocations, and scale cleanly to 100-billion-shape GPU/out-of-core execution, we propose a four-tier memory architecture (Figure~\ref{fig:mem_plan}):
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.6cm and 0.6cm, scale=0.9, transform shape]
+  \node[stage, minimum width=12.5cm, fill=blue!8] (t1) {\textbf{Tier 1: Per-Thread Linear Bump/Arena Pool (\texttt{TrapArenaModule}, Modern Fortran POD)}\\Pre-allocated contiguous \texttt{Trapezoid(:)} / \texttt{int64(:)} slabs per OpenMP thread; $O(1)$ \texttt{arena\_mark}/\texttt{arena\_reset}; zero \texttt{move\_alloc} in bands};
+  \node[stage, below=0.55cm of t1, minimum width=12.5cm, fill=teal!8, draw=tealaccent] (t2) {\textbf{Tier 2: Flat Open-Addressed Hash Tables + Zero-Copy \texttt{c\_loc} C++ Interop (\texttt{db/trap\_out.cpp})}\\Replace \texttt{std::unordered\_map} (eliminates 116M tiny mallocs); pass \texttt{type(Trapezoid)} directly via \texttt{c\_loc} (zero \texttt{TrapRecords} copy)};
+  \node[stage, below=0.55cm of t2, minimum width=12.5cm, fill=amberaccent!12, draw=amberaccent] (t3) {\textbf{Tier 3: Persistent GPU Device / Unified Memory Pools (\texttt{cudaMallocAsync} / \texttt{cudaMemPool\_t})}\\Reusable device arenas for G1--G4 CUDA/OpenMP-target kernels on GB10/H100/B200 without per-band \texttt{cudaMalloc} sync stalls};
+  \node[stage, below=0.55cm of t3, minimum width=12.5cm, fill=crimson!10, draw=crimson] (t4) {\textbf{Tier 4: Out-of-Core 100B-Shape Banded Ring Buffer (\texttt{AnyAngleBandedRun} + \texttt{nvCOMP})}\\Bounded 2--4 GiB active band working set; double-buffered NVMe/nvCOMP decode $\parallel$ GPU compute $\parallel$ nvCOMP encode; 64-bit \texttt{int64\_t} throughout};
+  \draw[flow] (t1) -- (t2);
+  \draw[flow] (t2) -- (t3);
+  \draw[flow] (t3) -- (t4);
+\end{tikzpicture}
+\caption{Four-tier memory architecture to eliminate heap consing across CPU OpenMP, C++ interop, GPU offload, and 100B-shape out-of-core streaming.}
+\label{fig:mem_plan}
+\end{figure}
+
+\subsection{Tier 1: Pure-POD Per-Thread Arena in Modern Fortran (\texttt{TrapArenaModule})}
+
+In Modern Fortran, a high-speed, \texttt{ifx}-safe arena requires \emph{no} polymorphism and \emph{no} derived types with allocatable components inside parallel regions: each OpenMP thread owns a flat backing array \texttt{pool(1:cap)} and a single integer cursor \texttt{top}. Sub-allocations inside \texttt{TrapSnapRound} and \texttt{TrapSweepUnion} become a 3-cycle integer addition, and freeing an entire band's temporary arrays is a single assignment \texttt{top = saved\_mark} with zero OS page faults!
+
+\begin{lstlisting}[caption={Proposed \texttt{ifx}-safe Modern Fortran linear arena pattern (\texttt{TrapArenaModule}) for zero-consing band sweeps.},label={lst:arena}]
+module TrapArenaModule
+  use, intrinsic :: iso_fortran_env, only: int64
+  use TrapezoidModule, only: Trapezoid
+  implicit none
+  private
+  public :: arena_alloc_i64, arena_alloc_trap
+
+  ! Backing buffers allocated ONCE per OpenMP thread outside the band loop
+  ! (plain arrays passed into band kernels; zero allocatable-component UDTs).
+contains
+  subroutine arena_alloc_i64(buf, cap, top, n, i0, i1)
+    integer(int64), allocatable, intent(inout) :: buf(:)
+    integer(int64), intent(inout) :: cap, top
+    integer(int64), intent(in)    :: n
+    integer(int64), intent(out)   :: i0, i1
+    integer(int64), allocatable   :: tmp(:)
+    integer(int64) :: new_cap
+    if (top + n > cap) then
+       new_cap = max(2_int64 * cap, top + n + 65536_int64)
+       allocate(tmp(new_cap))
+       if (top > 0) tmp(1:top) = buf(1:top)
+       call move_alloc(tmp, buf)
+       cap = new_cap
+    end if
+    i0 = top + 1; i1 = top + n; top = i1
+  end subroutine arena_alloc_i64
+
+  subroutine arena_alloc_trap(buf, cap, top, n, i0, i1)
+    type(Trapezoid), allocatable, intent(inout) :: buf(:)
+    integer(int64), intent(inout) :: cap, top
+    integer(int64), intent(in)    :: n
+    integer(int64), intent(out)   :: i0, i1
+    type(Trapezoid), allocatable  :: tmp(:)
+    integer(int64) :: new_cap
+    if (top + n > cap) then
+       new_cap = max(2_int64 * cap, top + n + 16384_int64)
+       allocate(tmp(new_cap))
+       if (top > 0) tmp(1:top) = buf(1:top)
+       call move_alloc(tmp, buf)
+       cap = new_cap
+    end if
+    i0 = top + 1; i1 = top + n; top = i1
+  end subroutine arena_alloc_trap
+end module TrapArenaModule
+\end{lstlisting}
+
+\subsection{Tier 2--4: Flat C++ Hashing, Zero-Copy \texttt{c\_loc}, GPU Pools, and 100B-Shape Streaming}
+
+\begin{enumerate}
+  \item \textbf{Flat Open-Addressed Hash Tables in \texttt{db/trap\_out.cpp}:} Replacing \texttt{std::unordered\_map<LKey, ...>} and \texttt{by\_y2}/\texttt{nodes\_at} with reusable flat open-addressed arrays eliminates the $\sim 116\text{M}$ tiny ($\le 64\text{ B}$) node allocations measured in Table~\ref{tab:consing_profile}.
+  \item \textbf{Zero-Copy \texttt{Trapezoid} Interop:} Because \texttt{type(Trapezoid)} in \texttt{trapezoid.f90} is a 40-byte sequence of 10 \texttt{int32} fields identical to \texttt{struct Trap} in \texttt{db/trap\_out.cpp}, marking it \texttt{bind(c)} allows Fortran to pass \texttt{c\_loc(traps(1))} directly to C++, eliminating both the temporary \texttt{TrapRecords} allocation and the C++ \texttt{std::vector<Trap>} copy (saving $80\text{ B/trapezoid} = 2.5\text{ GiB}$ on a 31.6M-trapezoid run).
+  \item \textbf{GPU Device Memory Pools (\texttt{cudaMemPool\_t}):} On NVIDIA Grace-Blackwell (GB10) and H100/B200 GPUs, stream-ordered \texttt{cudaMallocAsync} / \texttt{cudaFreeAsync} with a high-water-mark retention threshold (\texttt{cudaMemPoolAttrReleaseThreshold = UINT64\_MAX}) turns per-band GPU allocations in G1--G4 into lock-free sub-microsecond pool reuses with zero device synchronization.
+  \item \textbf{Out-of-Core 100B-Shape Streaming:} At 100 billion shapes ($\sim 150\text{B}$ canonical trapezoids = $6\text{ TB}$ uncompressed), no single machine can hold the full layer in RAM. Extending \texttt{band\_exec.f90} with a double-buffered Y-band ring buffer (2--4 GiB/band, halo $H = 1\text{ dbu}$ for Booleans selecting unclipped exact input edges, $H = |d| + 1\text{ dbu}$ for morphology, slope-dictionary + \texttt{nvCOMP} compressed on-disk bands, and 64-bit \texttt{int64\_t} indexing throughout) bounds peak RAM and GPU HBM to a constant $< 8\text{ GiB}$ regardless of total layout size.
+\end{enumerate}
+
+\section{Quantitative Impact Forecast and 100B-Shape Memory Budget}
+
+Table~\ref{tab:consing_roadmap} summarizes the projected impact of each memory-management phase on the measured \texttt{SDT16S\_R015} \texttt{TRAPBOOL} baseline (133.3M allocations, 40.06 GiB allocated, $11.19\times$ consing ratio, 5.11M minor page faults).
+
+\begin{table}[htbp]
+\centering
+\caption{Phased memory-optimization roadmap and projected impact on \texttt{SDT16S\_R015} \texttt{TRAPBOOL} (4 ops, 31.6M traps).}
+\label{tab:consing_roadmap}
+\small
+\begin{tabular}{@{}p{2.3cm}p{5.0cm}rrr@{}}
+\toprule
+\textbf{Phase} & \textbf{Engineering Change} & \textbf{Alloc Calls} & \textbf{Consing Ratio} & \textbf{Page Faults} \\
+\midrule
+\textbf{Baseline (current)} & Standard \texttt{allocate}/\texttt{move\_alloc} + \texttt{std::unordered\_map} & 133.3M & $11.19\times$ & 5.11M \\
+\textbf{M1 (Tier 2)} & Flat open-addressed hash maps in \texttt{db/trap\_out.cpp} + zero-copy \texttt{c\_loc} & $\sim 2.0\text{M}$ & $\sim 7.5\times$ & $\sim 3.8\text{M}$ \\
+\textbf{M2 (Tier 1)} & \texttt{TrapArenaModule} per-thread bump pools in \texttt{TrapSnapRound}/\texttt{TrapSweepUnion} & $< 0.2\text{M}$ & $\sim 2.1\times$ & $< 0.8\text{M}$ \\
+\textbf{M3 (Tier 3)} & Persistent GPU \texttt{cudaMemPool\_t} for G1--G4 CUDA/OpenMP-target kernels & $< 0.05\text{M}$ & $\sim 1.4\times$ & $< 0.3\text{M}$ \\
+\textbf{M4 (Tier 4)} & Double-buffered out-of-core Y-band ring buffer (2--4 GiB/band, 64-bit) & Bounded $O(1)$ & $\le 1.3\times$ & Bounded \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{100-Billion-Shape Storage Sizing}
+
+For a full-reticle 100-billion-shape curvilinear mask layer:
+\begin{itemize}
+  \item \textbf{Raw input vertices:} $\sim 400\text{B}$ \texttt{int32} pairs $\times 8\text{ B} \approx 3.2\text{ TB}$.
+  \item \textbf{Uncompressed canonical trapezoids:} $\sim 150\text{B} \times 40\text{ B} = 6.0\text{ TB}$ (requires 64-bit \texttt{int64\_t} indexing everywhere, already implemented in \texttt{db/trap\_out.cpp}).
+  \item \textbf{Slope-dictionary + \texttt{nvCOMP} compressed bands:} Typical rotated/curvilinear VLSI layers exhibit $< 64$ distinct slopes per band, compressing each trapezoid to $\sim 4\text{--}8\text{ B}$ ($0.6\text{--}1.2\text{ TB}$ on NVMe/Lustre; $50\text{--}100\text{ MB}$ per active band).
+  \item \textbf{Active working set:} Partitioning into $M \approx 2{,}000$ horizontal bands keeps $(A_{\text{band}} + B_{\text{band}} + \text{halo})$ under $2\text{--}4\text{ GiB}$, enabling sustained double-buffered streaming on a single GPU node.
+\end{itemize}

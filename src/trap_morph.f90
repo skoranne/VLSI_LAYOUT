@@ -37,17 +37,17 @@ module TrapMorphModule
 
   interface
      function ldb_trapset_loops(n, rec, lab, np, stats) result(h) bind(c, name='ldb_trapset_loops')
-       import :: c_ptr, c_int32_t, c_int64_t
+       import :: c_ptr, c_int64_t, Trapezoid
        integer(c_int64_t), value :: n, np
-       integer(c_int32_t), intent(in) :: rec(*)
+       type(Trapezoid), intent(in) :: rec(*)
        integer(c_int64_t), intent(in) :: lab(*)
        integer(c_int64_t), intent(out) :: stats(*)
        type(c_ptr) :: h
      end function ldb_trapset_loops
      function ldb_trapset_polys(n, rec, stats) result(h) bind(c, name='ldb_trapset_polys')
-       import :: c_ptr, c_int32_t, c_int64_t
+       import :: c_ptr, c_int64_t, Trapezoid
        integer(c_int64_t), value :: n
-       integer(c_int32_t), intent(in) :: rec(*)
+       type(Trapezoid), intent(in) :: rec(*)
        integer(c_int64_t), intent(out) :: stats(*)
        type(c_ptr) :: h
      end function ldb_trapset_polys
@@ -80,7 +80,6 @@ contains
     integer, intent(out) :: status
 
     type(TrapPolys) :: P
-    integer(int32), allocatable :: rec(:, :)
     integer(c_int64_t) :: cstat(8)
     type(c_ptr) :: hloops, hpolys
     integer(int64) :: nloop, nlvert, npA, nvA, npC, nvC, l
@@ -117,12 +116,11 @@ contains
        return
     end if
 
-    ! 1. Canonical PNUM + unbridged oriented boundary loops + exact polygons of A
+    ! 1. Canonical PNUM + unbridged oriented boundary loops + exact polygons of A (zero-copy Trapezoid)
     call TrapPNum(traps, ntrap, P)
     st%anomalies = st%anomalies + P%anomalies
-    call TrapRecords(traps, ntrap, rec)
     cstat = 0
-    hloops = ldb_trapset_loops(ntrap, rec, P%lab, P%np, cstat)
+    hloops = ldb_trapset_loops(ntrap, traps, P%lab, P%np, cstat)
     st%anomalies = st%anomalies + cstat(1)
     nloop = ldb_trapset_polys_count(hloops, nlvert)
     allocate(loff(nloop + 1), lx(max(nlvert, 1_int64)), ly(max(nlvert, 1_int64)))
@@ -130,13 +128,12 @@ contains
     call ldb_trapset_polys_free(hloops)
 
     cstat = 0
-    hpolys = ldb_trapset_polys(ntrap, rec, cstat)
+    hpolys = ldb_trapset_polys(ntrap, traps, cstat)
     st%anomalies = st%anomalies + cstat(7)
     npA = ldb_trapset_polys_count(hpolys, nvA)
     allocate(poA(npA + 1), xA(max(nvA, 1_int64)), yA(max(nvA, 1_int64)))
     call ldb_trapset_polys_get(hpolys, poA, xA, yA)
     call ldb_trapset_polys_free(hpolys)
-    deallocate(rec)
     t1 = omp_get_wtime()
     st%t_loops = t1 - t0
     st%loops = nloop

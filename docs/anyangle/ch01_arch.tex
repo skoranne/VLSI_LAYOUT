@@ -1,0 +1,134 @@
+\chapter{System Architecture and End-to-End Data Flow}
+\label{ch:arch}
+
+\section{Motivation: Beyond Manhattan Strip Approximation}
+
+Classical VLSI physical verification engines---including \texttt{MAGPARSER}'s original Manhattan box engine---represent every mask layer as a set of axis-aligned rectangles (\texttt{Box} records of four coordinates $(x_1, y_1, x_2, y_2)$). For purely orthogonal designs, this representation is compact, cache-friendly, and admits $O(N \log N)$ scanline and R-tree algorithms. However, modern semiconductor manufacturing increasingly requires exact non-rectilinear geometry:
+\begin{enumerate}
+  \item \textbf{45-degree and arbitrary-angle routing} in RF/analog inductors, redistribution layers (RDL), and silicon photonics waveguides;
+  \item \textbf{Curvilinear inverse lithography (ILT)} and multi-beam mask writer (MBMW) contours discretized into dense non-orthogonal polylines;
+  \item \textbf{Rotational-invariance verification}, in which an entire hierarchical layout is rotated by arbitrary angles $\theta \in [0^\circ, 359^\circ]$ to stress-test geometric robustness, DRC rule consistency, and connectivity extraction without hidden axis-aligned bias.
+\end{enumerate}
+
+When a non-orthogonal polygon is fed into a Manhattan box engine, it must be rasterized into thin horizontal rectangular strips (controlled in \texttt{MAGPARSER}'s hierarchical box iterator by \texttt{LDB\_SLANT\_STRIPS}). This staircase approximation introduces three fatal pathologies:
+\begin{itemize}
+  \item \textbf{Perimeter inflation by $\sqrt{2}$:} A $45^\circ$ edge of Euclidean length $L$ becomes a Manhattan staircase of length $\sqrt{2}\,L$, destroying perimeter-dependent checks (\texttt{PERIMETER}, \texttt{COMPACTNESS}, resistance estimation).
+  \item \textbf{Vertex and box explosion:} A single rotated wire spanning $10{,}000\text{ dbu}$ fragments into thousands of 1-dbu-tall strips, blowing up memory and sweep runtime.
+  \item \textbf{Topological corruption:} Adjacent slanted shapes that touch along a shared diagonal edge acquire spurious gaps or overlaps at staircase corners, breaking \texttt{TOUCH}, \texttt{MEET}, \texttt{INSIDE}, \texttt{CONNECT}, and \texttt{GROW}/\texttt{SHRINK} morphology.
+\end{itemize}
+
+To eliminate these pathologies without sacrificing \texttt{MAGPARSER}'s Manhattan speed on orthogonal layers, the \textbf{any-angle engine} introduces a dual-representation \texttt{Layer} model and a complete, exact integer-lattice trapezoid geometry stack.
+
+\section{Dual-Representation Layer Model and File Ingestion}
+
+In \texttt{MAGPARSER}, every mask layer (\texttt{type(Layer)} in \texttt{src/design.f90}) maintains either its classical Manhattan box storage (\texttt{layer\_boxes(1:n\_used)} or compressed \texttt{CompactLayer}) \emph{or} its canonical any-angle trapezoid set (\texttt{traps(1:n\_traps)}), along with optional raw source polygons (\texttt{raw\_off}, \texttt{raw\_x}, \texttt{raw\_y}) retained from initial file ingestion.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.85cm and 0.9cm, scale=0.88, transform shape]
+  % Input row
+  \node[datanode] (in) {OASIS / GDSII / Magic\\(\texttt{db/layoutdb})};
+  \node[stage, right=1.1cm of in] (load) {\texttt{LoadAnyAngleLayers}\\(\texttt{anyangle\_ops.f90})};
+  \node[stage, right=1.1cm of load] (merge) {\texttt{TrapMergePolygons}\\Snap Round + Sweep};
+  \node[datanode, right=1.1cm of merge] (canon) {Canonical \texttt{Trapezoid(:)} \\ (40 B POD, lattice sides)};
+
+  % Middle ops
+  \node[stage, below=1.2cm of merge, xshift=-3.6cm] (bool) {\textbf{2-Layer Booleans}\\ \texttt{OR/AND/NOT/XOR/SELF2}\\(\texttt{trap\_merge.f90})};
+  \node[stage, right=0.55cm of bool] (morph) {\textbf{Morphology}\\ \texttt{GROW/SHRINK/SIZE}\\(\texttt{trap\_morph.f90})};
+  \node[stage, right=0.55cm of morph] (topo) {\textbf{Topologicals}\\ 12 DE-9IM + \texttt{NOT\_*}\\(\texttt{trap\_topo.f90})};
+  \node[stage, right=0.55cm of topo] (pred) {\textbf{Predicates \& FASCL}\\ 20 Preds + \texttt{CONNECT}\\(\texttt{trap\_pred.f90})};
+
+  % PNUM & Out row
+  \node[stage, below=1.2cm of morph, xshift=1.4cm] (pnum) {\texttt{TrapPNum} + \texttt{db/trap\_out.cpp}\\Canonical Ordinals $1\dots N_p$, Exact Loops};
+  \node[datanode, below=1.0cm of pnum, xshift=-3.2cm] (oas) {OASIS \texttt{CTRAPEZOID} /\\ \texttt{TRAPEZOID} / \texttt{POLYGON}};
+  \node[datanode, below=1.0cm of pnum, xshift=3.2cm] (prop) {OASIS \texttt{PROPERTY} (28/29)\\ \texttt{CBLOCK} + \texttt{STRICT} Tables};
+
+  \draw[flow] (in) -- node[above, font=\scriptsize]{\texttt{ldb\_polys\_load}} (load);
+  \draw[flow] (load) -- node[above, font=\scriptsize]{raw CSR} (merge);
+  \draw[flow] (merge) -- (canon);
+
+  \draw[flow] (canon.south) |- ([yshift=0.45cm]bool.north) -- (bool.north);
+  \draw[flow] (canon.south) |- ([yshift=0.45cm]morph.north) -- (morph.north);
+  \draw[flow] (canon.south) |- ([yshift=0.45cm]topo.north) -- (topo.north);
+  \draw[flow] (canon.south) |- ([yshift=0.45cm]pred.north) -- (pred.north);
+
+  \draw[flow] (bool.south) |- (pnum.west);
+  \draw[flow] (morph.south) -- (pnum.north west);
+  \draw[flow] (topo.south) -- (pnum.north east);
+  \draw[flow] (pred.south) |- (pnum.east);
+
+  \draw[flow] (pnum.south) -| (oas.north);
+  \draw[flow] (pnum.south) -| (prop.north);
+\end{tikzpicture}
+\caption{End-to-end data flow of the any-angle geometry processing engine in \texttt{MAGPARSER}, from hierarchical layout ingestion through exact canonical trapezoid decomposition to SEMI P39 OASIS output.}
+\label{fig:pipeline}
+\end{figure}
+
+When a control file (\texttt{.ctr}) enables \texttt{var anyangle 1} (or the environment sets \texttt{MAGPARSER\_ANYANGLE=1}), \texttt{controlparser.f90} invokes \texttt{LoadAnyAngleLayers} immediately after opening the design database:
+\begin{enumerate}
+  \item For each layer, \texttt{db/layoutdb} invokes the exact hierarchical polygon iterator (\texttt{ldb\_polys\_load}), which applies all cell placement transforms (translations, mirrors, magnifications, and arbitrary-angle rotations) directly to polygon vertices without strip rasterization.
+  \item An OpenMP parallel scan checks whether any edge has $\Delta x \ne 0 \land \Delta y \ne 0$ (\texttt{nslant > 0}). Purely orthogonal layers remain in Manhattan box storage unless \texttt{MAGPARSER\_FORCE\_TRAP=1} is active.
+  \item Any layer with at least one slanted edge stores its raw unmerged polygons in \texttt{L\%raw\_off}, \texttt{L\%raw\_x}, \texttt{L\%raw\_y} (for single-pass joint snap rounding in subsequent two-layer Booleans!) and immediately runs \texttt{TrapMergePolygons} to populate \texttt{L\%traps(1:n\_traps)}.
+\end{enumerate}
+
+\begin{lstlisting}[caption={Exact slanted-layer detection and canonical merge in \texttt{src/anyangle\_ops.f90}.},label={lst:load_anyangle}]
+!$omp parallel do reduction(+:nslant) private(i, j, jn, a, b)
+do i = 1, npoly
+   a = poff(i); b = poff(i + 1) - 1
+   do j = a, b
+      jn = j + 1; if (jn > b) jn = a
+      if (px(jn) /= px(j) .and. py(jn) /= py(j)) nslant = nslant + 1
+   end do
+end do
+!$omp end parallel do
+if (nslant > 0 .or. AnyAngleForce()) then
+   call store_raw(L, npoly, poff, px, py)
+   call TrapMergePolygons(npoly, poff, px, py, traps, ntrap, mst, status)
+   call store_traps(L, traps, ntrap)
+end if
+\end{lstlisting}
+
+\section{Control-File Dispatch and Mixed-Operand Interoperability}
+
+\texttt{MAGPARSER} parses \texttt{.ctr} scripts (optionally macro-expanded via \texttt{m4} and optimized by \texttt{TRSOptimizerModule}) in \texttt{src/controlparser.f90}. Whenever an operation touches an any-angle layer (or \texttt{AnyAngleForce()} is enabled, or a polygon-component predicate is invoked), \texttt{controlparser.f90} intercepts the operator and dispatches to \texttt{AnyAngleOpsModule}:
+\begin{itemize}
+  \item \textbf{Single- and Two-Layer Booleans:} \texttt{+}, \texttt{OR}, \texttt{OR2}, \texttt{*}, \texttt{AND}, \texttt{AND2}, \texttt{!}, \texttt{@}, \texttt{\~}, \texttt{NOT}, \texttt{FRAMENOT}, \texttt{\^}, \texttt{XOR}, and single-layer self-overlap \texttt{AND} (\texttt{TOP\_SELF2}). If one operand is Manhattan (boxes) and the other is any-angle (trapezoids), \texttt{layer\_polys} converts the box operand into 4-vertex polygons so both operands enter a single joint snap-rounding pass. If the Boolean result happens to be purely orthogonal (all vertical sides), \texttt{store\_traps} automatically downgrades it back into \texttt{Layer\%layer\_boxes} so all downstream Manhattan operations work seamlessly.
+  \item \textbf{Morphology:} \texttt{GROW}, \texttt{SHRINK}, and signed \texttt{SIZE} (both isotropic scalar $d$ and anisotropic 4-directional $d_E, d_N, d_W, d_S$).
+  \item \textbf{Polygon-Level Topologicals:} All 12 DE-9IM relations (\texttt{INTERACT}, \texttt{CUT}, \texttt{TOUCH}, \texttt{INSIDE}, \texttt{OUTSIDE}, \texttt{EQUAL}, \texttt{DISJOINT}, \texttt{MEET}, \texttt{OVERLAPS}, \texttt{COVERS}, \texttt{COVEREDBY}, \texttt{CONTAINS}) plus their \texttt{NOT\_*} and two-word \texttt{NOT <OP>} complements.
+  \item \textbf{Polygon-Component Predicates:} All 20 rotation-invariant and orientation-specific predicates (\texttt{AREA}, \texttt{PERIMETER}, \texttt{VERTEX}, \texttt{HOLES}, \texttt{WIDTH}, \texttt{LENGTH}, \texttt{ASPECT\_RATIO}, \texttt{DIAMETER}, \texttt{COMPACTNESS}, \texttt{SOLIDITY}, \texttt{CONVEX\_CRITERIA}, \texttt{CONCAVE\_CRITERIA}, \texttt{IS\_RECTANGLE\_WITH\_ROTATION}, \texttt{IS\_SQUARE\_WITH\_ROTATION}, \texttt{NOTCH}, \texttt{ENCLOSE\_RECTANGLE}, \texttt{IS\_RECTILINEAR}, \texttt{IS\_45}, \texttt{IS\_RECTANGLE}, \texttt{IS\_SQUARE}) plus all \texttt{NOT\_*} complements and compound range constraints (\texttt{> a < b}).
+  \item \textbf{FASCL Properties and Connectivity:} \texttt{PROPERTY:NAME = db:layer FASCL [...]} and \texttt{CONNECT} / \texttt{NET\_ID} evaluate transparently on any-angle trapezoid layers via \texttt{PropTableIndexPieces} and exact \texttt{trap\_overlap\_positive}.
+\end{itemize}
+
+\section{Codebase Module Inventory}
+
+Table~\ref{tab:inventory} summarizes the 15 core source files comprising the any-angle geometry, FASCL property, and OASIS serialization subsystem (11,897 lines of code across Modern Fortran 90/2008 and C++17).
+
+\begin{table}[htbp]
+\centering
+\caption{Module inventory of the \texttt{MAGPARSER} any-angle geometry and OASIS property engine.}
+\label{tab:inventory}
+\small
+\begin{tabular}{@{}llrl@{}}
+\toprule
+\textbf{File} & \textbf{Lang.} & \textbf{LOC} & \textbf{Primary Responsibility} \\
+\midrule
+\texttt{src/wide\_int.f90} & Fortran & 216 & Exact 128-bit signed integer arithmetic (\texttt{i128}) \\
+\texttt{src/exact\_predicates.f90} & Fortran & 226 & Exact 2D orientation, segment crossing, rational rounding \\
+\texttt{src/trapezoid.f90} & Fortran & 701 & Canonical \texttt{TrapSide}/\texttt{Trapezoid}, exact overlap/contact \\
+\texttt{src/trap\_merge.f90} & Fortran & 1,835 & Snap rounding, band-parallel treap sweep, 2-layer Booleans \\
+\texttt{src/trap\_pnum.f90} & Fortran & 486 & Canonical PNUM components, exact $2A$, outline wrapper \\
+\texttt{src/trap\_topo.f90} & Fortran & 511 & DE-9IM polygon topologicals, zero-rounding gap coverage \\
+\texttt{src/trap\_morph.f90} & Fortran & 414 & Minkowski collar \texttt{GROW}/\texttt{SHRINK}/\texttt{SIZE} \\
+\texttt{src/trap\_pred.f90} & Fortran & 1,161 & 20 polygon predicates + \texttt{NOT\_*}, rotating calipers, slab core \\
+\texttt{src/anyangle\_ops.f90} & Fortran & 755 & \texttt{MAGPARSER} CTR glue, loader, arg parser, measure, digest \\
+\texttt{src/property\_table.f90} & Fortran & 933 & SoA per-polygon typed property store (\texttt{PropTableIndexPieces}) \\
+\texttt{src/fascl.f90} & Fortran & 1,825 & FASCL lambda compiler/evaluator on polygons \\
+\texttt{src/fascl\_connect.f90} & Fortran & 734 & Multi-layer \texttt{CONNECT}/\texttt{NET\_ID} (exact trapezoid overlap) \\
+\texttt{src/prop\_oasis.f90} & Fortran & 310 & Fortran bridge for OASIS export with \texttt{PROPERTY} records \\
+\texttt{src/db/trap\_out.cpp} & C++17 & 923 & 64-bit boundary tracing, loop/hole extraction, OASIS sink \\
+\texttt{src/db/prop\_oasis\_writer.cpp} & C++17 & 867 & SEMI P39 \texttt{PROPERTY}, repetitions, \texttt{CBLOCK}, \texttt{STRICT} writer \\
+\midrule
+\textbf{Total} & & \textbf{11,897} & \\
+\bottomrule
+\end{tabular}
+\end{table}

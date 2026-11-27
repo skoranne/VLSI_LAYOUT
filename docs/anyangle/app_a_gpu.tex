@@ -1,0 +1,37 @@
+\appendix
+\chapter{GPU Deployment Blueprint (NVIDIA Grace-Blackwell GB10 / H100 / B200)}
+\label{app:gpu}
+
+\section{Current GPU Footprint vs.\ Remaining CPU Kernels}
+
+\texttt{MAGPARSER}'s Manhattan engine already offloads Morton sorting (\texttt{src/gpu\_morton.cu} using CUB/Thrust radix sort), R-tree spatial queries (\texttt{src/rtree.f90}), and RLE/PNUM merges (\texttt{src/RLEMerge.f90}, \texttt{src/gpu\_pnummerge.f90}) to NVIDIA GPUs via CUDA and OpenMP \texttt{target teams distribute parallel do}. In the any-angle stack, all exact integer predicates in \texttt{WideIntModule} and \texttt{TrapezoidModule} (\texttt{i128\_*}, \texttt{side\_at\_row}, \texttt{trap\_overlap\_positive}, \texttt{trap\_contact}) are already compiled with \texttt{!\$omp declare target} for device execution, while the five outer orchestration phases---\texttt{TrapSnapRound}, \texttt{TrapSweepUnion}, \texttt{TrapPNum}, \texttt{TrapTopo}, \texttt{TrapMorph}, and \texttt{TrapPred}---currently run on CPU OpenMP.
+
+\section{Four-Phase GPU Offload Architecture (G1--G4)}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.65cm and 0.65cm, scale=0.88, transform shape]
+  \node[stage, minimum width=12.6cm, fill=blue!8] (g1) {\textbf{G1: GPU Snap-Rounding Grid \& Exact Crossings (\texttt{TrapSnapRound}, 55--70\% of Boolean time)}\\2-pass edge$\to$cell count + CUB prefix sum + CUB radix sort \texttt{(cell\_id, edge\_id)} $\to$ 1 warp/cell \texttt{\_\_int128} crossing kernel $\to$ CUB sort+unique hot pixels $\to$ GPU fragment split + \texttt{ReduceByKey} winding sum (8--20$\times$)};
+  \node[stage, below=0.55cm of g1, minimum width=12.6cm, fill=teal!8, draw=tealaccent] (g2) {\textbf{G2: GPU Narrow-Band Parallel Sweep (\texttt{TrapSweepUnion}, 25--35\% of Boolean time)}\\Partition $Y$ into $B = 4{,}096\dots 65{,}536$ narrow bands; 1 warp/CTA per band with flat sorted active array in L1/shared memory ($\le 256$ active edges; CPU/HBM treap fallback for ultra-dense bands) (5--15$\times$)};
+  \node[stage, below=0.55cm of g2, minimum width=12.6cm, fill=amberaccent!12, draw=amberaccent] (g3) {\textbf{G3: GPU Boundary Extraction \& Morphology Collars (\texttt{TrapMorph})}\\Emit directed boundary edges directly from canonical trapezoids on GPU (eliminating CPU \texttt{ldb\_trapset\_loops} round-trip); 1 thread/vertex emits CSR collar quads + miter/bevel caps directly into G1 (10--30$\times$)};
+  \node[stage, below=0.55cm of g3, minimum width=12.6cm, fill=crimson!10, draw=crimson] (g4) {\textbf{G4: GPU Pair Filtering for Topologicals \& \texttt{CONNECT} (\texttt{TrapTopo}, \texttt{fascl\_connect})}\\Reuse \texttt{trapezoid.f90}'s \texttt{!\$omp declare target} \texttt{trap\_overlap\_positive} / \texttt{trap\_contact} kernels over GPU uniform grid / LBVH candidate pairs (10--25$\times$)};
+  \draw[flow] (g1) -- (g2);
+  \draw[flow] (g2) -- (g3);
+  \draw[flow] (g3) -- (g4);
+\end{tikzpicture}
+\caption{Four-phase GPU offload roadmap (G1--G4) targeting NVIDIA Grace-Blackwell GB10 unified memory and H100/B200 discrete GPUs.}
+\label{fig:gpu_roadmap}
+\end{figure}
+
+\subsection{Why Unified Memory (GB10) and \texttt{cudaMemPool\_t} Are Essential}
+On NVIDIA Grace-Blackwell (GB10) systems with coherent NVLink-C2C unified memory, G1--G4 can share canonical \texttt{Trapezoid} arrays between CPU OpenMP and GPU CUDA kernels without explicit \texttt{cudaMemcpy} staging, provided that all intermediate allocations come from a persistent stream-ordered \texttt{cudaMemPool\_t} (Chapter~\ref{ch:memory}, Tier~3). Listing~\ref{lst:gpu_target} shows how \texttt{TrapezoidModule}'s existing \texttt{!\$omp declare target} predicates enable direct GPU pair evaluation in G4.
+
+\begin{lstlisting}[caption={Direct OpenMP GPU target pair kernel pattern reusing \texttt{trapezoid.f90}'s \texttt{!\$omp declare target} \texttt{trap\_overlap\_positive}.},label={lst:gpu_target}]
+!$omp target teams distribute parallel do &
+!$omp   map(to: tA(1:nA), tB(1:nB), pair_a(1:npairs), pair_b(1:npairs)) &
+!$omp   map(from: hit(1:npairs))
+do k = 1, npairs
+   hit(k) = trap_overlap_positive(tA(pair_a(k)), tB(pair_b(k)))
+end do
+!$omp end target teams distribute parallel do
+\end{lstlisting}

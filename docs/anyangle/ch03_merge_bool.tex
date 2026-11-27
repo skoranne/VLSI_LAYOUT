@@ -1,0 +1,196 @@
+\chapter{Single-Layer Merge and Two-Layer Booleans via Snap Rounding}
+\label{ch:merge_bool}
+
+\section{Pipeline Overview (\texttt{TrapMergeModule})}
+
+\texttt{src/trap\_merge.f90} (1,835 LOC) implements both single-layer union (\texttt{TrapMergePolygons}) and multi-operation two-layer Booleans (\texttt{TrapBooleanPolygons}) through a four-stage deterministic OpenMP pipeline:
+\begin{enumerate}
+  \item \textbf{\texttt{TrapBuildEdges}:} Converts CSR polygons into directed edges normalized to $y_1 < y_2$, with signed winding weight $w \in \{-1, +1\}$ (and horizontal edges $y_1 = y_2, w = 0$).
+  \item \textbf{\texttt{TrapSnapRound}:} Performs parallel Hobby / Guibas--Marimont snap rounding on the integer lattice so that no two fragments cross in their interiors and overlapping fragments become identical.
+  \item \textbf{\texttt{TrapSweepUnion}:} Partitioned into $B$ horizontal bands (typically $B = 160$), each band sweeps its active fragments with an augmented treap ordered by exact rational $x$ to emit maximal inside trapezoids for any Boolean winding predicate.
+  \item \textbf{\texttt{TrapStitch}:} Merges trapezoids split across band seam rows $y_{\text{band}}$ and converts endpoints into canonical \texttt{TrapSide} lattice-line records.
+\end{enumerate}
+
+\section{Stage 1: Orientation Normalization and Packed Winding}
+
+Input polygons from OASIS/GDSII files may be oriented either counter-clockwise (CCW) or clockwise (CW), and may self-overlap. \texttt{TrapBuildEdges} computes each polygon's exact signed area using \texttt{i128} shoelace summation. If the signed area is negative, the polygon's traversal is reversed so every input polygon contributes winding $+1$ to its interior. Each non-horizontal edge $(x_a, y_a) \to (x_b, y_b)$ is normalized to $y_1 < y_2$ with winding $w = +1$ if the polygon ran downwards (interior on its right) and $w = -1$ if upwards.
+
+For two-layer Booleans between layers $A$ and $B$, both edge sets are concatenated into a single \texttt{FragSet} with a \textbf{packed 64-bit winding pair}:
+\begin{equation}
+  w_{\text{pack}} = w_A + 2^{32}\,w_B.
+\end{equation}
+Because $w_A$ and $w_B$ are signed integers bounded by layer overlap multiplicity (well within $\pm 2^{30}$), additive winding updates in \texttt{merge\_identical} and treap subtree sums simultaneously maintain both $W_A$ and $W_B$ in a single 64-bit integer addition without branching. The sweep then evaluates any Boolean predicate directly on $(W_A, W_B)$:
+\begin{align*}
+  \texttt{TOP\_OR}:     &\quad (W_A \ne 0) \lor (W_B \ne 0) &
+  \texttt{TOP\_AND}:    &\quad (W_A \ne 0) \land (W_B \ne 0) \\
+  \texttt{TOP\_NOT}:    &\quad (W_A \ne 0) \land (W_B = 0) &
+  \texttt{TOP\_XOR}:    &\quad (W_A \ne 0) \oplus (W_B \ne 0) \\
+  \texttt{TOP\_BNOTA}:  &\quad (W_A = 0) \land (W_B \ne 0) &
+  \texttt{TOP\_SELF2}:  &\quad |W_A| \ge 2.
+\end{align*}
+Crucially, \texttt{TrapBooleanPolygons} runs \texttt{TrapSnapRound} \textbf{once} over $A \cup B$ and then sweeps all requested operations (\texttt{OR}, \texttt{AND}, \texttt{NOT}, \texttt{XOR}, \texttt{BNOTA}) over the \emph{same} snapped fragment set. This guarantees exact algebraic identities (\texttt{XOR = OR - AND}, \texttt{OR = NOT + AND + BNOTA}) and avoids the two-pass double-rounding error inherent in \texttt{A.merged() op B.merged()} flows.
+
+\section{Stage 2: Parallel Snap Rounding (\texttt{TrapSnapRound})}
+
+When two arbitrary-angle segments with integer endpoints cross, their intersection point $(x^*, y^*) \in \mathbb{Q}^2$ is generally non-integral. Simply rounding $(x^*, y^*)$ to the nearest integer without splitting nearby segments can cause a rounded vertex to jump \emph{across} an adjacent edge, inverting topology. \textbf{Snap rounding} (Hobby 1999; Guibas \& Marimont 1995) solves this with a rigorous geometric guarantee:
+
+\begin{definition}[Hot Pixel and Snap-Rounded Polyline]
+A \emph{hot pixel} centered at integer lattice point $(p_x, p_y) \in \mathbb{Z}^2$ is the half-open unit square $[p_x - \tfrac{1}{2}, p_x + \tfrac{1}{2}) \times [p_y - \tfrac{1}{2}, p_y + \tfrac{1}{2})$. A pixel is hot if it contains at least one input vertex or at least one proper edge-edge crossing point. Each input edge $e$ is replaced by the polyline connecting the centers of all hot pixels intersected by $e$, in order along $e$.
+\end{definition}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.15]
+  % Left panel: Single-pass snap rounding
+  \begin{scope}[xshift=0cm]
+    \draw[step=1.0, gray!25, thin] (0,0) grid (4,4);
+    % Hot pixel shaded around (2,2)
+    \fill[amberaccent!22, draw=amberaccent, dashed, thick] (1.5,1.5) rectangle (2.5,2.5);
+    \node[font=\scriptsize\sffamily, color=amberaccent] at (2.0,2.72) {Hot pixel $(2,2)$};
+    % Original edges
+    \draw[thick, slate, dashed] (0.0,1.0) -- (4.0,3.0);
+    \draw[thick, slate, dashed] (1.0,0.0) -- (3.0,4.0);
+    \draw[thick, slate, dashed] (0.0,3.0) -- (4.0,1.3);
+    % Exact crossing
+    \fill[crimson] (1.67,1.83) circle (2pt) node[below left, font=\tiny, color=crimson] {exact $c$};
+    % Snapped polylines through (2,2)
+    \draw[very thick, navy] (0,1) -- (2,2) -- (4,3);
+    \draw[very thick, tealaccent] (1,0) -- (2,2) -- (3,4);
+    \draw[very thick, purple] (0,3) -- (2,2) -- (4,1.3);
+    \fill[black] (2,2) circle (2.5pt);
+    \node[font=\footnotesize\bfseries, color=navy] at (2.0,-0.45) {(a) Single-Pass Snap Rounding ($H_\infty \le 0.5\text{ dbu}$)};
+  \end{scope}
+
+  % Right panel: Double rounding tilt
+  \begin{scope}[xshift=6.0cm]
+    \draw[step=1.0, gray!25, thin] (0,0) grid (4,4);
+    \fill[red!10] (1.5,1.5) rectangle (2.5,2.5);
+    \draw[thick, slate, dashed] (0.0,1.0) -- (4.0,3.0) node[right, font=\tiny] {exact $A$};
+    \draw[thick, crimson] (0.0,1.0) -- (1.0,2.0) -- (4.0,3.0);
+    \node[font=\tiny, color=crimson, rotate=20] at (2.5,2.75) {tilted $A_{\text{merged}}$};
+    \draw[thick, tealaccent] (1.3,0.0) -- (2.7,4.0) node[right, font=\tiny] {exact $B$};
+    \fill[navy] (1.9,1.95) circle (2.2pt);
+    \fill[crimson] (2.25,2.42) circle (2.5pt);
+    \draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]}, crimson, thick] (1.9,1.95) -- (2.25,2.42);
+    \node[font=\tiny\bfseries, color=crimson, anchor=west] at (2.3,2.1) {drift $> 0.5$ dbu};
+    \node[font=\footnotesize\bfseries, color=crimson] at (2.0,-0.45) {(b) Two-Pass \texttt{A.merged() op B.merged()} (up to $1.49\text{ dbu}$)};
+  \end{scope}
+\end{tikzpicture}
+\caption{Geometric comparison between (a) \texttt{MAGPARSER}'s joint single-pass snap rounding ($H_\infty \le 0.5\text{ dbu}$ tube guarantee) and (b) two-pass merged-operand Booleans where pre-merging tilts edges before the second rounding pass.}
+\label{fig:snap_round}
+\end{figure}
+
+In \texttt{TrapSnapRound}, hot pixels and edge--pixel hits are computed in parallel without $O(N^2)$ pair checks via a uniform spatial cell grid:
+\begin{enumerate}
+  \item \textbf{Cell Registration (\texttt{t\_grid}):} Each edge is rasterized into the uniform grid cells it traverses (2-pass count + prefix sum + scatter, sorted by \texttt{CompactSortPairs}).
+  \item \textbf{Exact Pair Crossings (\texttt{t\_cross}):} Within each cell, every pair of edges is tested once (in the unique cell containing their crossing point) using \texttt{ExactPredicatesModule}. Crossings are rounded half-up via \texttt{i128\_round\_div} to emit hot pixels.
+  \item \textbf{Hot-Pixel Deduplication (\texttt{t\_hot}):} All input vertices and rounded crossing centers are packed into 64-bit Morton/lexicographic keys, sorted, and deduplicated.
+  \item \textbf{Edge--Pixel Hits (\texttt{t\_hits}):} Each edge queries the hot-pixel grid along its span using exact half-open square intersection tests.
+  \item \textbf{Fragment Splitting \& Winding Reduction (\texttt{t\_frag}):} Each edge's hits are sorted along the edge to emit lattice-endpoint fragments. Identical fragments (same endpoints) are merged by sorting and summing their packed windings $w_{\text{pack}}$ (\texttt{merge\_identical}); fragments whose net winding becomes zero vanish.
+\end{enumerate}
+
+\subsection{Lock-Free Unique Cell Ownership for Crossing Pairs}
+
+When two long slanted edges $e_i$ and $e_j$ traverse multiple grid cells in parallel, naive per-cell testing would discover their intersection multiple times if they co-occur in several cells. \texttt{TrapSnapRound} avoids both duplicate crossings and atomic synchronization by enforcing a deterministic \textbf{unique-cell ownership rule}:
+\begin{quote}
+  Two edges $e_i, e_j$ registered in cell $(c_x, c_y)$ are tested for a proper crossing, and their rounded crossing pixel $(p_x, p_y)$ is emitted \emph{if and only if} $(p_x, p_y)$ maps to the current cell $(c_x, c_y)$ (or, for collinear endpoint overlaps, the low cell of their bounding-box intersection).
+\end{quote}
+Because each cell is processed by a single OpenMP thread and each crossing point belongs to exactly one cell, every crossing is discovered \emph{at most once} with zero locks and deterministic output order after sorting.
+
+\begin{lstlisting}[caption={Packed two-operand winding and region-predicate evaluation in \texttt{src/trap\_merge.f90}.},label={lst:wpack}]
+! Packed 64-bit winding pair: wpack = wA + 2**32 * wB
+! Decoding signed (wA, wB) from accumulated 64-bit subtree sum W:
+pure logical function winding_inside(wpack, op) result(in_reg)
+  integer(int64), intent(in) :: wpack
+  integer(int32), intent(in) :: op
+  integer(int64) :: wA, wB
+  ! Unpack signed 32-bit lanes with bias adjustment
+  wA = int(int(wpack, int32), int64)
+  wB = (wpack - wA) / K32
+  select case (op)
+  case (TOP_NONZERO); in_reg = (wpack /= 0_int64)
+  case (TOP_OR);      in_reg = (wA /= 0_int64) .or. (wB /= 0_int64)
+  case (TOP_AND);     in_reg = (wA /= 0_int64) .and. (wB /= 0_int64)
+  case (TOP_NOT);     in_reg = (wA /= 0_int64) .and. (wB == 0_int64)
+  case (TOP_XOR);     in_reg = (wA /= 0_int64) .neqv. (wB /= 0_int64)
+  case (TOP_BNOTA);   in_reg = (wA == 0_int64) .and. (wB /= 0_int64)
+  case (TOP_SELF2);   in_reg = (abs(wA) >= 2_int64)
+  case (TOP_A);       in_reg = (wA /= 0_int64)
+  case (TOP_B);       in_reg = (wB /= 0_int64)
+  case default;       in_reg = .false.
+  end select
+end function winding_inside
+\end{lstlisting}
+
+\section{Stage 3 \& 4: Band-Parallel Treap Sweep and Seam Stitching}
+
+Because snap-rounded fragments never cross in their interiors, their left-to-right order changes only at event rows (fragment endpoints and horizontal segments). \texttt{TrapSweepUnion} partitions the vertical die extent into $B$ horizontal bands (default $B = 8 \times N_{\text{threads}}$, e.g.\ $B = 160$ on a 20-core Grace CPU).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.95]
+  % Bands
+  \fill[blue!5] (0,0) rectangle (9,1.2);
+  \fill[teal!5] (0,1.2) rectangle (9,2.4);
+  \fill[blue!5] (0,2.4) rectangle (9,3.6);
+  \foreach \y/\lab in {0/$y_{\min}$, 1.2/$y_{b,1}$, 2.4/$y_{b,2}$, 3.6/$y_{\max}$} {
+    \draw[thick, dashed, navy] (0,\y) -- (9,\y);
+    \node[anchor=east, font=\scriptsize\ttfamily, color=navy] at (-0.1,\y) {\lab};
+  }
+  \node[anchor=west, font=\scriptsize\sffamily, color=slate] at (9.15,0.6) {Band 1 (Thread $t_1$)};
+  \node[anchor=west, font=\scriptsize\sffamily, color=slate] at (9.15,1.8) {Band 2 (Thread $t_2$)};
+  \node[anchor=west, font=\scriptsize\sffamily, color=slate] at (9.15,3.0) {Band 3 (Thread $t_3$)};
+
+  % Slanted polygon swept across bands
+  \fill[amberaccent!25, draw=amberaccent, thick] (1.5,0.3) -- (4.0,0.3) -- (4.6,1.2) -- (2.1,1.2) -- cycle;
+  \fill[amberaccent!35, draw=amberaccent, thick] (2.1,1.2) -- (4.6,1.2) -- (5.4,2.4) -- (2.9,2.4) -- cycle;
+  \fill[amberaccent!25, draw=amberaccent, thick] (2.9,2.4) -- (5.4,2.4) -- (5.8,3.0) -- (3.3,3.0) -- cycle;
+
+  % Stitch arrows at seams
+  \draw[{Stealth[length=2mm]}-{Stealth[length=2mm]}, crimson, very thick] (3.35,1.0) -- (3.35,1.4) node[right=4pt, font=\scriptsize\sffamily, color=crimson] {\texttt{TrapStitch} merges same $(l,r)$};
+  \draw[{Stealth[length=2mm]}-{Stealth[length=2mm]}, crimson, very thick] (4.15,2.2) -- (4.15,2.6);
+
+  % Treap callout
+  \node[draw=tealaccent, fill=white, rounded corners=2pt, align=left, font=\scriptsize, anchor=west] at (6.0,1.8) {
+    \textbf{Per-band Treap:}\\
+    Order: exact $x(y)$\\
+    Augment: $\sum w_{\text{pack}}$,\\
+    boundary-flag count\\
+    Cluster update at $y_e$
+  };
+\end{tikzpicture}
+\caption{Band-parallel sweep (\texttt{TrapSweepUnion}) and vertical seam stitching (\texttt{TrapStitch}). Each band runs independently in OpenMP; trapezoids split artificially at band boundaries $y_{b,k}$ are stitched back into canonical maximal trapezoids.}
+\label{fig:band_sweep}
+\end{figure}
+
+Within each band, a thread sweeps upward across sorted event rows $y$:
+\begin{itemize}
+  \item Fragments spanning the band bottom $y_{\text{lo}}$ are inserted into the band's \textbf{augmented treap} (ordered by exact rational $x$ at $y_{\text{lo}}$, breaking ties by slope $dx/dy$).
+  \item Each treap node stores the subtree sum of packed windings \texttt{sub\_w} and a count of active boundary edges \texttt{sub\_bnd}. Thus the winding immediately to the left of any fragment is obtained in $O(\log K)$ time by walking to the root.
+  \item At each event row $y_e$, only the local x-clusters touching an event vertex or horizontal fragment are updated: ending fragments are deleted, starting fragments are inserted, and open trapezoids whose bounding lines changed are closed and emitted.
+  \item Finally, \texttt{TrapStitch} sorts trapezoids touching band seam rows by $(\text{left line}, \text{right line}, y_1)$ and merges vertically contiguous pieces sharing identical lattice lines.
+\end{itemize}
+
+\section{Empirical Performance on Rotated SKY130 (\texttt{SDT16S\_R015})}
+
+Table~\ref{tab:merge_bool_perf} reports real measured timings on \texttt{SDT16S\_R015.oas} ($15^\circ$-rotated SKY130 design, 20 OpenMP threads on NVIDIA Grace CPU): single-layer \texttt{TRAPMERGE.exe} on \texttt{poly} (\texttt{66/20}) and four-operation \texttt{TRAPBOOL.exe} on \texttt{poly} $\times$ \texttt{diff} (\texttt{66/20} $\times$ \texttt{65/20}, 930,771 input polygons, 6.72M input edges, 3.71M crossings, 14.12M merged fragments, 31.61M output trapezoids, 0 anomalies).
+
+\begin{table}[htbp]
+\centering
+\caption{Measured stage breakdown of \texttt{TRAPMERGE.exe} and \texttt{TRAPBOOL.exe} on \texttt{SDT16S\_R015.oas} (20 threads, $B=160$ bands, 0 anomalies).}
+\label{tab:merge_bool_perf}
+\small
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+\textbf{Run / Operation} & \textbf{Input Polys} & \textbf{Edges} & \textbf{Crossings} & \textbf{Out Traps} & \textbf{$t_{\text{snap}}$ (s)} & \textbf{$t_{\text{sweep+stitch}}$ (s)} & \textbf{$t_{\text{write}}$ (s)} \\
+\midrule
+\texttt{TRAPMERGE 66/20} & 495,905 & 4,816,344 & 11,295 & 4,317,174 & 1.451 & 3.664 & 3.862 \\
+\midrule
+\texttt{TRAPBOOL shared} & 930,771 & 6,720,462 & 3,710,799 & --- & 3.264 & --- & --- \\
+\quad \texttt{op=OR} & --- & --- & --- & 10,404,477 & (shared) & 8.362 & 9.761 \\
+\quad \texttt{op=AND} & --- & --- & --- & 2,774,628 & (shared) & 9.611 & 2.458 \\
+\quad \texttt{op=NOT} & --- & --- & --- & 7,091,802 & (shared) & 6.861 & 6.174 \\
+\quad \texttt{op=XOR} & --- & --- & --- & 11,335,682 & (shared) & 6.830 & 10.120 \\
+\bottomrule
+\end{tabular}
+\end{table}
