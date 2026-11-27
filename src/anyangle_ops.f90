@@ -29,12 +29,13 @@ module AnyAngleOpsModule
   use TrapMergeModule
   use TrapPNumModule
   use TrapTopoModule
+  use TrapMorphModule
   implicit none
   private
 
   public :: AnyAngleEnabled, AnyAngleForce, AnyAngleSetEnabled, LoadAnyAngleLayers
   public :: TOP_OR, TOP_AND, TOP_NOT, TOP_XOR, TOP_BNOTA, TOP_SELF2
-  public :: AnyAngleTopo, AnyAngleTopoCode
+  public :: AnyAngleTopo, AnyAngleTopoCode, AnyAngleMorph
   public :: AnyAngleBoolean, AnyAngleMeasure, AnyAngleDigest, AnyAngleOpFromChar, AnyAngleOpFromName
 
   logical, save :: anyangle_on = .false., anyangle_env_read = .false.
@@ -437,6 +438,31 @@ contains
          ' B=', st%polys_b, ' selected=', st%selected, ' pairs=', st%pairs, ' t_pnum=', st%t_pnum, &
          ' t_pairs=', st%t_pairs, ' t_cover=', st%t_cover, ' t_total=', st%t_total
   end subroutine AnyAngleTopo
+
+  !> out = GROW/SHRINK/SIZE of A (exact Minkowski collar + TrapBooleanPolygons).
+  subroutine AnyAngleMorph(A, out, dE, dN, dW, dS, is_shrink, status)
+    type(Layer), intent(inout), target :: A, out
+    integer(int64), intent(in) :: dE, dN, dW, dS
+    logical, intent(in) :: is_shrink
+    integer, intent(out) :: status
+    type(Trapezoid), allocatable :: tA(:), res(:)
+    integer(int64) :: nA, nres
+    type(TrapMorphStats) :: st
+    status = 0
+    call layer_traps(A, tA, nA, status); if (status /= 0) return
+    call TrapMorph(tA, nA, dE, dN, dW, dS, is_shrink, res, nres, st, status)
+    if (status /= 0 .or. st%anomalies /= 0) then
+       write(*, '(A,I0,A,I0)') 'ERROR: anyangle morph failed: status=', status, ' anomalies=', st%anomalies
+       if (status == 0) status = 3
+       call ClearLayer(out)
+       return
+    end if
+    call store_traps(out, res, nres)
+    write(*, '(A,L1,4(A,I0),3(A,I0),4(A,F0.3))') 'INFO: anyangle morph shrink=', is_shrink, &
+         ' E=', dE, ' N=', dN, ' W=', dW, ' S=', dS, ' loops=', st%loops, ' collar=', st%collar_polys, &
+         ' traps=', nres, ' t_loops=', st%t_loops, ' t_collar=', st%t_collar, &
+         ' t_bool=', st%t_bool, ' t_total=', st%t_total
+  end subroutine AnyAngleMorph
 
   !> Canonical trapezoids of a layer: its own (any-angle) or its boxes merged exactly.
   subroutine layer_traps(L, t, n, status)

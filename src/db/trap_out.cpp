@@ -254,6 +254,45 @@ struct GroupPoly {
         holes = count_holes(st);
     }
 
+    // Unbridged oriented boundary loops of M (outer CCW, holes CW), collinear vertices dropped.
+    // Every direction-change vertex of a canonical trapezoid set is on the integer lattice (d == 1).
+    void extract_loops(const int* M, int nm, std::vector<int64_t>& loff,
+                       std::vector<int64_t>& lxs, std::vector<int64_t>& lys, Stats& st) {
+        build(M, nm, st);
+        const int ns = (int)seg.size();
+        seen.assign((size_t)ns, 0);
+        for (int i = 0; i < ns; ++i) {
+            if (seen[(size_t)i] || nxt[(size_t)i] < 0) continue;
+            ls.clear();
+            int s0 = i; bool ok = true;
+            while (!seen[(size_t)s0]) {
+                seen[(size_t)s0] = 1; ls.push_back(s0);
+                s0 = nxt[(size_t)s0];
+                if (s0 < 0) { ok = false; break; }
+            }
+            if (!ok || s0 != i) { st.anomalies++; continue; }
+            cv.clear();
+            const size_t L = ls.size();
+            for (size_t k = 0; k < L; ++k) {
+                const Seg& a = seg[(size_t)ls[(k + L - 1) % L]];
+                const Seg& b = seg[(size_t)ls[k]];
+                if (a.dx == b.dx && a.dy == b.dy) continue;
+                cv.push_back(b.a);
+            }
+            if (cv.size() < 3) { st.anomalies++; continue; }
+            const size_t base = lxs.size();
+            bool lattice = true;
+            for (size_t k = 0; k < cv.size(); ++k) {
+                const VKey& q = vk[(size_t)cv[k]];
+                if (q.d != 1) { lattice = false; break; }
+                lxs.push_back((int64_t)q.n);
+                lys.push_back(q.y);
+            }
+            if (!lattice) { st.anomalies++; lxs.resize(base); lys.resize(base); continue; }
+            loff.push_back((int64_t)lxs.size() + 1);
+        }
+    }
+
     // Holes of the closed region = bounded components of its complement. (1) Boundary segments
     // are split at every lattice vertex lying in their interior (a vertex of one part touching a
     // side of another: such T contacts are not vertices of the side segments built from the
@@ -806,4 +845,67 @@ extern "C" int ldb_trapset_measure(int64_t n, const int32_t* rec, const int64_t*
     for (auto& t : th) t.join();
     if (stats) stats[0] = anom.load();
     return anom.load() == 0 ? 0 : 1;
+}
+
+// Unbridged oriented boundary loops (outer CCW, holes CW) of a canonical trapezoid set,
+// grouped by PNUM ordinal lab[i] in 1..np. Returns a TrapPolySet* handle (read with
+// ldb_trapset_polys_count / ldb_trapset_polys_get, release with ldb_trapset_polys_free).
+extern "C" void* ldb_trapset_loops(int64_t n, const int32_t* rec, const int64_t* lab, int64_t np,
+                                   int64_t* stats) {
+    auto* r = new TrapPolySet();
+    r->off.push_back(1);
+    if (n <= 0 || np <= 0) {
+        if (stats) stats[0] = 0;
+        return r;
+    }
+    std::vector<Trap> T((size_t)n);
+    for (int64_t i = 0; i < n; ++i) {
+        const int32_t* p = rec + 10 * i;
+        T[(size_t)i] = { p[0], p[1], { p[2], p[3], p[4], p[5] }, { p[6], p[7], p[8], p[9] } };
+    }
+    std::vector<int> start((size_t)np + 2, 0), order((size_t)n);
+    for (int64_t i = 0; i < n; ++i) start[(size_t)lab[i] + 1]++;
+    for (int64_t p = 0; p <= np; ++p) start[(size_t)p + 1] += start[(size_t)p];
+    { std::vector<int> pos(start.begin(), start.end() - 1);
+      for (int64_t i = 0; i < n; ++i) order[(size_t)pos[(size_t)lab[i]]++] = (int)i; }
+
+    int nth = (int)std::thread::hardware_concurrency();
+    if (const char* e = std::getenv("OMP_NUM_THREADS")) { int v = std::atoi(e); if (v > 0) nth = v; }
+    nth = std::max(1, std::min(nth, (int)np));
+    struct Chunk { std::vector<int64_t> off{1}, xs, ys; int64_t anom = 0; };
+    std::vector<Chunk> chunks((size_t)nth);
+    auto worker = [&](int tid) {
+        const int64_t p0 = 1 + (np * tid) / nth;
+        const int64_t p1 = 1 + (np * (tid + 1)) / nth;
+        GroupPoly gp(T); Stats st;
+        Chunk& c = chunks[(size_t)tid];
+        for (int64_t p = p0; p < p1; ++p) {
+            gp.extract_loops(order.data() + start[(size_t)p], start[(size_t)p + 1] - start[(size_t)p],
+                             c.off, c.xs, c.ys, st);
+        }
+        c.anom = st.anomalies;
+    };
+    std::vector<std::thread> th;
+    for (int t = 1; t < nth; ++t) th.emplace_back(worker, t);
+    worker(0);
+    for (auto& t : th) t.join();
+
+    int64_t tot_loops = 0, tot_verts = 0, anom = 0;
+    for (const auto& c : chunks) {
+        tot_loops += (int64_t)c.off.size() - 1;
+        tot_verts += (int64_t)c.xs.size();
+        anom += c.anom;
+    }
+    r->off.reserve((size_t)tot_loops + 1);
+    r->xs.reserve((size_t)tot_verts);
+    r->ys.reserve((size_t)tot_verts);
+    int64_t vbase = 0;
+    for (const auto& c : chunks) {
+        for (size_t k = 1; k < c.off.size(); ++k) r->off.push_back(vbase + c.off[k]);
+        r->xs.insert(r->xs.end(), c.xs.begin(), c.xs.end());
+        r->ys.insert(r->ys.end(), c.ys.begin(), c.ys.end());
+        vbase += (int64_t)c.xs.size();
+    }
+    if (stats) stats[0] = anom;
+    return r;
 }

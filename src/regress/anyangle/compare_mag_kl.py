@@ -20,14 +20,19 @@ def parse(path, key):
     return m
 mag, kl, tag = parse(sys.argv[1], "MEASURE"), parse(sys.argv[2], "KLMEASURE"), sys.argv[3]
 ref = parse(sys.argv[4], "MEASURE") if len(sys.argv) > 4 else {}
-MORPH = {"grow", "shrink", "size_p", "size_n", "close", "open", "id_grow", "id_shrink", "id_close", "id_open", "id_sizep", "id_sizen"}
+MORPH = {"grow", "shrink", "size_p", "size_n", "close", "open"}
 npass = nfail = 0
 for lay in sorted(kl):
     if lay not in mag: continue
     a, b = mag[lay], kl[lay]
-    if lay in MORPH or lay == "selfand": st = "SKIP"
+    if lay == "selfand": st = "SKIP"
     elif lay.startswith("id_"):
         st = "INFO"
+    elif lay in MORPH:
+        geo = abs(a["area"] - b["area"]) <= 5e-3 * max(1, b["area"]) and \
+              abs(a["perimeter"] - b["perimeter"]) <= 5e-3 * max(1, b["perimeter"])
+        ok = geo and a["polygons"] > 0
+        st = "PASS" if ok else "FAIL"; npass += ok; nfail += not ok
     else:
         geo = abs(a["area"] - b["area"]) <= 1e-4 * max(1, b["area"]) and \
               abs(a["perimeter"] - b["perimeter"]) <= 5e-4 * max(1, b["perimeter"])

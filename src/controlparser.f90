@@ -1097,6 +1097,47 @@ contains
                         else if( AnyAngleTopoCode( primary_operator ) > 0 .and. associated( rhs2_layer ) ) then
                            call AnyAngleTopo( rhs1_layer, rhs2_layer, lhs_layer, AnyAngleTopoCode( primary_operator ), aa_status )
                            banded_done = .true.
+                        else if( primary_operator == 'GROW' .or. primary_operator == 'SHRINK' .or. &
+                                 primary_operator == 'SIZE' ) then
+                           if( rhs1_layer%n_used == 0 .and. rhs1_layer%n_traps == 0 .and. .not. rhs1_layer%is_compact ) &
+                                call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
+                           if( primary_operator == 'GROW' ) then
+                              rvar = 0.0_real64
+                              read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
+                              if( ios /= 0 ) then
+                                 read(rest, *, iostat=ios) buf1, buf2, rvar(1)
+                                 rvar(2)=rvar(1); rvar(3)=rvar(1); rvar(4)=rvar(1)
+                              end if
+                              call AnyAngleMorph( rhs1_layer, lhs_layer, &
+                                   nint(used_precision*rvar(1), int64), nint(used_precision*rvar(2), int64), &
+                                   nint(used_precision*rvar(3), int64), nint(used_precision*rvar(4), int64), &
+                                   .false., aa_status )
+                           else if( primary_operator == 'SHRINK' ) then
+                              rvar = 0.0_real64
+                              read(rest, *, iostat=ios) buf1, buf2, rvar(1), rvar(2), rvar(3), rvar(4)
+                              if( ios /= 0 ) then
+                                 read(rest, *, iostat=ios) buf1, buf2, rvar(1)
+                                 rvar(2)=rvar(1); rvar(3)=rvar(1); rvar(4)=rvar(1)
+                              end if
+                              call AnyAngleMorph( rhs1_layer, lhs_layer, &
+                                   nint(used_precision*rvar(1), int64), nint(used_precision*rvar(2), int64), &
+                                   nint(used_precision*rvar(3), int64), nint(used_precision*rvar(4), int64), &
+                                   .true., aa_status )
+                           else
+                              read(rest, *, iostat=ios) buf1, buf2, rvar(1)
+                              if( rvar(1) >= 0.0_real64 ) then
+                                 call AnyAngleMorph( rhs1_layer, lhs_layer, &
+                                      nint(used_precision*rvar(1), int64), nint(used_precision*rvar(1), int64), &
+                                      nint(used_precision*rvar(1), int64), nint(used_precision*rvar(1), int64), &
+                                      .false., aa_status )
+                              else
+                                 call AnyAngleMorph( rhs1_layer, lhs_layer, &
+                                      nint(-used_precision*rvar(1), int64), nint(-used_precision*rvar(1), int64), &
+                                      nint(-used_precision*rvar(1), int64), nint(-used_precision*rvar(1), int64), &
+                                      .true., aa_status )
+                              end if
+                           end if
+                           banded_done = .true.
                         else if( aa_any .and. primary_operator == 'COPY' ) then
                            call CopyLayer( lhs_layer, rhs1_layer )
                            banded_done = .true.
