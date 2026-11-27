@@ -790,7 +790,7 @@ int trapset_run(int64_t n, const int32_t* rec, int64_t* stats, TrapSink& sink) {
 }
 }
 
-struct TrapPolySet { std::vector<int64_t> off, xs, ys; };
+struct TrapPolySet { std::vector<int64_t> off, xs, ys, poly_off; };
 extern "C" void* ldb_trapset_polys(int64_t n, const int32_t* rec, int64_t* stats) {
     PolySink ps;
     trapset_run(n, rec, stats, ps);
@@ -872,16 +872,19 @@ extern "C" void* ldb_trapset_loops(int64_t n, const int32_t* rec, const int64_t*
     int nth = (int)std::thread::hardware_concurrency();
     if (const char* e = std::getenv("OMP_NUM_THREADS")) { int v = std::atoi(e); if (v > 0) nth = v; }
     nth = std::max(1, std::min(nth, (int)np));
-    struct Chunk { std::vector<int64_t> off{1}, xs, ys; int64_t anom = 0; };
+    struct Chunk { std::vector<int64_t> off{1}, xs, ys, pcnt; int64_t anom = 0; };
     std::vector<Chunk> chunks((size_t)nth);
     auto worker = [&](int tid) {
         const int64_t p0 = 1 + (np * tid) / nth;
         const int64_t p1 = 1 + (np * (tid + 1)) / nth;
         GroupPoly gp(T); Stats st;
         Chunk& c = chunks[(size_t)tid];
+        c.pcnt.reserve((size_t)(p1 - p0));
         for (int64_t p = p0; p < p1; ++p) {
+            const size_t before = c.off.size();
             gp.extract_loops(order.data() + start[(size_t)p], start[(size_t)p + 1] - start[(size_t)p],
                              c.off, c.xs, c.ys, st);
+            c.pcnt.push_back((int64_t)(c.off.size() - before));
         }
         c.anom = st.anomalies;
     };
@@ -899,8 +902,11 @@ extern "C" void* ldb_trapset_loops(int64_t n, const int32_t* rec, const int64_t*
     r->off.reserve((size_t)tot_loops + 1);
     r->xs.reserve((size_t)tot_verts);
     r->ys.reserve((size_t)tot_verts);
+    r->poly_off.reserve((size_t)np + 1);
+    r->poly_off.push_back(1);
     int64_t vbase = 0;
     for (const auto& c : chunks) {
+        for (int64_t cnt : c.pcnt) r->poly_off.push_back(r->poly_off.back() + cnt);
         for (size_t k = 1; k < c.off.size(); ++k) r->off.push_back(vbase + c.off[k]);
         r->xs.insert(r->xs.end(), c.xs.begin(), c.xs.end());
         r->ys.insert(r->ys.end(), c.ys.begin(), c.ys.end());
@@ -908,4 +914,9 @@ extern "C" void* ldb_trapset_loops(int64_t n, const int32_t* rec, const int64_t*
     }
     if (stats) stats[0] = anom;
     return r;
+}
+
+extern "C" void ldb_trapset_loops_poly_off(void* h, int64_t* poff) {
+    auto* r = (TrapPolySet*)h;
+    if (!r->poly_off.empty()) std::memcpy(poff, r->poly_off.data(), r->poly_off.size() * sizeof(int64_t));
 }

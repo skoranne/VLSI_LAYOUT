@@ -210,6 +210,9 @@ test_trapoverlap.exe: test_trapoverlap.o $(LIBRARY)
 test_trapmorph.exe: test_trapmorph.o $(LIBRARY) db/liblayoutdb.a
 	$(FORTRAN_COMPILER) $(FCFLAGS) test_trapmorph.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
 
+test_trappred.exe: test_trappred.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_trappred.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
 TRAPMERGE.exe: trapmerge_main.o $(LIBRARY) db/liblayoutdb.a
 	$(FORTRAN_COMPILER) $(FCFLAGS) trapmerge_main.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
 

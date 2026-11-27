@@ -312,7 +312,8 @@ contains
     integer(kind=K_COORDINATE_KIND):: ivar(16)
     integer(kind=K_COORDINATE_KIND) :: used_precision
     logical :: banded_done, aa_any
-    integer(int32) :: aa_op
+    integer(int32) :: aa_op, aa_cmp
+    real(real64) :: aa_v1, aa_v2
     integer :: aa_status
     character(len=1024) :: m4_cmd, expanded_file, echo_line, helper_name
     integer :: m4_stat, echo_unit, echo_ios, pid_self, pid_unit, helper_unit, helper_ios
@@ -1081,7 +1082,17 @@ contains
                      aa_any = .false.
                      if( associated( rhs1_layer ) ) aa_any = LayerIsAnyAngle( rhs1_layer )
                      if( associated( rhs2_layer ) ) aa_any = aa_any .or. LayerIsAnyAngle( rhs2_layer )
-                     if( ( aa_any .or. AnyAngleForce() ) .and. associated( lhs_layer ) ) then
+                     if( associated( rhs1_layer ) .and. associated( lhs_layer ) .and. &
+                         AnyAnglePredCode( primary_operator ) > 0 ) then
+                        if( rhs1_layer%n_used == 0 .and. rhs1_layer%n_traps == 0 .and. .not. rhs1_layer%is_compact ) &
+                             call RestoreSnapToLayer( rhs1_layer, rhs1_layer%fileName )
+                        aa_op = AnyAnglePredCode( primary_operator )
+                        call AnyAngleParsePredArgs( rest, aa_op, aa_cmp, aa_v1, aa_v2 )
+                        call AnyAnglePredicate( rhs1_layer, lhs_layer, aa_op, aa_cmp, aa_v1, aa_v2, &
+                             real( used_precision, real64 ), aa_status )
+                        banded_done = .true.
+                     end if
+                     if( ( .not. banded_done ) .and. ( aa_any .or. AnyAngleForce() ) .and. associated( lhs_layer ) ) then
                         aa_op = AnyAngleOpFromName( primary_operator, .not. associated( rhs2_layer ) )
                         if( aa_op >= 0 .and. ( aa_op == TOP_SELF2 .or. associated( rhs2_layer ) ) ) then
                            if( rhs1_layer%n_used == 0 .and. rhs1_layer%n_traps == 0 .and. .not. rhs1_layer%is_compact ) &

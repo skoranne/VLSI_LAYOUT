@@ -10,6 +10,7 @@
 | Canonical PNUM & exact lattice outlines / hole counts | Done | `trap_pnum.f90`, `db/trap_out.cpp` (`ldb_trapset_polys`, `ldb_trapset_measure`, `ldb_trapset_loops`) | `kl_pnum_check.py`, `exec measure` |
 | Polygon-level Topologicals (`INTERACT`, `CUT`, `TOUCH`, `INSIDE`, `OUTSIDE`, `EQUAL`, `DISJOINT`, `MEET`, `OVERLAPS`, `COVERS`, `COVEREDBY`, `CONTAINS` + `NOT_*`) | Done | `trap_topo.f90`, `anyangle_ops.f90` | `regress/anyangle/helpers/kl_topo.py` |
 | Morphology (`GROW`, `SHRINK`, `SIZE`, closing/opening, isotropic mode=2 & anisotropic E/N/W/S) | Done | `trap_morph.f90`, `anyangle_ops.f90`, `controlparser.f90` | `test_trapmorph.exe`, `SDT16S_R015` vs KLayout (`pass=7 fail=0`; `id_close` 4.8x and `id_open` 10.2x lower error than KLayout) |
+| Polygon Predicates (rotation-invariant: `AREA`, `PERIMETER`, `VERTEX`, `HOLES`, `WIDTH`, `LENGTH`, `ASPECT_RATIO`, `DIAMETER`, `COMPACTNESS`, `SOLIDITY`, `CONVEX_CRITERIA`, `CONCAVE_CRITERIA`, `IS_RECTANGLE_WITH_ROTATION`, `IS_SQUARE_WITH_ROTATION`, `NOTCH`, `ENCLOSE_RECTANGLE`; orientation-specific: `IS_RECTILINEAR`, `IS_45`, `IS_RECTANGLE`, `IS_SQUARE`) | Done | `trap_pred.f90`, `anyangle_ops.f90`, `controlparser.f90`, `db/trap_out.cpp` (`ldb_trapset_loops_poly_off`) | `test_trappred.exe` (0/1/15/30/45/90/137° + exact 45° octagon), `MAGPARSER.exe` CTR on `sky130_stdcell` R000/R001/R015 |
 | FASCL properties (`AREA`, `PERIMETER`, `VERTICES`, bbox) & `CONNECT` / `NET_ID` | Done | `fascl.f90`, `fascl_connect.f90`, `property_table.f90` | `db/regressions/fascl/run_fascl_regression.sh` |
 
 ---

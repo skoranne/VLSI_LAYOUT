@@ -30,12 +30,14 @@ module AnyAngleOpsModule
   use TrapPNumModule
   use TrapTopoModule
   use TrapMorphModule
+  use TrapPredModule
   implicit none
   private
 
   public :: AnyAngleEnabled, AnyAngleForce, AnyAngleSetEnabled, LoadAnyAngleLayers
   public :: TOP_OR, TOP_AND, TOP_NOT, TOP_XOR, TOP_BNOTA, TOP_SELF2
   public :: AnyAngleTopo, AnyAngleTopoCode, AnyAngleMorph
+  public :: AnyAnglePredCode, AnyAngleParsePredArgs, AnyAnglePredicate
   public :: AnyAngleBoolean, AnyAngleMeasure, AnyAngleDigest, AnyAngleOpFromChar, AnyAngleOpFromName
 
   logical, save :: anyangle_on = .false., anyangle_env_read = .false.
@@ -463,6 +465,110 @@ contains
          ' traps=', nres, ' t_loops=', st%t_loops, ' t_collar=', st%t_collar, &
          ' t_bool=', st%t_bool, ' t_total=', st%t_total
   end subroutine AnyAngleMorph
+
+  ! ------------------------------------------------------------------ polygon predicates
+
+  integer(int32) function AnyAnglePredCode(w) result(c)
+    character(len=*), intent(in) :: w
+    select case (trim(w))
+    case ('AREA');                                        c = TPRED_AREA
+    case ('PERIMETER');                                   c = TPRED_PERIMETER
+    case ('VERTEX', 'VERTICES');                          c = TPRED_VERTEX
+    case ('HOLES');                                       c = TPRED_HOLES
+    case ('WIDTH');                                       c = TPRED_WIDTH
+    case ('LENGTH');                                      c = TPRED_LENGTH
+    case ('ASPECT_RATIO');                                c = TPRED_ASPECT
+    case ('DIAMETER');                                    c = TPRED_DIAMETER
+    case ('COMPACTNESS', 'CIRCULARITY');                  c = TPRED_COMPACTNESS
+    case ('SOLIDITY', 'CONVEXITY');                       c = TPRED_SOLIDITY
+    case ('CONVEX_CRITERIA', 'IS_CONVEX', 'CONVEX');      c = TPRED_CONVEX
+    case ('CONCAVE_CRITERIA', 'IS_CONCAVE', 'CONCAVE');   c = TPRED_CONCAVE
+    case ('IS_RECTANGLE_WITH_ROTATION', 'IS_ROTATED_RECTANGLE'); c = TPRED_IS_RECT_ROT
+    case ('IS_SQUARE_WITH_ROTATION', 'IS_ROTATED_SQUARE');       c = TPRED_IS_SQ_ROT
+    case ('IS_RECTANGLE');                                c = TPRED_IS_RECT
+    case ('IS_SQUARE');                                   c = TPRED_IS_SQ
+    case ('IS_RECTILINEAR', 'IS_ORTHOGONAL');             c = TPRED_IS_RECTILIN
+    case ('IS_45', 'IS_OCTAGONAL');                       c = TPRED_IS_45
+    case ('NOTCH');                                       c = TPRED_NOTCH
+    case ('ENCLOSE_RECTANGLE');                           c = TPRED_ENCLOSE_RECT
+    case default;                                         c = TPRED_NONE
+    end select
+  end function AnyAnglePredCode
+
+  !> Parse trailing tokens of `OP nothing [<cmp> <val> | <lo> <hi> | <W> <H>]`.
+  subroutine AnyAngleParsePredArgs(rest, pred, cmp, v1, v2)
+    character(len=*), intent(in) :: rest
+    integer(int32), intent(in) :: pred
+    integer(int32), intent(out) :: cmp
+    real(real64), intent(out) :: v1, v2
+    character(len=128) :: b1, b2, t1, t2, t3
+    integer :: ios
+    cmp = TCMP_NONE; v1 = 0.0_real64; v2 = 0.0_real64
+    t1 = ''; t2 = ''; t3 = ''
+    if (pred == TPRED_ENCLOSE_RECT) then
+       read(rest, *, iostat=ios) b1, b2, v1, v2
+       if (ios /= 0) then
+          read(rest, *, iostat=ios) b1, b2, v1
+          v2 = v1
+       end if
+       return
+    end if
+    read(rest, *, iostat=ios) b1, b2, t1, t2, t3
+    if (ios /= 0) then
+       t3 = ''
+       read(rest, *, iostat=ios) b1, b2, t1, t2
+       if (ios /= 0) then
+          t2 = ''
+          read(rest, *, iostat=ios) b1, b2, t1
+          if (ios /= 0) t1 = ''
+       end if
+    end if
+    if (len_trim(t1) == 0) return
+    select case (trim(t1))
+    case ('>');       cmp = TCMP_GT; read(t2, *, iostat=ios) v1
+    case ('>=');      cmp = TCMP_GE; read(t2, *, iostat=ios) v1
+    case ('<');       cmp = TCMP_LT; read(t2, *, iostat=ios) v1
+    case ('<=');      cmp = TCMP_LE; read(t2, *, iostat=ios) v1
+    case ('==', '='); cmp = TCMP_EQ; read(t2, *, iostat=ios) v1
+    case ('!=', '/='); cmp = TCMP_NE; read(t2, *, iostat=ios) v1
+    case default
+       ! Two numeric values -> closed range [v1, v2]; one numeric value -> == v1
+       read(t1, *, iostat=ios) v1
+       if (ios == 0) then
+          if (len_trim(t2) > 0) then
+             read(t2, *, iostat=ios) v2
+             if (ios == 0) then
+                cmp = TCMP_RANGE
+             else
+                cmp = TCMP_EQ
+             end if
+          else
+             cmp = TCMP_EQ
+          end if
+       end if
+    end select
+  end subroutine AnyAngleParsePredArgs
+
+  subroutine AnyAnglePredicate(A, out, pred, cmp, v1, v2, prec, status)
+    type(Layer), intent(inout), target :: A, out
+    integer(int32), intent(in) :: pred, cmp
+    real(real64), intent(in) :: v1, v2, prec
+    integer, intent(out) :: status
+    type(Trapezoid), allocatable :: tA(:), sel(:)
+    integer(int64) :: nA, nsel
+    type(TrapPredStats) :: st
+    status = 0
+    call layer_traps(A, tA, nA, status); if (status /= 0) return
+    call TrapPredSelect(tA, nA, pred, cmp, v1, v2, prec, sel, nsel, st)
+    if (st%anomalies /= 0) then
+       write(*, '(A,I0)') 'ERROR: anyangle predicate anomalies=', st%anomalies
+       status = 3
+    end if
+    call store_traps(out, sel, nsel)
+    write(*, '(A,I0,A,I0,A,I0,A,I0,A,I0,3(A,F0.3))') 'INFO: poly pred=', pred, ' cmp=', cmp, &
+         ' polys=', st%polys, ' selected=', st%selected, ' traps=', nsel, &
+         ' t_pnum=', st%t_pnum, ' t_loops=', st%t_loops, ' t_total=', st%t_total
+  end subroutine AnyAnglePredicate
 
   !> Canonical trapezoids of a layer: its own (any-angle) or its boxes merged exactly.
   subroutine layer_traps(L, t, n, status)
