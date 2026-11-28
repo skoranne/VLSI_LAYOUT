@@ -1078,7 +1078,11 @@ contains
     character(len=8) :: ev
     integer :: evlen, evstat
     call get_environment_variable( 'MAGPARSER_COMPACT_LAYERS', ev, evlen, evstat )
-    CompactLayersEnabled = ( evstat == 0 .and. evlen > 0 .and. ev(1:1) /= '0' )
+    if( evstat == 0 .and. evlen > 0 ) then
+       CompactLayersEnabled = ( ev(1:1) /= '0' )
+    else
+       CompactLayersEnabled = .true.
+    end if
   end function CompactLayersEnabled
 
   !> Bytes held by the expanded (Box) form of a layer.

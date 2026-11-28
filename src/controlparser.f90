@@ -46,9 +46,11 @@ module ControlModule
   integer, parameter :: PARSE_ERR_UNKNOWN = 2
 contains
 
-  subroutine LoadDesignFileByExt(load_design, MAX_LAYERS)
+  subroutine LoadDesignFileByExt(load_design, MAX_LAYERS, filter_ht, filter_prefix)
     type(Design), intent(inout) :: load_design
     integer, intent(in) :: MAX_LAYERS
+    type(hash_type), intent(in), optional :: filter_ht
+    character(len=*), intent(in), optional :: filter_prefix
     character(len=:), allocatable :: fn, ext, lower_ext
     integer :: dot, i
     fn = trim(load_design%fileName)
@@ -64,7 +66,11 @@ contains
        call LoadLayoutDBFile(load_design, MAX_LAYERS)
        if( AnyAngleEnabled() ) call LoadAnyAngleLayers(load_design, fn)
     else
-       call parseMagicLayoutFile(load_design, MAX_LAYERS)
+       if( present(filter_ht) .and. present(filter_prefix) ) then
+          call parseMagicLayoutFile(load_design, MAX_LAYERS, filter_ht, filter_prefix)
+       else
+          call parseMagicLayoutFile(load_design, MAX_LAYERS)
+       end if
     end if
   end subroutine LoadDesignFileByExt
 
@@ -451,13 +457,14 @@ contains
     character(len=4096) :: line, rest   !> FASCL lambdas make long lines
     character(len=256) :: keyword
     integer :: unit, ios, pos, line_number, db_count, i
-    logical :: compact_on
+    logical :: compact_on, dag_gc_on, dag_has_flush, dag_has_tech
     integer(kind=int64) :: compact_budget
     integer :: lhs_db_index, rhs1_db_index, rhs2_db_index
     integer :: lhs_layer_index, rhs1_layer_index, rhs2_layer_index    
+    character(len=256) :: lhs_ctr_key, rhs1_ctr_key, rhs2_ctr_key
     type(Design), allocatable, target :: design_dbs(:)
     type(Layer), pointer :: lhs_layer, rhs1_layer, rhs2_layer !> either dont use
-    type(hash_type) :: ht
+    type(hash_type) :: ht, dag_last_use, dag_db_refs, dag_whole_db
     logical :: ins
     character :: operator_char !> single letter only
     character(len=256) :: TEMPORARY_FOLDER
@@ -482,6 +489,9 @@ contains
     end interface
     compact_on = CompactLayersEnabled()
     compact_budget = compact_budget_bytes()
+    dag_gc_on = dag_gc_enabled()
+    dag_has_flush = .false.
+    dag_has_tech = .false.
     if( compact_on ) write(*,'(A,F8.2,A)') 'INFO: compact layers ON, expanded budget ', &
          real(compact_budget,8)/1073741824.0d0, ' GB'
     db_count = 1
@@ -559,6 +569,10 @@ contains
           write(*,'(A)') 'WARNING: TRS optimization failed; running the control file unoptimized.'
        end if
        write(*,'(A)') '--- END TRS OPTIMIZATION ---'
+    end if
+
+    if( dag_gc_on ) then
+       call dag_liveness_scan( trim(expanded_file), dag_last_use, dag_db_refs, dag_whole_db, dag_has_flush, dag_has_tech )
     end if
 
     ! Open the expanded file for parsing
@@ -775,7 +789,21 @@ contains
              pos = index( keyword, ' ' )
              !write(*,*) 'DB file handle = ', trim(keyword(1:pos)) !> file
              design_dbs(db_count)%fileName = trim(keyword(1:pos))
-             call LoadDesignFileByExt(design_dbs(db_count), MAX_LAYERS)
+             block
+               integer :: ref_cnt, whole_flag
+               logical :: has_refs, is_whole
+               has_refs = .false.; is_whole = .false.; ref_cnt = 0
+               if( dag_gc_on .and. .not. dag_has_tech ) then
+                  call hash_get( dag_whole_db, trim(design_dbs(db_count)%designName), whole_flag, is_whole )
+                  call hash_get( dag_db_refs, trim(design_dbs(db_count)%designName), ref_cnt, has_refs )
+               end if
+               if( dag_gc_on .and. .not. dag_has_tech .and. .not. is_whole .and. has_refs .and. ref_cnt > 0 ) then
+                  call LoadDesignFileByExt(design_dbs(db_count), MAX_LAYERS, dag_last_use, &
+                       trim(design_dbs(db_count)%designName)//':')
+               else
+                  call LoadDesignFileByExt(design_dbs(db_count), MAX_LAYERS)
+               end if
+             end block
              if( len_trim(current_tech) > 0 ) call ApplyTechAliases( design_dbs(db_count), current_tech )
              db_count = db_count + 1
           else if( trim(rest(1:pos-1)) == 'hierdesign' ) then
@@ -880,6 +908,8 @@ contains
                 pos = index(rest, ' ')
                 if (pos == 0) pos = len_trim(rest)+1
                 call MeasureLayerRef( trim(rest(1:pos-1)), line_number, design_dbs, ht )
+                if( dag_gc_on ) call dag_gc_by_ref( design_dbs, ht, trim(rest(1:pos-1)), &
+                     line_number-1, dag_last_use, dag_whole_db, dag_has_flush, compact_on )
                 rest = adjustl(rest(pos:))
              end do
              cycle read_loop
@@ -946,6 +976,10 @@ contains
              cycle
           end if
           if( trim(rest(1:pos-1)) == 'run' ) then
+             lhs_db_index = 0; lhs_layer_index = 0
+             rhs1_db_index = 0; rhs1_layer_index = 0
+             rhs2_db_index = 0; rhs2_layer_index = 0
+             lhs_ctr_key = ''; rhs1_ctr_key = ''; rhs2_ctr_key = ''
              rest = adjustl(rest(pos+1:))             
              pos = index( rest, ' ' )
              !write(*,*) 'LHS = ', trim(rest(1:pos-1)) !> f1:gate
@@ -960,6 +994,7 @@ contains
              end if
              rest = adjustl(rest(pos+1:))
              pos  = index( rest, ' ')
+             lhs_ctr_key = trim(design_dbs(lhs_db_index)%designName)//':'//trim(rest(1:pos-1))
              lhs_layer_index = -1
              call hash_get( design_dbs( lhs_db_index )%ht, trim(rest(1:pos-1)), lhs_layer_index, ins )
              if( ins .and. design_dbs( lhs_db_index )%design_direction == DESIGN_DIRECTION_MEMORY ) then
@@ -1009,6 +1044,7 @@ contains
              end if
              rest = adjustl(rest(pos+1:))
              pos  = index( rest, ' ')
+             rhs1_ctr_key = trim(design_dbs(rhs1_db_index)%designName)//':'//trim(rest(1:pos-1))
              
              call hash_get( design_dbs( rhs1_db_index )%ht, trim(rest(1:pos-1)), rhs1_layer_index, ins )
              if( .not. ins ) then
@@ -1036,6 +1072,7 @@ contains
                 end if
                 rest = adjustl(rest(pos+1:))
                 pos  = index( rest, ' ')
+                rhs2_ctr_key = trim(design_dbs(rhs2_db_index)%designName)//':'//trim(rest(1:pos-1))
                 call hash_get( design_dbs( rhs2_db_index )%ht, trim(rest(1:pos-1)), rhs2_layer_index, ins )
                 if( .not. ins ) then
                    write(*,*) 'ERROR: RHS2 layer not found: ', trim(rest(1:pos-1)), &
@@ -1249,6 +1286,7 @@ contains
                         if( .not. ins ) error stop "TEXT OPERATOR RHS2 DB INDEX not located"
                         buf2 = adjustl(trim(rhs2_source_name(1+pos:)))
                         pos  = index( buf2, ' ')
+                        rhs2_ctr_key = trim(design_dbs(rhs2_db_index)%designName)//':'//trim(buf2(1:pos-1))
                         call hash_get( design_dbs( rhs2_db_index )%ht, trim(buf2(1:pos-1)), rhs2_layer_index, ins )
                         if( .not. ins ) then
                            write(*,*) 'ERROR: TEXT RHS2 ', rhs2_source_name, ' layer not found.', ' ', trim(buf2(1:pos-1))
@@ -1260,6 +1298,7 @@ contains
                         end if
                         rhs2_layer => design_dbs( rhs2_db_index )%layers( rhs2_layer_index )
                      else
+                        rhs2_db_index = 0; rhs2_layer_index = 0; rhs2_ctr_key = ''
                         nullify( rhs2_layer )
                      end if
                      call StartMarkTime(primary_operator)
@@ -1591,6 +1630,14 @@ contains
              if( associated( lhs_layer ) ) call PrintLayerDigest( lhs_layer, &
                   trim(design_dbs(lhs_db_index)%designName)//':'// &
                   trim(design_dbs(lhs_db_index)%layerNames(lhs_layer_index)), line_number-1 )
+             if( dag_gc_on ) then
+                call dag_gc_layer( design_dbs, rhs1_db_index, rhs1_layer_index, trim(rhs1_ctr_key), &
+                     line_number-1, dag_last_use, dag_whole_db, dag_has_flush, compact_on )
+                call dag_gc_layer( design_dbs, rhs2_db_index, rhs2_layer_index, trim(rhs2_ctr_key), &
+                     line_number-1, dag_last_use, dag_whole_db, dag_has_flush, compact_on )
+                call dag_gc_layer( design_dbs, lhs_db_index, lhs_layer_index, trim(lhs_ctr_key), &
+                     line_number-1, dag_last_use, dag_whole_db, dag_has_flush, compact_on )
+             end if
              cycle read_loop
           else if( trim(rest(1:pos-1)) == 'modedesign' ) then
              rest = adjustl(rest(pos+1:))             
@@ -1640,17 +1687,39 @@ contains
           call StartMarkTime("delete")
           rest = adjustl( rest ) !> remove leading whitespace
           pos = index( rest, ' ' )
-          call hash_get( ht, trim(rest(1:pos-1)), lhs_db_index, ins )
-          if( .not. ins ) then
-             write(*,*) 'ERROR: DELETE db-index not found: ', line_number-1
-             error stop "ERROR: DELETE db-index not found."
-          end if
-          call DeleteDesign( design_dbs( lhs_db_index ) )
-          !> any use of this db after this point in the file is an ERROR
-          call hash_remove( ht, trim(rest(1:pos-1)), ins )
-          if( .not. ins ) then
-             write(*,*) 'INFO: DELETE db-index not removed: ', line_number-1
-          end if
+          if( pos == 0 ) pos = len_trim(rest) + 1
+          block
+            character(len=:), allocatable :: del_tok
+            integer :: colon_pos
+            del_tok = trim(rest(1:pos-1))
+            colon_pos = index( del_tok, ':' )
+            if( colon_pos > 1 .and. colon_pos < len_trim(del_tok) ) then
+               !> per-layer delete: delete db:layer
+               call hash_get( ht, del_tok(1:colon_pos-1), lhs_db_index, ins )
+               if( .not. ins ) then
+                  write(*,*) 'ERROR: DELETE db-index not found: ', line_number-1
+                  error stop "ERROR: DELETE db-index not found."
+               end if
+               call hash_get( design_dbs(lhs_db_index)%ht, del_tok(colon_pos+1:), lhs_layer_index, ins )
+               if( ins .and. lhs_layer_index >= 1 .and. lhs_layer_index <= size(design_dbs(lhs_db_index)%layers) ) then
+                  call ClearLayer( design_dbs(lhs_db_index)%layers(lhs_layer_index) )
+               else
+                  write(*,*) 'INFO: DELETE layer not found: ', del_tok, ' line: ', line_number-1
+               end if
+            else
+               call hash_get( ht, del_tok, lhs_db_index, ins )
+               if( .not. ins ) then
+                  write(*,*) 'ERROR: DELETE db-index not found: ', line_number-1
+                  error stop "ERROR: DELETE db-index not found."
+               end if
+               call DeleteDesign( design_dbs( lhs_db_index ) )
+               !> any use of this db after this point in the file is an ERROR
+               call hash_remove( ht, del_tok, ins )
+               if( .not. ins ) then
+                  write(*,*) 'INFO: DELETE db-index not removed: ', line_number-1
+               end if
+            end if
+          end block
           call StopMarkTime("delete")          
           cycle read_loop
        case ('end')
@@ -1664,6 +1733,11 @@ contains
     end do read_loop
 100 continue !end of file
     close(unit, status='delete')
+    if( dag_gc_on ) then
+       call hash_destroy( dag_last_use )
+       call hash_destroy( dag_db_refs )
+       call hash_destroy( dag_whole_db )
+    end if
   end subroutine ParseControlFile
 
   !> Mark the layers used by the current op as most recently used (LRU clock).
@@ -2167,6 +2241,233 @@ contains
        if( .not. dbs(bd)%layers(bl)%is_compact ) dbs(bd)%layers(bl)%last_use = huge(oldest)  !> not encodable: skip
     end do
   end subroutine enforce_compact_budget
+
+  logical function dag_gc_enabled()
+    character(len=8) :: ev
+    integer :: evlen, evstat
+    call get_environment_variable( 'MAGPARSER_DAG_GC', ev, evlen, evstat )
+    if( evstat == 0 .and. evlen > 0 ) then
+       dag_gc_enabled = ( ev(1:1) /= '0' )
+    else
+       dag_gc_enabled = .true.
+    end if
+  end function dag_gc_enabled
+
+  logical function layer_has_output_ext( fn )
+    character(len=*), intent(in) :: fn
+    integer :: n
+    n = len_trim(fn)
+    layer_has_output_ext = .false.
+    if( n >= 4 ) then
+       if( fn(n-3:n) == '.bin' .or. fn(n-3:n) == '.oas' ) layer_has_output_ext = .true.
+    end if
+    if( n >= 5 ) then
+       if( fn(n-4:n) == '.snap' ) layer_has_output_ext = .true.
+    end if
+  end function layer_has_output_ext
+
+  subroutine dag_record_ref( tok, line_no, last_use, db_refs )
+    character(len=*), intent(in) :: tok
+    integer, intent(in) :: line_no
+    type(hash_type), intent(inout) :: last_use, db_refs
+    integer :: c, prev, cnt
+    logical :: found, ins
+    character(len=:), allocatable :: db_part, lyr_part
+    c = index( tok, ':' )
+    if( c <= 1 .or. c >= len_trim(tok) ) return
+    if( tok(1:1) == '/' .or. tok(1:1) == '.' ) return
+    if( len_trim(tok) >= 9 ) then
+       if( tok(1:9) == 'PROPERTY:' ) return
+    end if
+    db_part = tok(1:c-1)
+    lyr_part = trim(tok(c+1:))
+    if( lyr_part == 'nothing' ) return
+    call hash_get( last_use, trim(tok), prev, found )
+    if( .not. found .or. line_no > prev ) then
+       call hash_put( last_use, trim(tok), line_no, ins )
+    end if
+    call hash_get( db_refs, db_part, cnt, found )
+    if( .not. found ) cnt = 0
+    call hash_put( db_refs, db_part, cnt + 1, ins )
+  end subroutine dag_record_ref
+
+  subroutine dag_record_refs_in_str( s, line_no, last_use, db_refs )
+    character(len=*), intent(in) :: s
+    integer, intent(in) :: line_no
+    type(hash_type), intent(inout) :: last_use, db_refs
+    integer :: i, j, n
+    character(len=256) :: tok
+    n = len_trim(s)
+    i = 1
+    do while( i <= n )
+       do while( i <= n .and. (s(i:i) == ' ' .or. s(i:i) == achar(9)) )
+          i = i + 1
+       end do
+       if( i > n ) exit
+       j = i
+       do while( j <= n .and. s(j:j) /= ' ' .and. s(j:j) /= achar(9) )
+          j = j + 1
+       end do
+       tok = s(i:j-1)
+       if( index(tok, ':') > 0 ) then
+          !> strip trailing punctuation (e.g. ']', ')', ',')
+          do while( len_trim(tok) > 0 )
+             if( scan( tok(len_trim(tok):len_trim(tok)), ']),;' ) > 0 ) then
+                tok(len_trim(tok):len_trim(tok)) = ' '
+             else
+                exit
+             end if
+          end do
+          do while( len_trim(tok) > 0 )
+             if( scan( tok(1:1), '[(' ) > 0 ) then
+                tok = tok(2:)
+             else
+                exit
+             end if
+          end do
+          call dag_record_ref( trim(tok), line_no, last_use, db_refs )
+       end if
+       i = j
+    end do
+  end subroutine dag_record_refs_in_str
+
+  !> Pre-execution pass over the expanded CTR to compute per-layer last-use line numbers,
+  !> referenced input layers (for demand-loading), and whole-DB barriers.
+  subroutine dag_liveness_scan( path, last_use, db_refs, whole_db, has_flush, has_tech )
+    character(len=*), intent(in) :: path
+    type(hash_type), intent(out) :: last_use, db_refs, whole_db
+    logical, intent(out) :: has_flush, has_tech
+    integer :: u, ios, line_no, pos, eqp
+    character(len=4096) :: raw, line, rest
+    character(len=256) :: kw, sub, t1, t2, t3
+    logical :: ins
+    call hash_create( last_use, 1024 )
+    call hash_create( db_refs, 64 )
+    call hash_create( whole_db, 64 )
+    has_flush = .false.
+    has_tech = .false.
+    open(newunit=u, file=path, status='old', action='read', iostat=ios)
+    if( ios /= 0 ) return
+    line_no = 0
+    do
+       read(u, '(A)', iostat=ios) raw
+       if( ios /= 0 ) exit
+       line_no = line_no + 1
+       if( len_trim(raw) == 0 ) cycle
+       line = adjustl(raw)
+       if( len_trim(line) == 0 .or. line(1:1) == '#' ) cycle
+       pos = index(line, ' ')
+       if( pos == 0 ) then
+          kw = trim(line); rest = ''
+       else
+          kw = line(1:pos-1); rest = adjustl(line(pos+1:))
+       end if
+       if( len_trim(kw) > 9 ) then
+          if( kw(1:9) == 'PROPERTY:' ) then
+             eqp = index(rest, '=')
+             if( eqp > 0 ) call dag_record_refs_in_str( rest(eqp+1:), line_no, last_use, db_refs )
+             cycle
+          end if
+       end if
+       select case (trim(kw))
+       case ('var')
+          pos = index(rest, ' ')
+          if( pos > 1 ) then
+             if( rest(1:pos-1) == 'tech' ) has_tech = .true.
+          end if
+       case ('flush')
+          has_flush = .true.
+       case ('CONNECT')
+          t1 = ''; t2 = ''; t3 = ''
+          read(rest, *, iostat=ios) t1, t2, t3
+          if( trim(t1) == 'STACK' .and. len_trim(t3) > 0 ) then
+             call hash_put( whole_db, trim(t3), 1, ins )
+          else
+             !> CONNECT layers stay live for NET_ID / netinfo / defcheck
+             call dag_record_refs_in_str( rest, huge(line_no), last_use, db_refs )
+          end if
+       case ('exec')
+          pos = index(rest, ' ')
+          if( pos == 0 ) then
+             sub = trim(rest); rest = ''
+          else
+             sub = rest(1:pos-1); rest = adjustl(rest(pos+1:))
+          end if
+          select case (trim(sub))
+          case ('run')
+             eqp = index(rest, '=')
+             if( eqp > 0 ) then
+                call dag_record_refs_in_str( rest(eqp+1:), line_no, last_use, db_refs )
+             end if
+          case ('measure', 'oasout', 'propdump', 'propinfo', 'netinfo', 'defcheck')
+             call dag_record_refs_in_str( rest, line_no, last_use, db_refs )
+          case ('hierextent', 'hierinfo')
+             t1 = ''
+             read(rest, *, iostat=ios) t1
+             if( len_trim(t1) > 0 ) call hash_put( whole_db, trim(t1), 1, ins )
+          end select
+       end select
+    end do
+    close(u)
+  end subroutine dag_liveness_scan
+
+  !> Free or early-flush a layer once execution passes its last use in the CTR DAG.
+  subroutine dag_gc_layer( dbs, db_idx, layer_idx, ctr_key, cur_line, last_use, whole_db, has_flush, compact_on )
+    type(Design), intent(inout), target :: dbs(:)
+    integer, intent(in) :: db_idx, layer_idx, cur_line
+    character(len=*), intent(in) :: ctr_key
+    type(hash_type), intent(in) :: last_use, whole_db
+    logical, intent(in) :: has_flush, compact_on
+    integer :: last_u, dummy
+    logical :: found, is_whole, wrote
+    if( db_idx <= 0 .or. layer_idx <= 0 ) return
+    if( db_idx > size(dbs) ) return
+    if( .not. allocated( dbs(db_idx)%layers ) ) return
+    if( layer_idx > size( dbs(db_idx)%layers ) ) return
+    if( len_trim(ctr_key) == 0 ) return
+    if( allocated( dbs(db_idx)%designName ) ) then
+       call hash_get( whole_db, trim(dbs(db_idx)%designName), dummy, is_whole )
+       if( is_whole ) return
+    end if
+    call hash_get( last_use, trim(ctr_key), last_u, found )
+    if( .not. found ) last_u = 0
+    if( cur_line < last_u ) return
+    associate( L => dbs(db_idx)%layers(layer_idx) )
+      if( dbs(db_idx)%design_direction == DESIGN_DIRECTION_OUTPUT ) then
+         if( has_flush ) then
+            if( allocated( L%fileName ) ) then
+               if( layer_has_output_ext( L%fileName ) ) then
+                  if( LayerBoxCount( L ) > 0 ) call writeSingleLayer( dbs(db_idx), layer_idx, wrote )
+                  return
+               end if
+            end if
+            if( compact_on ) call LayerCompact( L )
+         else
+            call ClearLayer( L )
+         end if
+      else
+         !> DESIGN_DIRECTION_MEMORY or DESIGN_DIRECTION_INPUT: dead after cur_line
+         call ClearLayer( L )
+      end if
+    end associate
+  end subroutine dag_gc_layer
+
+  subroutine dag_gc_by_ref( dbs, ht, ref, cur_line, last_use, whole_db, has_flush, compact_on )
+    type(Design), intent(inout), target :: dbs(:)
+    type(hash_type), intent(in) :: ht, last_use, whole_db
+    character(len=*), intent(in) :: ref
+    integer, intent(in) :: cur_line
+    logical, intent(in) :: has_flush, compact_on
+    integer :: c, dbi, li
+    logical :: found
+    c = index( ref, ':' )
+    if( c <= 1 .or. c >= len_trim(ref) ) return
+    call hash_get( ht, ref(1:c-1), dbi, found )
+    if( .not. found ) return
+    call hash_get( dbs(dbi)%ht, trim(ref(c+1:)), li, found )
+    if( .not. found ) return
+    call dag_gc_layer( dbs, dbi, li, trim(ref), cur_line, last_use, whole_db, has_flush, compact_on )
+  end subroutine dag_gc_by_ref
 
   !> helper function, hopefully we do not have to debug them often
   !---------------------------------------------------------------
