@@ -1,0 +1,185 @@
+# Auto-generated comprehensive self-checking CTR from OASIS stats
+# Source: MW4x4.oas
+# Format: OASIS  DBU/um: 1000  TOP: MW4x4
+# Extent: -43630 -38270 2963250 3557950
+# Run: MAGPARSER.exe <this.ctr> 64
+# Layers (34):
+#   L64_D16      count=13839024     bbox=5665,13515,11943955,14306165 
+#   L64_D20      count=16537776     bbox=5330,12185,11944290,14307495 nwell
+#   L65_D20      count=38869376     bbox=5655,11115,11943965,14308565 diff
+#   L65_D44      count=5102592      bbox=18545,11200,11940735,14308480 tap
+#   L66_D15      count=22144        bbox=7005,12040,11939855,14307640 
+#   L66_D20      count=121164272    bbox=5775,10985,11943845,14308695 poly
+#   L66_D44      count=175896288    bbox=5695,11115,11943925,14308565 licon1
+#   L67_D16      count=29752544     bbox=7045,12005,11939810,14308885 li1_pin
+#   L67_D20      count=206167552    bbox=5520,10795,11944100,14308885 li1
+#   L67_D44      count=251753392    bbox=5665,10795,11943955,14308885 mcon
+#   L68_D16      count=32788464     bbox=5665,10790,11943955,14308890 met1_pin
+#   L68_D20      count=112093184    bbox=5520,9220,11947250,14309040 met1
+#   L68_D44      count=17413248     bbox=7055,9275,11947165,14308875 via
+#   L69_D16      count=27456        bbox=2710,-4800,11947370,14324800 met2_pin
+#   L69_D20      count=30028176     bbox=2710,-4800,11947370,14324800 met2
+#   L69_D44      count=4853888      bbox=7030,10780,11944320,14308900 via2
+#   L70_D16      count=8832         bbox=-4800,31700,11954800,14287300 met3_pin
+#   L70_D20      count=8373936      bbox=-4800,10715,11954800,14308965 met3
+#   L70_D44      count=2762800      bbox=9220,10780,11944320,14308900 via3
+#   L71_D16      count=6144         bbox=-43630,-38270,11993250,14357950 met4_pin
+#   L71_D20      count=794800       bbox=-43630,-38270,11993250,14357950 met4
+#   L71_D44      count=139840       bbox=-43280,-37920,11992900,14357600 via4
+#   L72_D16      count=2752         bbox=-43630,-38270,11993250,14357950 met5_pin
+#   L72_D20      count=4816         bbox=-43630,-38270,11993250,14357950 met5
+#   L78_D44      count=16395664     bbox=5520,12130,11944100,14307550 
+#   L81_D4       count=16390320     bbox=5520,10880,11944100,14308800 
+#   L81_D14      count=80           bbox=206370,211730,11743250,14107950 
+#   L81_D23      count=168656       bbox=42915,48075,11906685,14176405 
+#   L93_D44      count=19161552     bbox=5520,10690,11944100,14308990 
+#   L94_D20      count=23637920     bbox=5520,11070,11944100,14308610 
+#   L95_D20      count=27347264     bbox=5520,11015,11944100,14308665 
+#   L122_D16     count=13840736     bbox=5665,10795,11943955,14308885 
+#   L235_D4      count=112          bbox=0,0,11950000,14320000 
+#   L236_D0      count=12001664     bbox=5520,10880,11944100,14308800 
+#
+# Selected roles: diff=L65_D20 poly=L66_D20 li1=L67_D20 met1=L68_D20 met2=L69_D20
+program mw4x4_oasis_selftest
+var temp_folder /tmp/mw4x4_oasis_selftest/
+var temporary_layers 2
+var abort_on_assert_zero 2
+var debug 1
+systeminfo
+decl hierdesign d = MW4x4.oas
+decl memory m = nothing
+decl output o = MW4x4_OASIS_SELFTEST_output.mag
+info
+
+# --- Boolean basics ---
+exec run o:diff_or_poly = d:L65_D20 + d:L66_D20
+exec run o:diff_and_poly = d:L65_D20 * d:L66_D20
+exec run o:diff_not_poly = d:L65_D20 @ d:L66_D20
+exec run o:diff_xor_poly = d:L65_D20 ^ d:L66_D20
+exec run o:diff_or2_poly = d:L65_D20 OR2 d:L66_D20
+exec run o:diff_and2_poly = d:L65_D20 AND2 d:L66_D20
+exec run o:diff_fnot_poly = d:L65_D20 ~ d:L66_D20
+exec run o:diff_bnot_poly = d:L65_D20 ! d:L66_D20
+
+# --- Self-test identity: A AND (B NOT A) == 0 ---
+exec run m:bnot_a_dp = d:L66_D20 @ d:L65_D20
+exec run m:self_dp = d:L65_D20 * m:bnot_a_dp
+exec run m:az_self_dp = m:self_dp ASSERT_ZERO nothing
+exec run m:bnot_a_pl = d:L67_D20 @ d:L66_D20
+exec run m:self_pl = d:L66_D20 * m:bnot_a_pl
+exec run m:az_self_pl = m:self_pl ASSERT_ZERO nothing
+exec run m:bnot_a_lm1 = d:L68_D20 @ d:L67_D20
+exec run m:self_lm1 = d:L67_D20 * m:bnot_a_lm1
+exec run m:az_self_lm1 = m:self_lm1 ASSERT_ZERO nothing
+exec run m:bnot_a_m12 = d:L69_D20 @ d:L68_D20
+exec run m:self_m12 = d:L68_D20 * m:bnot_a_m12
+exec run m:az_self_m12 = m:self_m12 ASSERT_ZERO nothing
+
+# --- Boolean identities ---
+exec run m:xor_self = d:L65_D20 ^ d:L65_D20
+exec run m:az_xor_self = m:xor_self ASSERT_ZERO nothing
+exec run m:not_self = d:L65_D20 @ d:L65_D20
+exec run m:az_not_self = m:not_self ASSERT_ZERO nothing
+exec run m:and_self = d:L65_D20 * d:L65_D20
+exec run m:id_and = m:and_self ^ d:L65_D20
+exec run m:az_id_and = m:id_and ASSERT_ZERO nothing
+exec run m:or_self = d:L65_D20 + d:L65_D20
+exec run m:id_or = m:or_self ^ d:L65_D20
+exec run m:az_id_or = m:id_or ASSERT_ZERO nothing
+exec run m:not_sub = o:diff_not_poly @ d:L65_D20
+exec run m:az_not_sub = m:not_sub ASSERT_ZERO nothing
+
+# --- Morphological / derivations ---
+exec run m:g_poly = d:L66_D20 GROW nothing 0.1 0.1 0.1 0.1
+exec run m:s_poly = d:L66_D20 SHRINK nothing 0.1 0.1 0.1 0.1
+exec run m:sz_poly = d:L66_D20 SIZE nothing 0.1
+exec run o:poly_ring = m:g_poly ~ d:L66_D20
+exec run o:poly_inner = d:L66_D20 ~ m:s_poly
+exec run m:g_diff = d:L65_D20 GROW nothing 0.05 0.05 0.05 0.05
+
+# --- Topological/DE-9IM box ops (diff vs poly) ---
+exec run m:ti = d:L65_D20 INTERACT d:L66_D20
+exec run m:nti = d:L65_D20 NOT_INTERACT d:L66_D20
+exec run m:ti_c = m:ti * m:nti
+exec run m:ti_az = m:ti_c ASSERT_ZERO nothing
+exec run m:ti_u = m:ti + m:nti
+exec run m:ti_eq = m:ti_u ^ d:L65_D20
+exec run m:ti_eqaz = m:ti_eq ASSERT_ZERO nothing
+exec run m:tc = d:L65_D20 CUT d:L66_D20
+exec run m:ntc = d:L65_D20 NOT_CUT d:L66_D20
+exec run m:tc_c = m:tc * m:ntc
+exec run m:tc_az = m:tc_c ASSERT_ZERO nothing
+exec run m:tt = d:L65_D20 TOUCH d:L66_D20
+exec run m:ntt = d:L65_D20 NOT_TOUCH d:L66_D20
+exec run m:tt_c = m:tt * m:ntt
+exec run m:tt_az = m:tt_c ASSERT_ZERO nothing
+exec run m:tin = d:L65_D20 INSIDE d:L66_D20
+exec run m:ntin = d:L65_D20 NOT_INSIDE d:L66_D20
+exec run m:tin_c = m:tin * m:ntin
+exec run m:tin_az = m:tin_c ASSERT_ZERO nothing
+exec run m:to = d:L65_D20 OUTSIDE d:L66_D20
+exec run m:nto = d:L65_D20 NOT_OUTSIDE d:L66_D20
+exec run m:to_c = m:to * m:nto
+exec run m:to_az = m:to_c ASSERT_ZERO nothing
+exec run m:to_u = m:to + m:nto
+exec run m:to_eq = m:to_u ^ d:L65_D20
+exec run m:to_eqaz = m:to_eq ASSERT_ZERO nothing
+
+# --- Egenhofer/DE-9IM relations ---
+exec run m:disj = d:L65_D20 DISJOINT d:L66_D20
+exec run m:ndisj = d:L65_D20 NOT_DISJOINT d:L66_D20
+exec run m:disj_c = m:disj * m:ndisj
+exec run m:disj_az = m:disj_c ASSERT_ZERO nothing
+exec run m:meet = d:L65_D20 MEET d:L66_D20
+exec run m:nmeet = d:L65_D20 NOT_MEET d:L66_D20
+exec run m:meet_c = m:meet * m:nmeet
+exec run m:meet_az = m:meet_c ASSERT_ZERO nothing
+exec run m:ov = d:L65_D20 OVERLAPS d:L66_D20
+exec run m:nov = d:L65_D20 NOT_OVERLAPS d:L66_D20
+exec run m:ov_c = m:ov * m:nov
+exec run m:ov_az = m:ov_c ASSERT_ZERO nothing
+exec run m:eqr = d:L65_D20 EQUAL d:L65_D20
+exec run m:neqr = d:L65_D20 NOT_EQUAL d:L65_D20
+exec run m:eqr_c = m:eqr * m:neqr
+exec run m:eqr_az = m:eqr_c ASSERT_ZERO nothing
+exec run m:cont = m:g_poly CONTAINS d:L66_D20
+exec run m:ncont = m:g_poly NOT_CONTAINS d:L66_D20
+exec run m:cont_c = m:cont * m:ncont
+exec run m:cont_az = m:cont_c ASSERT_ZERO nothing
+exec run m:covby = d:L66_D20 COVEREDBY m:g_poly
+exec run m:ncovby = d:L66_D20 NOT_COVEREDBY m:g_poly
+exec run m:covby_c = m:covby * m:ncovby
+exec run m:covby_az = m:covby_c ASSERT_ZERO nothing
+
+# --- Edge topological / DE-9IM edge ops ---
+exec run m:ie = d:L66_D20 INSIDE_EDGE m:g_poly
+exec run m:nie = d:L66_D20 NOT_INSIDE_EDGE m:g_poly
+exec run m:oe = d:L66_D20 OUTSIDE_EDGE m:g_poly
+exec run m:noe = d:L66_D20 NOT_OUTSIDE_EDGE m:g_poly
+exec run m:cie = d:L66_D20 COINCIDENT_INSIDE_EDGE m:g_poly
+exec run m:ncie = d:L66_D20 NOT_COINCIDENT_INSIDE_EDGE m:g_poly
+exec run m:coe = d:L66_D20 COINCIDENT_OUTSIDE_EDGE m:g_poly
+exec run m:ncoe = d:L66_D20 NOT_COINCIDENT_OUTSIDE_EDGE m:g_poly
+exec run m:oe_az2 = m:oe ASSERT_ZERO nothing
+exec run m:cie_az2 = m:cie ASSERT_ZERO nothing
+exec run m:coe_az2 = m:coe ASSERT_ZERO nothing
+exec run m:nie_az2 = m:nie ASSERT_ZERO nothing
+# edge complement/exclusion checks
+exec run m:ie_exc1 = m:ie * m:oe
+exec run m:ie_exc1z = m:ie_exc1 ASSERT_ZERO nothing
+exec run m:ie_exc2 = m:ie * m:cie
+exec run m:ie_exc2z = m:ie_exc2 ASSERT_ZERO nothing
+exec run m:ie_exc3 = m:ie * m:coe
+exec run m:ie_exc3z = m:ie_exc3 ASSERT_ZERO nothing
+
+# --- More layer-pair coverage ---
+exec run o:li1_not_met1 = d:L67_D20 @ d:L68_D20
+exec run m:self_lm = d:L68_D20 * o:li1_not_met1
+exec run m:az_self_lm = m:self_lm ASSERT_ZERO nothing
+exec run m:met1_ti = d:L68_D20 INTERACT d:L69_D20
+exec run m:met1_tni = d:L68_D20 NOT_INTERACT d:L69_D20
+exec run m:met1_tic = m:met1_ti * m:met1_tni
+exec run m:met1_tiaz = m:met1_tic ASSERT_ZERO nothing
+
+flush
+end

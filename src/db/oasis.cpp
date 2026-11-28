@@ -42,6 +42,7 @@ static int parse_oasis_impl(LdbFile* f, ldb_box_cb stream_cb, void* stream_ud) {
     // LDB_OPEN_SHAPES: exact polygons/paths/texts next to the fractured boxes (lossless
     // re-encoding, ldb_iterate_polygons); not in low-memory mode.
     ps.keep_polys = (f->open_flags & LDB_OPEN_SHAPES) != 0 && (f->open_flags & LDB_OPEN_LOW_MEMORY) == 0;
+    ps.keep_texts = (f->open_flags & LDB_OPEN_LOW_MEMORY) == 0;
     const db::CblockBackend backend = db::cblock_backend_from_env();
     std::unique_ptr<CblockSource> source;
     double scan_ms = 0.0;

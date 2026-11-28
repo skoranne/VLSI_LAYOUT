@@ -484,6 +484,31 @@ extern "C" int ldb_iterate_polygons_flat(ldb_file_t* fh, ldb_poly_cb cb, void* u
     return 0;
 }
 
+extern "C" int ldb_iterate_texts(ldb_file_t* fh, ldb_text_cb cb, void* ud) {
+    auto* f = (LdbFile*)fh; if (!f || !cb) return -1;
+    for (auto& c : f->cells)
+        for (auto& t : c.texts)
+            cb(ud, c.name.c_str(), t.layer, t.texttype, t.x, t.y, t.str.c_str());
+    return 0;
+}
+
+extern "C" int ldb_iterate_texts_flat(ldb_file_t* fh, ldb_text_cb cb, void* ud) {
+    auto* f = (LdbFile*)fh; if (!f || !cb) return -1;
+    std::vector<char> on_stack(f->cells.size(), 0);
+    for (size_t root : ldb_flat_roots(f)) {
+        const char* top_cell = f->cells[root].name.c_str();
+        auto leaf = [&](LdbCell& c, const ldbflat::Affine& acc) {
+            for (auto& t : c.texts) {
+                int64_t x, y;
+                acc.apply(t.x, t.y, x, y);
+                cb(ud, top_cell, t.layer, t.texttype, x, y, t.str.c_str());
+            }
+        };
+        ldb_flat_walk(f, root, ldbflat::Affine(), on_stack, leaf);
+    }
+    return 0;
+}
+
 // Flat streaming load: OASIS boxes go straight to cb while parsing, no in-memory copy of the
 // geometry. Returns 0 ok, 2 hierarchical file (use ldb_open + ldb_iterate_boxes*),
 // 3 format not supported for streaming (GDSII), -1 error (errbuf).

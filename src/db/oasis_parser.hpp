@@ -201,6 +201,7 @@ struct Parser {
     size_t cblocks = 0, approximated = 0;
     bool saw_end = false, want_props = false;
     bool keep_polys = false;                 // also store exact non-rectangle shapes (LdbCell::polys)
+    bool keep_texts = false;                 // store TEXT elements (LdbCell::texts)
     double unit = 0;                         // START unit: grid steps per micron
     size_t last_inst_lo = 0, last_inst_hi = 0;
     std::vector<Rect> rects;                 // scratch
@@ -360,7 +361,7 @@ struct Parser {
 
     void text(Reader& s) {
         uint8_t info = s.u8();
-        const bool store = keep_polys && !stream_cb && !scan_only && cur >= 0;
+        const bool store = keep_texts && !stream_cb && !scan_only && cur >= 0;
         if (info & 0x40) {
             if (info & 0x20) { m.text_by_ref = true; m.text_ref = s.uint_(); }
             else if (store) { m.text_by_ref = false; m.text_str = s.str(); }

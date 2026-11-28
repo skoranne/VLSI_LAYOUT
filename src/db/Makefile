@@ -19,7 +19,7 @@ LDFLAGS += $(NVCOMP_LDLIBS) $(NVCOMP_CUDART) -pthread
 CORE_SRCS = layoutdb.cpp layoutdb_hier.cpp anyangle_capi.cpp trap_out.cpp gdsii.cpp oasis.cpp oasis_writer.cpp oasis_model_writer.cpp db_stats.cpp nvcomp_support.cpp lefdef_export.cpp oasis_tables.cpp oasis_sidecar.cpp prop_oasis_writer.cpp def_probe.cpp
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
 
-TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent bin2oas db_oasinfo db_mvi db_defcheck db_def2oas db_oasis_selftest db_rotcheck
+TESTS = MPW_MERGE db_extent db_extent_by_cell_layer db_hierarchy db_propnames db_roundtrip db_oasis2lefdef db_hier_extent bin2oas db_oasinfo db_oas_stats db_mvi db_defcheck db_def2oas db_oasis_selftest db_rotcheck
 
 all: $(TESTS) liblayoutdb.a liblayoutdb.so
 
@@ -44,6 +44,10 @@ db_def2oas: db_def2oas.cpp def_reader.hpp oasis_codec.hpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $(filter %.cpp %.o %.a,$^) -o $@ $(LDFLAGS)
 
 db_oasinfo: db_oasinfo.cpp $(CORE_OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Layer/bbox/text/property stats for OASIS/GDSII -> parseable text for CTR generation.
+db_oas_stats: db_oas_stats.cpp $(CORE_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 # OASIS/GDSII conformance self-test (spec tables, every record type, writer round trips);

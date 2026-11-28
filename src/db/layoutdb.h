@@ -60,6 +60,12 @@ typedef void (*ldb_poly_cb)(void* ud, const char* cell, int layer, int datatype,
                             int npts, const int64_t* xs, const int64_t* ys);
 int ldb_iterate_polygons(ldb_file_t* f, ldb_poly_cb cb, void* ud);
 int ldb_iterate_polygons_flat(ldb_file_t* f, ldb_poly_cb cb, void* ud);
+
+/* Iterate TEXT elements (DBU coordinates). str is UTF-8 (OASIS TEXT) or ASCII (GDSII STRING). */
+typedef void (*ldb_text_cb)(void* ud, const char* cell, int layer, int texttype,
+                            int64_t x, int64_t y, const char* str);
+int ldb_iterate_texts(ldb_file_t* f, ldb_text_cb cb, void* ud);
+int ldb_iterate_texts_flat(ldb_file_t* f, ldb_text_cb cb, void* ud);
 /* 3) print cell hierarchy to FILE* as text */
 int ldb_print_hierarchy(ldb_file_t* f, void* out_fp);
 /* 4) print property name table */
