@@ -1227,29 +1227,13 @@ contains
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout) :: output_layer
       type(Layer)                :: AnotB, BnotA
-      !$omp parallel default(shared)
-      !$omp single
-      !$omp task
       call PreprocessLayer( input_layer_A )
-      !$omp end task
-      !$omp task
       call PreprocessLayer( input_layer_B )
-      !$omp end task
-      !$omp end single
-      !$omp end parallel
 
       AnotB%layerState = LAYER_STATE_EVERYTHING
       BnotA%layerState = LAYER_STATE_EVERYTHING
-      !$omp parallel default(shared)
-      !$omp single
-      !$omp task
       call CalculateFrameNOT( input_layer_A, input_layer_B, AnotB )
-      !$omp end task
-      !$omp task
       call CalculateFrameNOT( input_layer_B, input_layer_A, BnotA )
-      !$omp end task
-      !$omp end single
-      !$omp end parallel
       call CalculateOR( AnotB, BnotA, output_layer )
    end subroutine CalculateExplicitXOR
 

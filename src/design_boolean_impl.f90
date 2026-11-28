@@ -58,38 +58,28 @@ contains
     call PreprocessLayer( output_layer )
   end subroutine CalculateOR
 
-  module subroutine CalculateAND( input_layer_A, input_layer_B, output_layer )
+  module subroutine CalculateAND( input_layer_A, input_layer_B, output_layer, preprocess_out )
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
     type(Layer), intent(inout) :: output_layer
+    logical, intent(in), optional :: preprocess_out
     real(kind=real64) :: t_start
     integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC, numNodesB
-    integer(kind=int64), parameter :: K_DFS_STACK = 256
-    integer(kind=int64) :: dfs_stack(K_DFS_STACK)
-    integer(kind=int64) :: sp, curr_idx, child_idx, c_end
-    integer(kind=int64) :: i, j, k, root_idx
+    integer(kind=int64) :: i, j
     type(Layer), allocatable :: buffers(:)
-    type(Box) :: boxA, boxB, tempBox
-    type(RTreeNode) :: currNode, childNode
     integer :: nthreads, tid, alloc_status
     integer(kind=int32) :: gpu_overflow
     integer(kind=int64), parameter :: K_INIT_BOX_COUNT = 4096
-    logical :: use_gpu, swap_ab
+    logical :: use_gpu, swap_ab, has_tree_A, has_tree_B, tree_is_A, do_pre_out
     integer(kind=int64) :: numNodesA
 
     if (profiling_enabled) t_start = get_cpu_time()
+    do_pre_out = .true.
+    if (present(preprocess_out)) do_pre_out = preprocess_out
 
-    !> preprocess A,B (builds RTrees/sorting as needed)
-    !$omp parallel default(shared)
-    !$omp single
-    !$omp task
-    call PreprocessLayer( input_layer_A )
-    !$omp end task
-    !$omp task
-    call PreprocessLayer( input_layer_B )
-    !$omp end task
-    !$omp taskwait
-    !$omp end single
-    !$omp end parallel
+    !> Sequential healing (keeps full OpenMP team available inside Heal/OMT/RTree).
+    !> Only one operand needs an R-tree; neither operand needs PNum for AND.
+    call EnsureLayerHealed( input_layer_A )
+    call EnsureLayerHealed( input_layer_B )
 
     num_boxesA = input_layer_A%n_used
     num_boxesB = input_layer_B%n_used
@@ -100,17 +90,35 @@ contains
        return
     end if
 
+    has_tree_A = (.not. NeedsRTree(input_layer_A)) .and. allocated(input_layer_A%tree%tree_nodes)
+    if (has_tree_A) has_tree_A = (size(input_layer_A%tree%tree_nodes, kind=int64) > 0 .and. input_layer_A%tree%root_index > 0)
+    has_tree_B = (.not. NeedsRTree(input_layer_B)) .and. allocated(input_layer_B%tree%tree_nodes)
+    if (has_tree_B) has_tree_B = (size(input_layer_B%tree%tree_nodes, kind=int64) > 0 .and. input_layer_B%tree%root_index > 0)
+
+    if (has_tree_A .and. .not. has_tree_B) then
+       tree_is_A = .true.
+    else if (has_tree_B .and. .not. has_tree_A) then
+       tree_is_A = .false.
+    else if (has_tree_A .and. has_tree_B) then
+       tree_is_A = (num_boxesA < num_boxesB)
+    else if (num_boxesA < num_boxesB) then
+       call EnsureLayerRTree( input_layer_A )
+       tree_is_A = .true.
+    else
+       call EnsureLayerRTree( input_layer_B )
+       tree_is_A = .false.
+    end if
+
     use_gpu = .false.
-    swap_ab = .false.
+    swap_ab = tree_is_A
     if (gpu_offload_enabled(min(num_boxesA, num_boxesB))) then
-       if (num_boxesA > num_boxesB .and. allocated(input_layer_A%tree%tree_nodes)) then
+       if (tree_is_A .and. allocated(input_layer_A%tree%tree_nodes)) then
           numNodesA = size(input_layer_A%tree%tree_nodes, kind=int64)
           if (numNodesA > 0 .and. input_layer_A%tree%root_index > 0) then
              use_gpu = .true.
              swap_ab = .true.
           end if
-       end if
-       if (.not. use_gpu .and. allocated(input_layer_B%tree%tree_nodes)) then
+       else if (.not. tree_is_A .and. allocated(input_layer_B%tree%tree_nodes)) then
           numNodesB = size(input_layer_B%tree%tree_nodes, kind=int64)
           if (numNodesB > 0 .and. input_layer_B%tree%root_index > 0) then
              use_gpu = .true.
@@ -143,7 +151,7 @@ contains
           if (allocated(output_layer%pnumtable%arr)) deallocate(output_layer%pnumtable%arr)
           output_layer%tree%root_index = 0
           output_layer%layerState = LAYER_STATE_HEAL
-          call PreprocessLayer(output_layer)
+          if (do_pre_out) call PreprocessLayer(output_layer)
           if (profiling_enabled) call RecordTime("CalculateAND", get_cpu_time() - t_start)
           return
        end if
@@ -159,62 +167,15 @@ contains
        buffers(i)%n_alloc = K_INIT_BOX_COUNT
        buffers(i)%n_used = 0
     end do
-    root_idx = input_layer_B%tree%root_index
-    !$omp parallel do private(dfs_stack, sp, curr_idx, child_idx, c_end, i, k, tid, boxA, boxB, tempBox, currNode, childNode)
-    over_all_boxes: do i=1,num_boxesA
-       tid = omp_get_thread_num()+1
-       boxA = input_layer_A%layer_boxes(i)
-       if (size(input_layer_B%tree%tree_nodes) == 0) then
-          do k = 1, num_boxesB
-             boxB = input_layer_B%layer_boxes(k)
-             if( boxA%x1 < boxB%x2 .and. boxA%x2 > boxB%x1 .and. &
-                 boxA%y1 < boxB%y2 .and. boxA%y2 > boxB%y1 ) then
-                tempBox%x1 = max(boxA%x1, boxB%x1)
-                tempBox%y1 = max(boxA%y1, boxB%y1)
-                tempBox%x2 = min(boxA%x2, boxB%x2)
-                tempBox%y2 = min(boxA%y2, boxB%y2)
-                call push_box(tempBox, buffers(tid))
-             end if
-          end do
-          cycle
-       end if
-       childNode = input_layer_B%tree%tree_nodes(root_idx)
-       if (boxA%x1 >= childNode%mbr%x2 .or. boxA%x2 <= childNode%mbr%x1 .or. &
-           boxA%y1 >= childNode%mbr%y2 .or. boxA%y2 <= childNode%mbr%y1) cycle
-       sp = 1
-       dfs_stack(1) = root_idx
-       do while (sp > 0)
-          curr_idx = dfs_stack(sp)
-          sp = sp - 1
-          currNode = input_layer_B%tree%tree_nodes(curr_idx)
-          if (currNode%IsLeaf) then
-             c_end = min(currNode%ChildStart + int(currNode%NumChildren, kind=int64) - 1_int64, num_boxesB)
-             do k = currNode%ChildStart, c_end
-                boxB = input_layer_B%layer_boxes(k)
-                if( boxA%x1 < boxB%x2 .and. boxA%x2 > boxB%x1 .and. &
-                    boxA%y1 < boxB%y2 .and. boxA%y2 > boxB%y1 ) then
-                   tempBox%x1 = max(boxA%x1, boxB%x1)
-                   tempBox%y1 = max(boxA%y1, boxB%y1)
-                   tempBox%x2 = min(boxA%x2, boxB%x2)
-                   tempBox%y2 = min(boxA%y2, boxB%y2)
-                   call push_box(tempBox, buffers(tid))
-                end if
-             end do
-          else
-             c_end = currNode%ChildStart + int(currNode%NumChildren, kind=int64) - 1_int64
-             do child_idx = currNode%ChildStart, c_end
-                childNode = input_layer_B%tree%tree_nodes(child_idx)
-                if (boxA%x1 < childNode%mbr%x2 .and. boxA%x2 > childNode%mbr%x1 .and. &
-                    boxA%y1 < childNode%mbr%y2 .and. boxA%y2 > childNode%mbr%y1) then
-                   if (sp < K_DFS_STACK) then
-                      sp = sp + 1
-                      dfs_stack(sp) = child_idx
-                   end if
-                end if
-             end do
-          end if
-       end do
-    end do over_all_boxes
+    if (tree_is_A) then
+       call and_cpu_query(input_layer_B%layer_boxes, num_boxesB, &
+            input_layer_A%layer_boxes, num_boxesA, &
+            input_layer_A%tree%tree_nodes, input_layer_A%tree%root_index, buffers)
+    else
+       call and_cpu_query(input_layer_A%layer_boxes, num_boxesA, &
+            input_layer_B%layer_boxes, num_boxesB, &
+            input_layer_B%tree%tree_nodes, input_layer_B%tree%root_index, buffers)
+    end if
 
     num_boxesC = sum([ (buffers(i)%n_used, i=1,nthreads) ])
     if( allocated( output_layer%layer_boxes ) ) then
@@ -248,9 +209,79 @@ contains
     if (allocated(output_layer%pnumtable%arr)) deallocate(output_layer%pnumtable%arr)
     output_layer%tree%root_index = 0
     output_layer%layerState = LAYER_STATE_HEAL
-    call PreprocessLayer( output_layer )
+    if (do_pre_out) call PreprocessLayer( output_layer )
 
     if (profiling_enabled) call RecordTime("CalculateAND", get_cpu_time() - t_start)
+  contains
+
+    subroutine and_cpu_query(q_boxes, n_q, t_boxes, n_t, t_nodes, r_idx, bufs)
+      type(Box), intent(in) :: q_boxes(:), t_boxes(:)
+      integer(kind=int64), intent(in) :: n_q, n_t, r_idx
+      type(RTreeNode), intent(in) :: t_nodes(:)
+      type(Layer), intent(inout) :: bufs(:)
+      integer(kind=int64), parameter :: K_DFS_STACK = 256
+      integer(kind=int64) :: dfs_stack(K_DFS_STACK)
+      integer(kind=int64) :: sp, curr_idx, child_idx, c_end, qi, tk
+      integer :: ltid
+      type(Box) :: boxQ, boxT, tmpB
+      type(RTreeNode) :: cNode, chNode
+
+      !$omp parallel do private(dfs_stack, sp, curr_idx, child_idx, c_end, qi, tk, ltid, boxQ, boxT, tmpB, cNode, chNode)
+      do qi = 1, n_q
+         ltid = omp_get_thread_num() + 1
+         boxQ = q_boxes(qi)
+         if (size(t_nodes) == 0) then
+            do tk = 1, n_t
+               boxT = t_boxes(tk)
+               if (boxQ%x1 < boxT%x2 .and. boxQ%x2 > boxT%x1 .and. &
+                   boxQ%y1 < boxT%y2 .and. boxQ%y2 > boxT%y1) then
+                  tmpB%x1 = max(boxQ%x1, boxT%x1)
+                  tmpB%y1 = max(boxQ%y1, boxT%y1)
+                  tmpB%x2 = min(boxQ%x2, boxT%x2)
+                  tmpB%y2 = min(boxQ%y2, boxT%y2)
+                  call push_box(tmpB, bufs(ltid))
+               end if
+            end do
+            cycle
+         end if
+         chNode = t_nodes(r_idx)
+         if (boxQ%x1 >= chNode%mbr%x2 .or. boxQ%x2 <= chNode%mbr%x1 .or. &
+             boxQ%y1 >= chNode%mbr%y2 .or. boxQ%y2 <= chNode%mbr%y1) cycle
+         sp = 1
+         dfs_stack(1) = r_idx
+         do while (sp > 0)
+            curr_idx = dfs_stack(sp)
+            sp = sp - 1
+            cNode = t_nodes(curr_idx)
+            if (cNode%IsLeaf) then
+               c_end = min(cNode%ChildStart + int(cNode%NumChildren, kind=int64) - 1_int64, n_t)
+               do tk = cNode%ChildStart, c_end
+                  boxT = t_boxes(tk)
+                  if (boxQ%x1 < boxT%x2 .and. boxQ%x2 > boxT%x1 .and. &
+                      boxQ%y1 < boxT%y2 .and. boxQ%y2 > boxT%y1) then
+                     tmpB%x1 = max(boxQ%x1, boxT%x1)
+                     tmpB%y1 = max(boxQ%y1, boxT%y1)
+                     tmpB%x2 = min(boxQ%x2, boxT%x2)
+                     tmpB%y2 = min(boxQ%y2, boxT%y2)
+                     call push_box(tmpB, bufs(ltid))
+                  end if
+               end do
+            else
+               c_end = cNode%ChildStart + int(cNode%NumChildren, kind=int64) - 1_int64
+               do child_idx = cNode%ChildStart, c_end
+                  chNode = t_nodes(child_idx)
+                  if (boxQ%x1 < chNode%mbr%x2 .and. boxQ%x2 > chNode%mbr%x1 .and. &
+                      boxQ%y1 < chNode%mbr%y2 .and. boxQ%y2 > chNode%mbr%y1) then
+                     if (sp < K_DFS_STACK) then
+                        sp = sp + 1
+                        dfs_stack(sp) = child_idx
+                     end if
+                  end if
+               end do
+            end if
+         end do
+      end do
+    end subroutine and_cpu_query
   end subroutine CalculateAND
 
   !> Direct multithreaded R-Tree box-subtraction algorithm for A NOT B
@@ -259,15 +290,19 @@ contains
   !> frees its per-thread buffers ("allocatable array is not allocated" or a
   !> segmentation fault, also with unmodified sources), so this platform keeps
   !> the scanline formulation  A NOT B = A AND complement(B within bbox(A)).
-  module subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer )
+  module subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer, preprocess_out )
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
     type(Layer), intent(inout) :: output_layer
+    logical, intent(in), optional :: preprocess_out
     type(XYTracker), allocatable :: trackers(:)
     type(Box) :: bboxA
     type(Layer) :: temp_layer
     real(kind=real64) :: t_start
+    logical :: do_pre_out
 
     if (profiling_enabled) t_start = get_cpu_time()
+    do_pre_out = .true.
+    if (present(preprocess_out)) do_pre_out = preprocess_out
     call PreprocessLayer( input_layer_A )
     call PreprocessLayer( input_layer_B )
 
@@ -282,14 +317,15 @@ contains
        call LayerMark( temp_layer, LAYER_STATE_HEAL )
        temp_layer%n_used = size( temp_layer%layer_boxes, kind=int64 )
        temp_layer%n_alloc = temp_layer%n_used
-       call CalculateAND( input_layer_A, temp_layer, output_layer )
+       call CalculateAND( input_layer_A, temp_layer, output_layer, preprocess_out=do_pre_out )
     end if
     if (profiling_enabled) call RecordTime("CalculateNOT", get_cpu_time() - t_start)
   end subroutine CalculateNOT
 #else
-  module subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer )
+  module subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer, preprocess_out )
     type(Layer), intent(inout) :: input_layer_A, input_layer_B
     type(Layer), intent(inout) :: output_layer
+    logical, intent(in), optional :: preprocess_out
     real(kind=real64) :: t_start
     integer(kind=int64) :: num_boxesA, num_boxesB, num_boxesC
     integer(kind=int64), parameter :: K_DFS_STACK = 1024
@@ -306,7 +342,7 @@ contains
     type(RTreeNode) :: currNode, childNode
     integer(kind=K_COORDINATE_KIND) :: rem_x1, rem_y1, rem_x2, rem_y2
     integer :: nthreads, tid, alloc_status
-    logical :: has_tree, use_gpu_not
+    logical :: has_tree, use_gpu_not, do_pre_out
     ! GPU path (ComputeNOTGPU): its output plus the A boxes it hands back for CPU recompute
     type(Box), allocatable :: gpu_out(:)
     integer(kind=int64), allocatable :: fallback(:)
@@ -315,9 +351,12 @@ contains
     real(kind=real64) :: tp
 
     if (profiling_enabled) t_start = get_cpu_time()
+    do_pre_out = .true.
+    if (present(preprocess_out)) do_pre_out = preprocess_out
 
-    call PreprocessLayer( input_layer_A )
-    call PreprocessLayer( input_layer_B )
+    !> A only needs HEAL (streamed linearly); B needs HEAL+SORT+RTREE (queried); neither needs PNum.
+    call EnsureLayerHealed( input_layer_A )
+    call EnsureLayerHealed( input_layer_B )
 
     num_boxesA = input_layer_A%n_used
     num_boxesB = input_layer_B%n_used
@@ -330,9 +369,12 @@ contains
     end if
     if (num_boxesB == 0) then
        call CopyLayer(output_layer, input_layer_A)
+       if (do_pre_out) call PreprocessLayer(output_layer)
        if (profiling_enabled) call RecordTime("CalculateNOT", get_cpu_time() - t_start)
        return
     end if
+
+    call EnsureLayerRTree( input_layer_B )
 
     root_idx = input_layer_B%tree%root_index
     has_tree = allocated(input_layer_B%tree%tree_nodes)
@@ -554,7 +596,7 @@ contains
     output_layer%n_used = num_boxesC
     output_layer%n_alloc = num_boxesC
     output_layer%layerState = LAYER_STATE_HEAL
-    call PreprocessLayer( output_layer )
+    if (do_pre_out) call PreprocessLayer( output_layer )
 
     if (profiling_enabled) call RecordTime("CalculateNOT", get_cpu_time() - t_start)
   contains

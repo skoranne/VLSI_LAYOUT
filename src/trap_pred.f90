@@ -222,18 +222,22 @@ contains
   subroutine ensure_i64(a, n)
     integer(int64), allocatable, intent(inout) :: a(:)
     integer(int64), intent(in) :: n
-    if (size(a, kind=int64) < n) then
+    integer(int64) :: cur
+    cur = size(a, kind=int64)
+    if (cur < n) then
        deallocate(a)
-       allocate(a(max(n, 2_int64 * size(a, kind=int64))))
+       allocate(a(max(n, 2_int64 * cur)))
     end if
   end subroutine ensure_i64
 
   subroutine ensure_r64(a, n)
     real(real64), allocatable, intent(inout) :: a(:)
     integer(int64), intent(in) :: n
-    if (size(a, kind=int64) < n) then
+    integer(int64) :: cur
+    cur = size(a, kind=int64)
+    if (cur < n) then
        deallocate(a)
-       allocate(a(max(n, 2_int64 * size(a, kind=int64))))
+       allocate(a(max(n, 2_int64 * cur)))
     end if
   end subroutine ensure_r64
 

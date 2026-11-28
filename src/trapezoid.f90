@@ -97,7 +97,7 @@ contains
     type(TrapSide), intent(out) :: s
     integer, intent(out) :: status
     integer(int64) :: dx, dy, g, t, ax
-    s = TrapSide()
+    s = TrapSide(0_int32, 0_int32, 0_int32, 1_int32)
     dx = xb - xa; dy = yb - ya
     if (dy == 0_int64) then
        status = K_TRAP_HORIZONTAL; return
@@ -189,7 +189,8 @@ contains
     type(Trapezoid), intent(out) :: t
     integer, intent(out) :: status
     integer :: st2
-    t = Trapezoid()
+    t = Trapezoid(0_int32, 0_int32, TrapSide(0_int32,0_int32,0_int32,1_int32), &
+                  TrapSide(0_int32,0_int32,0_int32,1_int32))
     if (y2 <= y1) then
        status = K_TRAP_EMPTY; return
     end if

@@ -369,14 +369,16 @@ module DesignModule
        type(Layer), intent(inout) :: output_layer
      end subroutine CalculateOR
 
-     module subroutine CalculateAND( input_layer_A, input_layer_B, output_layer )
+     module subroutine CalculateAND( input_layer_A, input_layer_B, output_layer, preprocess_out )
        type(Layer), intent(inout) :: input_layer_A, input_layer_B
        type(Layer), intent(inout) :: output_layer
+       logical, intent(in), optional :: preprocess_out
      end subroutine CalculateAND
 
-     module subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer )
+     module subroutine CalculateNOT( input_layer_A, input_layer_B, output_layer, preprocess_out )
        type(Layer), intent(inout) :: input_layer_A, input_layer_B
        type(Layer), intent(inout) :: output_layer
+       logical, intent(in), optional :: preprocess_out
      end subroutine CalculateNOT
 
      module subroutine CalculateTopologicalSelect( input_layer_A, input_layer_B, output_layer, topo_op )
@@ -924,11 +926,10 @@ contains
   end function calculate_union_area_by_polygon
 
   !------------------------------------------------------------------
-  !  Preprocessing: bring a layer to HEAL + SORT + RTREE + PNUM
+  !  Preprocessing: bring a layer to HEAL / HEAL+SORT+RTREE / +PNUM
   !------------------------------------------------------------------
-  subroutine PreprocessLayerSL( input_layer )
+  subroutine EnsureLayerHealed( input_layer )
     type(Layer), intent(inout) :: input_layer
-    real(kind=real64) :: overlap_area, overlap_perimeter
     integer(kind=int64) :: output_box_count
     real(kind=real64) :: tp
 
@@ -936,54 +937,60 @@ contains
        input_layer%layerState = LAYER_STATE_PREPROCESSED
        return
     end if
-    if( NeedsHealing( input_layer ) ) then
+    if( .not. NeedsHealing( input_layer ) ) return
 !#define USE_BOOST_POLYGON
 #ifdef USE_BOOST_POLYGON
-       block
-         type(Box), allocatable :: merged_boxes(:)
-         call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, merged_boxes )
-         call move_alloc( from=merged_boxes, to=input_layer%layer_boxes )
-         output_box_count = size( input_layer%layer_boxes, kind=int64 )
-       end block
+    block
+      type(Box), allocatable :: merged_boxes(:)
+      call MergeBoxesUsingBoostPolygon( input_layer%layer_boxes, merged_boxes )
+      call move_alloc( from=merged_boxes, to=input_layer%layer_boxes )
+      output_box_count = size( input_layer%layer_boxes, kind=int64 )
+    end block
 #else
-       if( input_layer%n_used >= K_FRAME_THRESHOLD .and. .not. sl_heal_forced() ) then
-          !> Same strategy as the KLBIN load (PNumLoop): certify disjointness on the tree (GPU),
-          !> and only heal when needed, with the tiled parallel merge instead of the serial scanline.
-          if( NeedsSorting( input_layer ) ) then
-             tp = PhaseBegin('pre.sort')
-             call sort_layer_boxes( input_layer, use_morton=.false. )
-             call PhaseEnd('pre.sort', tp, input_layer%n_used)
-          end if
-          if( NeedsRTree( input_layer ) ) then
-             tp = PhaseBegin('pre.rtree')
-             call rebuild_rtree( input_layer )
-             call PhaseEnd('pre.rtree', tp, input_layer%n_used)
-          end if
-          tp = PhaseBegin('pre.certify')
-          if( CertifyHealing( input_layer ) ) then
-             call PhaseEnd('pre.certify', tp, input_layer%n_used)
-             call LayerMark( input_layer, LAYER_STATE_HEAL )      !> boxes, order and tree unchanged
-          else
-             call PhaseEnd('pre.certify', tp, input_layer%n_used)
-             tp = PhaseBegin('pre.mergeheal')
-             call MergeHealLayer( input_layer )             !> sets state HEAL only
-             call PhaseEnd('pre.mergeheal', tp, input_layer%n_used)
-          end if
-          output_box_count = input_layer%n_used
+    if( input_layer%n_used >= K_FRAME_THRESHOLD .and. .not. sl_heal_forced() ) then
+       !> Same strategy as the KLBIN load (PNumLoop): certify disjointness on the tree (GPU),
+       !> and only heal when needed, with the tiled parallel merge instead of the serial scanline.
+       if( NeedsSorting( input_layer ) ) then
+          tp = PhaseBegin('pre.sort')
+          call sort_layer_boxes( input_layer, use_morton=.false. )
+          call PhaseEnd('pre.sort', tp, input_layer%n_used)
+       end if
+       if( NeedsRTree( input_layer ) ) then
+          tp = PhaseBegin('pre.rtree')
+          call rebuild_rtree( input_layer )
+          call PhaseEnd('pre.rtree', tp, input_layer%n_used)
+       end if
+       tp = PhaseBegin('pre.certify')
+       if( CertifyHealing( input_layer ) ) then
+          call PhaseEnd('pre.certify', tp, input_layer%n_used)
+          call LayerMark( input_layer, LAYER_STATE_HEAL )      !> boxes, order and tree unchanged
        else
-          tp = PhaseBegin('pre.heal')
-          call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
-          call PhaseEnd('pre.heal', tp, input_layer%n_used)
-          input_layer%layerState = LAYER_STATE_HEAL !> the boxes changed: everything else is stale
+          call PhaseEnd('pre.certify', tp, input_layer%n_used)
+          tp = PhaseBegin('pre.mergeheal')
+          call MergeHealLayer( input_layer )             !> sets state HEAL only
+          call PhaseEnd('pre.mergeheal', tp, input_layer%n_used)
        end if
-#endif
-       input_layer%n_used = output_box_count
-       if( allocated( input_layer%layer_boxes ) ) input_layer%n_alloc = size( input_layer%layer_boxes, kind=int64 )
-       if( input_layer%n_used == 0 ) then
-          input_layer%layerState = LAYER_STATE_PREPROCESSED
-          return
-       end if
+       output_box_count = input_layer%n_used
+    else
+       tp = PhaseBegin('pre.heal')
+       call heal_boxes( input_layer%n_used, input_layer%layer_boxes, output_box_count )
+       call PhaseEnd('pre.heal', tp, input_layer%n_used)
+       input_layer%layerState = LAYER_STATE_HEAL !> the boxes changed: everything else is stale
     end if
+#endif
+    input_layer%n_used = output_box_count
+    if( allocated( input_layer%layer_boxes ) ) input_layer%n_alloc = size( input_layer%layer_boxes, kind=int64 )
+    if( input_layer%n_used == 0 ) then
+       input_layer%layerState = LAYER_STATE_PREPROCESSED
+    end if
+  end subroutine EnsureLayerHealed
+
+  subroutine EnsureLayerRTree( input_layer )
+    type(Layer), intent(inout) :: input_layer
+    real(kind=real64) :: tp
+
+    call EnsureLayerHealed( input_layer )
+    if( input_layer%n_used == 0 ) return
     if( NeedsSorting( input_layer ) ) then
        tp = PhaseBegin('pre.sort')
        call sort_layer_boxes( input_layer, use_morton=.false. )
@@ -994,6 +1001,15 @@ contains
        call rebuild_rtree( input_layer )
        call PhaseEnd('pre.rtree', tp, input_layer%n_used)
     end if
+  end subroutine EnsureLayerRTree
+
+  subroutine PreprocessLayerSL( input_layer )
+    type(Layer), intent(inout) :: input_layer
+    real(kind=real64) :: overlap_area, overlap_perimeter
+    real(kind=real64) :: tp
+
+    call EnsureLayerRTree( input_layer )
+    if( input_layer%n_used == 0 ) return
     if( NeedsPNum( input_layer ) ) then
        tp = PhaseBegin('pre.pnum')
        call LayerDeviceEnsure( input_layer )   !> no-op unless PerformMerge will take the GPU path
