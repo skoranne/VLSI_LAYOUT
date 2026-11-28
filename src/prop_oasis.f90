@@ -103,8 +103,13 @@ contains
 
   pure function cstr( s ) result(c)
     character(len=*), intent(in) :: s
-    character(kind=c_char, len=len_trim(s)+1) :: c
-    c = trim(s) // c_null_char
+    character(kind=c_char) :: c(len_trim(s)+1)
+    integer :: i, n
+    n = len_trim(s)
+    do i = 1, n
+       c(i) = s(i:i)
+    end do
+    c(n+1) = c_null_char
   end function cstr
 
   subroutine OasisPropOpen( w, path, cell )
