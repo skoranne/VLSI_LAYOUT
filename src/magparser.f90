@@ -680,6 +680,7 @@ contains
           write(*,'(A,A,A,I0,A)') 'WARNING: no layer/datatype for ', lname, ', using ', lno, '/0'
        end if
        call OasisPropAddLayer( ow, load_design%layers(i), lname, lno, dt, st, msg )
+       call ClearLayer( load_design%layers(i) )  !> free memory as soon as layer is written to OASIS
        if( st /= 0 ) exit
     end do
     if( st == 0 ) then

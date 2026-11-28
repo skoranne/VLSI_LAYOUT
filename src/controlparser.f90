@@ -696,6 +696,17 @@ contains
              else
                 write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
              end if             
+          else if( trim(rest(1:pos-1)) == 'dag_gc' ) then
+             rest = adjustl(rest)
+             pos = index( rest, ' ' )
+             rest = trim( adjustl( rest(pos+1:)))
+             read(rest, *, iostat=ios) i
+             if( ios == 0 ) then
+                dag_gc_on = ( i /= 0 )
+                write(*,*) 'INFO: VAR changing dag_gc = ', merge(1,0,dag_gc_on)
+             else
+                write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
+             end if
           else if( trim(rest(1:pos-1)) == 'debug_verbosity' ) then             
              rest = adjustl(rest)
              pos = index( rest, ' ' )
@@ -2185,6 +2196,14 @@ contains
              else
                 call OasisPropClose( w, st2, m2 )
              end if
+             block
+               integer :: odb
+               logical :: ofound
+               call hash_get( ht, trim(tok(1)(1:index(tok(1),':')-1)), odb, ofound )
+               if( ofound ) then
+                  if( dbs(odb)%design_direction /= DESIGN_DIRECTION_INPUT ) call ClearLayer( L )
+               end if
+             end block
           end if
        else
           call hash_get( ht, trim(tok(1)), idb, found )
@@ -2209,6 +2228,7 @@ contains
                       write(*,'(A,A,A,I0,A)') 'WARNING: no layer/datatype for ', lname, ', using ', lno, '/0'
                    end if
                    call OasisPropAddLayer( w, L, lname, lno, dt, status, msg )
+                   if( dbs(idb)%design_direction /= DESIGN_DIRECTION_INPUT ) call ClearLayer( L )  !> free memory as soon as written
                    if( status /= 0 ) exit
                 end do
                 if( status == 0 .and. nmap_entries > 0 .and. nmapped /= nmap_entries ) then
