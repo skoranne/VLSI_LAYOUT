@@ -219,6 +219,9 @@ test_trapstream.exe: test_trapstream.o $(LIBRARY) db/liblayoutdb.a
 test_nurbs.exe: test_nurbs.o $(LIBRARY) db/liblayoutdb.a
 	$(FORTRAN_COMPILER) $(FCFLAGS) test_nurbs.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
 
+test_nurbs_offset.exe: test_nurbs_offset.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_nurbs_offset.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
 TRAPMERGE.exe: trapmerge_main.o $(LIBRARY) db/liblayoutdb.a
 	$(FORTRAN_COMPILER) $(FCFLAGS) trapmerge_main.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
 
