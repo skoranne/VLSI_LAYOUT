@@ -1,4 +1,4 @@
-LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o trapezoid.o trap_arena.o trap_merge.o trap_band_stream.o trap_pnum.o trap_topo.o trap_morph.o trap_pred.o device_registry.o compact_layer.o measure.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o anyangle_ops.o \
+LIB_OBJS = commonmodule.o wide_int.o exact_predicates.o trapezoid.o trap_arena.o trap_merge.o trap_band_stream.o trap_pnum.o trap_topo.o trap_morph.o trap_pred.o nurbs_curve.o device_registry.o compact_layer.o measure.o systeminfo.o systeminfo_macos.o hashtable.o geometry.o design.o band_exec.o anyangle_ops.o \
            controlparser.o hdfdata.o datastructures.o \
            rtree.o pnummerge.o magparser.o contour.o version_mod.o morton.o \
 	   polygon_fracture.o boxmerge.o kldata.o design_impl.o design_boolean_impl.o design_topo_impl.o design_device_impl.o gpu_morton_sort.o\
@@ -89,3 +89,7 @@ trap_pred.o: wide_int.o trapezoid.o trap_pnum.o
 test_trapmorph.o: trapezoid.o trap_merge.o trap_pnum.o trap_morph.o
 test_trappred.o: trapezoid.o trap_merge.o trap_pnum.o trap_pred.o anyangle_ops.o
 test_trapstream.o: trapezoid.o trap_merge.o trap_band_stream.o
+
+
+nurbs_curve.o: 
+test_nurbs.o: nurbs_curve.o
