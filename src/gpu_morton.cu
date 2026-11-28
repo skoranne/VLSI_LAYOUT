@@ -154,6 +154,9 @@ extern "C" int32_t thrust_sort_u64_i32_host(uint64_t *h_keys, int32_t *h_vals, i
 // NVTX range shims for the Fortran phase timers (ProfilerModule); no-ops without CUDA.
 extern "C" void magparser_nvtx_push(const char *) {}
 extern "C" void magparser_nvtx_pop(void) {}
+extern "C" void *gpu_pool_alloc(int64_t bytes) { return bytes > 0 ? std::malloc((size_t)bytes) : nullptr; }
+extern "C" void gpu_pool_free(void *p) { if (p) std::free(p); }
+extern "C" void gpu_pool_trim(int64_t) {}
 #else
 // ============================================================================
 // GPU implementation (nvcc -DUSE_GPU)
@@ -209,7 +212,48 @@ namespace
         return g_stream;
     }
 
-    // Grow-only device scratch buffer, cached up to cache_cap().
+    bool g_pool_init = false;
+    cudaMemPool_t g_mempool = nullptr;
+
+    void init_mempool()
+    {
+        if (g_pool_init)
+            return;
+        g_pool_init = true;
+        int dev = 0, supported = 0;
+        if (cudaGetDevice(&dev) == cudaSuccess &&
+            cudaDeviceGetAttribute(&supported, cudaDevAttrMemoryPoolsSupported, dev) == cudaSuccess &&
+            supported &&
+            cudaDeviceGetDefaultMemPool(&g_mempool, dev) == cudaSuccess && g_mempool)
+        {
+            uint64_t thresh = UINT64_MAX;
+            cudaMemPoolSetAttribute(g_mempool, cudaMemPoolAttrReleaseThreshold, &thresh);
+        }
+        else
+        {
+            g_mempool = nullptr;
+        }
+    }
+
+    cudaError_t pool_alloc_raw(void **ptr, size_t bytes)
+    {
+        init_mempool();
+        if (g_mempool)
+            return cudaMallocAsync(ptr, bytes, stream());
+        return cudaMalloc(ptr, bytes);
+    }
+
+    void pool_free_raw(void *ptr)
+    {
+        if (!ptr)
+            return;
+        if (g_mempool)
+            cudaFreeAsync(ptr, stream());
+        else
+            cudaFree(ptr);
+    }
+
+    // Grow-only device scratch buffer, backed by stream-ordered cudaMemPool_t.
     struct Scratch
     {
         void *ptr = nullptr;
@@ -219,7 +263,7 @@ namespace
             if (bytes <= cap)
                 return ptr;
             release();
-            if (cudaMalloc(&ptr, bytes) != cudaSuccess)
+            if (pool_alloc_raw(&ptr, bytes) != cudaSuccess)
             {
                 ptr = nullptr;
                 return nullptr;
@@ -235,14 +279,14 @@ namespace
         void release()
         {
             if (ptr)
-                cudaFree(ptr);
+                pool_free_raw(ptr);
             ptr = nullptr;
             cap = 0;
         }
     };
     Scratch g_keys, g_boxes, g_idx;
 
-    // Thrust temporary-storage allocator that reuses freed blocks (classic Thrust example).
+    // Thrust temporary-storage allocator backed by cudaMemPool_t + local reuse.
     struct CachedAllocator
     {
         typedef char value_type;
@@ -260,11 +304,13 @@ namespace
                 return p;
             }
             char *p = nullptr;
-            if (cudaMalloc((void **)&p, n) != cudaSuccess)
+            if (pool_alloc_raw((void **)&p, (size_t)n) != cudaSuccess)
             {
                 // Release cached blocks and retry once before giving up.
                 trim(0);
-                if (cudaMalloc((void **)&p, n) != cudaSuccess)
+                if (g_mempool)
+                    cudaMemPoolTrimTo(g_mempool, 0);
+                if (pool_alloc_raw((void **)&p, (size_t)n) != cudaSuccess)
                     throw std::bad_alloc();
             }
             allocated_blocks.insert(std::make_pair(p, n));
@@ -285,7 +331,7 @@ namespace
             {
                 if ((size_t)it->first > keep_max)
                 {
-                    cudaFree(it->second);
+                    pool_free_raw(it->second);
                     it = free_blocks.erase(it);
                 }
                 else
@@ -548,7 +594,7 @@ extern "C"
 }
 // Sort plain uint64 keys on the device (CompactLayerModule: Morton/shape keys). Radix sort;
 // reuses the cached key scratch buffer. Returns 0 on success (caller falls back to CPU).
-extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
+static int32_t thrust_sort_u64_dev(uint64_t *h_keys, int64_t n)
 {
     if (n <= 1)
         return 0;
@@ -583,7 +629,7 @@ extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
 
 // Lexicographic (key, value) sort on the device: stable sort by value, then stable sort by
 // key (two-pass LSD), so equal keys stay ordered by value. Wide compact layers only.
-extern "C" int32_t thrust_sort_u64_i32_host(uint64_t *h_keys, int32_t *h_vals, int64_t n)
+static int32_t thrust_sort_u64_i32_dev(uint64_t *h_keys, int32_t *h_vals, int64_t n)
 {
     if (n <= 1)
         return 0;
@@ -620,9 +666,62 @@ extern "C" int32_t thrust_sort_u64_i32_host(uint64_t *h_keys, int32_t *h_vals, i
     return (serr == cudaSuccess) ? 0 : 5;
 }
 
+// Public sorts: device first; when the device cannot serve the call (no memory, busy, any
+// CUDA/Thrust error) the same sort runs on the host, so callers never see a failure for a
+// resource problem (GB10: device memory is shared with concurrent host jobs).
+extern "C" int32_t thrust_sort_u64_host(uint64_t *h_keys, int64_t n)
+{
+    if (n <= 1)
+        return 0;
+    if (thrust_sort_u64_dev(h_keys, n) == 0)
+        return 0;
+    cudaGetLastError();
+    std::sort(h_keys, h_keys + n);
+    return 0;
+}
+extern "C" int32_t thrust_sort_u64_i32_host(uint64_t *h_keys, int32_t *h_vals, int64_t n)
+{
+    if (n <= 1)
+        return 0;
+    if (thrust_sort_u64_i32_dev(h_keys, h_vals, n) == 0)
+        return 0;
+    cudaGetLastError();
+    std::vector<std::pair<uint64_t, int32_t>> v((size_t)n);
+    for (int64_t i = 0; i < n; ++i)
+        v[(size_t)i] = std::make_pair(h_keys[i], h_vals[i]);
+    std::sort(v.begin(), v.end());
+    for (int64_t i = 0; i < n; ++i)
+    {
+        h_keys[i] = v[(size_t)i].first;
+        h_vals[i] = v[(size_t)i].second;
+    }
+    return 0;
+}
+
 // NVTX range shims for the Fortran phase timers (ProfilerModule): header-only NVTX3,
 // so nsys timelines show the same phase names as the MAGPARSER_PHASE_TIMERS log lines.
 #include <nvtx3/nvToolsExt.h>
 extern "C" void magparser_nvtx_push(const char *name) { nvtxRangePushA(name); }
 extern "C" void magparser_nvtx_pop(void) { nvtxRangePop(); }
+
+// Stream-ordered GPU memory pool C API (Tier 3) for Fortran/C++ device allocations.
+extern "C" void *gpu_pool_alloc(int64_t bytes)
+{
+    if (bytes <= 0)
+        return nullptr;
+    void *p = nullptr;
+    if (pool_alloc_raw(&p, (size_t)bytes) != cudaSuccess)
+        return nullptr;
+    return p;
+}
+extern "C" void gpu_pool_free(void *p)
+{
+    pool_free_raw(p);
+}
+extern "C" void gpu_pool_trim(int64_t keep_bytes)
+{
+    g_alloc.trim((size_t)(keep_bytes > 0 ? keep_bytes : 0));
+    if (g_mempool)
+        cudaMemPoolTrimTo(g_mempool, (size_t)(keep_bytes > 0 ? keep_bytes : 0));
+}
 #endif

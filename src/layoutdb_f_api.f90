@@ -7,6 +7,7 @@ module layoutdb_f_api
   integer(c_int), parameter :: LDB_OPEN_STRICT_F     = 1
   integer(c_int), parameter :: LDB_OPEN_PROPERTY_F   = 2
   integer(c_int), parameter :: LDB_OPEN_LOW_MEMORY_F = 4
+  integer(c_int), parameter :: LDB_OPEN_SHAPES_F     = 8
 
   type, bind(C) :: ldb_extent_c
      integer(c_int64_t) :: xmin, ymin, xmax, ymax
@@ -115,6 +116,46 @@ module layoutdb_f_api
        type(c_ptr), value :: f
        integer(c_int), value :: i
      end function ldb_top_cell_name_c
+
+     function ldb_is_hierarchical_c(f) bind(C, name="ldb_is_hierarchical")
+       import :: c_ptr, c_int
+       integer(c_int) :: ldb_is_hierarchical_c
+       type(c_ptr), value :: f
+     end function ldb_is_hierarchical_c
+
+     function ldb_iterate_cell_view_c(f, cell, cb, ud) bind(C, name="ldb_iterate_cell_view")
+       import :: c_ptr, c_funptr, c_int, c_char
+       integer(c_int) :: ldb_iterate_cell_view_c
+       type(c_ptr), value :: f
+       character(kind=c_char), dimension(*), intent(in) :: cell
+       type(c_funptr), value :: cb
+       type(c_ptr), value :: ud
+     end function ldb_iterate_cell_view_c
+
+     function ldb_layer_summary_hier_c(f, cell, cb, ud) bind(C, name="ldb_layer_summary_hier")
+       import :: c_ptr, c_funptr, c_int, c_char
+       integer(c_int) :: ldb_layer_summary_hier_c
+       type(c_ptr), value :: f
+       character(kind=c_char), dimension(*), intent(in) :: cell
+       type(c_funptr), value :: cb
+       type(c_ptr), value :: ud
+     end function ldb_layer_summary_hier_c
+
+     function ldb_cell_placements_c(f, cell) bind(C, name="ldb_cell_placements")
+       import :: c_ptr, c_char, c_int64_t
+       integer(c_int64_t) :: ldb_cell_placements_c
+       type(c_ptr), value :: f
+       character(kind=c_char), dimension(*), intent(in) :: cell
+     end function ldb_cell_placements_c
+
+     function ldb_iterate_placements_c(f, cell, cb, ud) bind(C, name="ldb_iterate_placements")
+       import :: c_ptr, c_funptr, c_int, c_char
+       integer(c_int) :: ldb_iterate_placements_c
+       type(c_ptr), value :: f
+       character(kind=c_char), dimension(*), intent(in) :: cell
+       type(c_funptr), value :: cb
+       type(c_ptr), value :: ud
+     end function ldb_iterate_placements_c
   end interface
 
 end module layoutdb_f_api

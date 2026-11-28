@@ -28,6 +28,8 @@ module DesignModule
   use BoostPolygonAPIModule
   use RTreeBuilderGPU
   use CompactLayerModule
+  use PropertyTableModule, only: PropertyTable
+  use TrapezoidModule, only: Trapezoid
   use iso_c_binding
   use iso_fortran_env, only : int32, int64, real64
   use omp_lib
@@ -38,6 +40,7 @@ module DesignModule
        LAYER_STATE_SLSORT, LAYER_STATE_FINAL, LAYER_STATE_PREPROCESSED, LAYER_STATE_EVERYTHING
   public :: DESIGN_DIRECTION_INPUT, DESIGN_DIRECTION_OUTPUT, DESIGN_DIRECTION_MEMORY
   public :: NeedsSorting, NeedsRTree, NeedsPNum, NeedsHealing
+  public :: LayerHas, LayerMark, LayerUnmark, LayerReserve
   public :: LayerCompact, LayerExpand, LayerDropCompact, LayerExpandedBytes, CompactLayersEnabled
   public :: LayerAppendPart, LayerFinishParts
   public :: push_box, ClearLayer, CopyLayer, AssignFromBox, swap_layer, FinalizeLayer, DeleteDesign
@@ -46,6 +49,7 @@ module DesignModule
   public :: PerformUnion, PerformPolygonUnion, calculate_union_area_by_polygon, &
        PreprocessLayer, PreprocessLayerByPolygon, PreprocessLayerSL, &
        BuildTree, MergeHealLayer, CertifyHealing, PerformMergeLayer, RemoveIdentical
+  public :: LayerIsAnyAngle
   public :: CalculateSingleLayerAND, CalculateAND, CalculateOR, CalculateNOT, CalculateXOR, &
        CalculateFrameAND, CalculateFrameNOT, CalculateBoostOperation, CalculateTopologicalSelect, &
        CalculateGROWLayer, CalculateSHRINKLayer, CalculateSHRINKDirectional, CalculateOverlapCount, &
@@ -118,11 +122,22 @@ module DesignModule
      type(CompactLayer), allocatable :: cextra(:)
      logical                :: parts_failed = .false.   !> streaming compaction gave up (31-bit limit)
      integer(kind=int64)    :: shadow_n = 0, shadow_hash = 0
-   contains
-     procedure :: has     => layer_has_state
-     procedure :: mark    => layer_mark_state
-     procedure :: unmark  => layer_unmark_state
-     procedure :: reserve => layer_reserve
+     !> Per-polygon properties (FASCL, property_table.f90); allocated on first use.
+     !> Columns are keyed by canonical polygon ordinal and carry the geometry signature
+     !> they were computed on, so a reordered layer keeps them and a rewritten one drops them.
+     type(PropertyTable), allocatable :: props
+     !> Any-angle geometry (anyangle_ops.f90): when n_traps > 0 the layer's region is the canonical
+     !> trapezoid set traps(1:n_traps) (TrapMergeModule: exact, interior-disjoint, lattice-line
+     !> sides) and layer_boxes is empty. Only operations that dispatch on LayerIsAnyAngle accept it.
+     integer(kind=int64) :: n_traps = 0
+     type(Trapezoid), allocatable :: traps(:)
+     !> Source polygons of an any-angle layer read from a file (raw_off 1-based, n+1 entries;
+     !> int32 lattice coordinates). Booleans on loaded layers snap these, unmerged, jointly
+     !> (one rounding of the input, and self-overlap AND sees the input overlaps). Results and
+     !> copies of results have raw_np = 0 and are fed back as their exact trapezoid outlines.
+     integer(kind=int64) :: raw_np = 0
+     integer(kind=int64), allocatable :: raw_off(:)
+     integer(kind=int32), allocatable :: raw_x(:), raw_y(:)
   end type Layer
 
   !> A layer partitioned on a rows x cols grid. This *has* layers, it is
@@ -227,7 +242,7 @@ module DesignModule
      end subroutine populate_gridlayer_from_unit
 
      module subroutine PerformOperation( gA, gB, gO, opcode )
-       class(Layer), intent(inout) :: gA, gB, gO
+       type(Layer), intent(inout) :: gA, gB, gO
        integer                        :: opcode
      end subroutine PerformOperation
 
@@ -242,7 +257,7 @@ module DesignModule
      end subroutine SaveLayerToSnap
 
      module subroutine RestoreSnapToLayer( input_layer, snap_filename )
-       class(Layer), intent(inout) :: input_layer
+       type(Layer), intent(inout) :: input_layer
        character(*), intent(in)   :: snap_filename      
      end subroutine RestoreSnapToLayer
 
@@ -374,57 +389,57 @@ module DesignModule
 
 contains
   !------------------------------------------------------------------
-  !  Layer state
+  !  Layer state (non-polymorphic: avoids ifx static RTTI prologue writes)
   !------------------------------------------------------------------
-  pure function layer_has_state(this, flags) result(retval)
-    class(Layer), intent(in)        :: this
+  pure function LayerHas(this, flags) result(retval)
+    type(Layer), intent(in)         :: this
     integer(kind=c_int), intent(in) :: flags
     logical :: retval
     retval = iand(this%layerState, flags) == flags
-  end function layer_has_state
+  end function LayerHas
 
-  pure subroutine layer_mark_state(this, flags)
-    class(Layer), intent(inout)     :: this
+  pure subroutine LayerMark(this, flags)
+    type(Layer), intent(inout)      :: this
     integer(kind=c_int), intent(in) :: flags
     this%layerState = ior(this%layerState, flags)
-  end subroutine layer_mark_state
+  end subroutine LayerMark
 
-  pure subroutine layer_unmark_state(this, flags)
-    class(Layer), intent(inout)     :: this
+  pure subroutine LayerUnmark(this, flags)
+    type(Layer), intent(inout)      :: this
     integer(kind=c_int), intent(in) :: flags
     this%layerState = iand(this%layerState, not(flags))
-  end subroutine layer_unmark_state
+  end subroutine LayerUnmark
 
   pure function NeedsSorting(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_SORT)
+    retval = iand(input_layer%layerState, LAYER_STATE_SORT) == 0
   end function NeedsSorting
 
   pure function NeedsPNum(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_PNUM)
+    retval = iand(input_layer%layerState, LAYER_STATE_PNUM) == 0
   end function NeedsPNum
 
   pure function NeedsRTree(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_RTREE)
+    retval = iand(input_layer%layerState, LAYER_STATE_RTREE) == 0
   end function NeedsRTree
 
   pure function NeedsHealing(input_layer) result(retval)
     type(Layer), intent(in) :: input_layer
     logical :: retval
-    retval = .not. input_layer%has(LAYER_STATE_HEAL)
+    retval = iand(input_layer%layerState, LAYER_STATE_HEAL) == 0
   end function NeedsHealing
 
   !------------------------------------------------------------------
   !  Layer storage
   !------------------------------------------------------------------
   !> Make room for at least min_capacity boxes, keeping the live ones.
-  subroutine layer_reserve(this, min_capacity)
-    class(Layer), intent(inout)     :: this
+  subroutine LayerReserve(this, min_capacity)
+    type(Layer), intent(inout)      :: this
     integer(kind=int64), intent(in) :: min_capacity
     type(Box), allocatable :: grown(:)
     integer(kind=int64)    :: i
@@ -438,14 +453,14 @@ contains
     end do
     call move_alloc( from=grown, to=this%layer_boxes )
     this%n_alloc = min_capacity
-  end subroutine layer_reserve
+  end subroutine LayerReserve
 
   subroutine push_box( xbox, th_layer )
     type(Box), intent(in) :: xbox
     type(Layer), intent(inout) :: th_layer
     integer(kind=int64), parameter :: K_GROWTH_FACTOR = 2
     if( th_layer%n_used == th_layer%n_alloc ) then
-       call th_layer%reserve( max( 1_int64, th_layer%n_alloc * K_GROWTH_FACTOR ) )
+       call LayerReserve( th_layer, max( 1_int64, th_layer%n_alloc * K_GROWTH_FACTOR ) )
     end if
     th_layer%n_used = th_layer%n_used + 1
     th_layer%layer_boxes( th_layer%n_used ) = xbox
@@ -454,12 +469,24 @@ contains
   !> Release the geometry and everything derived from it. The backing
   !> store (fileName, iunit) is left alone. An empty layer trivially has
   !> every property, so no preprocessing is triggered for it.
+  !> The layer holds any-angle geometry (canonical trapezoids instead of boxes).
+  pure logical function LayerIsAnyAngle( L )
+    type(Layer), intent(in) :: L
+    LayerIsAnyAngle = L%n_traps > 0
+  end function LayerIsAnyAngle
+
   subroutine ClearLayer( input_layer_A )
     type(Layer), intent(inout), target :: input_layer_A
     call LayerDeviceRelease( input_layer_A )
     call LayerDropCompact( input_layer_A )
     if( allocated( input_layer_A%layer_boxes ) ) deallocate( input_layer_A%layer_boxes )
     if( allocated( input_layer_A%pnumtable%arr ) ) deallocate( input_layer_A%pnumtable%arr )
+    if( allocated( input_layer_A%props ) ) deallocate( input_layer_A%props )
+    if( allocated( input_layer_A%traps ) ) deallocate( input_layer_A%traps )
+    input_layer_A%n_traps = 0
+    if( allocated( input_layer_A%raw_off ) ) deallocate( input_layer_A%raw_off )
+    if( allocated( input_layer_A%raw_x ) ) deallocate( input_layer_A%raw_x, input_layer_A%raw_y )
+    input_layer_A%raw_np = 0
     call drop_rtree( input_layer_A )
     input_layer_A%n_used = 0
     input_layer_A%n_alloc = 0
@@ -480,6 +507,20 @@ contains
     p_out = c_loc(output_layer); p_in = c_loc(input_layer_A)
     if( c_associated( p_out, p_in ) ) return
     n = input_layer_A%n_used
+    if( input_layer_A%n_traps > 0 ) then          !> any-angle layer: the trapezoids are the geometry
+       call ClearLayer( output_layer )
+       allocate( output_layer%traps, source=input_layer_A%traps(1:input_layer_A%n_traps) )
+       output_layer%n_traps = input_layer_A%n_traps
+       if( input_layer_A%raw_np > 0 ) then
+          allocate( output_layer%raw_off, source=input_layer_A%raw_off )
+          allocate( output_layer%raw_x, source=input_layer_A%raw_x )
+          allocate( output_layer%raw_y, source=input_layer_A%raw_y )
+          output_layer%raw_np = input_layer_A%raw_np
+       end if
+       output_layer%layerState = LAYER_STATE_NONE
+       if( allocated( input_layer_A%props ) ) allocate( output_layer%props, source=input_layer_A%props )
+       return
+    end if
     if( n == 0 ) then
        call ClearLayer( output_layer )
        return
@@ -502,6 +543,9 @@ contains
        allocate( output_layer%tree%tree_nodes, source=input_layer_A%tree%tree_nodes )
        output_layer%tree%root_index = input_layer_A%tree%root_index
     end if
+    !> properties travel with the geometry (e.g. o1:m = d1:m COPY nothing)
+    if( allocated( output_layer%props ) ) deallocate( output_layer%props )
+    if( allocated( input_layer_A%props ) ) allocate( output_layer%props, source=input_layer_A%props )
   end subroutine CopyLayer
 
   !> O(1) exchange of two layers; allocatable payloads are moved, never copied.
@@ -512,6 +556,7 @@ contains
     type(RTreeNode), allocatable     :: temp_nodes(:)
     integer(kind=int64), allocatable :: temp_pnum(:)
     character(len=:), allocatable    :: temp_fileName
+    type(PropertyTable), allocatable :: temp_props
 
     if( a%is_compact .or. b%is_compact ) error stop "swap_layer: expand compact layers first"
     call LayerDropCompact( a )      !> shadows belong to the old contents
@@ -539,6 +584,24 @@ contains
     call move_alloc(a%pnumtable%arr, temp_pnum)
     call move_alloc(b%pnumtable%arr, a%pnumtable%arr)
     call move_alloc(temp_pnum,       b%pnumtable%arr)
+
+    call move_alloc(a%props, temp_props)
+    call move_alloc(b%props, a%props)
+    call move_alloc(temp_props, b%props)
+
+    block
+      type(Trapezoid), allocatable :: temp_traps(:)
+      integer(kind=int64), allocatable :: t_off(:)
+      integer(kind=int32), allocatable :: t_c(:)
+      call swap_int64( a%n_traps, b%n_traps )
+      call move_alloc(a%traps, temp_traps)
+      call move_alloc(b%traps, a%traps)
+      call move_alloc(temp_traps, b%traps)
+      call swap_int64( a%raw_np, b%raw_np )
+      call move_alloc(a%raw_off, t_off); call move_alloc(b%raw_off, a%raw_off); call move_alloc(t_off, b%raw_off)
+      call move_alloc(a%raw_x, t_c); call move_alloc(b%raw_x, a%raw_x); call move_alloc(t_c, b%raw_x)
+      call move_alloc(a%raw_y, t_c); call move_alloc(b%raw_y, a%raw_y); call move_alloc(t_c, b%raw_y)
+    end block
 
     if( filename_as_well ) then
        call move_alloc(a%fileName, temp_fileName)
@@ -600,7 +663,7 @@ contains
     allocate( input_layer%tree%tree_nodes( total_nodes ) )
     call BuildRTree( input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY, &
          input_layer%tree%tree_nodes, input_layer%tree%root_index )
-    call input_layer%mark( LAYER_STATE_RTREE )
+    call LayerMark( input_layer, LAYER_STATE_RTREE )
     call LayerTreeBuilt( input_layer )
   end subroutine rebuild_rtree
 
@@ -629,13 +692,13 @@ contains
        !> OMT packing on 1e8 boxes) at the cost of a less overlap-minimising R-tree order.
        if( presort_gpu_enabled() .and. input_layer%n_used >= 65536_int64 ) then
           call SortBoxesDirect( input_layer%layer_boxes, input_layer%n_used )
-          call input_layer%mark( LAYER_STATE_SORT )
+          call LayerMark( input_layer, LAYER_STATE_SORT )
           return
        end if
 #endif
        call omt_pack( input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY )
     end if
-    call input_layer%mark( LAYER_STATE_SORT )
+    call LayerMark( input_layer, LAYER_STATE_SORT )
   end subroutine sort_layer_boxes
 
   logical function presort_gpu_enabled()
@@ -723,7 +786,7 @@ contains
     if( first_polygon == 2 ) num_rects = segments(1)%end_idx
     if( num_rects == input_layer%n_used ) then
        !> nothing touches anything else, so the layer is healed as it stands
-       call input_layer%mark( LAYER_STATE_HEAL )
+       call LayerMark( input_layer, LAYER_STATE_HEAL )
        return
     end if
 
@@ -788,8 +851,8 @@ contains
     input_layer%n_alloc = final_count
 
     !> boxes changed: the polygon numbers and the tree are stale
-    call input_layer%unmark( LAYER_STATE_PNUM )
-    call input_layer%mark( LAYER_STATE_HEAL )
+    call LayerUnmark( input_layer, LAYER_STATE_PNUM )
+    call LayerMark( input_layer, LAYER_STATE_HEAL )
     call sort_layer_boxes( input_layer, use_morton=dominated_by_squares )
     call rebuild_rtree( input_layer )
   contains
@@ -899,7 +962,7 @@ contains
           tp = PhaseBegin('pre.certify')
           if( CertifyHealing( input_layer ) ) then
              call PhaseEnd('pre.certify', tp, input_layer%n_used)
-             call input_layer%mark( LAYER_STATE_HEAL )      !> boxes, order and tree unchanged
+             call LayerMark( input_layer, LAYER_STATE_HEAL )      !> boxes, order and tree unchanged
           else
              call PhaseEnd('pre.certify', tp, input_layer%n_used)
              tp = PhaseBegin('pre.mergeheal')
@@ -938,7 +1001,7 @@ contains
             input_layer%tree%tree_nodes, input_layer%tree%root_index, overlap_area, overlap_perimeter)
        call LayerDeviceDone( input_layer )
        call PhaseEnd('pre.pnum', tp, input_layer%n_used)
-       call input_layer%mark( LAYER_STATE_PNUM )
+       call LayerMark( input_layer, LAYER_STATE_PNUM )
     end if
   end subroutine PreprocessLayerSL
 
@@ -972,8 +1035,8 @@ contains
        call PerformMergeWithOverlapDetection( input_layer%pnumtable, input_layer%layer_boxes(1:input_layer%n_used), &
             K_LEAF_CAPACITY, input_layer%tree%tree_nodes, &
             input_layer%tree%root_index, overlap_area, overlap_perimeter, area_overlap_roots)
-       if( overlap_area == 0 ) call input_layer%mark( LAYER_STATE_HEAL )
-       call input_layer%mark( LAYER_STATE_PNUM )
+       if( overlap_area == 0 ) call LayerMark( input_layer, LAYER_STATE_HEAL )
+       call LayerMark( input_layer, LAYER_STATE_PNUM )
     end if
     if( .not. allocated( area_overlap_roots ) ) allocate( area_overlap_roots(0) )
     call PerformPolygonUnion( input_layer, area_overlap_roots )
@@ -1015,7 +1078,11 @@ contains
     character(len=8) :: ev
     integer :: evlen, evstat
     call get_environment_variable( 'MAGPARSER_COMPACT_LAYERS', ev, evlen, evstat )
-    CompactLayersEnabled = ( evstat == 0 .and. evlen > 0 .and. ev(1:1) /= '0' )
+    if( evstat == 0 .and. evlen > 0 ) then
+       CompactLayersEnabled = ( ev(1:1) /= '0' )
+    else
+       CompactLayersEnabled = .true.
+    end if
   end function CompactLayersEnabled
 
   !> Bytes held by the expanded (Box) form of a layer.

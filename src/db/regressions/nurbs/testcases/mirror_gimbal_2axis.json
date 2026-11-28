@@ -1,0 +1,461 @@
+{
+  "schema": "NURBS-BRep-2D-v1",
+  "units": "micrometer",
+  "tolerance": 1e-06,
+  "device": "gimbal_micromirror_2axis",
+  "parameters": {
+    "mirror_rx_um": 150.0,
+    "mirror_ry_um": 120.0,
+    "gimbal_r_out_um": 190,
+    "gimbal_r_in_um": 165
+  },
+  "curves": {
+    "mirror_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          150.0,
+          0
+        ],
+        [
+          150.0,
+          120.0
+        ],
+        [
+          0,
+          120.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "mirror_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0,
+          120.0
+        ],
+        [
+          -150.0,
+          120.0
+        ],
+        [
+          -150.0,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "mirror_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -150.0,
+          0
+        ],
+        [
+          -150.0,
+          -120.0
+        ],
+        [
+          0,
+          -120.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "mirror_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0,
+          -120.0
+        ],
+        [
+          150.0,
+          -120.0
+        ],
+        [
+          150.0,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "gimbal_out_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          190.0,
+          0
+        ],
+        [
+          190.0,
+          190.0
+        ],
+        [
+          0,
+          190.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "gimbal_out_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0,
+          190.0
+        ],
+        [
+          -190.0,
+          190.0
+        ],
+        [
+          -190.0,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "gimbal_out_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -190.0,
+          0
+        ],
+        [
+          -190.0,
+          -190.0
+        ],
+        [
+          0,
+          -190.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "gimbal_out_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0,
+          -190.0
+        ],
+        [
+          190.0,
+          -190.0
+        ],
+        [
+          190.0,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "gimbal_in_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          165.0,
+          0
+        ],
+        [
+          165.0,
+          -165.0
+        ],
+        [
+          0,
+          -165.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "gimbal_in_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0,
+          -165.0
+        ],
+        [
+          -165.0,
+          -165.0
+        ],
+        [
+          -165.0,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "gimbal_in_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -165.0,
+          0
+        ],
+        [
+          -165.0,
+          165.0
+        ],
+        [
+          0,
+          165.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "gimbal_in_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0,
+          165.0
+        ],
+        [
+          165.0,
+          165.0
+        ],
+        [
+          165.0,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "hinge_n": {
+      "type": "NURBS_POLYLINE",
+      "degree": 1,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        4
+      ],
+      "control_points": [
+        [
+          -5,
+          150
+        ],
+        [
+          5,
+          150
+        ],
+        [
+          3,
+          165
+        ],
+        [
+          -3,
+          165
+        ],
+        [
+          -5,
+          150
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  "face_topology": {
+    "outer_wire_ccw": [
+      "mirror_q0",
+      "mirror_q1",
+      "mirror_q2",
+      "mirror_q3"
+    ],
+    "inner_hole_wires_cw": [],
+    "additional_closed_wires": [
+      [
+        "gimbal_out_q0",
+        "gimbal_out_q1",
+        "gimbal_out_q2",
+        "gimbal_out_q3"
+      ],
+      [
+        "hinge_n"
+      ]
+    ]
+  }
+}

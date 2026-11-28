@@ -21,6 +21,7 @@
 // The parser is strict: a record it cannot decode aborts the load with the
 // file offset instead of guessing a resynchronisation point.
 #include "oasis_parser.hpp"
+#include <cstdlib>
 
 using namespace oasis_parse;
 
@@ -38,6 +39,9 @@ static int parse_oasis_impl(LdbFile* f, ldb_box_cb stream_cb, void* stream_ud) {
     ps.stream_cb = stream_cb; ps.stream_ud = stream_ud;
     ps.nvst = db::nvcomp_init();
     ps.want_props = (f->open_flags & LDB_OPEN_PROPERTY) != 0 || f->strict_mode;
+    // LDB_OPEN_SHAPES: exact polygons/paths/texts next to the fractured boxes (lossless
+    // re-encoding, ldb_iterate_polygons); not in low-memory mode.
+    ps.keep_polys = (f->open_flags & LDB_OPEN_SHAPES) != 0 && (f->open_flags & LDB_OPEN_LOW_MEMORY) == 0;
     const db::CblockBackend backend = db::cblock_backend_from_env();
     std::unique_ptr<CblockSource> source;
     double scan_ms = 0.0;

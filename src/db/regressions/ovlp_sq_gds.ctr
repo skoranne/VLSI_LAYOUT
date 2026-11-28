@@ -4,7 +4,7 @@ systeminfo
 var temp_folder RUN_GDS_OVLP/
 var temporary_layers 2
 var abort_on_assert_zero 2
-decl design d1 = ../../ovlp_sq.gds
+decl design d1 = ovlp_sq.gds
 decl memory t1 = nothing
 info
 exec init t1:nothing

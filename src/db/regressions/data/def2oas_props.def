@@ -1,0 +1,42 @@
+VERSION 5.8 ;
+DIVIDERCHAR "/" ;
+BUSBITCHARS "[]" ;
+DESIGN props_demo ;
+UNITS DISTANCE MICRONS 1000 ;
+DIEAREA ( 0 0 ) ( 20000 10880 ) ;
+ROW ROW_0 unithd 0 0 N DO 40 BY 1 STEP 460 0 ;
+ROW ROW_1 unithd 0 2720 FS DO 40 BY 1 STEP 460 0 ;
+TRACKS X 230 DO 43 STEP 460 LAYER li1 ;
+PROPERTYDEFINITIONS
+    COMPONENT owner STRING ;
+    NET critical INTEGER ;
+END PROPERTYDEFINITIONS
+COMPONENTS 4 ;
+    - u_inv sky130_fd_sc_hd__inv_1 + SOURCE NETLIST + PLACED ( 1380 0 ) N ;
+    - u_buf sky130_fd_sc_hd__buf_1 + FIXED ( 4600 2720 ) FS + PROPERTY owner "alu team" ;
+    - u_nand sky130_fd_sc_hd__nand2_1 + SOURCE TIMING + WEIGHT 5 + PLACED ( 9200 0 ) FN ;
+    - u_fill sky130_fd_sc_hd__fill_2 + SOURCE DIST + PLACED ( 12880 2720 ) S ;
+END COMPONENTS
+PINS 2 ;
+    - A + NET n_a + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER met2 ( -70 -240 ) ( 70 240 )
+        + PLACED ( 2070 10640 ) N ;
+    - Y + NET n_y + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER met2 ( -70 -240 ) ( 70 240 )
+        + PLACED ( 10350 10640 ) N ;
+END PINS
+SPECIALNETS 1 ;
+    - VPWR ( * VPWR ) + USE POWER
+      + ROUTED met1 480 + SHAPE FOLLOWPIN ( 0 2720 ) ( 20000 2720 ) ;
+END SPECIALNETS
+NETS 3 ;
+    - n_a ( PIN A ) ( u_inv A ) + USE SIGNAL + PROPERTY critical 1
+      + ROUTED met2 ( 2070 10400 ) ( * 5000 )
+      NEW met1 ( 1610 5000 ) ( 2070 * ) ;
+    - n_y ( PIN Y ) ( u_nand Y ) + USE SIGNAL
+      + ROUTED met2 ( 10350 10400 ) ( * 6000 ) ;
+    - n_mid ( u_inv Y ) ( u_buf A ) + USE SIGNAL ;
+END NETS
+END DESIGN

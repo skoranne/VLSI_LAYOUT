@@ -73,7 +73,7 @@ contains
     ok = DeviceAcquire( c_loc( L%layer_boxes(1) ), nb, L%dev_gen, &
          boxes_fingerprint( L%layer_boxes, L%n_used ), L%dev_boxes_id )
     L%device_resident = ok
-    if( allocated( L%tree%tree_nodes ) .and. L%has( LAYER_STATE_RTREE ) ) then
+    if( allocated( L%tree%tree_nodes ) .and. LayerHas( L, LAYER_STATE_RTREE ) ) then
        nt = size( L%tree%tree_nodes, kind=int64 )
        if( nt > 0 ) then
           nb = int( nt, c_size_t ) * int( storage_size( L%tree%tree_nodes(1) ) / 8, c_size_t )

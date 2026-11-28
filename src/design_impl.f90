@@ -32,7 +32,7 @@ contains
     if( NeedsRTree( input_layer ) ) call BuildTree( input_layer )
     call PerformMerge( input_layer%pnumtable, input_layer%layer_boxes(1:input_layer%n_used), K_LEAF_CAPACITY, &
                       input_layer%tree%tree_nodes, input_layer%tree%root_index, overlap_area, overlap_perimeter)
-    call input_layer%mark( LAYER_STATE_PNUM )    
+    call LayerMark( input_layer, LAYER_STATE_PNUM )    
   end subroutine PerformMergeLayer
   
   module function CertifyHealing( input_layer ) result(retval)
@@ -80,7 +80,7 @@ contains
       end do
       call move_alloc( from=tempBoxes, to=output_layer%layer_boxes)
       output_layer%n_alloc = N
-      call output_layer%mark( LAYER_STATE_FINAL )
+      call LayerMark( output_layer, LAYER_STATE_FINAL )
    end subroutine FinalizeLayer
 
 
@@ -177,7 +177,7 @@ contains
       end if
       !> we can choose not to perform some operations later
       call FinalizeLayer( output_layer )
-      call output_layer%mark( LAYER_STATE_HEAL ) !> otherwise this might merge
+      call LayerMark( output_layer, LAYER_STATE_HEAL ) !> otherwise this might merge
       call PreprocessLayer( output_layer )
    end subroutine FilterLayer
 
@@ -227,6 +227,12 @@ contains
       if (rows < 1 .or. cols < 1) then
          write(*,*) 'ERROR: rows = ', rows, ' cols = ', cols
          error stop "CreateGrid: rows and cols must be positive"
+      end if
+
+      !> Empty input (e.g. "X GRID nothing" on an empty layer): the grid is empty too.
+      if (input_layer%n_used == 0) then
+         call ClearLayer( output_layer )
+         return
       end if
 
       if (.not. input_box%is_valid()) then
@@ -311,7 +317,7 @@ contains
             end do
          end block
       end do
-      call output_layer%mark( LAYER_STATE_HEAL ) !> otherwise this might merge
+      call LayerMark( output_layer, LAYER_STATE_HEAL ) !> otherwise this might merge
       call PreprocessLayer( output_layer )
        if (profiling_enabled) call RecordTime("CreateGrid", get_cpu_time() - t_start)
    end subroutine CreateGrid
@@ -319,18 +325,25 @@ contains
    module subroutine CreateEXTENT( input_layer, output_layer )
       type(Layer),      intent(in)    :: input_layer
       type(Layer),      intent(inout) :: output_layer
-      if( allocated( output_layer%layer_boxes ) ) then
-         if( size( output_layer%layer_boxes ) /= 0 ) error stop "|LB| /= 0"
-         if( output_layer%n_used /= 0  ) error stop "|NU| /= 0"
-         if( output_layer%n_alloc /= 0 ) error stop "|NA| /= 0"
-         deallocate( output_layer%layer_boxes ) !> we checked n_alloc and size are both 0
+      type(Box) :: mbr
+      !> EXTENT of an empty layer is empty (its MBR is not a valid box).
+      if( input_layer%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
       end if
+      !> Compute the MBR before touching the output (output may alias the input).
+      mbr = mbr_of_array( input_layer%layer_boxes, input_layer%n_used )
+      if( .not. mbr%is_valid() ) error stop "CreateEXTENT: invalid MBR"
+      !> The output is overwritten. Layers of an output/file db arrive pre-allocated
+      !> (parseMagicLayoutFile reserves INIT_ALLOC boxes with n_used=0), so do not
+      !> require an unallocated output: clear it like CopyLayer does.
+      call ClearLayer( output_layer )
       allocate( output_layer%layer_boxes(1) )
-      output_layer%layer_boxes(1) = mbr_of_array( input_layer%layer_boxes, input_layer%n_used )
-      if( .not. output_layer%layer_boxes(1)%is_valid() ) error stop
+      output_layer%layer_boxes(1) = mbr
+      output_layer%n_alloc = 1
       output_layer%n_used = 1
       output_layer%layerState = LAYER_STATE_HEAL
-      call output_layer%mark( LAYER_STATE_SORT )
+      call LayerMark( output_layer, LAYER_STATE_SORT )
       call PreprocessLayer( output_layer )
    end subroutine CreateEXTENT
 
@@ -355,8 +368,8 @@ contains
       !call SortBoxesDirect( input_layer_A%layer_boxes, N )
       !> boxes reordered in place: derived structures are stale
       call LayerDeviceRelease( input_layer_A )
-      call input_layer_A%unmark( ior( LAYER_STATE_RTREE, LAYER_STATE_PNUM ) )
-      call input_layer_A%mark( LAYER_STATE_SORT )
+      call LayerUnmark( input_layer_A, ior( LAYER_STATE_RTREE, LAYER_STATE_PNUM ) )
+      call LayerMark( input_layer_A, LAYER_STATE_SORT )
       allocate( TreeNodes( total_nodes ) )
       call BuildRTree( input_layer_A%layer_boxes(1:N), K_LEAF_CAPACITY, TreeNodes, RootIndex)
       gpu_overflow = 1_int32
@@ -382,9 +395,9 @@ contains
             !call SortBoxesDirect( input_layer_A%layer_boxes, N )
             call omt_pack( input_layer_A%layer_boxes , K_LEAF_CAPACITY )
          end if
-         call input_layer_A%mark( LAYER_STATE_SORT )
+         call LayerMark( input_layer_A, LAYER_STATE_SORT )
          call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, input_layer_A%tree%tree_nodes, input_layer_A%tree%root_index)
-         call input_layer_A%mark( LAYER_STATE_RTREE )
+         call LayerMark( input_layer_A, LAYER_STATE_RTREE )
       end if
       call ComputeInteractionsCPU( input_layer_A%tree%tree_nodes, int(size(input_layer_A%tree%tree_nodes),kind=int64),&
          input_layer_A%layer_boxes, N,&
@@ -410,8 +423,8 @@ contains
       call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
       !> boxes reordered in place: derived structures are stale
       call LayerDeviceRelease( input_layer )
-      call input_layer%unmark( ior( LAYER_STATE_RTREE, LAYER_STATE_PNUM ) )
-      call input_layer%mark( LAYER_STATE_SORT )
+      call LayerUnmark( input_layer, ior( LAYER_STATE_RTREE, LAYER_STATE_PNUM ) )
+      call LayerMark( input_layer, LAYER_STATE_SORT )
       allocate( TreeNodes( total_nodes ) )
       call BuildRTree( input_layer%layer_boxes(1:N), K_LEAF_CAPACITY, TreeNodes, RootIndex)
       gpu_overflow = 1_int32
@@ -438,9 +451,9 @@ contains
             !call SortBoxesDirect( input_layer%layer_boxes, N )
             call omt_pack( input_layer%layer_boxes , K_LEAF_CAPACITY )
          end if
-         call input_layer%mark( LAYER_STATE_SORT )
+         call LayerMark( input_layer, LAYER_STATE_SORT )
          call BuildRTree( input_layer%layer_boxes, K_LEAF_CAPACITY, input_layer%tree%tree_nodes, input_layer%tree%root_index)
-         call input_layer%mark( LAYER_STATE_RTREE )
+         call LayerMark( input_layer, LAYER_STATE_RTREE )
       end if
 
       call FindSingletonsCPU( input_layer%layer_boxes, input_layer%tree%tree_nodes, input_layer%tree%root_index,&
@@ -482,13 +495,13 @@ contains
       !> omt_pack reorders the boxes in place, so any existing tree, pnum table or device copy
       !> is stale. Rebuild the layer's own tree once (it is reused by the search below).
       call LayerDeviceRelease( input_layer_A )
-      call input_layer_A%unmark( ior( LAYER_STATE_RTREE, LAYER_STATE_PNUM ) )
-      call input_layer_A%mark( LAYER_STATE_SORT )
+      call LayerUnmark( input_layer_A, ior( LAYER_STATE_RTREE, LAYER_STATE_PNUM ) )
+      call LayerMark( input_layer_A, LAYER_STATE_SORT )
       if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
       allocate( input_layer_A%tree%tree_nodes( total_nodes ) )
       call BuildRTree( input_layer_A%layer_boxes(1:N), K_LEAF_CAPACITY, input_layer_A%tree%tree_nodes, &
            input_layer_A%tree%root_index )
-      call input_layer_A%mark( LAYER_STATE_RTREE )
+      call LayerMark( input_layer_A, LAYER_STATE_RTREE )
       call LayerTreeBuilt( input_layer_A )
       RootIndex = input_layer_A%tree%root_index
       write(*,*) 'Tree constructed: ', RootIndex, ' |RT| = ', size(input_layer_A%tree%tree_nodes)
@@ -513,7 +526,7 @@ contains
          if( allocated( input_layer_A%tree%tree_nodes ) ) deallocate( input_layer_A%tree%tree_nodes )
          allocate( input_layer_A%tree%tree_nodes( CalculateTotalNodes( input_layer_A%n_used, K_LEAF_CAPACITY ) ) )
          call BuildRTree( input_layer_A%layer_boxes, K_LEAF_CAPACITY, input_layer_A%tree%tree_nodes, input_layer_A%tree%root_index)
-         call input_layer_A%mark( LAYER_STATE_RTREE )
+         call LayerMark( input_layer_A, LAYER_STATE_RTREE )
       end if
 
       nthreads = omp_get_max_threads()
@@ -592,7 +605,7 @@ contains
       end do
       output_layer%n_used = num_boxesC
       !> we can use the optimization that by construction the output is HEALED
-      call output_layer%mark( LAYER_STATE_HEAL )
+      call LayerMark( output_layer, LAYER_STATE_HEAL )
    end subroutine CalculateSingleLayerAND
 
 
@@ -778,7 +791,8 @@ contains
       integer(kind=int64), allocatable :: grid_layer_counts(:,:,:)
       integer,parameter :: A_IN_GRID=1, B_IN_GRID=2, TRACKER_GRID=3, TEMP_LAYER_GRID=4, OUTPUT_LAYER_GRID=5
       number_tree_nodes = CalculateTotalNodes( max( input_layer_A%n_used, input_layer_B%n_used ), K_LEAF_CAPACITY )
-      K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
+      !> max(1,..): an empty input gives 0 nodes -> K_GRID 0 -> CreateGrid error stop
+      K_GRID = max( 1, int( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
       !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
 
       allocate( grids(K_GRID, K_GRID) )
@@ -844,7 +858,7 @@ contains
                templayerGrid(rows,cols)%n_used = size( templayerGrid(rows,cols)%layer_boxes)
                if( allocated( trackersGrid(rows,cols)%trackers)) deallocate( trackersGrid(rows,cols)%trackers )
                grid_layer_counts(rows,cols,TEMP_LAYER_GRID) = templayerGrid(rows,cols)%n_used
-               call templayerGrid(rows,cols)%mark( LAYER_STATE_HEAL )
+               call LayerMark( templayerGrid(rows,cols), LAYER_STATE_HEAL )
                if( templayerGrid(rows,cols)%n_used == 0 ) error stop "GENERATED TASK 2 FRAME tempLayer EMPTY"
             end if
 
@@ -903,7 +917,7 @@ contains
       end do
       deallocate( outputGrid )
       output_layer%n_used = total_count
-      call output_layer%mark( LAYER_STATE_HEAL )    !> correct by construction in each GRID
+      call LayerMark( output_layer, LAYER_STATE_HEAL )    !> correct by construction in each GRID
       call PreprocessLayer( output_layer )
       if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
    end subroutine CalculateFrameNOTExplicit
@@ -1001,7 +1015,7 @@ contains
                   call generate_trackers( BinGrid(rows,cols)%layer_boxes, grids(rows,cols)%layer_boxes(1), &
                      trackersGrid(rows,cols)%trackers ) !> this does CW ordering of inner contours
                   call scanline_fracture(trackersGrid(rows,cols)%trackers, templayerGrid(rows,cols)%layer_boxes)
-                  call templayerGrid(rows,cols)%mark( LAYER_STATE_HEAL )
+                  call LayerMark( templayerGrid(rows,cols), LAYER_STATE_HEAL )
                   templayerGrid(rows,cols)%n_used = size( templayerGrid(rows,cols)%layer_boxes)
                   if( templayerGrid(rows,cols)%n_used == 0 ) error stop "GENERATED TASK 2 FRAME tempLayer EMPTY"
                end if
@@ -1061,7 +1075,7 @@ contains
          end do
       end do
       output_layer%n_used = total_count
-      call output_layer%mark( LAYER_STATE_HEAL )    !> correct by construction in each GRID
+      call LayerMark( output_layer, LAYER_STATE_HEAL )    !> correct by construction in each GRID
       call PreprocessLayer( output_layer )
       if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
    end subroutine CalculateFrameNOTTask
@@ -1264,7 +1278,8 @@ contains
       type(CGArgument) :: local_arg
       if (profiling_enabled) t_start = get_cpu_time()
       number_tree_nodes = CalculateTotalNodes( max( input_layer_A%n_used, input_layer_B%n_used ), K_LEAF_CAPACITY )
-      K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
+      !> max(1,..): an empty input gives 0 nodes -> K_GRID 0 -> CreateGrid error stop
+      K_GRID = max( 1, int( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
       !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
 
       allocate( grids(K_GRID, K_GRID) )
@@ -1394,6 +1409,14 @@ contains
      type(Layer), intent(inout) :: input_layer_A, input_layer_B
      type(Layer), intent(inout) :: output_layer
 #if defined(__APPLE__) && defined(__INTEL_COMPILER)
+     !> The frame grid is built over A's MBR: handle empty operands up front.
+     if( input_layer_A%n_used == 0 ) then
+        call ClearLayer( output_layer )
+        return
+     else if( input_layer_B%n_used == 0 ) then
+        call CopyLayer( output_layer, input_layer_A )
+        return
+     end if
      !> CalculateNOT falls back to the scanline formulation on this platform
      !> (see design_boolean_impl.f90), which fractures far more; keep Boost here.
      call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_NOT, 0_int64 )
@@ -1410,6 +1433,17 @@ contains
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout) :: output_layer
 
+      !> The frame grid is built over A's MBR, so an empty operand must not reach it.
+      if( input_layer_A%n_used == 0 .and. input_layer_B%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
+      else if( input_layer_A%n_used == 0 ) then
+         call CopyLayer( output_layer, input_layer_B )
+         return
+      else if( input_layer_B%n_used == 0 ) then
+         call CopyLayer( output_layer, input_layer_A )
+         return
+      end if
       call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_XOR, 0_int64 )
       output_layer%layerState = LAYER_STATE_HEAL
       call PreprocessLayer( output_layer )
@@ -1419,6 +1453,11 @@ contains
       type(Layer), intent(inout) :: input_layer_A, input_layer_B
       type(Layer), intent(inout) :: output_layer
 
+      !> Empty operand: result is empty (and the frame grid over A's MBR would error stop).
+      if( input_layer_A%n_used == 0 .or. input_layer_B%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
+      end if
       call CalculateFrameFunction2( input_layer_A, input_layer_B, output_layer, BoostKernelBinary, K_BOOST_CONTROL_AND, 0_int64 )
       output_layer%layerState = LAYER_STATE_HEAL
       call PreprocessLayer( output_layer )
@@ -1449,8 +1488,13 @@ contains
       integer(kind=int64), allocatable :: grid_layer_counts(:,:,:)
       integer,parameter :: A_IN_GRID=1, B_IN_GRID=2, TRACKER_GRID=3, TEMP_LAYER_GRID=4, OUTPUT_LAYER_GRID=5
       type(CGArgument) :: local_arg
+      if( input_layer_A%n_used == 0 ) then
+         call ClearLayer( output_layer )
+         return
+      end if
       number_tree_nodes = CalculateTotalNodes( input_layer_A%n_used, K_LEAF_CAPACITY )
-      K_GRID = int( ( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
+      !> max(1,..): an empty input gives 0 nodes -> K_GRID 0 -> CreateGrid error stop
+      K_GRID = max( 1, int( sqrt( sqrt( real( number_tree_nodes, kind=real64) ) ) ) )
       !write(*,*) '|TREE NODES| = ', number_tree_nodes, '  for ',  max( input_layer_A%n_used, input_layer_B%n_used ), ' -> ', K_GRID
 
       allocate( grids(K_GRID, K_GRID) )
@@ -1550,7 +1594,7 @@ contains
       end do
       deallocate( outputGrid )
       output_layer%n_used = total_count
-      call output_layer%mark( LAYER_STATE_HEAL )    !> correct by construction in each GRID
+      call LayerMark( output_layer, LAYER_STATE_HEAL )    !> correct by construction in each GRID
       call PreprocessLayer( output_layer )
       if( debug_verbosity > 2 ) write(*,*) '|FRAME| = ', output_layer%n_used
    end subroutine CalculateFrameFunction1

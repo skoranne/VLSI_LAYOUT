@@ -16,7 +16,9 @@ static bool files_equal(const char* a,const char* b){
 
 int main(int argc,char**argv){
     if(argc<3){
-        fprintf(stderr,"usage: %s readwrite <in.gds> [out.gds]\n       %s gear_oasis <out.oas>\n",argv[0],argv[0]);
+        fprintf(stderr,"usage: %s readwrite <in.gds> [out.gds]\n       %s gear_oasis <out.oas>\n"
+                       "       %s convert <in.gds|in.oas> <out.oas|out.gds> [--no-rep] [--no-strict] [--no-cblock]\n"
+                       "                 [--independent] [--checksum] [--no-crc]   (re-encodes through the model)\n",argv[0],argv[0],argv[0]);
         return 2;
     }
     std::string mode=argv[1];
@@ -27,6 +29,33 @@ int main(int argc,char**argv){
         if(rc!=0){ fprintf(stderr,"gear_oasis failed: %s\n",err); return 1; }
         printf("Wrote GEAR/MULTIGON OASIS: %s\n",argv[2]);
         printf("CPU(s)=%.6f MaxRSS(kB)=%ld Mem(bytes)=%zu GPU=%s util=%u%% gpu_mem=%zu\n", st.cpu_seconds, st.max_rss_kb, st.in_memory_bytes, st.gpu_name, st.gpu_util_percent, st.gpu_mem_total_bytes);
+        return 0;
+    }
+    if(mode=="convert"){
+        if(argc<4){ fprintf(stderr,"convert needs <in> <out>\n"); return 2; }
+        const std::string in=argv[2], out=argv[3];
+        ldb_oasis_write_opts_t o; ldb_oasis_write_opts_default(&o); o.reencode=1;
+        for(int i=4;i<argc;i++){
+            std::string a=argv[i];
+            if(a=="--no-rep") o.repetitions=0; else if(a=="--no-strict") o.strict=0; else if(a=="--no-cblock") o.cblock_kb=0;
+            else if(a=="--independent") o.independent_cblocks=1; else if(a=="--checksum") o.validation=2; else if(a=="--no-crc") o.validation=0;
+            else { fprintf(stderr,"unknown option %s\n",a.c_str()); return 2; }
+        }
+        char err[512]; db_stats_begin();
+        ldb_open_opts_t oo{ LDB_OPEN_PROPERTY | LDB_OPEN_SHAPES, 0 };
+        ldb_file_t* f=ldb_open_opts(in.c_str(),&oo,err,sizeof(err));
+        if(!f){ fprintf(stderr,"open failed: %s\n",err); return 1; }
+        db_stats_t st0{}; db_stats_end(&st0,ldb_memory_bytes(f));
+        db_stats_begin();
+        const bool to_gds = out.size()>4 && (out.compare(out.size()-4,4,".gds")==0 || out.compare(out.size()-4,4,".GDS")==0);
+        int rc = to_gds ? ldb_write_gdsii(f,out.c_str(),err,sizeof(err)) : ldb_write_oasis_opts(f,out.c_str(),&o,err,sizeof(err));
+        db_stats_t st{}; db_stats_end(&st,0);
+        if(rc!=0){ fprintf(stderr,"write failed: %s\n",err); ldb_close(f); return 1; }
+        std::ifstream a(in,std::ios::binary|std::ios::ate), b(out,std::ios::binary|std::ios::ate);
+        printf("convert %s (%lld bytes, dbu %g/um) -> %s (%lld bytes)\n", in.c_str(), (long long)a.tellg(),
+               ldb_dbu_per_micron(f), out.c_str(), (long long)b.tellg());
+        printf("read CPU(s)=%.3f  write CPU(s)=%.3f  MaxRSS(kB)=%ld\n", st0.cpu_seconds, st.cpu_seconds, st.max_rss_kb);
+        ldb_close(f);
         return 0;
     }
     if(mode=="readwrite"){

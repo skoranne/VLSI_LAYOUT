@@ -87,7 +87,8 @@ version_mod.f90: ../.git/HEAD ../.git/index
 	@echo "end module version_mod" >> $@
 
 unit_test: test_contour.exe test_morton.exe CONVERT.exe test_boxmerge.exe \
-	   test_skiplist.exe test_compact_layer.exe test_viewer_index.exe
+	   test_skiplist.exe test_compact_layer.exe test_viewer_index.exe \
+	   test_wide_int.exe test_predicates.exe test_measure.exe test_trapmerge.exe test_trapbool.exe test_trapoverlap.exe
 
 clean:
 	rm -f *.o *.mod *.a *.exe
@@ -115,7 +116,10 @@ $(LIBRARY): $(LIB_OBJS)
 
 # --- Executable Builds ---
 # By linking against the library, we don't have to list out all objects again.
-MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a
+omp_target_stubs.o: omp_target_stubs.c
+	$(CC) -O2 -c $< -o $@
+
+MAGPARSER.exe: mainmagparser.o $(LIBRARY) db/liblayoutdb.a omp_target_stubs.o
 	$(LINKER_FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 test_contour.exe: test_contour.o $(LIBRARY)
@@ -157,18 +161,71 @@ event_sorter.o:	       event_sorter.cu
 		       g++ -x c++ -O3 -c event_sorter.cu
 gpu_morton.o:	gpu_morton.cu
 	g++ -O3 -c -x c++ gpu_morton.cu
+nurbs_gpu.o:	nurbs_gpu/nurbs_gpu.cu nurbs_gpu/nurbs_types.hpp
+	g++ -O3 -std=c++17 -Inurbs_gpu -c -x c++ nurbs_gpu/nurbs_gpu.cu -o nurbs_gpu.o
 glf90w.o: glf90w.F90
 	$(FC) -c -O3 -fpp -DGLF90W_USE_INTRINSIC_C_F_STRPOINTER glf90w.F90 -o $@
-GLFW_INC ?= $(GLFW_LIBDIR)/../include
+# GLFW header discovery: do not assume a system-wide GLFW (rhel8-A has none;
+# spark-bc08 / macOS do, which used to hide a wrong default path).
+# Order: explicit GLFW_INC, pkg-config glfw3, glf90w's bundled glfw source tree.
+ifeq ($(origin GLFW_INC),undefined)
+  GLFW_INC := $(patsubst -I%,%,$(filter -I%,$(shell pkg-config --cflags glfw3 2>/dev/null)))
+  ifeq ($(GLFW_INC),)
+    GLFW_INC := $(firstword $(wildcard $(GLFW_LIBDIR)/../glfw/include $(GLFW_LIBDIR)/../include))
+  endif
+endif
 viewer_gl.o: viewer_gl.c
-	gcc -c -O2 -I$(GLFW_INC) viewer_gl.c -o $@
+	@for d in $(GLFW_INC) /usr/include /usr/local/include; do \
+	   [ -f $$d/GLFW/glfw3.h ] && exit 0; done; \
+	 echo "ERROR: GLFW/glfw3.h not found (GLFW_INC='$(GLFW_INC)')."; \
+	 echo "       Set GLFW_INC=<dir containing GLFW/glfw3.h> or GLFW_LIBDIR=<glfw build dir>."; exit 1
+	gcc -c -O2 $(addprefix -I,$(GLFW_INC)) viewer_gl.c -o $@
 viewer_font.o: viewer_font.f90
 	$(FC) -c -O2 viewer_font.f90 -o $@
 test_layout_files.exe: test_layout_files.f90 viewer_tiles.o $(LIBRARY) db/liblayoutdb.a
 	$(LINKER_FC) $(FCFLAGS) test_layout_files.f90 viewer_tiles.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
 viewer_tiles.o: viewer_tiles.f90 $(LIBRARY)
 	$(FC) $(FCFLAGS) -c viewer_tiles.f90 -o $@
-MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o viewer_tiles.o db/liblayoutdb.a
-	$(LINKER_FC) $(FCFLAGS) magviewer.f90 viewer_font.o viewer_tiles.o $(LIBRARY) viewer_gl.o -L$(GLFW_LIBDIR) -Wl,-rpath,$(GLFW_LIBDIR) -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
+MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o viewer_tiles.o db/liblayoutdb.a omp_target_stubs.o
+	$(LINKER_FC) $(FCFLAGS) magviewer.f90 viewer_font.o viewer_tiles.o $(LIBRARY) viewer_gl.o omp_target_stubs.o -L$(GLFW_LIBDIR) -Wl,-rpath,$(GLFW_LIBDIR) -lglfw -lGL -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
        
 ALL_EXE:    CONVERT.exe test_interaction.exe test_repetition.exe BOOST_XOR_CHECKER.exe generate_bin.exe MAGVIEWER.exe
+
+# Any-angle exact kernel unit tests
+test_wide_int.exe: test_wide_int.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_predicates.exe: test_predicates.o $(LIBRARY)
+	$(FC) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_measure.exe: test_measure.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapmerge.exe: test_trapmerge.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapbool.exe: test_trapbool.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapoverlap.exe: test_trapoverlap.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapmorph.exe: test_trapmorph.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_trapmorph.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trappred.exe: test_trappred.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_trappred.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapstream.exe: test_trapstream.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_trapstream.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_nurbs.exe: test_nurbs.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_nurbs.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_nurbs_offset.exe: test_nurbs_offset.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_nurbs_offset.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+TRAPMERGE.exe: trapmerge_main.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) trapmerge_main.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+TRAPBOOL.exe: trapbool_main.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) trapbool_main.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)

@@ -1,0 +1,77 @@
+\chapter{Verification Methodology: Degree Rotation, Rotational Invariance, and Rational Gold}
+\label{ch:verification}
+
+\section{The Four-Tier Verification Pyramid}
+
+Geometric bugs in planar sweep engines are notoriously subtle: a single degenerate T-junction, collinear overlap, or near-vertical slope can pass 99.99\% of Manhattan layouts while failing silently on rotated or curvilinear data. To guarantee mathematical soundness across all angles, \texttt{MAGPARSER}'s any-angle engine employs a four-tier verification hierarchy (Figure~\ref{fig:verif_pyramid}).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.95]
+  % Pyramid tiers from bottom to top
+  \fill[blue!10, draw=navy, thick] (0,0) -- (11,0) -- (9.8,1.15) -- (1.2,1.15) -- cycle;
+  \node[font=\small\bfseries, color=navy] at (5.5,0.75) {Tier 1: Exact Unit \& Differential Fuzz Tests};
+  \node[font=\scriptsize, color=slate] at (5.5,0.32) {\texttt{test\_wide\_int}, \texttt{test\_predicates}, \texttt{test\_trapoverlap} (900k), \texttt{test\_trapmerge}, \texttt{test\_trapbool}, \texttt{test\_trapmorph}, \texttt{test\_trappred}};
+
+  \fill[teal!12, draw=tealaccent, thick] (1.2,1.15) -- (9.8,1.15) -- (8.6,2.3) -- (2.4,2.3) -- cycle;
+  \node[font=\small\bfseries, color=tealaccent] at (5.5,1.9) {Tier 2: Multi-Angle ($15^\circ$) \& Full $1^\circ$ ($0^\circ\dots 359^\circ$) Rotation Sweeps};
+  \node[font=\scriptsize, color=slate] at (5.5,1.47) {\texttt{run\_359\_sweep.py} + \texttt{run\_mag\_rot.sh} on \texttt{SDT16}, \texttt{MW}, \texttt{FPU}, \texttt{MW\_4x4}, \texttt{SDT6X6}};
+
+  \fill[amberaccent!16, draw=amberaccent, thick] (2.4,2.3) -- (8.6,2.3) -- (7.4,3.45) -- (3.6,3.45) -- cycle;
+  \node[font=\small\bfseries, color=amberaccent] at (5.5,3.05) {Tier 3: KLayout Ground-Truth Differential Checks};
+  \node[font=\scriptsize, color=slate] at (5.5,2.62) {\texttt{pya.Region} XOR, PNUM, \texttt{kl\_topo.py}, \texttt{compare\_mag\_kl.py}};
+
+  \fill[crimson!15, draw=crimson, thick] (3.6,3.45) -- (7.4,3.45) -- (5.5,4.75) -- cycle;
+  \node[font=\small\bfseries, color=crimson] at (5.5,4.05) {Tier 4: Rational Gold};
+  \node[font=\scriptsize, color=crimson] at (5.5,3.68) {\texttt{fractions.Fraction} ($H_\infty \le 0.5$ dbu)};
+\end{tikzpicture}
+\caption{Four-tier verification pyramid for the \texttt{MAGPARSER} any-angle geometry engine.}
+\label{fig:verif_pyramid}
+\end{figure}
+
+\section{Degree-Rotation Testbed (\texttt{run\_359\_sweep.py})}
+
+Because real semiconductor layouts are authored predominantly at $0^\circ/90^\circ$, rotating a full hierarchical VLSI design by every integer degree $\theta \in \{0^\circ, 1^\circ, 2^\circ, \dots, 359^\circ\}$ provides an inexhaustible generator of realistic non-orthogonal test cases with known exact ground truth (the unrotated \texttt{R000} design!).
+
+\texttt{src/regress/anyangle/run\_359\_sweep.py} automates a resumable, disk-cached 360-angle verification sweep for any OASIS/GDSII input or preset design (\texttt{SDT16}, \texttt{MW}, \texttt{FPU}, \texttt{MW\_4x4}, \texttt{SDT16\_6x6}, \texttt{MW\_8x8}):
+\begin{enumerate}
+  \item \textbf{Hierarchy-Preserving Rotation (\texttt{gen} stage):} Rather than flattening and rotating millions of shapes individually, KLayout instantiates the original top cell(s) inside a wrapper cell with placement transform \texttt{ICplxTrans(1.0, angle\_deg, False, 0, 0)}. This keeps the rotated OASIS files compact and exercises \texttt{MAGPARSER}'s hierarchical transform loader (\texttt{ldb\_polys\_load}) at every angle.
+  \item \textbf{Single-Layer Merge + FASCL Properties (\texttt{merge} stage):} Runs \texttt{TRAPMERGE.exe} on target layers (\texttt{66/20}, \texttt{65/20}, \texttt{68/20}) and dumps per-polygon rotation-invariant properties (\texttt{AREA}, \texttt{PERIMETER}, \texttt{VERTICES}) via \texttt{MAGPARSER} FASCL \texttt{propdump} into compressed CSVs.
+  \item \textbf{Two-Layer Booleans (\texttt{bool} stage):} Runs \texttt{TRAPBOOL.exe -ops OR,AND,NOT,XOR,BNOTA,A,B} on layer pairs (\texttt{66/20}$\times$\texttt{65/20}, \texttt{68/20}$\times$\texttt{69/20}) and verifies exact algebraic identities (\texttt{XOR = OR - AND}, \texttt{OR = NOT + AND + BNOTA}) and zero internal anomalies.
+  \item \textbf{Polygon-Level Topologicals (\texttt{topo} stage):} Runs all 13 primary topological operators (\texttt{INTERACT}, \texttt{NOT\_INTERACT}, \texttt{CUT}, \texttt{TOUCH}, \texttt{INSIDE}, \texttt{OUTSIDE}, \texttt{OVERLAPS}, \texttt{COVERS}, \texttt{COVEREDBY}, \texttt{CONTAINS}, \texttt{DISJOINT}, \texttt{MEET}, \texttt{EQUAL}) with \texttt{MAGPARSER\_FORCE\_TRAP=1} at \texttt{R000} so unrotated polygon-level counts match rotated angles directly.
+  \item \textbf{Invariance Aggregation (\texttt{summary} stage):} Compares every angle $\theta \in [1^\circ, 359^\circ]$ against \texttt{R000} and writes \texttt{summary.tsv}.
+\end{enumerate}
+
+\section{Quantitative Rotational-Invariance Bounds}
+
+Rotating a lattice polygon by $\theta \notin \{0^\circ, 90^\circ, 180^\circ, 270^\circ\}$ and rounding each vertex to the nearest integer lattice point perturbs every vertex by at most $\tfrac{1}{\sqrt{2}} \approx 0.7071\text{ dbu}$ in $L_2$ (and $\tfrac{1}{2}\text{ dbu}$ in $L_\infty$). Consequently, any rotation-invariant geometry engine must satisfy rigorous analytical bounds relative to \texttt{R000}:
+\begin{align}
+  N_{\text{poly}}(\theta) &= N_{\text{poly}}(0^\circ), \qquad N_{\text{holes}}(\theta) = N_{\text{holes}}(0^\circ), \\
+  \bigl|A(\theta) - A(0^\circ)\bigr| &\le 0.7072 \cdot P(0^\circ), \\
+  \bigl|P(\theta) - P(0^\circ)\bigr| &\le 1.5 \cdot V(0^\circ), \\
+  \text{anomalies}(\theta) &= 0, \qquad \operatorname{area2}(\theta) \in \mathbb{Z}.
+\end{align}
+At multiples of $90^\circ$ ($\theta \in \{0^\circ, 90^\circ, 180^\circ, 270^\circ\}$), rotation is an exact lattice isometry, so area, perimeter, vertex count, polygon count, hole count, and every predicate selection count must agree \textbf{bit-for-bit} with \texttt{R000}.
+
+\section{Exact Rational-Integer Gold Oracle (\texttt{gold\_check.py})}
+
+Whenever \texttt{TRAPBOOL.exe} and KLayout disagree on a rotated clip, differential testing alone cannot decide which tool is more accurate. \texttt{src/regress/anyangle/gold/gold\_check.py} resolves this definitively by computing the \textbf{mathematically exact} Boolean $E = A \operatorname{op} B$ in Python using unbounded exact rational arithmetic (\texttt{fractions.Fraction}): a slab sweep cut at every input vertex row and every exact rational edge crossing, with zero rounding anywhere.
+
+For any candidate output $C$ (\texttt{TRAPBOOL} or KLayout's \texttt{A.merged() op B.merged()}), \texttt{gold\_check.py} computes the exact symmetric difference $C \oplus E$, its exact area error $dA$, and its exact $L_\infty$ Hausdorff boundary deviation $H_\infty = \max_{p \in C \oplus E} d_\infty(p, \partial E)$.
+
+\begin{table}[htbp]
+\centering
+\caption{Exact rational gold comparison (\texttt{regress/anyangle/gold/run\_gold.sh}): \texttt{MAGPARSER} single-pass snap rounding vs.\ KLayout merged-operand Booleans.}
+\label{tab:gold_results}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Benchmark Set} & \textbf{Op-Cases} & \textbf{Ours max $H_\infty$ (dbu)} & \textbf{KLayout max $H_\infty$ (dbu)} & \textbf{KLayout $> 0.5$ dbu} \\
+\midrule
+200 synthetic clips & 1,000 & \textbf{0.5000} & 1.4878 & 72 cases \\
+\texttt{SDT16S R045} (\texttt{poly}$\times$\texttt{diff}) & 20 & \textbf{0.5000} & 0.7793 & 2 cases \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Across all 1,020 test cases (Table~\ref{tab:gold_results}), \texttt{MAGPARSER} never exceeds the theoretical snap-rounding tube $H_\infty \le 0.5000\text{ dbu}$, whereas KLayout's two-pass merged flow exceeds $0.5\text{ dbu}$ in 74 cases (up to $1.4878\text{ dbu}$ on \texttt{clips/synth\_s0028.oas}) because merging $A$ first rounds $A$'s self-crossings, tilts $A$'s edges, and compounds a second rounding pass during the Boolean. On the 20 \texttt{SDT16S\_R045} clips, total exact area error $\sum dA$ is $46{,}048\text{ dbu}^2$ for \texttt{MAGPARSER} versus $48{,}689\text{ dbu}^2$ for KLayout.

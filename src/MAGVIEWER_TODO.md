@@ -429,3 +429,58 @@ Phases 0–1 are small and independent of the rest; 2–3 are the core of the la
 5. **Annotations output:** JSON sidecar + OASIS overlay export enough, or should annotations
    be written back into the OASIS file?
 6. **Order of work:** proposed 0 → 1 → 2 → 3 → (4, 5, 6) → 7. Start with Phase 0 + 1?
+
+## 13. TODO: hierarchical OASIS falls back from streaming to the full reader
+
+Added 2026-11-24, not started. Seen on a large file:
+
+    INFO: OASIS stream not possible (rc=2), using full reader
+
+**What it means.** The file is hierarchical (it has PLACEMENT records). The streaming load
+supports flat OASIS only, so the loader drops it and reloads the whole file with the full
+reader.
+
+**Code path**
+1. `LoadLayoutDBFile` (`layoutdb_loader.f90`, around line 345) tries `ldb_stream_boxes_c`
+   first. It sends each box from the parser straight to the Fortran `box_callback`, with no
+   C++ copy.
+2. The stream parser can't place instance geometry without the cell hierarchy. At the first
+   PLACEMENT it throws `StreamHier` (`db/oasis_parser.hpp:301`).
+3. `db/oasis.cpp:69` catches it and returns 2 ("hierarchical OASIS (PLACEMENT): streaming
+   not possible"). Return codes from `ldb_stream_boxes` (`db/layoutdb.cpp`): 0 = ok,
+   2 = hierarchical, 3 = GDSII (not streamable), -1 = parse error.
+4. In Fortran, `ClearLayer` throws away the boxes already streamed, then `load_ldb_common`
+   reparses from the start with the full reader (`ldb_open` + `ldb_iterate_boxes*`).
+
+**Why it costs a lot on large files**
+- **Wasted first pass.** Streaming runs until the first PLACEMENT. If leaf cells come first
+  (common: all geometry, then the top cells that place it), most of the file is parsed and
+  sent to Fortran before being discarded. The CBLOCK pre-scan and inflation also run twice.
+- **Peak memory.** The full reader keeps every cell's boxes in C++ (about 48 B/box), plus a
+  copy of the whole file (`f->oasis_raw`, kept so the file can be written back unchanged)
+  on top of the mmap. Then the hierarchy walk in `ldb_iterate_boxes` fills the Fortran
+  layers while the C++ copy is still alive. That duplicate is what streaming avoids.
+- **Flattening growth.** Arrays and repeated instances expand into Fortran boxes, so the
+  box count can be far larger than the file size suggests.
+
+**Options (cheapest first)**
+1. **Workaround, no code change.** Flatten files you load often, once (KLayout: read,
+   flatten top cell, write OASIS). They then stream, and the log shows
+   `INFO: Streamed OASIS:`.
+2. **Skip the wasted pass.** The CBLOCK pre-scan in `db/oasis.cpp` (`scan_only`) already
+   walks every record. Have it also note whether any PLACEMENT (record 17/18) exists, and
+   return 2 at once if so. Catch: PLACEMENTs inside CBLOCKs show up only after inflating
+   them, so the scan must look inside CBLOCKs or accept a partial answer. For strict-mode
+   files a hint may also come from the table-only open (`db/oasis_tables.cpp`): more than
+   one cell, or a top cell with no geometry.
+3. **Lower full-reader memory.** Don't fill `oasis_raw` unless lossless write-back was
+   requested (an open flag). Free each cell's C++ boxes as soon as nothing else needs them.
+4. **Hierarchical streaming.** A pass that keeps only the cell table, per-cell offsets and
+   instance lists (no geometry). Then for each placed cell, reparse its geometry from the
+   mmap and send it to the callback once per instance transform. No `oasis_raw`, no
+   per-cell box vectors. Strict-mode `S_CELL_OFFSET` makes the per-cell reparse cheap; the
+   MAGVIEWER sidecar (§3) could supply offsets for non-strict files.
+
+**Measure first:** add a log line on the rc=2 path giving the byte offset of the first
+PLACEMENT and how many boxes were streamed before it. That shows how much the wasted pass
+costs on the real file and whether option 2 is worth doing before option 4.

@@ -60,7 +60,7 @@ contains
     output_layer%tree%root_index = 0
     if( numA == 0 ) then
        call ClearLayer( output_layer )
-       call output_layer%mark( LAYER_STATE_HEAL )
+       call LayerMark( output_layer, LAYER_STATE_HEAL )
        return
     end if
 
@@ -257,7 +257,7 @@ contains
           call ClearLayer( buffers(tid) )
        end do
        call ClearLayer( output_layer )
-       call output_layer%mark( LAYER_STATE_HEAL )
+       call LayerMark( output_layer, LAYER_STATE_HEAL )
     else
        allocate( output_layer%layer_boxes( output_layer%n_used ), stat=alloc_status )
        if( alloc_status /= 0 ) error stop "ALLOCATION FAILED in CalculateTopologicalSelect"
@@ -326,7 +326,9 @@ contains
     end if
 
     if( numB == 0 .or. .not. allocated(input_layer_B%tree%tree_nodes) ) then
-       !$omp parallel do private(i,e,tid,abox,ex1,ey1,ex2,ey2,ebox,select_it)
+       !> purely_*/coinc_* are written per edge: they must be private (were shared -> data race).
+       !$omp parallel do private(i,e,tid,abox,ex1,ey1,ex2,ey2,ebox,select_it, &
+       !$omp   purely_inside,purely_outside,coinc_in,coinc_out)
        do i=1,numA
           tid = omp_get_thread_num()+1
           abox = input_layer_A%layer_boxes(i)
@@ -368,7 +370,11 @@ contains
        i = 1
        do tid=1,nthreads
           if( buffers(tid)%n_used == 0 ) cycle
-          output_layer%layer_boxes(i:i+buffers(tid)%n_used-1) = buffers(tid)%layer_boxes(1:buffers(tid)%n_used)
+          !> Explicit loop: the array-section form made ifx build a stack temporary of
+          !> n_used boxes, which overflowed the 8 MB default stack (SIGSEGV) on MW_FLAT poly.
+          do k = 1, buffers(tid)%n_used
+             output_layer%layer_boxes(i + k - 1) = buffers(tid)%layer_boxes(k)
+          end do
           i = i + buffers(tid)%n_used
           call ClearLayer(buffers(tid))
        end do
@@ -442,6 +448,9 @@ contains
     integer(kind=K_COORDINATE_KIND) :: ox1,oy1,ox2,oy2
     logical :: any_inside, any_outside, any_boundary
     logical :: on_b_boundary, same_side
+    logical :: lci, lco, q_in, q_b, q_out
+    integer(kind=K_COORDINATE_KIND) :: qx, qy
+    integer(kind=int64) :: seam_stack(K_DFS_STACK)
     ! For simplicity: test midpoint and endpoints; for rectilinear healed B this is robust for box-aligned edges.
     integer(kind=K_COORDINATE_KIND) :: mx,my
 
@@ -505,8 +514,26 @@ contains
              c_end = min(currNode%ChildStart + int(currNode%NumChildren,kind=int64)-1_int64, numB)
              do k=currNode%ChildStart, c_end
                 ibox = B%layer_boxes(k)
-                call edge_coincident_with_box(ex1,ey1,ex2,ey2,edir,abox,ibox,coinc_in,coinc_out)
-                if( coinc_in .or. coinc_out ) return
+                lci = .false.; lco = .false.
+                call edge_coincident_with_box(ex1,ey1,ex2,ey2,edir,abox,ibox,lci,lco)
+                if( .not. (lci .or. lco) ) cycle
+                !> Only a shared segment on the boundary of the union of B counts. If the
+                !> ibox edge is an internal seam of B's box decomposition (another B box
+                !> continues across it), the edge is interior to B, consistent with the seam
+                !> handling of purely_inside above. Probe one unit across the shared edge,
+                !> outside ibox, at the overlap midpoint; it uses its own DFS stack because
+                !> dfs_stack is in use by this traversal.
+                if( ey1 == ey2 ) then
+                   qx = ( max(ex1,ibox%x1) + min(ex2,ibox%x2) ) / 2
+                   if( ey1 == ibox%y1 ) then; qy = ey1 - 1; else; qy = ey1 + 1; end if
+                else
+                   qy = ( max(ey1,ibox%y1) + min(ey2,ibox%y2) ) / 2
+                   if( ex1 == ibox%x1 ) then; qx = ex1 - 1; else; qx = ex1 + 1; end if
+                end if
+                call classify_point_against_B(qx,qy,B,numB,root_idx,seam_stack,K_DFS_STACK,q_in,q_b,q_out)
+                if( .not. q_out ) cycle   !> seam: B continues across this edge
+                coinc_in = lci; coinc_out = lco
+                return
              end do
           else
              c_end = currNode%ChildStart + int(currNode%NumChildren,kind=int64)-1_int64

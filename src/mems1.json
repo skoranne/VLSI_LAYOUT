@@ -1,0 +1,117 @@
+{
+  "schema": "NURBS-BRep-2D-v1",
+  "units": "micrometer",
+  "tolerance": 1e-6,
+  "parameters": {
+    "R_hub": 38.0,
+    "R_rotor_inner": 122.0,
+    "R_rotor_outer": 148.0,
+    "W_oxide_half": 175.0,
+    "H_oxide_half": 175.0,
+    "N_comb_banks": 8,
+    "N_fingers_per_bank": 11,
+    "finger_radial_pitch": 6.5,
+    "finger_radial_width": 2.4,
+    "comb_angular_span_deg": 24.0
+  },
+  "curves": {
+    "C_rotor_hub_circle": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [0, 0, 0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1, 1, 1],
+      "control_points": [
+        [38.0, 0.0], [38.0, 38.0], [0.0, 38.0],
+        [-38.0, 38.0], [-38.0, 0.0], [-38.0, -38.0],
+        [0.0, -38.0], [38.0, -38.0], [38.0, 0.0]
+      ],
+      "weights": [1.0, 0.7071067811865476, 1.0, 0.7071067811865476, 1.0, 0.7071067811865476, 1.0, 0.7071067811865476, 1.0]
+    },
+    "C_comb_tooth_outer_arc": {
+      "comment": "Single rotary comb tooth outer arc at r = 52.0 um, theta in [18 deg, 42 deg], w1 = cos(12 deg)",
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [0, 0, 0, 1, 1, 1],
+      "control_points": [
+        [49.454944, 16.068884],
+        [46.026728, 26.573545],
+        [38.643528, 34.794793]
+      ],
+      "weights": [1.0, 0.9781476007338057, 1.0]
+    },
+    "C_comb_tooth_radial_tip": {
+      "comment": "Radial edge of comb tooth from r = 49.6 um to r = 52.0 um at theta = 42 deg",
+      "type": "NURBS_CURVE",
+      "degree": 1,
+      "rational": false,
+      "knots": [0, 0, 1, 1],
+      "control_points": [
+        [38.643528, 34.794793],
+        [36.859981, 33.188879]
+      ],
+      "weights": [1.0, 1.0]
+    },
+    "C_comb_tooth_inner_arc": {
+      "comment": "Inner arc at r = 49.6 um, reversed orientation theta in [42 deg, 18 deg]",
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [0, 0, 0, 1, 1, 1],
+      "control_points": [
+        [36.859981, 33.188879],
+        [43.902418, 25.347073],
+        [47.172408, 15.327243]
+      ],
+      "weights": [1.0, 0.9781476007338057, 1.0]
+    },
+    "C_comb_tooth_radial_root": {
+      "type": "NURBS_CURVE",
+      "degree": 1,
+      "rational": false,
+      "knots": [0, 0, 1, 1],
+      "control_points": [
+        [47.172408, 15.327243],
+        [49.454944, 16.068884]
+      ],
+      "weights": [1.0, 1.0]
+    },
+    "C_gimbal_tapered_spoke_north": {
+      "comment": "Closed trapezoidal beam for north red gimbal spoke",
+      "type": "NURBS_POLYLINE",
+      "degree": 1,
+      "rational": false,
+      "knots": [0, 0, 1, 2, 3, 4, 4],
+      "control_points": [
+        [-2.2, 24.0], [2.2, 24.0], [6.5, 118.0], [-6.5, 118.0], [-2.2, 24.0]
+      ],
+      "weights": [1.0, 1.0, 1.0, 1.0, 1.0]
+    },
+    "C_dioxide_outer_boundary": {
+      "comment": "Grey dioxide substrate with top/bottom gimbal anchor tabs",
+      "type": "NURBS_POLYLINE",
+      "degree": 1,
+      "rational": false,
+      "knots": [0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 12],
+      "control_points": [
+        [-175.0, -175.0], [-24.0, -175.0], [-24.0, -215.0], [24.0, -215.0],
+        [24.0, -175.0], [175.0, -175.0], [175.0, 175.0], [32.0, 175.0],
+        [32.0, 215.0], [-32.0, 215.0], [-32.0, 175.0], [-175.0, 175.0],
+        [-175.0, -175.0]
+      ],
+      "weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    }
+  },
+  "layers": {
+    "rotor_silicon": {
+      "boolean_recipe": "UNION(rotor_outer_annulus, rotor_hub, ARRAY_ROTATE_8(comb_rotor_teeth), top_bottom_outer_arms) - gimbal_clearance_offset(2.0)"
+    },
+    "gimbal_silicon": {
+      "boolean_recipe": "UNION(ARRAY_ROTATE_4(C_gimbal_tapered_spoke_north), ARRAY_ROTATE_8(comb_stator_teeth), gimbal_anchor_flexures)"
+    },
+    "dioxide": {
+      "boolean_recipe": "C_dioxide_outer_boundary - OFFSET_OUTWARD(UNION(rotor_silicon, gimbal_silicon), 1.5)"
+    }
+  }
+}
+

@@ -35,7 +35,8 @@ module CompactLayerModule
 
   public :: CompactLayer, CompactEncode, CompactDecode, CompactPack, CompactUnpack, &
        CompactRelease, CompactBytes, CompactPrintStats, CompactKeyOf, K_CL_BLOCK, &
-       CompactDecodeBlocks, CompactMove, CompactDecodeCold, BoxSetHash, CompactMergeParts, CompactSortU64, CompactDecodeColdInto
+       CompactDecodeBlocks, CompactMove, CompactDecodeCold, BoxSetHash, CompactMergeParts, CompactSortU64, CompactDecodeColdInto, &
+       CompactSortPairs
 
   integer(kind=int64), parameter :: K_CL_BLOCK = 128_int64
 
@@ -687,6 +688,14 @@ contains
     integer(kind=int64), intent(in) :: n
     call sort_u64(a, n)
   end subroutine CompactSortU64
+
+  !> Public sort of unsigned int64 keys with an int32 payload (Thrust / std::sort).
+  subroutine CompactSortPairs(a, v, n)
+    integer(kind=int64), intent(inout), target :: a(:)
+    integer(kind=int32), intent(inout), target :: v(:)
+    integer(kind=int64), intent(in) :: n
+    call sort_pairs(a, v, n)
+  end subroutine CompactSortPairs
 
   !> Merge independently encoded compact layers (e.g. per-band outputs) into one, without
   !> materialising the boxes: global origin = min origin, grid = gcd of the part grids and

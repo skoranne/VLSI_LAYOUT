@@ -98,7 +98,8 @@ version_mod.f90: ../.git/HEAD ../.git/index
 	@echo "end module version_mod" >> $@
 
 unit_test: test_contour.exe test_morton.exe test_polygonfracture.exe test_boxmerge.exe \
-	   test_skiplist.exe test_compact_layer.exe test_viewer_index.exe
+	   test_skiplist.exe test_compact_layer.exe test_viewer_index.exe \
+	   test_wide_int.exe test_predicates.exe test_measure.exe test_trapmerge.exe test_trapbool.exe test_trapoverlap.exe
 
 clean:
 	rm -f *.o *.mod *.a *.exe
@@ -116,7 +117,7 @@ clean:
 %.o: %.f90
 	$(FORTRAN_COMPILER) $(FCFLAGS) -c $< -o $@
 %.o: %.F90
-	$(FORTRAN_COMPILER) $(FCFLAGS) -fpp -gen-dep=$(@:.o=.d) -c $< -o $@
+	$(FORTRAN_COMPILER) $(FCFLAGS) -c $< -o $@
 
 # --- Library Creation ---
 # Bundles all the core objects into a single static library.
@@ -175,11 +176,15 @@ event_sorter.o:	       event_sorter.cu
 		       g++ -x c++ -O3 -c event_sorter.cu
 gpu_morton.o:   gpu_morton.cu
 		       g++ -O3 -c -x c++ gpu_morton.cu
+nurbs_gpu.o:    nurbs_gpu/nurbs_gpu.cu nurbs_gpu/nurbs_types.hpp
+		       g++ -O3 -std=c++17 -Inurbs_gpu -c -x c++ nurbs_gpu/nurbs_gpu.cu -o nurbs_gpu.o
 else
 event_sorter.o:	       event_sorter.cu
 		       $(NVCC) $(NVCCFLAGS) -c event_sorter.cu
 gpu_morton.o:   gpu_morton.cu
 		       $(NVCC) $(NVCCFLAGS) -c gpu_morton.cu
+nurbs_gpu.o:    nurbs_gpu/nurbs_gpu.cu nurbs_gpu/nurbs_types.hpp
+		       $(NVCC) $(NVCCFLAGS) -Inurbs_gpu -c nurbs_gpu/nurbs_gpu.cu -o nurbs_gpu.o
 endif
 # Nsight Systems profiling for nvfortran+OpenMP target offload (GB10). Example:
 #   make -f Makefile.nvf profile CTR=check_interactions.ctr LAYERS=10
@@ -214,3 +219,42 @@ viewer_tiles.o: viewer_tiles.f90 $(LIBRARY)
 	$(FORTRAN_COMPILER) $(FCFLAGS) -c viewer_tiles.f90 -o $@
 MAGVIEWER.exe: magviewer.f90 $(LIBRARY) viewer_gl.o viewer_font.o viewer_tiles.o db/liblayoutdb.a
 	$(FORTRAN_COMPILER) $(FCFLAGS) magviewer.f90 viewer_font.o viewer_tiles.o $(LIBRARY) viewer_gl.o $(GLFW_LIB) $(LIBGL) -ldl -lm -o MAGVIEWER.exe $(LDFLAGS) $(LDLIBS)
+
+# Any-angle exact kernel unit tests
+test_wide_int.exe: test_wide_int.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+test_predicates.exe: test_predicates.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_measure.exe: test_measure.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapmerge.exe: test_trapmerge.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapbool.exe: test_trapbool.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapoverlap.exe: test_trapoverlap.o $(LIBRARY)
+	$(FORTRAN_COMPILER) $(FCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapmorph.exe: test_trapmorph.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_trapmorph.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trappred.exe: test_trappred.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_trappred.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_trapstream.exe: test_trapstream.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_trapstream.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_nurbs.exe: test_nurbs.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_nurbs.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+test_nurbs_offset.exe: test_nurbs_offset.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) test_nurbs_offset.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+TRAPMERGE.exe: trapmerge_main.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) trapmerge_main.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)
+
+TRAPBOOL.exe: trapbool_main.o $(LIBRARY) db/liblayoutdb.a
+	$(FORTRAN_COMPILER) $(FCFLAGS) trapbool_main.o $(LIBRARY) -o $@ $(LDFLAGS) $(LDLIBS)

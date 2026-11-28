@@ -1,0 +1,59 @@
+# Rotation-invariance regression (regress/rotation/run_rotation.sh fills @FILE@ @TAG@ @TMP@).
+# Every result measured here is invariant under rotation of the input, so the run of a
+# rotated copy must reproduce the run of the unrotated design (exactly at multiples of
+# 90 degrees; within grid-snapping tolerance otherwise), and must agree with KLayout running
+# the same operations on the same rotated file (kl_measure.py, same layer names).
+# SkyWater 130 layers: diff 65/20 (B), poly 66/20 (A), li1 67/20 (C), met1 68/20 (M1),
+#                      met2 69/20 (M2), licon 66/44, mcon 67/44
+# Morphology: edge-offset sizing is rotation invariant (each edge moves along its own
+# normal); KLayout Region.sized(d) is the reference. Distances in microns (1 um = 1000 dbu).
+# Layers named id_* must be EMPTY at every angle (algebraic identities).
+program ROT_@TAG@
+var temp_folder @TMP@/
+var temporary_layers 2
+decl design d1_input = @FILE@
+decl memory t1 = nothing
+exec init t1:nothing
+exec measure d1_input:65:20 d1_input:66:20 d1_input:67:20 d1_input:68:20 d1_input:69:20 d1_input:66:44 d1_input:67:44
+# --- Booleans
+exec run t1:and = d1_input:66:20 * d1_input:65:20
+exec run t1:and2 = d1_input:66:20 AND2 d1_input:65:20
+exec run t1:not = d1_input:65:20 ! d1_input:66:20
+exec run t1:not_at = d1_input:65:20 @ d1_input:66:20
+exec run t1:not_tilde = d1_input:65:20 ~ d1_input:66:20
+exec run t1:framenot = d1_input:65:20 FRAMENOT d1_input:66:20
+exec run t1:or = d1_input:66:20 + d1_input:67:20
+exec run t1:or_ab = d1_input:66:20 + d1_input:65:20
+exec run t1:xor = d1_input:66:20 ^ d1_input:65:20
+exec run t1:xor_named = d1_input:66:20 XOR d1_input:65:20
+exec run t1:m1m2 = d1_input:68:20 * d1_input:69:20
+exec run t1:selfand = d1_input:67:20 AND t1:nothing
+# --- Morphology on met1
+exec run t1:grow = d1_input:68:20 GROW t1:nothing 0.05 0.05 0.05 0.05
+exec run t1:shrink = d1_input:68:20 SHRINK t1:nothing 0.03
+exec run t1:size_p = d1_input:68:20 SIZE t1:nothing 0.05
+exec run t1:size_n = d1_input:68:20 SIZE t1:nothing -0.03
+exec run t1:close = t1:grow SHRINK t1:nothing 0.05
+exec run t1:open = t1:shrink GROW t1:nothing 0.03 0.03 0.03 0.03
+# --- Identities: every id_* layer must be empty
+exec run t1:id_xorself = d1_input:66:20 ^ d1_input:66:20
+exec run t1:sym = t1:or_ab ! t1:and
+exec run t1:id_sym = t1:sym ^ t1:xor
+exec run t1:id_xornamed = t1:xor ^ t1:xor_named
+exec run t1:id_and2 = t1:and ^ t1:and2
+exec run t1:id_framenot = t1:not ^ t1:framenot
+exec run t1:id_notat = t1:not ^ t1:not_at
+exec run t1:id_nottilde = t1:not ^ t1:not_tilde
+exec run t1:bnota = d1_input:65:20 ! t1:and
+exec run t1:id_notand = t1:bnota ^ t1:not
+exec run t1:id_grow = d1_input:68:20 ! t1:grow
+exec run t1:id_shrink = t1:shrink ! d1_input:68:20
+exec run t1:id_close = d1_input:68:20 ! t1:close
+exec run t1:id_open = t1:open ! d1_input:68:20
+exec run t1:id_sizep = t1:size_p ^ t1:grow
+exec run t1:id_sizen = t1:size_n ^ t1:shrink
+exec measure t1:and t1:and2 t1:not t1:not_at t1:not_tilde t1:framenot t1:or t1:or_ab t1:xor t1:xor_named t1:m1m2 t1:selfand
+exec measure t1:grow t1:shrink t1:size_p t1:size_n t1:close t1:open
+exec measure t1:id_xorself t1:id_sym t1:id_xornamed t1:id_and2 t1:id_framenot t1:id_notat t1:id_nottilde t1:id_notand
+exec measure t1:id_grow t1:id_shrink t1:id_close t1:id_open t1:id_sizep t1:id_sizen
+end

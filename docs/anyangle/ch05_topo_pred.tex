@@ -1,0 +1,211 @@
+\chapter{Polygon-Level Topologicals and Geometric Predicates}
+\label{ch:topo_pred}
+
+\section{Exact Polygon-Level Topologicals (\texttt{TrapTopoModule})}
+
+Physical verification rule decks rely heavily on spatial-relation selectors (\texttt{INTERACT}, \texttt{CUT}, \texttt{TOUCH}, \texttt{INSIDE}, \texttt{OUTSIDE}, \texttt{EQUAL}, \texttt{DISJOINT}, \texttt{MEET}, \texttt{OVERLAPS}, \texttt{COVERS}, \texttt{COVEREDBY}, \texttt{CONTAINS}, and their \texttt{NOT\_*} complements) that select \emph{whole polygons} of layer $A$ based on their DE-9IM topological relation to layer $B$.
+
+\texttt{src/trap\_topo.f90} evaluates all 24 operators exactly without any Boolean snap rounding:
+\begin{enumerate}
+  \item \textbf{Component Labeling:} Both $A$ and $B$ are labeled via \texttt{TrapPNum}, yielding canonical polygons $P_A$ and $P_B$.
+  \item \textbf{Broad-Phase Grid + Narrow-Phase \texttt{trap\_contact}:} A uniform spatial grid (\texttt{PieceGrid}) indexes $B$'s trapezoids. For each trapezoid $a \in A$, nearby trapezoids $b \in B$ are classified by exact \texttt{trap\_contact(a, b)} into interior overlap (\texttt{f\_ov}), 1D segment touch (\texttt{f\_t2}), or 0D point touch (\texttt{f\_t1}).
+  \item \textbf{Zero-Rounding Gap-Complement Coverage:} To decide whether polygon $a \subseteq B$ (needed for \texttt{INSIDE}, \texttt{CUT}, \texttt{EQUAL}, \texttt{COVEREDBY}, \texttt{CONTAINS}, \texttt{COVERS}, \texttt{OVERLAPS}) without rounding, \texttt{coverage()} inspects each piece $p \in a$ against the nearby pieces of $B$:
+  \begin{quote}
+    Between consecutive horizontal rows $y_k < y_{k+1}$ of $B$'s pieces intersecting $p$'s bounding box, $B$'s interior-disjoint pieces are sorted left-to-right by exact $x$. The complement $\mathbb{R}^2 \setminus B$ inside slab $[y_k, y_{k+1}]$ is simply the sequence of \emph{gap trapezoids} between consecutive $B$ pieces, bounded by $B$'s own exact lattice lines!
+  \end{quote}
+  Piece $p$ is covered by $B$ if and only if no gap trapezoid overlaps $p$ with positive area (\texttt{trap\_overlap\_positive}). Checking whether a gap in slabs one row beyond $p$ meets $p$ along a segment decides whether $\partial p \cap (\mathbb{R}^2 \setminus B)$ has 1D contact (distinguishing \texttt{COVEREDBY} from strict \texttt{INSIDE}).
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % Slab rows
+  \foreach \y/\lab in {0.5/$y_0$, 1.5/$y_1$, 2.5/$y_2$, 3.5/$y_3$} {
+    \draw[dashed, slate!60] (0,\y) -- (10,\y);
+    \node[anchor=east, font=\scriptsize\ttfamily, color=slate] at (-0.1,\y) {\lab};
+  }
+  % B pieces (two slanted strips with a gap between them)
+  \fill[blue!14, draw=navy, thick] (1.0,0.5) -- (3.8,0.5) -- (4.3,1.5) -- (1.5,1.5) -- cycle;
+  \fill[blue!14, draw=navy, thick] (1.5,1.5) -- (4.3,1.5) -- (4.8,2.5) -- (2.0,2.5) -- cycle;
+  \fill[blue!14, draw=navy, thick] (1.0,2.5) -- (8.0,2.5) -- (8.5,3.5) -- (1.5,3.5) -- cycle;
+
+  \fill[blue!14, draw=navy, thick] (5.5,0.5) -- (8.2,0.5) -- (8.7,1.5) -- (6.0,1.5) -- cycle;
+  \fill[blue!14, draw=navy, thick] (6.0,1.5) -- (8.7,1.5) -- (9.2,2.5) -- (6.5,2.5) -- cycle;
+
+  % Gap trapezoid highlighted in crimson
+  \fill[crimson!18, pattern=north east lines, pattern color=crimson!60, draw=crimson, thick]
+    (4.3,1.5) -- (6.0,1.5) -- (6.5,2.5) -- (4.8,2.5) -- cycle;
+  \node[font=\scriptsize\bfseries, color=crimson] at (5.4,2.0) {Gap $G \subset B^c$};
+
+  % Query piece p in A
+  \fill[teal!28, opacity=0.75, draw=tealaccent, very thick] (3.0,1.2) -- (5.2,1.2) -- (5.6,2.8) -- (3.4,2.8) -- cycle;
+  \node[font=\scriptsize\bfseries, color=tealaccent] at (4.1,2.2) {Query $p \in A$};
+
+  \node[font=\scriptsize\sffamily, color=navy] at (2.4,1.0) {$B_1$};
+  \node[font=\scriptsize\sffamily, color=navy] at (7.3,1.0) {$B_2$};
+  \node[draw=crimson, fill=white, rounded corners=2pt, font=\scriptsize, align=left, anchor=west] at (6.7,3.1) {
+    \texttt{trap\_overlap\_positive(p, G)}\\
+    $= \text{true} \implies p \not\subseteq B$!
+  };
+\end{tikzpicture}
+\caption{Zero-rounding slab-gap complement coverage test in \texttt{TrapTopoModule}. Every complement gap $G \subset \mathbb{R}^2 \setminus B$ is itself an exact lattice-line trapezoid.}
+\label{fig:topo_gap}
+\end{figure}
+
+On \texttt{SDT16S}, every single topological selection count is \textbf{bit-identical} between \texttt{R000} (with \texttt{MAGPARSER\_FORCE\_TRAP=1}) and \texttt{R030}.
+
+\section{Polygon-Component Geometric Predicates (\texttt{TrapPredModule})}
+
+\texttt{src/trap\_pred.f90} (1,161 LOC) implements 20 polygon-component predicates---16 rotation-invariant and 4 orientation-specific---each with full \texttt{NOT\_*} (and two-word \texttt{NOT <PRED>}) complement support via \texttt{TPRED\_NOT\_OFFSET = 100} and arbitrary single or compound range constraints (\texttt{>}, \texttt{>=}, \texttt{<}, \texttt{<=}, \texttt{==}, \texttt{!=}, \texttt{/=}, \texttt{> a < b}, \texttt{>= a <= b}, \texttt{a b}).
+
+\begin{table}[htbp]
+\centering
+\caption{Complete catalog of polygon-component predicates in \texttt{TrapPredModule} (all support \texttt{NOT\_*}).}
+\label{tab:predicates}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Predicate} & \textbf{Rot.-Inv.?} & \textbf{Units / Output} & \textbf{Core Algorithm} \\
+\midrule
+\texttt{AREA} & Yes & $\mu\text{m}^2$ & Exact \texttt{tp\%area2(pid) / (2 * prec**2)} \\
+\texttt{PERIMETER} & Yes & $\mu\text{m}$ & Exact boundary edge sum via \texttt{TrapPolyOutline} \\
+\texttt{VERTEX} / \texttt{VERTICES} & Yes & count & Simplified lattice vertex count \\
+\texttt{HOLES} & Yes & count & Exact complement-cycle count ($1 - \chi$) \\
+\texttt{COMPACTNESS} & Yes & $[0,1]$ & Isoperimetric quotient $4\pi A / P^2$ \\
+\texttt{WIDTH}, \texttt{LENGTH} & Yes & $\mu\text{m}$ & $O(n_h)$ rotating calipers MABR short/long side \\
+\texttt{ASPECT\_RATIO} & Yes & $\ge 1$ & $\text{LENGTH} / \text{WIDTH}$ \\
+\texttt{DIAMETER} & Yes & $\mu\text{m}$ & $O(n_h)$ rotating calipers antipodal max distance \\
+\texttt{SOLIDITY} & Yes & $(0,1]$ & $A / A_{\text{hull}}$ (origin-shifted exact hull) \\
+\texttt{CONVEX\_CRITERIA} & Yes & bool / count & Exact \texttt{i128} corner turns ($n_{\text{conc}} = 0 \land n_{\text{holes}} = 0$) \\
+\texttt{CONCAVE\_CRITERIA} & Yes & bool / count & Exact \texttt{i128} reflex turns ($n_{\text{conc}} > 0 \lor n_{\text{holes}} > 0$) \\
+\texttt{IS\_RECTANGLE\_WITH\_ROTATION} & Yes & bool & $n_{\text{holes}}=0 \land A \ge 0.85 A_{\text{MABR}} \land |A - A_{\text{MABR}}| \le \max(2, 0.55 P)$ \\
+\texttt{IS\_SQUARE\_WITH\_ROTATION} & Yes & bool & Rotated rectangle $\land |L - W| \le \max(2, 0.01 L)$ \\
+\texttt{NOTCH} & Yes & $\mu\text{m}$ / bool & Exterior CCW-loop gap (X-sweep, off-boundary, non-crossing) \\
+\texttt{ENCLOSE\_RECTANGLE W H} & Yes & bool & Rotated slab-core intersection + slanted-edge balance $y_0$ \\
+\midrule
+\texttt{IS\_RECTILINEAR} & No & bool & Every edge satisfies $dx = 0 \lor dy = 0$ \\
+\texttt{IS\_45} / \texttt{IS\_OCTAGONAL} & No & bool & Every edge satisfies $dx = 0 \lor dy = 0 \lor |dx| = |dy|$ \\
+\texttt{IS\_RECTANGLE}, \texttt{IS\_SQUARE} & No & bool & Rectilinear, $n_{\text{holes}}=0$, 1 loop, 4 vertices (+ equal bbox) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Key Algorithmic Details and Hardening}
+
+\begin{enumerate}
+  \item \textbf{Single C++ Loop Extraction:} \texttt{TrapPredSelect} never invokes both \texttt{TrapPolyOutline} (\texttt{ldb\_trapset\_measure}) and \texttt{ldb\_trapset\_loops}. When loops are extracted (\texttt{need\_loops = .true.}), hole counts (via exact \texttt{i128} signed loop area) and perimeter are computed directly from the loops.
+  \item \textbf{Origin-Shifted $O(n_h)$ Rotating Calipers:} \texttt{poly\_hull\_mabr} builds the strictly convex CCW hull via Andrew's monotone chain using exact \texttt{i128\_cmp\_prod}, shifts all hull coordinates by $(o_x, o_y) = (h_x(1), h_y(1))$ to eliminate \texttt{real64} catastrophic cancellation at $10^8\text{ dbu}$, and tracks three monotonic caliper pointers (\texttt{iright}, \texttt{itop}, \texttt{ileft}) to compute both \texttt{DIAMETER} and MABR in $O(n_h)$ time.
+  \item \textbf{Exterior \texttt{NOTCH} Excluding Holes:} \texttt{poly\_min\_notch} collects only edges belonging to outer CCW loops (signed area $> 0$, excluding CW hole loops so internal hole widths are never misclassified as exterior notches), sorts segments by $x_{\min}$ for sweep-line early exit, and verifies three conditions on every candidate closest-point segment $(c_1, c_2)$: its midpoint is outside the polygon (\texttt{.not. point\_in\_loops}), strictly off all boundary edges (\texttt{.not. point\_on\_loops\_boundary}), and the open segment crosses no polygon edge (\texttt{.not. open\_seg\_crosses\_loops}).
+  \item \textbf{\texttt{ENCLOSE\_RECTANGLE} Slab-Core Intersection:} \texttt{poly\_enclose\_rect} first applies O(1) area, MABR, and diameter pruning, then tests candidate orientations $\theta \in [0, \pi)$ (MABR angle, all polygon edge angles, and a $5^\circ$ uniform grid) in both $(W, H)$ and $(H, W)$ orientations. For each $\theta$, \texttt{rect\_fits\_at\_angle} rotates the origin-shifted polygon by $-\theta$, builds candidate bottom rows $y_0$ (every vertex $r_y$, $r_y - H$, exact slanted-edge balance points $x_{e_1}(y_0) = x_{e_2}(y_0 + H)$ for $n_{\text{pts}} \le 64$, and uniform slices), and intersects the exact horizontal slab cores across $[y_0, y_0 + H]$ using dynamically sized scanline buffers (eliminating any fixed crossing cap on wide comb/mesh polygons).
+  \item \textbf{Whitespace CTR Argument Parser:} \texttt{AnyAngleParsePredArgs} in \texttt{src/anyangle\_ops.f90} replaces Fortran list-directed \texttt{read(rest, *)} (which treats \texttt{/} in \texttt{/=} as end-of-record!) with a dedicated whitespace tokenizer supporting \texttt{!=}, \texttt{/=}, compound ranges (\texttt{> 0.1 < 0.5}, \texttt{<= 0.5 >= 0.1}), and two-word \texttt{NOT <PRED>}.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % Left: Rotating Calipers MABR
+  \begin{scope}[xshift=0cm]
+    % Rotated MABR box
+    \begin{scope}[rotate=22]
+      \draw[dashed, amberaccent, very thick] (0.5,0.4) rectangle (4.2,2.4);
+      % Convex hull inside
+      \fill[blue!15, draw=navy, very thick] (1.1,0.4) -- (3.7,0.4) -- (4.2,1.3) -- (3.4,2.4) -- (1.4,2.4) -- (0.5,1.5) -- cycle;
+      % Caliper contact points
+      \fill[crimson] (4.2,1.3) circle (2.2pt) node[right, font=\tiny, color=crimson] {\texttt{iright}};
+      \fill[crimson] (3.4,2.4) circle (2.2pt) node[above, font=\tiny, color=crimson] {\texttt{itop}};
+      \fill[crimson] (0.5,1.5) circle (2.2pt) node[left, font=\tiny, color=crimson] {\texttt{ileft}};
+      \draw[{Stealth[length=1.8mm]}-{Stealth[length=1.8mm]}, tealaccent, thick] (0.5,0.15) -- (4.2,0.15) node[midway, below, font=\scriptsize, color=tealaccent] {\texttt{LENGTH}};
+      \draw[{Stealth[length=1.8mm]}-{Stealth[length=1.8mm]}, tealaccent, thick] (4.5,0.4) -- (4.5,2.4) node[midway, right, font=\scriptsize, color=tealaccent] {\texttt{WIDTH}};
+    \end{scope}
+    \node[font=\footnotesize\bfseries, color=navy] at (1.8,-0.65) {(a) $O(n_h)$ Rotating Calipers MABR};
+  \end{scope}
+
+  % Right: ENCLOSE_RECTANGLE slab-core intersection
+  \begin{scope}[xshift=6.5cm]
+    % Rotated L-polygon
+    \fill[blue!12, draw=navy, thick] (0.5,0.4) -- (4.5,0.4) -- (4.5,1.7) -- (2.3,1.7) -- (2.3,3.0) -- (0.5,3.0) -- cycle;
+    % Slab rows y0, y_mid, y0+H
+    \draw[dashed, slate] (0.0,0.6) -- (5.0,0.6) node[right, font=\tiny\ttfamily] {$y_0$};
+    \draw[dashed, slate] (0.0,1.7) -- (5.0,1.7) node[right, font=\tiny\ttfamily] {$y_{\text{cut}}$};
+    \draw[dashed, slate] (0.0,2.5) -- (5.0,2.5) node[right, font=\tiny\ttfamily] {$y_0+H$};
+    % Enclosed rectangle
+    \fill[teal!30, draw=tealaccent, very thick] (0.65,0.6) rectangle (2.15,2.5);
+    \node[font=\scriptsize\bfseries, color=tealaccent] at (1.4,1.55) {$W \times H$};
+    \node[font=\footnotesize\bfseries, color=navy] at (2.4,-0.65) {(b) Slab-Core Intersection at Angle $\theta$};
+  \end{scope}
+\end{tikzpicture}
+\caption{(a) $O(n_h)$ rotating calipers computing MABR \texttt{WIDTH}, \texttt{LENGTH}, and \texttt{DIAMETER} on origin-shifted convex hull coordinates. (b) \texttt{ENCLOSE\_RECTANGLE} slab-core interval intersection over $[y_0, y_0 + H]$ in the rotated frame $\operatorname{rot}(P, -\theta)$.}
+\label{fig:mabr_enclose}
+\end{figure}
+
+\section{Measured Predicate Consistency on Rotated \texttt{SDT16S}}
+
+Running \texttt{MAGPARSER.exe} on \texttt{SDT16S} at \texttt{R000}, \texttt{R001}, and \texttt{R015} verifies exact rotational invariance and \texttt{NOT\_*} partitioning at scale:
+\begin{itemize}
+  \item \texttt{poly} (\texttt{66:20}, 485,155 polygons, 4.32M traps at \texttt{R015}): \texttt{AREA > 0.1 < 0.5} selects exactly \textbf{108,431} polygons at \texttt{R000}, \texttt{R001}, and \texttt{R015}; \texttt{NOT\_AREA > 0.1 < 0.5} and \texttt{NOT AREA > 0.1 < 0.5} select exactly \textbf{376,724} ($108{,}431 + 376{,}724 = 485{,}155$).
+  \item \texttt{mcon} (\texttt{67:44}, 1,107,034 polygons, 3.32M traps at \texttt{R015}): \texttt{IS\_RECTANGLE\_WITH\_ROTATION} and \texttt{IS\_SQUARE\_WITH\_ROTATION} select all \textbf{1,107,034} rotated square contacts at both \texttt{R000} and \texttt{R015} in $2.31\text{ s}$ total ($0.30\text{ s}$ loop extraction, $0.08\text{ s}$ parallel evaluation); \texttt{NOT\_IS\_SQUARE\_WITH\_ROTATION} selects \textbf{0}.
+\end{itemize}
+
+\section{Control-File (\texttt{.ctr}) Usage Reference}
+
+Listing~\ref{lst:ctr_example} illustrates a complete \texttt{MAGPARSER} control file exercising every any-angle capability---Booleans, morphology, polygon topologicals, positive and \texttt{NOT\_*} predicates with compound ranges and \texttt{/=}, FASCL properties, and connectivity---on a rotated OASIS layout.
+
+\begin{lstlisting}[style=ctrstyle,caption={Complete \texttt{MAGPARSER} any-angle \texttt{.ctr} script demonstrating Booleans, morphology, topologicals, predicates, and FASCL.},label={lst:ctr_example}]
+program ANYANGLE_DEMO
+var temp_folder /tmp/opencode/demo/
+var temporary_layers 2
+var anyangle 1
+decl design d1 = /scratch1/skoranne/OSS_EDA_TOOLS/DESIGNS/ROTATION/SDT16S_R015.oas
+decl memory t1 = nothing
+exec init t1:nothing
+
+# 1. Two-layer Booleans (single shared snap rounding)
+exec run t1:gate     = d1:66:20 * d1:65:20
+exec run t1:diff_not = d1:65:20 ! d1:66:20
+exec run t1:poly_xor = d1:66:20 ^ d1:65:20
+
+# 2. Morphology (Minkowski collar duality)
+exec run t1:poly_grow   = d1:66:20 GROW nothing 0.02
+exec run t1:poly_shrink = d1:66:20 SHRINK nothing 0.01
+
+# 3. Polygon-level DE-9IM Topologicals (+ NOT_*)
+exec run t1:poly_int   = d1:66:20 INTERACT d1:65:20
+exec run t1:poly_cut   = d1:66:20 CUT d1:65:20
+exec run t1:poly_disj  = d1:66:20 NOT_INTERACT d1:65:20
+
+# 4. Polygon-component Predicates (+ NOT_*, /=, compound ranges)
+exec run t1:mid_area   = d1:66:20 AREA nothing > 0.1 < 0.5
+exec run t1:out_area   = d1:66:20 NOT_AREA nothing > 0.1 < 0.5
+exec run t1:non_quad   = d1:66:20 VERTEX nothing /= 4
+exec run t1:rot_sq     = d1:67:44 IS_SQUARE_WITH_ROTATION nothing
+exec run t1:not_sq     = d1:67:44 NOT IS_SQUARE_WITH_ROTATION nothing
+exec run t1:fit_rect   = d1:66:20 ENCLOSE_RECTANGLE nothing 0.14 0.5
+exec run t1:small_ntch = d1:66:20 NOTCH nothing < 0.2
+
+# 5. FASCL per-polygon properties & CONNECT
+PROPERTY:A = d1:66:20 FASCL [ (id) AREA(id) ] d1:nothing
+CONNECT STACK SKY130 d1
+PROPERTY:N = d1:68:20 FASCL [ (id) NET_ID(id) ] d1:nothing
+exec measure t1:gate t1:mid_area t1:rot_sq
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Whitespace-tokenized predicate argument parser (\texttt{AnyAngleParsePredArgs}) in \texttt{src/anyangle\_ops.f90} avoiding Fortran's \texttt{/} list-directed delimiter trap.},label={lst:arg_parser}]
+subroutine next_ws_tok(s, pos, tok)
+  character(len=*), intent(in) :: s
+  integer, intent(inout) :: pos
+  character(len=*), intent(out) :: tok
+  integer :: n, i0
+  tok = ''; n = len_trim(s)
+  do while (pos <= n)
+     if (s(pos:pos) /= ' ' .and. s(pos:pos) /= char(9)) exit
+     pos = pos + 1
+  end do
+  if (pos > n) return
+  i0 = pos
+  do while (pos <= n)
+     if (s(pos:pos) == ' ' .or. s(pos:pos) == char(9)) exit
+     pos = pos + 1
+  end do
+  tok = s(i0:pos - 1)
+end subroutine next_ws_tok
+\end{lstlisting}
