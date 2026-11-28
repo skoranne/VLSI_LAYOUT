@@ -181,5 +181,10 @@ exec run m:met1_tni = d:L68_D20 NOT_INTERACT d:L69_D20
 exec run m:met1_tic = m:met1_ti * m:met1_tni
 exec run m:met1_tiaz = m:met1_tic ASSERT_ZERO nothing
 
+# --- OASIS output (read OASIS -> ops -> write OASIS) ---
+exec oasout o:diff_or_poly /tmp/MW4x4_selftest_diff_or_poly.oas 65 20
+exec oasout o:diff_and_poly /tmp/MW4x4_selftest_diff_and_poly.oas 65 20
+exec oasout o /tmp/MW4x4_selftest_out.oas
+
 flush
 end

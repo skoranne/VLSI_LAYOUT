@@ -68,7 +68,7 @@ module NurbsCurveModule
        import :: c_int, BezSpan
        type(BezSpan), intent(in)  :: in_spans(*)
        integer(c_int), value      :: n, max_out
-       type(BezSpan), intent(out) :: out_spans(*)
+       type(BezSpan), intent(inout) :: out_spans(*)
      end function nurbs_gpu_split_y_monotone
 
      integer(c_int) function nurbs_gpu_find_overlaps(spans, n, eps, pair_a, pair_b, max_pairs) &
