@@ -1,0 +1,299 @@
+{
+  "schema": "NURBS-BRep-2D-v1",
+  "units": "micrometer",
+  "tolerance": 1e-06,
+  "device": "mag_flux_concentrator",
+  "parameters": {
+    "gap_um": 1.0,
+    "horn_len_um": 100
+  },
+  "curves": {
+    "horn_l_bot": {
+      "type": "NURBS_CURVE",
+      "degree": 3,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -100,
+          -40
+        ],
+        [
+          -40,
+          -10
+        ],
+        [
+          -10,
+          -2
+        ],
+        [
+          -2,
+          -0.5
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "gap_bot": {
+      "type": "NURBS_CURVE",
+      "degree": 3,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -2,
+          -0.5
+        ],
+        [
+          0,
+          -0.5
+        ],
+        [
+          0,
+          0.5
+        ],
+        [
+          -2,
+          0.5
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "horn_l_top": {
+      "type": "NURBS_CURVE",
+      "degree": 3,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -2,
+          0.5
+        ],
+        [
+          -10,
+          2
+        ],
+        [
+          -40,
+          10
+        ],
+        [
+          -100,
+          40
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "horn_l_back": {
+      "type": "NURBS_CURVE",
+      "degree": 1,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -100,
+          40
+        ],
+        [
+          -100,
+          -40
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0
+      ]
+    },
+    "horn_r_bot": {
+      "type": "NURBS_CURVE",
+      "degree": 3,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          100,
+          -40
+        ],
+        [
+          40,
+          -10
+        ],
+        [
+          10,
+          -2
+        ],
+        [
+          2,
+          -0.5
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "gap_r_stub": {
+      "type": "NURBS_CURVE",
+      "degree": 1,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          2,
+          -0.5
+        ],
+        [
+          2,
+          0.5
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0
+      ]
+    },
+    "horn_r_top": {
+      "type": "NURBS_CURVE",
+      "degree": 3,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          2,
+          0.5
+        ],
+        [
+          10,
+          2
+        ],
+        [
+          40,
+          10
+        ],
+        [
+          100,
+          40
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "horn_r_back": {
+      "type": "NURBS_CURVE",
+      "degree": 1,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          100,
+          40
+        ],
+        [
+          100,
+          -40
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0
+      ]
+    }
+  },
+  "face_topology": {
+    "outer_wire_ccw": [
+      "horn_l_bot",
+      "gap_bot",
+      "horn_l_top",
+      "horn_l_back"
+    ],
+    "inner_hole_wires_cw": [],
+    "additional_closed_wires": [
+      [
+        "horn_r_bot",
+        "gap_r_stub",
+        "horn_r_top",
+        "horn_r_back"
+      ]
+    ]
+  }
+}

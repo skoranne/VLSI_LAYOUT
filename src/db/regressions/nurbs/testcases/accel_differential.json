@@ -1,0 +1,6287 @@
+{
+  "schema": "NURBS-BRep-2D-v1",
+  "units": "micrometer",
+  "tolerance": 1e-06,
+  "device": "differential_accelerometer",
+  "parameters": {
+    "mass_um": 120,
+    "etch_r_um": 4.0,
+    "etch_count": 46
+  },
+  "curves": {
+    "proof_mass": {
+      "type": "NURBS_POLYLINE",
+      "degree": 1,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        4
+      ],
+      "control_points": [
+        [
+          -60,
+          -60
+        ],
+        [
+          60,
+          -60
+        ],
+        [
+          60,
+          60
+        ],
+        [
+          -60,
+          60
+        ],
+        [
+          -60,
+          -60
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "etch_0_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -41.0,
+          -45
+        ],
+        [
+          -41.0,
+          -49.0
+        ],
+        [
+          -45.0,
+          -49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_0_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -45.0,
+          -49.0
+        ],
+        [
+          -49.0,
+          -49.0
+        ],
+        [
+          -49.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_0_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -49.0,
+          -45
+        ],
+        [
+          -49.0,
+          -41.0
+        ],
+        [
+          -45.0,
+          -41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_0_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -45.0,
+          -41.0
+        ],
+        [
+          -41.0,
+          -41.0
+        ],
+        [
+          -41.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_1_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -26.0,
+          -45
+        ],
+        [
+          -26.0,
+          -49.0
+        ],
+        [
+          -30.0,
+          -49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_1_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -30.0,
+          -49.0
+        ],
+        [
+          -34.0,
+          -49.0
+        ],
+        [
+          -34.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_1_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -34.0,
+          -45
+        ],
+        [
+          -34.0,
+          -41.0
+        ],
+        [
+          -30.0,
+          -41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_1_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -30.0,
+          -41.0
+        ],
+        [
+          -26.0,
+          -41.0
+        ],
+        [
+          -26.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_2_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -11.0,
+          -45
+        ],
+        [
+          -11.0,
+          -49.0
+        ],
+        [
+          -15.0,
+          -49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_2_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -15.0,
+          -49.0
+        ],
+        [
+          -19.0,
+          -49.0
+        ],
+        [
+          -19.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_2_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -19.0,
+          -45
+        ],
+        [
+          -19.0,
+          -41.0
+        ],
+        [
+          -15.0,
+          -41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_2_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -15.0,
+          -41.0
+        ],
+        [
+          -11.0,
+          -41.0
+        ],
+        [
+          -11.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_3_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          4.0,
+          -45
+        ],
+        [
+          4.0,
+          -49.0
+        ],
+        [
+          0.0,
+          -49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_3_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0.0,
+          -49.0
+        ],
+        [
+          -4.0,
+          -49.0
+        ],
+        [
+          -4.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_3_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -4.0,
+          -45
+        ],
+        [
+          -4.0,
+          -41.0
+        ],
+        [
+          0.0,
+          -41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_3_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0.0,
+          -41.0
+        ],
+        [
+          4.0,
+          -41.0
+        ],
+        [
+          4.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_4_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          19.0,
+          -45
+        ],
+        [
+          19.0,
+          -49.0
+        ],
+        [
+          15.0,
+          -49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_4_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          15.0,
+          -49.0
+        ],
+        [
+          11.0,
+          -49.0
+        ],
+        [
+          11.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_4_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          11.0,
+          -45
+        ],
+        [
+          11.0,
+          -41.0
+        ],
+        [
+          15.0,
+          -41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_4_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          15.0,
+          -41.0
+        ],
+        [
+          19.0,
+          -41.0
+        ],
+        [
+          19.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_5_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          34.0,
+          -45
+        ],
+        [
+          34.0,
+          -49.0
+        ],
+        [
+          30.0,
+          -49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_5_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          30.0,
+          -49.0
+        ],
+        [
+          26.0,
+          -49.0
+        ],
+        [
+          26.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_5_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          26.0,
+          -45
+        ],
+        [
+          26.0,
+          -41.0
+        ],
+        [
+          30.0,
+          -41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_5_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          30.0,
+          -41.0
+        ],
+        [
+          34.0,
+          -41.0
+        ],
+        [
+          34.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_6_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          49.0,
+          -45
+        ],
+        [
+          49.0,
+          -49.0
+        ],
+        [
+          45.0,
+          -49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_6_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          45.0,
+          -49.0
+        ],
+        [
+          41.0,
+          -49.0
+        ],
+        [
+          41.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_6_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          41.0,
+          -45
+        ],
+        [
+          41.0,
+          -41.0
+        ],
+        [
+          45.0,
+          -41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_6_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          45.0,
+          -41.0
+        ],
+        [
+          49.0,
+          -41.0
+        ],
+        [
+          49.0,
+          -45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_7_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -33.5,
+          -30
+        ],
+        [
+          -33.5,
+          -34.0
+        ],
+        [
+          -37.5,
+          -34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_7_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -37.5,
+          -34.0
+        ],
+        [
+          -41.5,
+          -34.0
+        ],
+        [
+          -41.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_7_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -41.5,
+          -30
+        ],
+        [
+          -41.5,
+          -26.0
+        ],
+        [
+          -37.5,
+          -26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_7_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -37.5,
+          -26.0
+        ],
+        [
+          -33.5,
+          -26.0
+        ],
+        [
+          -33.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_8_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -18.5,
+          -30
+        ],
+        [
+          -18.5,
+          -34.0
+        ],
+        [
+          -22.5,
+          -34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_8_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -22.5,
+          -34.0
+        ],
+        [
+          -26.5,
+          -34.0
+        ],
+        [
+          -26.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_8_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -26.5,
+          -30
+        ],
+        [
+          -26.5,
+          -26.0
+        ],
+        [
+          -22.5,
+          -26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_8_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -22.5,
+          -26.0
+        ],
+        [
+          -18.5,
+          -26.0
+        ],
+        [
+          -18.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_9_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -3.5,
+          -30
+        ],
+        [
+          -3.5,
+          -34.0
+        ],
+        [
+          -7.5,
+          -34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_9_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -7.5,
+          -34.0
+        ],
+        [
+          -11.5,
+          -34.0
+        ],
+        [
+          -11.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_9_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -11.5,
+          -30
+        ],
+        [
+          -11.5,
+          -26.0
+        ],
+        [
+          -7.5,
+          -26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_9_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -7.5,
+          -26.0
+        ],
+        [
+          -3.5,
+          -26.0
+        ],
+        [
+          -3.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_10_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          11.5,
+          -30
+        ],
+        [
+          11.5,
+          -34.0
+        ],
+        [
+          7.5,
+          -34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_10_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          7.5,
+          -34.0
+        ],
+        [
+          3.5,
+          -34.0
+        ],
+        [
+          3.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_10_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          3.5,
+          -30
+        ],
+        [
+          3.5,
+          -26.0
+        ],
+        [
+          7.5,
+          -26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_10_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          7.5,
+          -26.0
+        ],
+        [
+          11.5,
+          -26.0
+        ],
+        [
+          11.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_11_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          26.5,
+          -30
+        ],
+        [
+          26.5,
+          -34.0
+        ],
+        [
+          22.5,
+          -34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_11_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          22.5,
+          -34.0
+        ],
+        [
+          18.5,
+          -34.0
+        ],
+        [
+          18.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_11_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          18.5,
+          -30
+        ],
+        [
+          18.5,
+          -26.0
+        ],
+        [
+          22.5,
+          -26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_11_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          22.5,
+          -26.0
+        ],
+        [
+          26.5,
+          -26.0
+        ],
+        [
+          26.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_12_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          41.5,
+          -30
+        ],
+        [
+          41.5,
+          -34.0
+        ],
+        [
+          37.5,
+          -34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_12_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          37.5,
+          -34.0
+        ],
+        [
+          33.5,
+          -34.0
+        ],
+        [
+          33.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_12_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          33.5,
+          -30
+        ],
+        [
+          33.5,
+          -26.0
+        ],
+        [
+          37.5,
+          -26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_12_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          37.5,
+          -26.0
+        ],
+        [
+          41.5,
+          -26.0
+        ],
+        [
+          41.5,
+          -30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_13_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -41.0,
+          -15
+        ],
+        [
+          -41.0,
+          -19.0
+        ],
+        [
+          -45.0,
+          -19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_13_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -45.0,
+          -19.0
+        ],
+        [
+          -49.0,
+          -19.0
+        ],
+        [
+          -49.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_13_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -49.0,
+          -15
+        ],
+        [
+          -49.0,
+          -11.0
+        ],
+        [
+          -45.0,
+          -11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_13_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -45.0,
+          -11.0
+        ],
+        [
+          -41.0,
+          -11.0
+        ],
+        [
+          -41.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_14_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -26.0,
+          -15
+        ],
+        [
+          -26.0,
+          -19.0
+        ],
+        [
+          -30.0,
+          -19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_14_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -30.0,
+          -19.0
+        ],
+        [
+          -34.0,
+          -19.0
+        ],
+        [
+          -34.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_14_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -34.0,
+          -15
+        ],
+        [
+          -34.0,
+          -11.0
+        ],
+        [
+          -30.0,
+          -11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_14_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -30.0,
+          -11.0
+        ],
+        [
+          -26.0,
+          -11.0
+        ],
+        [
+          -26.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_15_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -11.0,
+          -15
+        ],
+        [
+          -11.0,
+          -19.0
+        ],
+        [
+          -15.0,
+          -19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_15_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -15.0,
+          -19.0
+        ],
+        [
+          -19.0,
+          -19.0
+        ],
+        [
+          -19.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_15_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -19.0,
+          -15
+        ],
+        [
+          -19.0,
+          -11.0
+        ],
+        [
+          -15.0,
+          -11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_15_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -15.0,
+          -11.0
+        ],
+        [
+          -11.0,
+          -11.0
+        ],
+        [
+          -11.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_16_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          4.0,
+          -15
+        ],
+        [
+          4.0,
+          -19.0
+        ],
+        [
+          0.0,
+          -19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_16_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0.0,
+          -19.0
+        ],
+        [
+          -4.0,
+          -19.0
+        ],
+        [
+          -4.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_16_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -4.0,
+          -15
+        ],
+        [
+          -4.0,
+          -11.0
+        ],
+        [
+          0.0,
+          -11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_16_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0.0,
+          -11.0
+        ],
+        [
+          4.0,
+          -11.0
+        ],
+        [
+          4.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_17_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          19.0,
+          -15
+        ],
+        [
+          19.0,
+          -19.0
+        ],
+        [
+          15.0,
+          -19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_17_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          15.0,
+          -19.0
+        ],
+        [
+          11.0,
+          -19.0
+        ],
+        [
+          11.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_17_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          11.0,
+          -15
+        ],
+        [
+          11.0,
+          -11.0
+        ],
+        [
+          15.0,
+          -11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_17_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          15.0,
+          -11.0
+        ],
+        [
+          19.0,
+          -11.0
+        ],
+        [
+          19.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_18_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          34.0,
+          -15
+        ],
+        [
+          34.0,
+          -19.0
+        ],
+        [
+          30.0,
+          -19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_18_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          30.0,
+          -19.0
+        ],
+        [
+          26.0,
+          -19.0
+        ],
+        [
+          26.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_18_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          26.0,
+          -15
+        ],
+        [
+          26.0,
+          -11.0
+        ],
+        [
+          30.0,
+          -11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_18_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          30.0,
+          -11.0
+        ],
+        [
+          34.0,
+          -11.0
+        ],
+        [
+          34.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_19_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          49.0,
+          -15
+        ],
+        [
+          49.0,
+          -19.0
+        ],
+        [
+          45.0,
+          -19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_19_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          45.0,
+          -19.0
+        ],
+        [
+          41.0,
+          -19.0
+        ],
+        [
+          41.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_19_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          41.0,
+          -15
+        ],
+        [
+          41.0,
+          -11.0
+        ],
+        [
+          45.0,
+          -11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_19_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          45.0,
+          -11.0
+        ],
+        [
+          49.0,
+          -11.0
+        ],
+        [
+          49.0,
+          -15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_20_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -33.5,
+          0
+        ],
+        [
+          -33.5,
+          -4.0
+        ],
+        [
+          -37.5,
+          -4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_20_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -37.5,
+          -4.0
+        ],
+        [
+          -41.5,
+          -4.0
+        ],
+        [
+          -41.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_20_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -41.5,
+          0
+        ],
+        [
+          -41.5,
+          4.0
+        ],
+        [
+          -37.5,
+          4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_20_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -37.5,
+          4.0
+        ],
+        [
+          -33.5,
+          4.0
+        ],
+        [
+          -33.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_21_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -18.5,
+          0
+        ],
+        [
+          -18.5,
+          -4.0
+        ],
+        [
+          -22.5,
+          -4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_21_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -22.5,
+          -4.0
+        ],
+        [
+          -26.5,
+          -4.0
+        ],
+        [
+          -26.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_21_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -26.5,
+          0
+        ],
+        [
+          -26.5,
+          4.0
+        ],
+        [
+          -22.5,
+          4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_21_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -22.5,
+          4.0
+        ],
+        [
+          -18.5,
+          4.0
+        ],
+        [
+          -18.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_22_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -3.5,
+          0
+        ],
+        [
+          -3.5,
+          -4.0
+        ],
+        [
+          -7.5,
+          -4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_22_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -7.5,
+          -4.0
+        ],
+        [
+          -11.5,
+          -4.0
+        ],
+        [
+          -11.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_22_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -11.5,
+          0
+        ],
+        [
+          -11.5,
+          4.0
+        ],
+        [
+          -7.5,
+          4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_22_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -7.5,
+          4.0
+        ],
+        [
+          -3.5,
+          4.0
+        ],
+        [
+          -3.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_23_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          11.5,
+          0
+        ],
+        [
+          11.5,
+          -4.0
+        ],
+        [
+          7.5,
+          -4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_23_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          7.5,
+          -4.0
+        ],
+        [
+          3.5,
+          -4.0
+        ],
+        [
+          3.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_23_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          3.5,
+          0
+        ],
+        [
+          3.5,
+          4.0
+        ],
+        [
+          7.5,
+          4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_23_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          7.5,
+          4.0
+        ],
+        [
+          11.5,
+          4.0
+        ],
+        [
+          11.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_24_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          26.5,
+          0
+        ],
+        [
+          26.5,
+          -4.0
+        ],
+        [
+          22.5,
+          -4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_24_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          22.5,
+          -4.0
+        ],
+        [
+          18.5,
+          -4.0
+        ],
+        [
+          18.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_24_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          18.5,
+          0
+        ],
+        [
+          18.5,
+          4.0
+        ],
+        [
+          22.5,
+          4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_24_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          22.5,
+          4.0
+        ],
+        [
+          26.5,
+          4.0
+        ],
+        [
+          26.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_25_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          41.5,
+          0
+        ],
+        [
+          41.5,
+          -4.0
+        ],
+        [
+          37.5,
+          -4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_25_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          37.5,
+          -4.0
+        ],
+        [
+          33.5,
+          -4.0
+        ],
+        [
+          33.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_25_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          33.5,
+          0
+        ],
+        [
+          33.5,
+          4.0
+        ],
+        [
+          37.5,
+          4.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_25_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          37.5,
+          4.0
+        ],
+        [
+          41.5,
+          4.0
+        ],
+        [
+          41.5,
+          0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_26_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -41.0,
+          15
+        ],
+        [
+          -41.0,
+          11.0
+        ],
+        [
+          -45.0,
+          11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_26_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -45.0,
+          11.0
+        ],
+        [
+          -49.0,
+          11.0
+        ],
+        [
+          -49.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_26_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -49.0,
+          15
+        ],
+        [
+          -49.0,
+          19.0
+        ],
+        [
+          -45.0,
+          19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_26_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -45.0,
+          19.0
+        ],
+        [
+          -41.0,
+          19.0
+        ],
+        [
+          -41.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_27_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -26.0,
+          15
+        ],
+        [
+          -26.0,
+          11.0
+        ],
+        [
+          -30.0,
+          11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_27_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -30.0,
+          11.0
+        ],
+        [
+          -34.0,
+          11.0
+        ],
+        [
+          -34.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_27_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -34.0,
+          15
+        ],
+        [
+          -34.0,
+          19.0
+        ],
+        [
+          -30.0,
+          19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_27_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -30.0,
+          19.0
+        ],
+        [
+          -26.0,
+          19.0
+        ],
+        [
+          -26.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_28_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -11.0,
+          15
+        ],
+        [
+          -11.0,
+          11.0
+        ],
+        [
+          -15.0,
+          11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_28_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -15.0,
+          11.0
+        ],
+        [
+          -19.0,
+          11.0
+        ],
+        [
+          -19.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_28_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -19.0,
+          15
+        ],
+        [
+          -19.0,
+          19.0
+        ],
+        [
+          -15.0,
+          19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_28_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -15.0,
+          19.0
+        ],
+        [
+          -11.0,
+          19.0
+        ],
+        [
+          -11.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_29_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          4.0,
+          15
+        ],
+        [
+          4.0,
+          11.0
+        ],
+        [
+          0.0,
+          11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_29_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0.0,
+          11.0
+        ],
+        [
+          -4.0,
+          11.0
+        ],
+        [
+          -4.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_29_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -4.0,
+          15
+        ],
+        [
+          -4.0,
+          19.0
+        ],
+        [
+          0.0,
+          19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_29_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0.0,
+          19.0
+        ],
+        [
+          4.0,
+          19.0
+        ],
+        [
+          4.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_30_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          19.0,
+          15
+        ],
+        [
+          19.0,
+          11.0
+        ],
+        [
+          15.0,
+          11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_30_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          15.0,
+          11.0
+        ],
+        [
+          11.0,
+          11.0
+        ],
+        [
+          11.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_30_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          11.0,
+          15
+        ],
+        [
+          11.0,
+          19.0
+        ],
+        [
+          15.0,
+          19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_30_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          15.0,
+          19.0
+        ],
+        [
+          19.0,
+          19.0
+        ],
+        [
+          19.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_31_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          34.0,
+          15
+        ],
+        [
+          34.0,
+          11.0
+        ],
+        [
+          30.0,
+          11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_31_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          30.0,
+          11.0
+        ],
+        [
+          26.0,
+          11.0
+        ],
+        [
+          26.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_31_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          26.0,
+          15
+        ],
+        [
+          26.0,
+          19.0
+        ],
+        [
+          30.0,
+          19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_31_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          30.0,
+          19.0
+        ],
+        [
+          34.0,
+          19.0
+        ],
+        [
+          34.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_32_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          49.0,
+          15
+        ],
+        [
+          49.0,
+          11.0
+        ],
+        [
+          45.0,
+          11.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_32_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          45.0,
+          11.0
+        ],
+        [
+          41.0,
+          11.0
+        ],
+        [
+          41.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_32_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          41.0,
+          15
+        ],
+        [
+          41.0,
+          19.0
+        ],
+        [
+          45.0,
+          19.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_32_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          45.0,
+          19.0
+        ],
+        [
+          49.0,
+          19.0
+        ],
+        [
+          49.0,
+          15
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_33_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -33.5,
+          30
+        ],
+        [
+          -33.5,
+          26.0
+        ],
+        [
+          -37.5,
+          26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_33_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -37.5,
+          26.0
+        ],
+        [
+          -41.5,
+          26.0
+        ],
+        [
+          -41.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_33_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -41.5,
+          30
+        ],
+        [
+          -41.5,
+          34.0
+        ],
+        [
+          -37.5,
+          34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_33_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -37.5,
+          34.0
+        ],
+        [
+          -33.5,
+          34.0
+        ],
+        [
+          -33.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_34_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -18.5,
+          30
+        ],
+        [
+          -18.5,
+          26.0
+        ],
+        [
+          -22.5,
+          26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_34_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -22.5,
+          26.0
+        ],
+        [
+          -26.5,
+          26.0
+        ],
+        [
+          -26.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_34_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -26.5,
+          30
+        ],
+        [
+          -26.5,
+          34.0
+        ],
+        [
+          -22.5,
+          34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_34_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -22.5,
+          34.0
+        ],
+        [
+          -18.5,
+          34.0
+        ],
+        [
+          -18.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_35_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -3.5,
+          30
+        ],
+        [
+          -3.5,
+          26.0
+        ],
+        [
+          -7.5,
+          26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_35_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -7.5,
+          26.0
+        ],
+        [
+          -11.5,
+          26.0
+        ],
+        [
+          -11.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_35_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -11.5,
+          30
+        ],
+        [
+          -11.5,
+          34.0
+        ],
+        [
+          -7.5,
+          34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_35_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -7.5,
+          34.0
+        ],
+        [
+          -3.5,
+          34.0
+        ],
+        [
+          -3.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_36_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          11.5,
+          30
+        ],
+        [
+          11.5,
+          26.0
+        ],
+        [
+          7.5,
+          26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_36_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          7.5,
+          26.0
+        ],
+        [
+          3.5,
+          26.0
+        ],
+        [
+          3.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_36_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          3.5,
+          30
+        ],
+        [
+          3.5,
+          34.0
+        ],
+        [
+          7.5,
+          34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_36_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          7.5,
+          34.0
+        ],
+        [
+          11.5,
+          34.0
+        ],
+        [
+          11.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_37_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          26.5,
+          30
+        ],
+        [
+          26.5,
+          26.0
+        ],
+        [
+          22.5,
+          26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_37_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          22.5,
+          26.0
+        ],
+        [
+          18.5,
+          26.0
+        ],
+        [
+          18.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_37_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          18.5,
+          30
+        ],
+        [
+          18.5,
+          34.0
+        ],
+        [
+          22.5,
+          34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_37_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          22.5,
+          34.0
+        ],
+        [
+          26.5,
+          34.0
+        ],
+        [
+          26.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_38_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          41.5,
+          30
+        ],
+        [
+          41.5,
+          26.0
+        ],
+        [
+          37.5,
+          26.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_38_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          37.5,
+          26.0
+        ],
+        [
+          33.5,
+          26.0
+        ],
+        [
+          33.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_38_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          33.5,
+          30
+        ],
+        [
+          33.5,
+          34.0
+        ],
+        [
+          37.5,
+          34.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_38_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          37.5,
+          34.0
+        ],
+        [
+          41.5,
+          34.0
+        ],
+        [
+          41.5,
+          30
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_39_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -41.0,
+          45
+        ],
+        [
+          -41.0,
+          41.0
+        ],
+        [
+          -45.0,
+          41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_39_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -45.0,
+          41.0
+        ],
+        [
+          -49.0,
+          41.0
+        ],
+        [
+          -49.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_39_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -49.0,
+          45
+        ],
+        [
+          -49.0,
+          49.0
+        ],
+        [
+          -45.0,
+          49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_39_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -45.0,
+          49.0
+        ],
+        [
+          -41.0,
+          49.0
+        ],
+        [
+          -41.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_40_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -26.0,
+          45
+        ],
+        [
+          -26.0,
+          41.0
+        ],
+        [
+          -30.0,
+          41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_40_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -30.0,
+          41.0
+        ],
+        [
+          -34.0,
+          41.0
+        ],
+        [
+          -34.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_40_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -34.0,
+          45
+        ],
+        [
+          -34.0,
+          49.0
+        ],
+        [
+          -30.0,
+          49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_40_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -30.0,
+          49.0
+        ],
+        [
+          -26.0,
+          49.0
+        ],
+        [
+          -26.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_41_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -11.0,
+          45
+        ],
+        [
+          -11.0,
+          41.0
+        ],
+        [
+          -15.0,
+          41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_41_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -15.0,
+          41.0
+        ],
+        [
+          -19.0,
+          41.0
+        ],
+        [
+          -19.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_41_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -19.0,
+          45
+        ],
+        [
+          -19.0,
+          49.0
+        ],
+        [
+          -15.0,
+          49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_41_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -15.0,
+          49.0
+        ],
+        [
+          -11.0,
+          49.0
+        ],
+        [
+          -11.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_42_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          4.0,
+          45
+        ],
+        [
+          4.0,
+          41.0
+        ],
+        [
+          0.0,
+          41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_42_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0.0,
+          41.0
+        ],
+        [
+          -4.0,
+          41.0
+        ],
+        [
+          -4.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_42_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          -4.0,
+          45
+        ],
+        [
+          -4.0,
+          49.0
+        ],
+        [
+          0.0,
+          49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_42_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          0.0,
+          49.0
+        ],
+        [
+          4.0,
+          49.0
+        ],
+        [
+          4.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_43_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          19.0,
+          45
+        ],
+        [
+          19.0,
+          41.0
+        ],
+        [
+          15.0,
+          41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_43_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          15.0,
+          41.0
+        ],
+        [
+          11.0,
+          41.0
+        ],
+        [
+          11.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_43_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          11.0,
+          45
+        ],
+        [
+          11.0,
+          49.0
+        ],
+        [
+          15.0,
+          49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_43_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          15.0,
+          49.0
+        ],
+        [
+          19.0,
+          49.0
+        ],
+        [
+          19.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_44_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          34.0,
+          45
+        ],
+        [
+          34.0,
+          41.0
+        ],
+        [
+          30.0,
+          41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_44_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          30.0,
+          41.0
+        ],
+        [
+          26.0,
+          41.0
+        ],
+        [
+          26.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_44_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          26.0,
+          45
+        ],
+        [
+          26.0,
+          49.0
+        ],
+        [
+          30.0,
+          49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_44_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          30.0,
+          49.0
+        ],
+        [
+          34.0,
+          49.0
+        ],
+        [
+          34.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_45_q3": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          49.0,
+          45
+        ],
+        [
+          49.0,
+          41.0
+        ],
+        [
+          45.0,
+          41.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_45_q2": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          45.0,
+          41.0
+        ],
+        [
+          41.0,
+          41.0
+        ],
+        [
+          41.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_45_q1": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          41.0,
+          45
+        ],
+        [
+          41.0,
+          49.0
+        ],
+        [
+          45.0,
+          49.0
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "etch_45_q0": {
+      "type": "NURBS_CURVE",
+      "degree": 2,
+      "rational": true,
+      "knots": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        1
+      ],
+      "control_points": [
+        [
+          45.0,
+          49.0
+        ],
+        [
+          49.0,
+          49.0
+        ],
+        [
+          49.0,
+          45
+        ]
+      ],
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    },
+    "spring_ur": {
+      "type": "NURBS_POLYLINE",
+      "degree": 1,
+      "rational": false,
+      "knots": [
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        6
+      ],
+      "control_points": [
+        [
+          60,
+          50
+        ],
+        [
+          90,
+          50
+        ],
+        [
+          90,
+          70
+        ],
+        [
+          70,
+          70
+        ],
+        [
+          70,
+          60
+        ],
+        [
+          60,
+          60
+        ],
+        [
+          60,
+          50
+        ]
+      ],
+      "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  "face_topology": {
+    "outer_wire_ccw": [
+      "proof_mass"
+    ],
+    "inner_hole_wires_cw": [
+      [
+        "etch_0_q3",
+        "etch_0_q2",
+        "etch_0_q1",
+        "etch_0_q0"
+      ],
+      [
+        "etch_1_q3",
+        "etch_1_q2",
+        "etch_1_q1",
+        "etch_1_q0"
+      ],
+      [
+        "etch_2_q3",
+        "etch_2_q2",
+        "etch_2_q1",
+        "etch_2_q0"
+      ],
+      [
+        "etch_3_q3",
+        "etch_3_q2",
+        "etch_3_q1",
+        "etch_3_q0"
+      ],
+      [
+        "etch_4_q3",
+        "etch_4_q2",
+        "etch_4_q1",
+        "etch_4_q0"
+      ],
+      [
+        "etch_5_q3",
+        "etch_5_q2",
+        "etch_5_q1",
+        "etch_5_q0"
+      ],
+      [
+        "etch_6_q3",
+        "etch_6_q2",
+        "etch_6_q1",
+        "etch_6_q0"
+      ],
+      [
+        "etch_7_q3",
+        "etch_7_q2",
+        "etch_7_q1",
+        "etch_7_q0"
+      ],
+      [
+        "etch_8_q3",
+        "etch_8_q2",
+        "etch_8_q1",
+        "etch_8_q0"
+      ],
+      [
+        "etch_9_q3",
+        "etch_9_q2",
+        "etch_9_q1",
+        "etch_9_q0"
+      ],
+      [
+        "etch_10_q3",
+        "etch_10_q2",
+        "etch_10_q1",
+        "etch_10_q0"
+      ],
+      [
+        "etch_11_q3",
+        "etch_11_q2",
+        "etch_11_q1",
+        "etch_11_q0"
+      ],
+      [
+        "etch_12_q3",
+        "etch_12_q2",
+        "etch_12_q1",
+        "etch_12_q0"
+      ],
+      [
+        "etch_13_q3",
+        "etch_13_q2",
+        "etch_13_q1",
+        "etch_13_q0"
+      ],
+      [
+        "etch_14_q3",
+        "etch_14_q2",
+        "etch_14_q1",
+        "etch_14_q0"
+      ],
+      [
+        "etch_15_q3",
+        "etch_15_q2",
+        "etch_15_q1",
+        "etch_15_q0"
+      ],
+      [
+        "etch_16_q3",
+        "etch_16_q2",
+        "etch_16_q1",
+        "etch_16_q0"
+      ],
+      [
+        "etch_17_q3",
+        "etch_17_q2",
+        "etch_17_q1",
+        "etch_17_q0"
+      ],
+      [
+        "etch_18_q3",
+        "etch_18_q2",
+        "etch_18_q1",
+        "etch_18_q0"
+      ],
+      [
+        "etch_19_q3",
+        "etch_19_q2",
+        "etch_19_q1",
+        "etch_19_q0"
+      ],
+      [
+        "etch_20_q3",
+        "etch_20_q2",
+        "etch_20_q1",
+        "etch_20_q0"
+      ],
+      [
+        "etch_21_q3",
+        "etch_21_q2",
+        "etch_21_q1",
+        "etch_21_q0"
+      ],
+      [
+        "etch_22_q3",
+        "etch_22_q2",
+        "etch_22_q1",
+        "etch_22_q0"
+      ],
+      [
+        "etch_23_q3",
+        "etch_23_q2",
+        "etch_23_q1",
+        "etch_23_q0"
+      ],
+      [
+        "etch_24_q3",
+        "etch_24_q2",
+        "etch_24_q1",
+        "etch_24_q0"
+      ],
+      [
+        "etch_25_q3",
+        "etch_25_q2",
+        "etch_25_q1",
+        "etch_25_q0"
+      ],
+      [
+        "etch_26_q3",
+        "etch_26_q2",
+        "etch_26_q1",
+        "etch_26_q0"
+      ],
+      [
+        "etch_27_q3",
+        "etch_27_q2",
+        "etch_27_q1",
+        "etch_27_q0"
+      ],
+      [
+        "etch_28_q3",
+        "etch_28_q2",
+        "etch_28_q1",
+        "etch_28_q0"
+      ],
+      [
+        "etch_29_q3",
+        "etch_29_q2",
+        "etch_29_q1",
+        "etch_29_q0"
+      ],
+      [
+        "etch_30_q3",
+        "etch_30_q2",
+        "etch_30_q1",
+        "etch_30_q0"
+      ],
+      [
+        "etch_31_q3",
+        "etch_31_q2",
+        "etch_31_q1",
+        "etch_31_q0"
+      ],
+      [
+        "etch_32_q3",
+        "etch_32_q2",
+        "etch_32_q1",
+        "etch_32_q0"
+      ],
+      [
+        "etch_33_q3",
+        "etch_33_q2",
+        "etch_33_q1",
+        "etch_33_q0"
+      ],
+      [
+        "etch_34_q3",
+        "etch_34_q2",
+        "etch_34_q1",
+        "etch_34_q0"
+      ],
+      [
+        "etch_35_q3",
+        "etch_35_q2",
+        "etch_35_q1",
+        "etch_35_q0"
+      ],
+      [
+        "etch_36_q3",
+        "etch_36_q2",
+        "etch_36_q1",
+        "etch_36_q0"
+      ],
+      [
+        "etch_37_q3",
+        "etch_37_q2",
+        "etch_37_q1",
+        "etch_37_q0"
+      ],
+      [
+        "etch_38_q3",
+        "etch_38_q2",
+        "etch_38_q1",
+        "etch_38_q0"
+      ],
+      [
+        "etch_39_q3",
+        "etch_39_q2",
+        "etch_39_q1",
+        "etch_39_q0"
+      ],
+      [
+        "etch_40_q3",
+        "etch_40_q2",
+        "etch_40_q1",
+        "etch_40_q0"
+      ],
+      [
+        "etch_41_q3",
+        "etch_41_q2",
+        "etch_41_q1",
+        "etch_41_q0"
+      ],
+      [
+        "etch_42_q3",
+        "etch_42_q2",
+        "etch_42_q1",
+        "etch_42_q0"
+      ],
+      [
+        "etch_43_q3",
+        "etch_43_q2",
+        "etch_43_q1",
+        "etch_43_q0"
+      ],
+      [
+        "etch_44_q3",
+        "etch_44_q2",
+        "etch_44_q1",
+        "etch_44_q0"
+      ],
+      [
+        "etch_45_q3",
+        "etch_45_q2",
+        "etch_45_q1",
+        "etch_45_q0"
+      ]
+    ],
+    "additional_closed_wires": [
+      [
+        "spring_ur"
+      ]
+    ]
+  }
+}
