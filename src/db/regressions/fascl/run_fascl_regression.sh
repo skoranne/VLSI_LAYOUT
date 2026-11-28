@@ -36,7 +36,7 @@ check fascl_norep.oas        68/20,69/20,70/20 1 1 0 1   # no repetitions: PROPE
 check fascl_plain_m1.oas     68/20       0 0 -   # no CBLOCK, offsets in START (68/20 props are unique)
 check fascl_copy_L68_D20.oas 68/20       1 1 -   # COPY into an output db, .mag names an .oas file
 
-full=$(stat -c %s fascl_full.oas); norep=$(stat -c %s fascl_norep.oas)
+full=$(stat -f %z fascl_full.oas 2>/dev/null || stat -c %s fascl_full.oas); norep=$(stat -f %z fascl_norep.oas 2>/dev/null || stat -c %s fascl_norep.oas)
 if [ "$full" -ge "$norep" ]; then
   echo "FAIL: repetitions did not shrink the file ($full >= $norep bytes)"; status=1
 else

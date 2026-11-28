@@ -78,6 +78,8 @@ event_sorter.o: event_sorter.cu
 	g++ -x c++ -O3 -c event_sorter.cu -o $@
 gpu_morton.o: gpu_morton.cu
 	g++ -x c++ -O3 -c gpu_morton.cu -o $@
+nurbs_gpu.o: nurbs_gpu/nurbs_gpu.cu nurbs_gpu/nurbs_types.hpp
+	g++ -O3 -std=c++17 -Inurbs_gpu -c -x c++ nurbs_gpu/nurbs_gpu.cu -o $@
 
 # Any-angle exact kernel unit tests
 .PHONY: unit_test_anyangle

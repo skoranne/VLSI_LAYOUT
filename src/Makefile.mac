@@ -125,6 +125,9 @@ event_sorter.o: event_sorter.cu
 gpu_morton.o: gpu_morton.cu
 	$(CXX) -O3 -c -x c++ gpu_morton.cu -o $@
 
+nurbs_gpu.o: nurbs_gpu/nurbs_gpu.cu nurbs_gpu/nurbs_types.hpp
+	$(CXX) -O3 -std=c++17 -Inurbs_gpu -c -x c++ nurbs_gpu/nurbs_gpu.cu -o $@
+
 # MAGVIEWER (OpenGL/glfw + f90gl wrappers). On macOS this may require glfw/f90gl libraries.
 GLFW_LIBS ?= -lglfw
 GL_LIBS_MAC ?= -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
