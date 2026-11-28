@@ -17,17 +17,17 @@ inline void eval_bez(const BezSpan& b, f64 t, f64& x, f64& y) {
     x = bx[0]/bw[0]; y = by[0]/bw[0];
 }
 
-// Split rational Bezier at t into left/right (de Casteljau).
+// Split rational Bezier at t into left/right (homogeneous de Casteljau).
 inline void split_bez(const BezSpan& b, f64 t, BezSpan& L, BezSpan& R) {
     int p=b.degree;
-    f64 px[4][4], py[4][4], pw[4][4];
-    for(int i=0;i<=p;++i){ px[0][i]=b.cx[i]; py[0][i]=b.cy[i]; pw[0][i]=b.cw[i]; }
+    f64 hx[4][4], hy[4][4], hw[4][4];
+    for(int i=0;i<=p;++i){ f64 w=b.cw[i]; hx[0][i]=b.cx[i]*w; hy[0][i]=b.cy[i]*w; hw[0][i]=w; }
     for(int r=1;r<=p;++r) for(int j=0;j<=p-r;++j){
-        f64 u=1.0-t; px[r][j]=u*px[r-1][j]+t*px[r-1][j+1];
-        py[r][j]=u*py[r-1][j]+t*py[r-1][j+1]; pw[r][j]=u*pw[r-1][j]+t*pw[r-1][j+1]; }
+        f64 u=1.0-t; hx[r][j]=u*hx[r-1][j]+t*hx[r-1][j+1];
+        hy[r][j]=u*hy[r-1][j]+t*hy[r-1][j+1]; hw[r][j]=u*hw[r-1][j]+t*hw[r-1][j+1]; }
     L=b; R=b;
-    for(int i=0;i<=p;++i){ L.cx[i]=px[i][0]; L.cy[i]=py[i][0]; L.cw[i]=pw[i][0];
-                           R.cx[i]=px[p-i][i]; R.cy[i]=py[p-i][i]; R.cw[i]=pw[p-i][i]; }
+    for(int i=0;i<=p;++i){ L.cw[i]=hw[i][0]; L.cx[i]=hx[i][0]/hw[i][0]; L.cy[i]=hy[i][0]/hw[i][0];
+                           R.cw[i]=hw[p-i][i]; R.cx[i]=hx[p-i][i]/hw[p-i][i]; R.cy[i]=hy[p-i][i]/hw[p-i][i]; }
 }
 
 // Derivative control points for polynomial (non-rational) Bezier degree p: p*(P_{i+1}-P_i)

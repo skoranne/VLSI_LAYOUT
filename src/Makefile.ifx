@@ -161,6 +161,8 @@ event_sorter.o:	       event_sorter.cu
 		       g++ -x c++ -O3 -c event_sorter.cu
 gpu_morton.o:	gpu_morton.cu
 	g++ -O3 -c -x c++ gpu_morton.cu
+nurbs_gpu.o:	nurbs_gpu/nurbs_gpu.cu nurbs_gpu/nurbs_types.hpp
+	g++ -O3 -std=c++17 -Inurbs_gpu -c -x c++ nurbs_gpu/nurbs_gpu.cu -o nurbs_gpu.o
 glf90w.o: glf90w.F90
 	$(FC) -c -O3 -fpp -DGLF90W_USE_INTRINSIC_C_F_STRPOINTER glf90w.F90 -o $@
 # GLFW header discovery: do not assume a system-wide GLFW (rhel8-A has none;

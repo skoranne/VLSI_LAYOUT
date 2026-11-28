@@ -176,11 +176,15 @@ event_sorter.o:	       event_sorter.cu
 		       g++ -x c++ -O3 -c event_sorter.cu
 gpu_morton.o:   gpu_morton.cu
 		       g++ -O3 -c -x c++ gpu_morton.cu
+nurbs_gpu.o:    nurbs_gpu/nurbs_gpu.cu nurbs_gpu/nurbs_types.hpp
+		       g++ -O3 -std=c++17 -Inurbs_gpu -c -x c++ nurbs_gpu/nurbs_gpu.cu -o nurbs_gpu.o
 else
 event_sorter.o:	       event_sorter.cu
 		       $(NVCC) $(NVCCFLAGS) -c event_sorter.cu
 gpu_morton.o:   gpu_morton.cu
 		       $(NVCC) $(NVCCFLAGS) -c gpu_morton.cu
+nurbs_gpu.o:    nurbs_gpu/nurbs_gpu.cu nurbs_gpu/nurbs_types.hpp
+		       $(NVCC) $(NVCCFLAGS) -Inurbs_gpu -c nurbs_gpu/nurbs_gpu.cu -o nurbs_gpu.o
 endif
 # Nsight Systems profiling for nvfortran+OpenMP target offload (GB10). Example:
 #   make -f Makefile.nvf profile CTR=check_interactions.ctr LAYERS=10
