@@ -1,0 +1,71 @@
+{
+  "schema": "NURBS-BRep-2D-v1",
+  "domain_id": "Omega_curvilinear_multiply_connected",
+  "vertices": {
+    "A_0_1": [42.0, 62.0],
+    "A_1_1": [34.0, 3.0],
+    "A_2_1": [89.0, 9.0],
+    "A_3_1": [96.0, 90.0],
+    "A_Jm1_1": [5.0, 63.0],
+    "A_0_2": [57.0, 65.0],
+    "A_1_2": [59.0, 87.0]
+  },
+  "curves": {
+    "Gamma_1_1": {
+      "from": "A_0_1", "to": "A_1_1",
+      "degree": 2, "rational": true,
+      "knots": [0, 0, 0, 1, 1, 1],
+      "control_points": [[42.0, 62.0], [56.0, 32.0], [34.0, 3.0]],
+      "weights": [1.0, 0.85, 1.0]
+    },
+    "Gamma_2_1": {
+      "from": "A_1_1", "to": "A_2_1",
+      "degree": 1, "rational": false,
+      "knots": [0, 0, 1, 1],
+      "control_points": [[34.0, 3.0], [89.0, 9.0]],
+      "weights": [1.0, 1.0]
+    },
+    "Gamma_3_1": {
+      "from": "A_2_1", "to": "A_3_1",
+      "degree": 2, "rational": true,
+      "knots": [0, 0, 0, 1, 1, 1],
+      "control_points": [[89.0, 9.0], [64.0, 56.0], [96.0, 90.0]],
+      "weights": [1.0, 0.82, 1.0]
+    },
+    "Gamma_Jm1_1": {
+      "from": "A_3_1", "to": "A_Jm1_1",
+      "degree": 2, "rational": true,
+      "knots": [0, 0, 0, 1, 1, 1],
+      "control_points": [[96.0, 90.0], [48.0, 106.0], [5.0, 63.0]],
+      "weights": [1.0, 0.88, 1.0]
+    },
+    "Gamma_J_1": {
+      "from": "A_Jm1_1", "to": "A_0_1",
+      "degree": 2, "rational": true,
+      "knots": [0, 0, 0, 1, 1, 1],
+      "control_points": [[5.0, 63.0], [21.0, 31.0], [42.0, 62.0]],
+      "weights": [1.0, 0.78, 1.0]
+    },
+    "Gamma_1_2": {
+      "from": "A_1_2", "to": "A_0_2",
+      "degree": 2, "rational": true,
+      "knots": [0, 0, 0, 1, 1, 1],
+      "control_points": [[59.0, 87.0], [72.0, 76.0], [57.0, 65.0]],
+      "weights": [1.0, 0.80, 1.0]
+    },
+    "Gamma_2_2": {
+      "from": "A_0_2", "to": "A_1_2",
+      "degree": 1, "rational": false,
+      "knots": [0, 0, 1, 1],
+      "control_points": [[57.0, 65.0], [59.0, 87.0]],
+      "weights": [1.0, 1.0]
+    }
+  },
+  "face_topology": {
+    "outer_wire_ccw": ["Gamma_1_1", "Gamma_2_1", "Gamma_3_1", "Gamma_Jm1_1", "Gamma_J_1"],
+    "inner_hole_wires_cw": [
+      ["Gamma_1_2", "Gamma_2_2"]
+    ]
+  }
+}
+

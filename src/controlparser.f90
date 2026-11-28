@@ -289,6 +289,161 @@ contains
          ' time=', t1 - t0
   end subroutine MeasureLayerRef
 
+  subroutine MetricCountRef( ref, line_no, design_dbs, ht )
+    character(len=*), intent(in) :: ref
+    integer, intent(in) :: line_no
+    type(Design), intent(inout), target :: design_dbs(:)
+    type(hash_type), intent(inout) :: ht
+    integer :: c, dbi, li
+    logical :: found
+    integer(kind=int64) :: cnt
+    c = index(ref, ':')
+    if( c == 0 ) then
+       write(*,'(A,A)') 'ERROR: exec count: expected db:layer, got ', ref
+       return
+    end if
+    call hash_get( ht, ref(1:c-1), dbi, found )
+    if( .not. found ) then
+       write(*,'(A,A)') 'ERROR: exec count: unknown design ', ref(1:c-1)
+       return
+    end if
+    call hash_get( design_dbs(dbi)%ht, ref(c+1:), li, found )
+    if( .not. found ) then
+       write(*,'(A,I0,A,A,A)') 'COUNT line=', line_no, ' layer=', ref, ' missing'
+       return
+    end if
+    associate( L => design_dbs(dbi)%layers(li) )
+      if( L%is_compact ) call LayerExpand( L )
+      if( LayerIsAnyAngle( L ) ) then
+         ! count trapezoids/boxes in any-angle store
+         if( L%n_traps > 0 ) then
+            cnt = L%n_traps
+         else
+            cnt = L%n_used
+         end if
+      else
+         cnt = L%n_used
+      end if
+    end associate
+    write(*,'(A,I0,A,A,A,I0)') 'COUNT line=', line_no, ' layer=', ref, ' count=', cnt
+  end subroutine MetricCountRef
+
+  subroutine MetricAreaRef( ref, line_no, design_dbs, ht )
+    character(len=*), intent(in) :: ref
+    integer, intent(in) :: line_no
+    type(Design), intent(inout), target :: design_dbs(:)
+    type(hash_type), intent(inout) :: ht
+    integer :: c, dbi, li
+    logical :: found
+    type(LayerMeasures) :: m
+    real(kind=real64) :: t0, t1
+    c = index(ref, ':')
+    if( c == 0 ) then
+       write(*,'(A,A)') 'ERROR: exec area: expected db:layer, got ', ref
+       return
+    end if
+    call hash_get( ht, ref(1:c-1), dbi, found )
+    if( .not. found ) then
+       write(*,'(A,A)') 'ERROR: exec area: unknown design ', ref(1:c-1)
+       return
+    end if
+    call hash_get( design_dbs(dbi)%ht, ref(c+1:), li, found )
+    if( .not. found ) then
+       write(*,'(A,I0,A,A,A)') 'AREA line=', line_no, ' layer=', ref, ' missing'
+       return
+    end if
+    call cpu_time(t0)
+    associate( L => design_dbs(dbi)%layers(li) )
+      if( LayerIsAnyAngle( L ) ) then
+         call AnyAngleMeasure( L, m )
+      else
+         if( L%is_compact ) call LayerExpand( L )
+         if( L%n_used > 0 .and. NeedsHealing( L ) ) call PreprocessLayer( L )
+         call MeasureDisjointBoxes( L%layer_boxes, L%n_used, m )
+      end if
+    end associate
+    call cpu_time(t1)
+    write(*,'(A,I0,A,A,A,I0,A,F0.2)') 'AREA line=', line_no, ' layer=', ref, ' area=', m%area, ' time=', t1-t0
+  end subroutine MetricAreaRef
+
+  subroutine MetricBBoxRef( ref, line_no, design_dbs, ht )
+    character(len=*), intent(in) :: ref
+    integer, intent(in) :: line_no
+    type(Design), intent(inout), target :: design_dbs(:)
+    type(hash_type), intent(inout) :: ht
+    integer :: c, dbi, li
+    logical :: found
+    integer(kind=int64) :: i
+    integer(kind=K_COORDINATE_KIND) :: minx, miny, maxx, maxy
+    logical :: have
+    c = index(ref, ':')
+    if( c == 0 ) then
+       write(*,'(A,A)') 'ERROR: exec bbox: expected db:layer, got ', ref
+       return
+    end if
+    call hash_get( ht, ref(1:c-1), dbi, found )
+    if( .not. found ) then
+       write(*,'(A,A)') 'ERROR: exec bbox: unknown design ', ref(1:c-1)
+       return
+    end if
+    call hash_get( design_dbs(dbi)%ht, ref(c+1:), li, found )
+    if( .not. found ) then
+       write(*,'(A,I0,A,A,A)') 'BBOX line=', line_no, ' layer=', ref, ' missing'
+       return
+    end if
+    have = .false.
+    minx = 0; miny = 0; maxx = 0; maxy = 0
+    associate( L => design_dbs(dbi)%layers(li) )
+      if( L%is_compact ) call LayerExpand( L )
+      if( LayerIsAnyAngle( L ) ) then
+         ! compute from traps if present, else boxes
+         if( L%n_traps > 0 ) then
+            do i = 1, L%n_traps
+               if( .not. have ) then
+                  minx = int(L%traps(i)%l%ax, K_COORDINATE_KIND); maxx = int(L%traps(i)%r%ax, K_COORDINATE_KIND)
+                  miny = int(L%traps(i)%y1, K_COORDINATE_KIND); maxy = int(L%traps(i)%y2, K_COORDINATE_KIND)
+                  have = .true.
+               else
+                  minx = min(minx, int(L%traps(i)%l%ax, K_COORDINATE_KIND))
+                  maxx = max(maxx, int(L%traps(i)%r%ax, K_COORDINATE_KIND))
+                  miny = min(miny, int(L%traps(i)%y1, K_COORDINATE_KIND))
+                  maxy = max(maxy, int(L%traps(i)%y2, K_COORDINATE_KIND))
+               end if
+            end do
+         else if( L%n_used > 0 ) then
+            do i = 1, L%n_used
+               if( .not. have ) then
+                  minx = L%layer_boxes(i)%x1; miny = L%layer_boxes(i)%y1
+                  maxx = L%layer_boxes(i)%x2; maxy = L%layer_boxes(i)%y2
+                  have = .true.
+               else
+                  minx = min(minx, L%layer_boxes(i)%x1); maxx = max(maxx, L%layer_boxes(i)%x2)
+                  miny = min(miny, L%layer_boxes(i)%y1); maxy = max(maxy, L%layer_boxes(i)%y2)
+               end if
+            end do
+         end if
+      else
+         if( L%n_used > 0 ) then
+            do i = 1, L%n_used
+               if( .not. have ) then
+                  minx = L%layer_boxes(i)%x1; miny = L%layer_boxes(i)%y1
+                  maxx = L%layer_boxes(i)%x2; maxy = L%layer_boxes(i)%y2
+                  have = .true.
+               else
+                  minx = min(minx, L%layer_boxes(i)%x1); maxx = max(maxx, L%layer_boxes(i)%x2)
+                  miny = min(miny, L%layer_boxes(i)%y1); maxy = max(maxy, L%layer_boxes(i)%y2)
+               end if
+            end do
+         end if
+      end if
+    end associate
+    if( .not. have ) then
+       write(*,'(A,I0,A,A,A)') 'BBOX line=', line_no, ' layer=', ref, ' empty'
+    else
+       write(*,'(A,I0,A,A,A,I0,A,I0,A,I0,A,I0,A)') 'BBOX line=', line_no, ' layer=', ref, ' (', minx, ',', miny, ')-(', maxx, ',', maxy, ')'
+    end if
+  end subroutine MetricBBoxRef
+
   subroutine ParseControlFile( fileName, MAX_LAYERS )
     character(len=*), intent(in) :: fileName
     integer, intent(in) :: MAX_LAYERS
@@ -725,6 +880,33 @@ contains
                 pos = index(rest, ' ')
                 if (pos == 0) pos = len_trim(rest)+1
                 call MeasureLayerRef( trim(rest(1:pos-1)), line_number, design_dbs, ht )
+                rest = adjustl(rest(pos:))
+             end do
+             cycle read_loop
+          else if( trim(rest(1:pos-1)) == 'count' ) then
+             rest = adjustl(rest(pos+1:))
+             do while( len_trim(rest) > 0 )
+                pos = index(rest, ' ')
+                if (pos == 0) pos = len_trim(rest)+1
+                call MetricCountRef( trim(rest(1:pos-1)), line_number, design_dbs, ht )
+                rest = adjustl(rest(pos:))
+             end do
+             cycle read_loop
+          else if( trim(rest(1:pos-1)) == 'area' ) then
+             rest = adjustl(rest(pos+1:))
+             do while( len_trim(rest) > 0 )
+                pos = index(rest, ' ')
+                if (pos == 0) pos = len_trim(rest)+1
+                call MetricAreaRef( trim(rest(1:pos-1)), line_number, design_dbs, ht )
+                rest = adjustl(rest(pos:))
+             end do
+             cycle read_loop
+          else if( trim(rest(1:pos-1)) == 'bbox' ) then
+             rest = adjustl(rest(pos+1:))
+             do while( len_trim(rest) > 0 )
+                pos = index(rest, ' ')
+                if (pos == 0) pos = len_trim(rest)+1
+                call MetricBBoxRef( trim(rest(1:pos-1)), line_number, design_dbs, ht )
                 rest = adjustl(rest(pos:))
              end do
              cycle read_loop
@@ -1165,6 +1347,10 @@ contains
                         else if( aa_any .and. primary_operator == 'COPY' ) then
                            call CopyLayer( lhs_layer, rhs1_layer )
                            banded_done = .true.
+                        else if( aa_any .and. primary_operator == 'MERGE' ) then
+                           call CopyLayer( lhs_layer, rhs1_layer )
+                           call MergeHealLayer( lhs_layer )
+                           banded_done = .true.
                         else if( aa_any .and. primary_operator == 'ASSERT_ZERO' ) then
                            if( rhs1_layer%n_traps > 0 ) then
                               write(*,'(A,I5,A)') '************ ASSERT_ZERO fail on layer. Line: ', line_number-1, &
@@ -1247,6 +1433,9 @@ contains
                      case('FRAMENOT')
                         call CalculateFrameNOT( rhs1_layer, rhs2_layer, lhs_layer )
                         !write(*,'(A,I12,A,I12,A,I12)') '|R1| = ', rhs1_layer%n_used, ' |R2| = ', rhs2_layer%n_used, ' |O1| = ', lhs_layer%n_used
+                     case('ANDNOT')
+                        !> A ANDNOT B == A \ B (BOOSTNOT semantics, same as A ! B)
+                        call CalculateBoostOperation( rhs1_layer, rhs2_layer, lhs_layer, K_BOOST_CONTROL_NOT, 0_int64 )
                      case ('EXTENT')
                         !> d1:poly EXTENT nothing
                         if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing') &
@@ -1333,6 +1522,12 @@ contains
                         !if( rhs2_source_name /= 'nothing' ) error stop "COPY must use nothing as second layer"
                         !write(*,*) 'Found PRIMARY_OPERATOR = COPY'
                         call CopyLayer( lhs_layer, rhs1_layer )
+                     case ('MERGE')
+                        !> d1:poly MERGE nothing
+                        if( rhs2_source_name /= 'nothing' .and. rhs2_source_name /= 't1:nothing') &
+                             error stop "MERGE must use nothing as second layer"
+                        call CopyLayer( lhs_layer, rhs1_layer )
+                        call MergeHealLayer( lhs_layer )
                      case ('GRID')
                         !> d1:poly GRID nothing 10 10
                         !write(*,*) 'Found PRIMARY_OPERATOR = GRID'

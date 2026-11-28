@@ -141,7 +141,7 @@ contains
     select case (w)
     case ('OR', 'OR2');            op = TOP_OR
     case ('AND2', 'FRAMEAND');     op = TOP_AND
-    case ('NOT', 'FRAMENOT');      op = TOP_NOT
+    case ('NOT', 'FRAMENOT', 'ANDNOT'); op = TOP_NOT
     case ('XOR');                  op = TOP_XOR
     case ('AND')                   !> MAGPARSER AND is the single-layer self-overlap (B ignored)
        op = TOP_SELF2
