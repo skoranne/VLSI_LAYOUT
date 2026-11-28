@@ -625,6 +625,8 @@ contains
     type(Design), intent(inout), target :: load_design
     integer :: i, deleted_layer_count
     logical :: wrote
+    character(len=:), allocatable :: fn_lower
+    integer :: fnl
     if( load_design%design_direction /= DESIGN_DIRECTION_OUTPUT ) then
        if( temporary_layers /= K_TEMPORARY_LAYER_DISK ) then
           error stop "Non-output DB being written out" !> I may relax this, but not good idea
@@ -635,6 +637,15 @@ contains
     end if
     deleted_layer_count = 0
     if( .not. allocated( load_design%layers ) ) return !> we have already flushed this db
+    fn_lower = ''
+    if( allocated( load_design%fileName ) ) fn_lower = trim(load_design%fileName)
+    fnl = len_trim(fn_lower)
+    if( fnl >= 4 ) then
+       if( fn_lower(fnl-3:fnl) == '.oas' .or. (fnl >= 6 .and. fn_lower(fnl-5:fnl) == '.oasis') ) then
+          call writeOASISDesign( load_design )
+          return
+       end if
+    end if
     do i=1,min( hash_nitems( load_design%ht), size( load_design%layers ) ) !> skipped sections have no layers(i)
        call writeSingleLayer( load_design, i, wrote )
        if( wrote ) deleted_layer_count = deleted_layer_count + 1
@@ -643,4 +654,42 @@ contains
        write(*,*) 'Written and delete : ', deleted_layer_count, ' layers.'
     end if
   end subroutine writeMagicLayoutFile
+
+  subroutine writeOASISDesign( load_design )
+    type(Design), intent(inout), target :: load_design
+    type(OasisWriter) :: ow
+    integer :: i, st, st2
+    integer(kind=int64) :: lno, dt
+    logical :: ok
+    character(len=:), allocatable :: msg, m2, lname, cellname
+    cellname = 'TOP'
+    if( allocated( load_design%designName ) ) then
+       if( len_trim(load_design%designName) > 0 ) cellname = trim(load_design%designName)
+    end if
+    call OasisPropOpen( ow, trim(load_design%fileName), trim(cellname) )
+    st = 0; msg = ''
+    do i=1,min( hash_nitems( load_design%ht), size( load_design%layers ) )
+       call LayerExpand( load_design%layers(i) )
+       if( load_design%layers(i)%n_used == 0 ) cycle
+       lname = trim(load_design%layerNames(i))
+       call ParseLayerDatatype( lname, lno, dt, ok )
+       if( .not. ok .and. allocated( load_design%layers(i)%fileName ) ) &
+            call ParseLayerDatatype( load_design%layers(i)%fileName, lno, dt, ok )
+       if( .not. ok ) then
+          lno = i; dt = 0
+          write(*,'(A,A,A,I0,A)') 'WARNING: no layer/datatype for ', lname, ', using ', lno, '/0'
+       end if
+       call OasisPropAddLayer( ow, load_design%layers(i), lname, lno, dt, st, msg )
+       if( st /= 0 ) exit
+    end do
+    if( st == 0 ) then
+       call OasisPropClose( ow, st, msg )
+    else
+       call OasisPropClose( ow, st2, m2 )
+    end if
+    if( st /= 0 ) then
+       write(*,*) 'ERROR: ', msg
+       error stop "OASIS output failed"
+    end if
+  end subroutine writeOASISDesign
 end module MagicVLSILayoutParser

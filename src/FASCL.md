@@ -188,8 +188,7 @@ The summary ends with `DEFCHECK RESULT: opens=N shorts=N misses=N`. Results:
 
 ## OASIS output (`prop_oasis.f90`, `db/prop_oasis_writer.cpp`)
 
-`exec oasout`, and any output layer whose `.mag` entry names a `*.oas` file (e.g.
-`KLBIN met1_L68_D20.oas`), write SEMI P39 OASIS with the properties of every polygon:
+`exec oasout`, `decl output o = foo.oas` (whole-design flush), and any output layer whose `.mag` entry names a `*.oas` file (e.g. `KLBIN met1_L68_D20.oas`) write SEMI P39 OASIS with per-polygon properties.
 
 * each polygon is one element: `RECTANGLE` (with the square form when w == h) or a Manhattan
   `POLYGON` (point-list type 2) traced from the healed boxes; holes are joined to the outer
@@ -210,8 +209,23 @@ The summary ends with `DEFCHECK RESULT: opens=N shorts=N misses=N`. Results:
   `PROPSTRING` and `LAYERNAME` tables after the cell, strict table offsets in the 256-byte END.
 
 Options (`var`): `oasis_strict`, `oasis_cblock`, `oasis_repetition` (0/1, default 1),
-`oasis_cblock_bytes N` (uncompressed bytes per CBLOCK, default 4 MiB). Layer/datatype come from the
-layer or file name (`L68_20`, `68:20`, `..._L68_D20...`), else the layer index and datatype 0.
+`oasis_cblock_bytes N` (uncompressed bytes per CBLOCK, default 4 MiB),
+`oasis_cblock_backend cpu|nvcomp|auto` (default `auto`; `nvcomp` uses GPU batched deflate when built with `LAYOUTDB_USE_NVCOMP`, else falls back to zlib CPU).
+
+Layer/datatype come from explicit mapping, else the layer/file name (`L68_20`, `68:20`, `..._L68_D20...`), else the layer index and datatype 0.
+
+Explicit whole-db mapping (line-block form for 1000s of layers; no parser line-length limit):
+
+```ctr
+exec oasout o out.oas [
+  diff_or_poly=100:0
+  diff_and_poly=101:0
+  diff_not_poly=102:0
+]
+```
+
+Inline forms also accepted: `exec oasout o out.oas name=100:0 name2=101:0`, `exec oasout d1:met1 met1.oas 68 20`.
+`decl output o = out.oas` writes one multi-layer OASIS on `flush`/end; use `exec oasout` for explicit per-layer L/D control.
 
 ## Regression
 

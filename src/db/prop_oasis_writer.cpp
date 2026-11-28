@@ -27,11 +27,17 @@
 
 #include "oasis_codec.hpp"
 #include <zlib.h>
+#if defined(LAYOUTDB_USE_NVCOMP)
+#include <cuda_runtime.h>
+#include <nvcomp.h>
+#include <nvcomp/deflate.h>
+#endif
 #include <algorithm>
 #include <array>
 #include <climits>
 #include <tuple>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -336,6 +342,7 @@ struct OasisPropWriter {
     std::string path, cell;
     uint64_t grid = 1000;
     bool use_cblock = true, use_rep = true, strict = true;
+    int cblock_backend = 2;                      // 0 cpu(zlib), 1 nvcomp(gpu), 2 auto
     std::string err;
 
     std::map<std::string, uint64_t> propnames, propstrings;
@@ -655,8 +662,124 @@ struct OasisPropWriter {
         return true;
     }
 
+    static void zlib_compress_one(const uint8_t* in, size_t n, std::vector<uint8_t>& z, size_t& zn) {
+        z.resize(compressBound((uLong)n) + 64);
+        z_stream zs{};
+        deflateInit2(&zs, 6, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
+        zs.next_in = const_cast<Bytef*>(in); zs.avail_in = (uInt)n;
+        zs.next_out = z.data(); zs.avail_out = (uInt)z.size();
+        deflate(&zs, Z_FINISH);
+        zn = z.size() - zs.avail_out;
+        deflateEnd(&zs);
+        z.resize(zn);
+    }
+
+    bool nvcomp_compress_chunks(const std::vector<std::pair<const uint8_t*, size_t>>& chunks,
+                                std::vector<std::vector<uint8_t>>& out) {
+#if !defined(LAYOUTDB_USE_NVCOMP)
+        (void)chunks; (void)out; return false;
+#else
+        if (chunks.empty()) return true;
+        int devcount = 0;
+        if (cudaGetDeviceCount(&devcount) != cudaSuccess || devcount <= 0) return false;
+        size_t n = chunks.size();
+        size_t max_in = 0, total_in = 0;
+        for (auto& c : chunks) { max_in = std::max(max_in, c.second); total_in += c.second; }
+        nvcompBatchedDeflateCompressOpts_t opts = nvcompBatchedDeflateCompressDefaultOpts;
+        nvcompAlignmentRequirements_t align{8,8,8};
+        if (nvcompBatchedDeflateCompressGetRequiredAlignments(opts, &align) != nvcompSuccess) return false;
+
+        size_t max_out = 0;
+        if (nvcompBatchedDeflateCompressGetMaxOutputChunkSize(max_in, opts, &max_out) != nvcompSuccess) return false;
+        size_t temp_bytes = 0;
+        if (nvcompBatchedDeflateCompressGetTempSizeAsync(n, max_in, opts, &temp_bytes, total_in) != nvcompSuccess) return false;
+
+        auto cuda_ok = [](cudaError_t e) { return e == cudaSuccess; };
+        uint8_t *d_in = nullptr, *d_out = nullptr, *d_temp = nullptr;
+        void **h_in_ptrs = nullptr, **h_out_ptrs = nullptr;
+        size_t *h_in_bytes = nullptr, *h_out_bytes = nullptr;
+        void **d_in_ptrs = nullptr, **d_out_ptrs = nullptr;
+        size_t *d_in_bytes = nullptr, *d_out_bytes = nullptr;
+        nvcompStatus_t *d_status = nullptr, *h_status = nullptr;
+        cudaStream_t stream = 0;
+        bool ok = true;
+
+        auto cleanup = [&]() {
+            if (stream) cudaStreamDestroy(stream);
+            if (d_status) cudaFree(d_status);
+            if (d_out_bytes) cudaFree(d_out_bytes);
+            if (d_in_bytes) cudaFree(d_in_bytes);
+            if (d_out_ptrs) cudaFree(d_out_ptrs);
+            if (d_in_ptrs) cudaFree(d_in_ptrs);
+            if (d_temp) cudaFree(d_temp);
+            if (d_out) cudaFree(d_out);
+            if (d_in) cudaFree(d_in);
+            if (h_status) cudaFreeHost(h_status);
+            if (h_out_bytes) cudaFreeHost(h_out_bytes);
+            if (h_in_bytes) cudaFreeHost(h_in_bytes);
+            if (h_out_ptrs) cudaFreeHost(h_out_ptrs);
+            if (h_in_ptrs) cudaFreeHost(h_in_ptrs);
+        };
+
+        if (!cuda_ok(cudaStreamCreate(&stream))) { cleanup(); return false; }
+        if (!cuda_ok(cudaMallocHost((void**)&h_in_ptrs, n * sizeof(void*))) ||
+            !cuda_ok(cudaMallocHost((void**)&h_out_ptrs, n * sizeof(void*))) ||
+            !cuda_ok(cudaMallocHost((void**)&h_in_bytes, n * sizeof(size_t))) ||
+            !cuda_ok(cudaMallocHost((void**)&h_out_bytes, n * sizeof(size_t))) ||
+            !cuda_ok(cudaMallocHost((void**)&h_status, n * sizeof(nvcompStatus_t)))) { cleanup(); return false; }
+
+        if (!cuda_ok(cudaMalloc(&d_in, total_in)) ||
+            !cuda_ok(cudaMalloc(&d_out, n * max_out)) ||
+            !cuda_ok(cudaMalloc(&d_temp, temp_bytes)) ||
+            !cuda_ok(cudaMalloc(&d_in_ptrs, n * sizeof(void*))) ||
+            !cuda_ok(cudaMalloc(&d_out_ptrs, n * sizeof(void*))) ||
+            !cuda_ok(cudaMalloc(&d_in_bytes, n * sizeof(size_t))) ||
+            !cuda_ok(cudaMalloc(&d_out_bytes, n * sizeof(size_t))) ||
+            !cuda_ok(cudaMalloc(&d_status, n * sizeof(nvcompStatus_t)))) { cleanup(); return false; }
+
+        size_t in_off = 0;
+        for (size_t i = 0; i < n; ++i) {
+            h_in_ptrs[i] = d_in + in_off;
+            h_out_ptrs[i] = d_out + i * max_out;
+            h_in_bytes[i] = chunks[i].second;
+            if (!cuda_ok(cudaMemcpyAsync(d_in + in_off, chunks[i].first, chunks[i].second, cudaMemcpyHostToDevice, stream))) ok = false;
+            in_off += chunks[i].second;
+        }
+        if (ok) {
+            ok = cuda_ok(cudaMemcpyAsync(d_in_ptrs, h_in_ptrs, n * sizeof(void*), cudaMemcpyHostToDevice, stream)) &&
+                 cuda_ok(cudaMemcpyAsync(d_out_ptrs, h_out_ptrs, n * sizeof(void*), cudaMemcpyHostToDevice, stream)) &&
+                 cuda_ok(cudaMemcpyAsync(d_in_bytes, h_in_bytes, n * sizeof(size_t), cudaMemcpyHostToDevice, stream));
+        }
+        if (ok) {
+            nvcompStatus_t st = nvcompBatchedDeflateCompressAsync(
+                (const void* const*)d_in_ptrs, d_in_bytes, max_in, n,
+                d_temp, temp_bytes,
+                d_out_ptrs, d_out_bytes,
+                opts, d_status, stream);
+            ok = (st == nvcompSuccess);
+        }
+        if (ok) ok = cuda_ok(cudaMemcpyAsync(h_out_bytes, d_out_bytes, n * sizeof(size_t), cudaMemcpyDeviceToHost, stream));
+        if (ok) ok = cuda_ok(cudaMemcpyAsync(h_status, d_status, n * sizeof(nvcompStatus_t), cudaMemcpyDeviceToHost, stream));
+        if (ok) ok = cuda_ok(cudaStreamSynchronize(stream));
+        if (ok) {
+            out.assign(n, std::vector<uint8_t>());
+            for (size_t i = 0; i < n; ++i) {
+                if (h_status[i] != nvcompSuccess || h_out_bytes[i] == 0 || h_out_bytes[i] > max_out) { ok = false; break; }
+                out[i].resize(h_out_bytes[i]);
+            }
+            for (size_t i = 0; ok && i < n; ++i) {
+                ok = cuda_ok(cudaMemcpy(out[i].data(), d_out + i * max_out, h_out_bytes[i], cudaMemcpyDeviceToHost));
+            }
+        }
+        cleanup();
+        return ok;
+#endif
+    }
+
     // A CBLOCK must hold whole records: split the stream only at record starts.
     void cblock_flush(Encoder& f, const std::vector<uint8_t>& raw, const std::vector<size_t>& starts) {
+        std::vector<std::pair<const uint8_t*, size_t>> chunks;
+        std::vector<size_t> chunk_raw;
         size_t chunk = cblock_bytes;
         size_t o = 0, si = 0;
         while (o < raw.size()) {
@@ -666,20 +789,33 @@ struct OasisPropWriter {
                 size_t best = 0;
                 size_t sj = si;
                 while (sj < starts.size() && starts[sj] <= lim) best = starts[sj++];
-                cut = best > o ? best : (si < starts.size() ? starts[si] : raw.size());   // one huge record
+                cut = best > o ? best : (si < starts.size() ? starts[si] : raw.size());
             }
-            size_t n = cut - o;
-            std::vector<uint8_t> z(compressBound((uLong)n) + 64);
-            z_stream zs{};
-            deflateInit2(&zs, 6, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
-            zs.next_in = const_cast<Bytef*>(raw.data() + o); zs.avail_in = (uInt)n;
-            zs.next_out = z.data(); zs.avail_out = (uInt)z.size();
-            deflate(&zs, Z_FINISH);
-            size_t zn = z.size() - zs.avail_out;
-            deflateEnd(&zs);
-            f.u8(34); f.uint_(0); f.uint_(n); f.uint_(zn);
-            f.bytes(z.data(), zn);
+            chunks.push_back({ raw.data() + o, cut - o });
+            chunk_raw.push_back(cut - o);
             o = cut;
+        }
+
+        std::vector<std::vector<uint8_t>> compressed(chunks.size());
+        bool used_nvcomp = false;
+        int backend = cblock_backend;
+        if (use_cblock && backend != 0) {
+#if defined(LAYOUTDB_USE_NVCOMP)
+            if (backend == 1 || backend == 2) used_nvcomp = nvcomp_compress_chunks(chunks, compressed);
+#else
+            (void)backend;
+#endif
+        }
+        if (!used_nvcomp) {
+            for (size_t i = 0; i < chunks.size(); ++i) {
+                size_t zn = 0;
+                zlib_compress_one(chunks[i].first, chunks[i].second, compressed[i], zn);
+            }
+        }
+
+        for (size_t i = 0; i < chunks.size(); ++i) {
+            f.u8(34); f.uint_(0); f.uint_(chunk_raw[i]); f.uint_(compressed[i].size());
+            f.bytes(compressed[i].data(), compressed[i].size());
         }
     }
 
@@ -801,6 +937,11 @@ int32_t fpo_poly_geom(int64_t nbox, const int64_t* boxes, int64_t* out, int32_t*
 
 void fpo_set_cblock_bytes(void* h, int64_t n) {
     if (n > 0) ((OasisPropWriter*)h)->cblock_bytes = (size_t)n;
+}
+
+void fpo_set_cblock_backend(void* h, int32_t backend) {
+    auto* w = (OasisPropWriter*)h;
+    if (backend >= 0 && backend <= 2) w->cblock_backend = backend;
 }
 
 // poly_start: npoly+1 offsets, 1-based (Fortran CSR); boxes: 4*nbox int64 (x1,y1,x2,y2)

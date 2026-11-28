@@ -21,6 +21,7 @@ module PropOasisModule
   integer, parameter :: FPO_CBLOCK = 1, FPO_REP = 2, FPO_STRICT = 4
   integer, save :: oasis_flags = FPO_CBLOCK + FPO_REP + FPO_STRICT
   integer(int64), save :: oasis_cblock_bytes = 0     !> 0 = writer default (4 MiB)
+  integer, save :: oasis_cblock_backend = 2          !> 0 cpu, 1 nvcomp, 2 auto
 
   type :: OasisWriter
      type(c_ptr) :: h = c_null_ptr
@@ -40,6 +41,11 @@ module PropOasisModule
        type(c_ptr), value :: h
        integer(c_int64_t), value :: n
      end subroutine fpo_set_cblock_bytes
+     subroutine fpo_set_cblock_backend( h, backend ) bind(C, name='fpo_set_cblock_backend')
+       import :: c_ptr, c_int32_t
+       type(c_ptr), value :: h
+       integer(c_int32_t), value :: backend
+     end subroutine fpo_set_cblock_backend
      function fpo_begin_layer( h, lname, layer, datatype, npoly, poly_start, nbox, boxes ) &
           bind(C, name='fpo_begin_layer') result(st)
        import :: c_ptr, c_char, c_int64_t, c_int32_t
@@ -78,6 +84,7 @@ module PropOasisModule
 contains
 
   !> `var oasis_cblock|oasis_repetition|oasis_strict 0|1`, `var oasis_cblock_bytes N`;
+  !> `var oasis_cblock_backend 0|1|2` (cpu, nvcomp, auto).
   !> returns .false. if not an OASIS option.
   logical function OasisPropSetOption( name, value ) result(known)
     character(len=*), intent(in) :: name
@@ -87,6 +94,9 @@ contains
     select case( name )
     case( 'oasis_cblock_bytes' )
        oasis_cblock_bytes = value
+       return
+    case( 'oasis_cblock_backend' )
+       oasis_cblock_backend = value
        return
     case( 'oasis_cblock' );     bit = FPO_CBLOCK
     case( 'oasis_repetition' ); bit = FPO_REP
@@ -118,6 +128,7 @@ contains
     w%path = trim(path)
     w%h = fpo_create( cstr(path), cstr(cell), int( GetPrecision(), c_int64_t ), int( oasis_flags, c_int32_t ) )
     if( oasis_cblock_bytes > 0 ) call fpo_set_cblock_bytes( w%h, int( oasis_cblock_bytes, c_int64_t ) )
+    call fpo_set_cblock_backend( w%h, int( oasis_cblock_backend, c_int32_t ) )
   end subroutine OasisPropOpen
 
   subroutine OasisPropAddLayer( w, L, lname, layer_no, datatype, status, msg )

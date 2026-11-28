@@ -477,6 +477,9 @@ contains
     integer(int32) :: aa_op, aa_cmp
     real(real64) :: aa_v1, aa_v2
     integer :: aa_status
+    character(len=256), allocatable :: oas_blk(:)
+    character(len=256) :: oas_blk_line
+    integer :: noas_blk, oas_blk_ios
     character(len=1024) :: m4_cmd, expanded_file, echo_line, helper_name
     integer :: m4_stat, echo_unit, echo_ios, pid_self, pid_unit, helper_unit, helper_ios
     character(len=1024) :: trs_rules_file, trs_file
@@ -705,13 +708,26 @@ contains
              end if             
           else if( index( trim(rest(1:pos-1)), 'oasis_' ) == 1 ) then
              block
-               character(len=64) :: oname
+               character(len=64) :: oname, osval
                integer :: oval
                oname = trim(rest(1:pos-1))
                rest = trim( adjustl( rest(pos+1:)))
-               read( rest, *, iostat=ios ) oval
-               if( ios /= 0 ) then
-                  write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
+               if( trim(oname) == 'oasis_cblock_backend' ) then
+                  osval = trim(adjustl(rest))
+                  select case( trim(osval) )
+                  case( 'cpu', 'zlib', '0' ); oval = 0
+                  case( 'nvcomp', 'gpu', '1' ); oval = 1
+                  case( 'auto', '2' ); oval = 2
+                  case default
+                     write(*,*) 'WARNING: unknown oasis_cblock_backend ', trim(osval), ' on line: ', line_number
+                     oval = -1
+                  end select
+                  ios = 0
+               else
+                  read( rest, *, iostat=ios ) oval
+               end if
+               if( ios /= 0 .or. oval < 0 ) then
+                  if( ios /= 0 ) write(*,*) 'WARNING: VAR not parsed correctly on line: ', line_number
                else if( OasisPropSetOption( trim(oname), oval ) ) then
                   write(*,*) 'INFO: VAR changing ', trim(oname), ' = ', oval
                else
@@ -866,7 +882,28 @@ contains
           if( trim(rest(1:pos-1)) == 'oasout' .or. trim(rest(1:pos-1)) == 'propdump' .or. &
                trim(rest(1:pos-1)) == 'propinfo' .or. trim(rest(1:pos-1)) == 'netinfo' .or. &
                trim(rest(1:pos-1)) == 'defcheck' .or. trim(rest(1:pos-1)) == 'tech' ) then
-             call RunPropertyCommand( trim(rest(1:pos-1)), trim(adjustl(rest(pos+1:))), ht, design_dbs, line_number-1 )
+             if( trim(rest(1:pos-1)) == 'oasout' .and. index(rest, '[') > 0 .and. index(rest, ']') == 0 ) then
+                noas_blk = 0
+                allocate( oas_blk(0) )
+                do
+                   read(unit, '(A)', iostat=oas_blk_ios) oas_blk_line
+                   if( oas_blk_ios /= 0 ) exit
+                   line_number = line_number + 1
+                   if( index(oas_blk_line, ']') > 0 ) exit
+                   block
+                     character(len=256), allocatable :: tmpblk(:)
+                     allocate( tmpblk(noas_blk+1) )
+                     if( noas_blk > 0 ) tmpblk(1:noas_blk) = oas_blk
+                     tmpblk(noas_blk+1) = oas_blk_line
+                     call move_alloc( tmpblk, oas_blk )
+                     noas_blk = noas_blk + 1
+                   end block
+                end do
+                call RunPropertyCommand( 'oasout', trim(adjustl(rest(pos+1:))), ht, design_dbs, line_number-1, oas_blk, noas_blk )
+                if( allocated(oas_blk) ) deallocate(oas_blk)
+             else
+                call RunPropertyCommand( trim(rest(1:pos-1)), trim(adjustl(rest(pos+1:))), ht, design_dbs, line_number-1 )
+             end if
              cycle read_loop
           end if
           if( trim(rest(1:pos-1)) == 'hierextent' ) then
@@ -1960,22 +1997,27 @@ contains
   end function itoa_cp
 
   !> exec oasout   <db>|<db:layer> <file.oas> [layer datatype]
+  !> exec oasout   <db> <file.oas> [ name=L:D ... | [ block ] ]
   !> exec propdump <db:layer> <file.csv>
   !> exec propinfo <db:layer>
-  subroutine RunPropertyCommand( cmd, args, ht, dbs, line_no )
+  subroutine RunPropertyCommand( cmd, args, ht, dbs, line_no, map_lines, nmap )
     use iso_c_binding, only: c_char, c_double, c_int32_t, c_null_char
     character(len=*), intent(in) :: cmd, args
     type(hash_type), intent(in) :: ht
     type(Design), intent(inout), target :: dbs(:)
     integer, intent(in) :: line_no
+    character(len=*), intent(in), optional :: map_lines(:)
+    integer, intent(in), optional :: nmap
     character(len=1024) :: tok(6)
-    integer :: ntok, status, ios, idb, i, k, st2
+    integer :: ntok, status, ios, idb, i, k, st2, mi, nmap_entries, nmapped
     character(len=:), allocatable :: msg, lname, m2
     type(Layer), pointer :: L
     type(OasisWriter) :: w
     integer(int64) :: lno, dt
     logical :: ok, found
     character(len=1024) :: rest
+    character(len=256), allocatable :: map_names(:)
+    integer(int64), allocatable :: map_lno(:), map_dt(:)
     interface
        integer(c_int32_t) function fdef_layout_dbu( path, dbu ) bind(C, name='fdef_layout_dbu')
          import :: c_char, c_double, c_int32_t
@@ -2114,7 +2156,7 @@ contains
        end if
     case( 'oasout' )
        if( ntok < 2 ) then
-          status = 1; msg = 'oasout needs <db>|<db:layer> <file.oas> [layer datatype]'
+          status = 1; msg = 'oasout needs <db>|<db:layer> <file.oas> [layer datatype | name=L:D ... | [ block ]]'
        else if( index( tok(1), ':' ) > 0 ) then
           call ResolveLayerSpec( trim(tok(1)), ht, dbs, L, status, msg )
           if( status == 0 ) then
@@ -2149,25 +2191,35 @@ contains
           if( .not. found ) then
              status = 1; msg = 'unknown db '//trim(tok(1))
           else
-             call OasisPropOpen( w, trim(tok(2)), cell_name( trim(tok(1)) ) )
-             do i = 1, min( hash_nitems( dbs(idb)%ht ), size( dbs(idb)%layers ) )
-                L => dbs(idb)%layers(i)
-                call LayerExpand( L )
-                if( L%n_used == 0 ) cycle
-                lname = trim( dbs(idb)%layerNames(i) )
-                call ParseLayerDatatype( lname, lno, dt, ok )
-                if( .not. ok .and. allocated( L%fileName ) ) call ParseLayerDatatype( L%fileName, lno, dt, ok )
-                if( .not. ok ) then
-                   lno = i; dt = 0
-                   write(*,'(A,A,A,I0,A)') 'WARNING: no layer/datatype for ', lname, ', using ', lno, '/0'
-                end if
-                call OasisPropAddLayer( w, L, lname, lno, dt, status, msg )
-                if( status /= 0 ) exit
-             end do
+             call collect_oasout_mappings( args, map_lines, nmap, map_names, map_lno, map_dt, nmap_entries, status, msg )
              if( status == 0 ) then
-                call OasisPropClose( w, status, msg )
-             else
-                call OasisPropClose( w, st2, m2 )
+                call OasisPropOpen( w, trim(tok(2)), cell_name( trim(tok(1)) ) )
+                nmapped = 0
+                do i = 1, min( hash_nitems( dbs(idb)%ht ), size( dbs(idb)%layers ) )
+                   L => dbs(idb)%layers(i)
+                   call LayerExpand( L )
+                   if( L%n_used == 0 ) cycle
+                   lname = trim( dbs(idb)%layerNames(i) )
+                   call lookup_oasout_mapping( map_names, map_lno, map_dt, nmap_entries, lname, lno, dt, ok )
+                   if( ok ) nmapped = nmapped + 1
+                   if( .not. ok ) call ParseLayerDatatype( lname, lno, dt, ok )
+                   if( .not. ok .and. allocated( L%fileName ) ) call ParseLayerDatatype( L%fileName, lno, dt, ok )
+                   if( .not. ok ) then
+                      lno = i; dt = 0
+                      write(*,'(A,A,A,I0,A)') 'WARNING: no layer/datatype for ', lname, ', using ', lno, '/0'
+                   end if
+                   call OasisPropAddLayer( w, L, lname, lno, dt, status, msg )
+                   if( status /= 0 ) exit
+                end do
+                if( status == 0 .and. nmap_entries > 0 .and. nmapped /= nmap_entries ) then
+                   status = 1
+                   msg = 'oasout: some mapped layer names were not found in output db '//trim(tok(1))
+                end if
+                if( status == 0 ) then
+                   call OasisPropClose( w, status, msg )
+                else
+                   call OasisPropClose( w, st2, m2 )
+                end if
              end if
           end if
        end if
@@ -2190,6 +2242,167 @@ contains
          end if
       end if
     end function cell_name
+
+    subroutine collect_oasout_mappings( argstr, mlines, nm, names, lnos, dts, nent, st, emsg )
+      character(len=*), intent(in) :: argstr
+      character(len=*), intent(in), optional :: mlines(:)
+      integer, intent(in), optional :: nm
+      character(len=256), allocatable, intent(out) :: names(:)
+      integer(int64), allocatable, intent(out) :: lnos(:), dts(:)
+      integer, intent(out) :: nent, st
+      character(len=:), allocatable, intent(out) :: emsg
+      character(len=1024) :: t
+      character(len=256) :: mtok(8)
+      integer :: nmt, j, p, eqp, ios2, nl
+      integer(int64) :: ml, md
+      logical :: mok
+      character(len=:), allocatable :: tail
+      st = 0; emsg = ''; nent = 0
+      allocate( names(0), lnos(0), dts(0) )
+      ! skip first two tokens (db, file) from argstr
+      tail = trim(adjustl(argstr))
+      do j = 1, 2
+         p = index( trim(tail), ' ' )
+         if( p == 0 ) then
+            tail = ''
+         else
+            tail = trim(adjustl(tail(p+1:)))
+         end if
+      end do
+      call parse_oasout_map_string( tail, names, lnos, dts, nent, st, emsg )
+      if( st /= 0 ) return
+      if( present(mlines) .and. present(nm) ) then
+         do j = 1, nm
+            t = trim(adjustl(mlines(j)))
+            if( len_trim(t) == 0 ) cycle
+            if( t(1:1) == '#' ) cycle
+            if( t(1:1) == ']' ) cycle
+            call parse_oasout_map_string( t, names, lnos, dts, nent, st, emsg )
+            if( st /= 0 ) return
+         end do
+      end if
+      ! reject duplicate names
+      do j = 1, nent
+         do p = j+1, nent
+            if( trim(names(j)) == trim(names(p)) ) then
+               st = 1; emsg = 'oasout: duplicate layer mapping for '//trim(names(j))
+               return
+            end if
+         end do
+      end do
+    end subroutine collect_oasout_mappings
+
+    subroutine parse_oasout_map_string( s, names, lnos, dts, nent, st, emsg )
+      character(len=*), intent(in) :: s
+      character(len=256), allocatable, intent(inout) :: names(:)
+      integer(int64), allocatable, intent(inout) :: lnos(:), dts(:)
+      integer, intent(inout) :: nent, st
+      character(len=:), allocatable, intent(inout) :: emsg
+      character(len=1024) :: r
+      character(len=256) :: tk
+      character(len=256) :: nm
+      integer :: p, eqp, ios2
+      integer(int64) :: ml, md
+      logical :: got
+      r = trim(adjustl(s))
+      do while( len_trim(r) > 0 )
+         p = index( trim(r), ' ' )
+         if( p == 0 ) then
+            tk = trim(r); r = ''
+         else
+            tk = r(1:p-1); r = trim(adjustl(r(p+1:)))
+         end if
+         if( len_trim(tk) == 0 ) cycle
+         if( tk(1:1) == '#' ) exit
+         if( trim(tk) == '[' .or. trim(tk) == ']' ) cycle
+         eqp = index( tk, '=' )
+         if( eqp > 0 ) then
+            nm = tk(1:eqp-1)
+            call parse_ld_pair( tk(eqp+1:), ml, md, got )
+            if( .not. got ) then
+               st = 1; emsg = 'oasout: bad layer mapping '//trim(tk); return
+            end if
+            call append_oasout_map( names, lnos, dts, nent, trim(nm), ml, md )
+         else
+            ! triplet form: name L D
+            nm = tk
+            p = index( trim(r), ' ' )
+            if( p == 0 ) then
+               tk = trim(r); r = ''
+            else
+               tk = r(1:p-1); r = trim(adjustl(r(p+1:)))
+            end if
+            read( tk, *, iostat=ios2 ) ml
+            if( ios2 /= 0 ) then
+               st = 1; emsg = 'oasout: bad layer number in mapping for '//trim(nm); return
+            end if
+            p = index( trim(r), ' ' )
+            if( p == 0 ) then
+               tk = trim(r); r = ''
+            else
+               tk = r(1:p-1); r = trim(adjustl(r(p+1:)))
+            end if
+            read( tk, *, iostat=ios2 ) md
+            if( ios2 /= 0 ) then
+               st = 1; emsg = 'oasout: bad datatype in mapping for '//trim(nm); return
+            end if
+            call append_oasout_map( names, lnos, dts, nent, trim(nm), ml, md )
+         end if
+      end do
+    end subroutine parse_oasout_map_string
+
+    subroutine parse_ld_pair( s, ml, md, got )
+      character(len=*), intent(in) :: s
+      integer(int64), intent(out) :: ml, md
+      logical, intent(out) :: got
+      integer :: p, ios2
+      character(len=256) :: t
+      got = .false.; ml = 0; md = 0
+      t = trim(adjustl(s))
+      p = index( t, ':' )
+      if( p == 0 ) p = index( t, '/' )
+      if( p <= 1 ) return
+      read( t(1:p-1), *, iostat=ios2 ) ml
+      if( ios2 /= 0 ) return
+      read( t(p+1:), *, iostat=ios2 ) md
+      if( ios2 /= 0 ) return
+      got = .true.
+    end subroutine parse_ld_pair
+
+    subroutine append_oasout_map( names, lnos, dts, nent, nm, ml, md )
+      character(len=256), allocatable, intent(inout) :: names(:)
+      integer(int64), allocatable, intent(inout) :: lnos(:), dts(:)
+      integer, intent(inout) :: nent
+      character(len=*), intent(in) :: nm
+      integer(int64), intent(in) :: ml, md
+      character(len=256), allocatable :: nn(:)
+      integer(int64), allocatable :: nl(:), nd(:)
+      allocate( nn(nent+1), nl(nent+1), nd(nent+1) )
+      if( nent > 0 ) then
+         nn(1:nent) = names; nl(1:nent) = lnos; nd(1:nent) = dts
+      end if
+      nn(nent+1) = trim(nm); nl(nent+1) = ml; nd(nent+1) = md
+      call move_alloc( nn, names )
+      call move_alloc( nl, lnos )
+      call move_alloc( nd, dts )
+      nent = nent + 1
+    end subroutine append_oasout_map
+
+    subroutine lookup_oasout_mapping( names, lnos, dts, nent, lname, ml, md, got )
+      character(len=256), allocatable, intent(in) :: names(:)
+      integer(int64), allocatable, intent(in) :: lnos(:), dts(:)
+      integer, intent(in) :: nent
+      character(len=*), intent(in) :: lname
+      integer(int64), intent(out) :: ml, md
+      logical, intent(out) :: got
+      integer :: j
+      got = .false.; ml = 0; md = 0
+      do j = 1, nent
+         if( trim(names(j)) == trim(lname) ) then
+            ml = lnos(j); md = dts(j); got = .true.; return
+         end if
+      end do
+    end subroutine lookup_oasout_mapping
   end subroutine RunPropertyCommand
 
   subroutine touch_layers( a, b, c )
