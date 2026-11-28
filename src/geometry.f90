@@ -4,6 +4,7 @@
 
 module GeometryModule
   use iso_fortran_env, only: int8, int32, int64, real64
+  use omp_lib, only: omp_in_parallel
   use CommonModule
   implicit none
   private
@@ -721,11 +722,17 @@ contains
     ! Allocate a single workspace array to avoid repeated memory allocations
     ! during the recursive splitting steps.
     allocate(workspace(size(arr)))
-    !$omp parallel default(none) shared(arr,workspace) firstprivate(node_capacity)
-    !$omp single
-    call omt_pack_recursive(arr, 1_int64, int(size(arr),kind=int64), node_capacity, workspace)
-    !$omp end single
-    !$omp end parallel
+    if (omp_in_parallel()) then
+       !$omp taskgroup
+       call omt_pack_recursive(arr, 1_int64, int(size(arr),kind=int64), node_capacity, workspace, .false.)
+       !$omp end taskgroup
+    else
+       !$omp parallel default(none) shared(arr,workspace) firstprivate(node_capacity)
+       !$omp single
+       call omt_pack_recursive(arr, 1_int64, int(size(arr),kind=int64), node_capacity, workspace, .false.)
+       !$omp end single
+       !$omp end parallel
+    end if
 
     deallocate(workspace)
   end subroutine omt_pack
@@ -793,39 +800,49 @@ contains
     end if
   end subroutine omt_pack_recursive
 #else
-  recursive subroutine omt_pack_recursive(arr, start_idx, end_idx, node_capacity, workspace)
+  recursive subroutine omt_pack_recursive(arr, start_idx, end_idx, node_capacity, workspace, src_in_ws)
     type(Box), intent(inout), dimension(:) :: arr
     integer(kind=int64), intent(in) :: start_idx, end_idx, node_capacity
     type(Box), intent(inout), dimension(:) :: workspace
+    logical, intent(in) :: src_in_ws
 
     integer, parameter :: MIN_TASK_SIZE = 32768
     integer(kind=int64) :: n, num_leaves, left_leaves, split_idx
-    real :: overlap_x, area_x, overlap_y, area_y
+    real(kind=real64) :: overlap_x, area_x, overlap_y, area_y
+    logical :: x_wins
 
     n = end_idx - start_idx + 1_int64
-    if (n <= node_capacity) return
+    if (n <= node_capacity) then
+       if (src_in_ws) arr(start_idx:end_idx) = workspace(start_idx:end_idx)
+       return
+    end if
 
-    num_leaves = ceiling(real(n) / real(node_capacity))
-    left_leaves = num_leaves / 2
+    num_leaves = (n + node_capacity - 1_int64) / node_capacity
+    left_leaves = num_leaves / 2_int64
     split_idx = start_idx + left_leaves * node_capacity - 1_int64
 
     ! =================================================================
-    ! 1. PRE-TASK STATE ISOLATION (Fixes Data Race)
-    ! Copy 'arr' to 'workspace' safely BEFORE any tasks start mutating
+    ! 1. PRE-TASK STATE ISOLATION (Ping-Pong: no copy-back on X win)
+    ! Mirror current active buffer into the sibling buffer once before
+    ! evaluating X (in workspace) and Y (in arr).
     ! =================================================================
-    workspace(start_idx:end_idx) = arr(start_idx:end_idx)
+    if (src_in_ws) then
+       arr(start_idx:end_idx) = workspace(start_idx:end_idx)
+    else
+       workspace(start_idx:end_idx) = arr(start_idx:end_idx)
+    end if
 
     if (n >= MIN_TASK_SIZE) then
-       
+
        ! -----------------------------------------------------
        ! TASK 1: Evaluate X (Operates strictly on 'workspace')
        ! -----------------------------------------------------
        !$omp task shared(workspace, overlap_x, area_x) &
        !$omp firstprivate(start_idx, end_idx, split_idx) default(none)
-       
+
        call quickselect_boxes_STR(workspace, start_idx, end_idx, split_idx, AXIS_X)
        call evaluate_split(workspace, start_idx, split_idx, end_idx, overlap_x, area_x)
-       
+
        !$omp end task
 
        ! -----------------------------------------------------
@@ -833,10 +850,10 @@ contains
        ! -----------------------------------------------------
        !$omp task shared(arr, overlap_y, area_y) &
        !$omp firstprivate(start_idx, end_idx, split_idx) default(none)
-       
+
        call quickselect_boxes_STR(arr, start_idx, end_idx, split_idx, AXIS_Y)
        call evaluate_split(arr, start_idx, split_idx, end_idx, overlap_y, area_y)
-       
+
        !$omp end task
 
        ! Wait for both axes to finish partitioning
@@ -844,45 +861,41 @@ contains
 
     else
        ! =================================================================
-       ! Serial fallback for small leaf arrays (Fixes State Destruction)
+       ! Serial fallback for small leaf arrays
        ! =================================================================
-       
+
        ! 1. Evaluate X strictly on 'workspace'
        call quickselect_boxes_STR(workspace, start_idx, end_idx, split_idx, AXIS_X)
        call evaluate_split(workspace, start_idx, split_idx, end_idx, overlap_x, area_x)
-       
+
        ! 2. Evaluate Y strictly on 'arr'
        call quickselect_boxes_STR(arr, start_idx, end_idx, split_idx, AXIS_Y)
        call evaluate_split(arr, start_idx, split_idx, end_idx, overlap_y, area_y)
-       
+
     end if
 
     ! =================================================================
-    ! 3. Choose the best axis 
+    ! 3. Choose the best axis (no copy-back; children read winning buffer)
     ! =================================================================
-    if ((overlap_x < overlap_y) .or. (overlap_x == overlap_y .and. area_x < area_y)) then
-       ! X was better: copy the winning X-partitioned data back into arr
-       arr(start_idx:end_idx) = workspace(start_idx:end_idx)
-    end if
-    ! If Y was better, arr is already partitioned by Y, so we do nothing.
+    x_wins = (overlap_x < overlap_y) .or. (overlap_x == overlap_y .and. area_x < area_y)
 
     ! =================================================================
     ! 4. Recursively process partitions
     ! =================================================================
     if (split_idx - start_idx + 1_int64 >= MIN_TASK_SIZE) then
-       !$omp task shared(arr, workspace) firstprivate(start_idx, split_idx, node_capacity) default(none)
-       call omt_pack_recursive(arr, start_idx, split_idx, node_capacity, workspace)
+       !$omp task shared(arr, workspace) firstprivate(start_idx, split_idx, node_capacity, x_wins) default(none)
+       call omt_pack_recursive(arr, start_idx, split_idx, node_capacity, workspace, x_wins)
        !$omp end task
     else
-       call omt_pack_recursive(arr, start_idx, split_idx, node_capacity, workspace)
+       call omt_pack_recursive(arr, start_idx, split_idx, node_capacity, workspace, x_wins)
     end if
 
     if (end_idx - split_idx >= MIN_TASK_SIZE) then
-       !$omp task shared(arr, workspace) firstprivate(split_idx, end_idx, node_capacity) default(none)
-       call omt_pack_recursive(arr, split_idx + 1_int64, end_idx, node_capacity, workspace)
+       !$omp task shared(arr, workspace) firstprivate(split_idx, end_idx, node_capacity, x_wins) default(none)
+       call omt_pack_recursive(arr, split_idx + 1_int64, end_idx, node_capacity, workspace, x_wins)
        !$omp end task
     else
-       call omt_pack_recursive(arr, split_idx + 1_int64, end_idx, node_capacity, workspace)
+       call omt_pack_recursive(arr, split_idx + 1_int64, end_idx, node_capacity, workspace, x_wins)
     end if
 
     ! The child tasks share this frame's arr/workspace dummy arguments, so
@@ -896,41 +909,43 @@ contains
   subroutine evaluate_split(arr, start_idx, split_idx, end_idx, overlap, total_area)
     type(Box), intent(in), dimension(:) :: arr
     integer(kind=int64), intent(in) :: start_idx, split_idx, end_idx
-    real, intent(out) :: overlap, total_area
+    real(kind=real64), intent(out) :: overlap, total_area
 
-    integer(kind=int64) :: l_xmin, l_xmax, l_ymin, l_ymax
-    integer(kind=int64) :: r_xmin, r_xmax, r_ymin, r_ymax
+    integer(kind=K_COORDINATE_KIND) :: l_xmin, l_xmax, l_ymin, l_ymax
+    integer(kind=K_COORDINATE_KIND) :: r_xmin, r_xmax, r_ymin, r_ymax
     integer(kind=int64) :: over_x, over_y
     integer(kind=int64) :: i
 
     ! Initialize left MBR
-    l_xmin = int(arr(start_idx)%x1, kind=int64); l_xmax = int(arr(start_idx)%x2, kind=int64)
-    l_ymin = int(arr(start_idx)%y1, kind=int64); l_ymax = int(arr(start_idx)%y2, kind=int64)
-    do i = start_idx + 1, split_idx
-       l_xmin = min(l_xmin, int(arr(i)%x1, kind=int64))
-       l_xmax = max(l_xmax, int(arr(i)%x2, kind=int64))
-       l_ymin = min(l_ymin, int(arr(i)%y1, kind=int64))
-       l_ymax = max(l_ymax, int(arr(i)%y2, kind=int64))
+    l_xmin = arr(start_idx)%x1; l_xmax = arr(start_idx)%x2
+    l_ymin = arr(start_idx)%y1; l_ymax = arr(start_idx)%y2
+    do i = start_idx + 1_int64, split_idx
+       l_xmin = min(l_xmin, arr(i)%x1)
+       l_xmax = max(l_xmax, arr(i)%x2)
+       l_ymin = min(l_ymin, arr(i)%y1)
+       l_ymax = max(l_ymax, arr(i)%y2)
     end do
 
     ! Initialize right MBR
-    r_xmin = int(arr(split_idx + 1)%x1, kind=int64); r_xmax = int(arr(split_idx + 1)%x2, kind=int64)
-    r_ymin = int(arr(split_idx + 1)%y1, kind=int64); r_ymax = int(arr(split_idx + 1)%y2, kind=int64)
-    do i = split_idx + 2, end_idx
-       r_xmin = min(r_xmin, int(arr(i)%x1, kind=int64))
-       r_xmax = max(r_xmax, int(arr(i)%x2, kind=int64))
-       r_ymin = min(r_ymin, int(arr(i)%y1, kind=int64))
-       r_ymax = max(r_ymax, int(arr(i)%y2, kind=int64))
+    r_xmin = arr(split_idx + 1_int64)%x1; r_xmax = arr(split_idx + 1_int64)%x2
+    r_ymin = arr(split_idx + 1_int64)%y1; r_ymax = arr(split_idx + 1_int64)%y2
+    do i = split_idx + 2_int64, end_idx
+       r_xmin = min(r_xmin, arr(i)%x1)
+       r_xmax = max(r_xmax, arr(i)%x2)
+       r_ymin = min(r_ymin, arr(i)%y1)
+       r_ymax = max(r_ymax, arr(i)%y2)
     end do
 
     ! Compute total area of both bounding boxes
-    total_area = (l_xmax - l_xmin) * (l_ymax - l_ymin) + &
-         (r_xmax - r_xmin) * (r_ymax - r_ymin)
+    total_area = real(int(l_xmax, int64) - int(l_xmin, int64), real64) * &
+                 real(int(l_ymax, int64) - int(l_ymin, int64), real64) + &
+                 real(int(r_xmax, int64) - int(r_xmin, int64), real64) * &
+                 real(int(r_ymax, int64) - int(r_ymin, int64), real64)
 
     ! Compute physical overlap area
-    over_x = max(0_int64, min(l_xmax, r_xmax) - max(l_xmin, r_xmin))
-    over_y = max(0_int64, min(l_ymax, r_ymax) - max(l_ymin, r_ymin))
-    overlap = over_x * over_y
+    over_x = max(0_int64, int(min(l_xmax, r_xmax), int64) - int(max(l_xmin, r_xmin), int64))
+    over_y = max(0_int64, int(min(l_ymax, r_ymax), int64) - int(max(l_ymin, r_ymin), int64))
+    overlap = real(over_x, real64) * real(over_y, real64)
 
   end subroutine evaluate_split
 
